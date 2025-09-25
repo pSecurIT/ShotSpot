@@ -31,23 +31,56 @@ coverage/
 *.swo
 *.swn
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # Backend specific
 backend/dist/
 backend/node_modules/
 backend/coverage/
 backend/.env
+backend/scripts/setup-db.sql
+backend/scripts/*-credentials.sql
+backend/scripts/*-secrets.sql
+backend/*.log
+backend/tmp/
 
 # Frontend specific
 frontend/dist/
 frontend/node_modules/
 frontend/coverage/
 frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/build/
+frontend/*.log
 
-# OS files
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Temporary files
+*.tmp
+*.temp
 .DS_Store
 Thumbs.db
+*~
+
+# Local development
+*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+debug.log
+debug/
+
+# Production files
+/build
+/dist
+
+# Package manager locks
+# Uncomment if you want to ignore lock files
+# package-lock.json
+# yarn.lock

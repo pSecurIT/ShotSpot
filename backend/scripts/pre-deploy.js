@@ -3,7 +3,11 @@
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
+const dotenv = require('dotenv');
 const validateEnv = require('../src/utils/validateEnv');
+
+// Load environment variables from .env file
+dotenv.config();
 
 function checkDatabaseConnection() {
   try {
