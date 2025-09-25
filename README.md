@@ -1,4 +1,4 @@
-# Korfball-game-statistics
+# ShotSpot
 
 ## ✅ App Summary
 
@@ -53,9 +53,13 @@ Download/export CSV or PDF report
 
 ## 📱 Tech stack
 
-- Front-end: React.js
+- Front-end: 
+  - React.js with TypeScript
+  - Vite (build tool & dev server)
+  - Vitest for unit testing
+  - Cypress for E2E testing
 - Back-end: Node.js + Express
-- Database: PosgreSQL
+- Database: PostgreSQL
 
 ## 🎨 UX/UI Considerations
 

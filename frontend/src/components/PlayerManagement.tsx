@@ -1,0 +1,162 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+interface Player {
+  id: number;
+  team_id: number;
+  first_name: string;
+  last_name: string;
+  jersey_number: number;
+  position: string;
+  is_active: boolean;
+}
+
+interface Team {
+  id: number;
+  name: string;
+}
+
+const PlayerManagement: React.FC = () => {
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [newPlayer, setNewPlayer] = useState({
+    first_name: '',
+    last_name: '',
+    jersey_number: '',
+    position: '',
+    team_id: ''
+  });
+
+  useEffect(() => {
+    fetchTeams();
+    fetchPlayers();
+  }, []);
+
+  const fetchTeams = async () => {
+    try {
+      const response = await axios.get('http://localhost:3001/api/teams');
+      setTeams(response.data);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+    }
+  };
+
+  const fetchPlayers = async () => {
+    try {
+      const response = await axios.get('http://localhost:3001/api/players');
+      setPlayers(response.data);
+    } catch (error) {
+      console.error('Error fetching players:', error);
+    }
+  };
+
+  const handleAddPlayer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('http://localhost:3001/api/players', {
+        ...newPlayer,
+        jersey_number: parseInt(newPlayer.jersey_number),
+        team_id: parseInt(newPlayer.team_id)
+      });
+      setPlayers([...players, response.data]);
+      setNewPlayer({
+        first_name: '',
+        last_name: '',
+        jersey_number: '',
+        position: '',
+        team_id: ''
+      });
+    } catch (error) {
+      console.error('Error adding player:', error);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setNewPlayer(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  return (
+    <div>
+      <h2>Player Management</h2>
+      
+      <form onSubmit={handleAddPlayer}>
+        <div>
+          <label>Team:</label>
+          <select
+            name="team_id"
+            value={newPlayer.team_id}
+            onChange={handleInputChange}
+            required
+          >
+            <option value="">Select a team</option>
+            {teams.map(team => (
+              <option key={team.id} value={team.id}>{team.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label>First Name:</label>
+          <input
+            type="text"
+            name="first_name"
+            value={newPlayer.first_name}
+            onChange={handleInputChange}
+            required
+          />
+        </div>
+
+        <div>
+          <label>Last Name:</label>
+          <input
+            type="text"
+            name="last_name"
+            value={newPlayer.last_name}
+            onChange={handleInputChange}
+            required
+          />
+        </div>
+
+        <div>
+          <label>Jersey Number:</label>
+          <input
+            type="number"
+            name="jersey_number"
+            value={newPlayer.jersey_number}
+            onChange={handleInputChange}
+            required
+          />
+        </div>
+
+        <div>
+          <label>Position:</label>
+          <input
+            type="text"
+            name="position"
+            value={newPlayer.position}
+            onChange={handleInputChange}
+            required
+          />
+        </div>
+
+        <button type="submit">Add Player</button>
+      </form>
+
+      <div className="players-list">
+        <h3>Players</h3>
+        {players.map(player => (
+          <div key={player.id} className="player-item">
+            {player.first_name} {player.last_name} - #{player.jersey_number}
+            {teams.find(team => team.id === player.team_id)?.name}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default PlayerManagement;
