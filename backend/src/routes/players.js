@@ -51,7 +51,47 @@ router.get('/', async (req, res) => {
     `);
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch players' });
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Get a player by ID with stats
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Get player details and basic stats
+    const result = await db.query(`
+      WITH player_stats AS (
+        SELECT 
+          player_id,
+          COUNT(*) as total_shots,
+          COUNT(CASE WHEN result = 'goal' THEN 1 END) as goals,
+          COUNT(CASE WHEN result = 'miss' THEN 1 END) as misses,
+          COUNT(DISTINCT game_id) as games_played
+        FROM shots
+        WHERE player_id = $1
+        GROUP BY player_id
+      )
+      SELECT 
+        p.*,
+        t.name as team_name,
+        COALESCE(ps.total_shots, 0) as total_shots,
+        COALESCE(ps.goals, 0) as goals,
+        COALESCE(ps.misses, 0) as misses,
+        COALESCE(ps.games_played, 0) as games_played
+      FROM players p
+      LEFT JOIN teams t ON p.team_id = t.id
+      LEFT JOIN player_stats ps ON p.id = ps.player_id
+      WHERE p.id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
 
@@ -70,7 +110,7 @@ router.get('/team/:teamId', async (req, res) => {
 });
 
 // Create a new player
-router.post('/', validatePlayer, async (req, res) => {
+router.post('/', [requireRole(['admin', 'coach']), validatePlayer], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -112,7 +152,7 @@ router.post('/', validatePlayer, async (req, res) => {
 });
 
 // Update a player
-router.put('/:id', validatePlayer, async (req, res) => {
+router.put('/:id', [requireRole(['admin', 'coach']), validatePlayer], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -156,16 +196,40 @@ router.put('/:id', validatePlayer, async (req, res) => {
 });
 
 // Delete a player
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
   const { id } = req.params;
   try {
+    // Begin transaction
+    await db.query('BEGIN');
+
+    // Check if player has participated in any games
+    const gameCheck = await db.query(`
+      SELECT DISTINCT g.id 
+      FROM games g
+      JOIN shots s ON g.id = s.game_id
+      WHERE s.player_id = $1
+      LIMIT 1
+    `, [id]);
+
+    if (gameCheck.rows.length > 0) {
+      await db.query('ROLLBACK');
+      return res.status(409).json({
+        error: 'Cannot delete player',
+        details: 'Player has participated in games. You can set is_active to false instead.'
+      });
+    }
+
     const result = await db.query('DELETE FROM players WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ error: 'Player not found' });
     }
+
+    await db.query('COMMIT');
     res.json({ message: 'Player deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to delete player' });
+    await db.query('ROLLBACK');
+    res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
 

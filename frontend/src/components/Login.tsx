@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../utils/api';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -13,11 +14,13 @@ const Login: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    const result = await login(username, password);
-    if (result.success) {
+    try {
+      const response = await api.post('/auth/login', { username, password });
+      const { token, user } = response.data;
+      login(token, user);
       navigate('/teams');
-    } else {
-      setError(result.error || 'An error occurred');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'An error occurred during login');
     }
   };
 

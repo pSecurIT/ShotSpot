@@ -20,6 +20,7 @@ router.get('/', async (req, res) => {
 
 // Create a new team
 router.post('/', [
+  requireRole(['admin', 'coach']),
   body('name')
     .trim()
     .notEmpty()
@@ -41,12 +42,63 @@ router.post('/', [
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create team' });
+    if (err.code === '23505') { // Unique violation
+      return res.status(409).json({ error: 'Team name already exists' });
+    }
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Get a team by ID
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await db.query('SELECT * FROM teams WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Get team players
+router.get('/:id/players', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // First check if team exists
+    const teamResult = await db.query('SELECT id FROM teams WHERE id = $1', [id]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    const result = await db.query(
+      'SELECT * FROM players WHERE team_id = $1 ORDER BY jersey_number',
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
 
 // Update a team
-router.put('/:id', async (req, res) => {
+router.put('/:id', [
+  requireRole(['admin', 'coach']),
+  body('name')
+    .trim()
+    .notEmpty()
+    .withMessage('Team name is required')
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Team name must be between 2 and 100 characters')
+], async (req, res) => {
+  // Check for validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
   const { id } = req.params;
   const { name } = req.body;
   try {
@@ -59,21 +111,52 @@ router.put('/:id', async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to update team' });
+    if (err.code === '23505') { // Unique violation
+      return res.status(409).json({ error: 'Team name already exists' });
+    }
+    res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
 
 // Delete a team
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', [
+  requireRole(['admin', 'coach'])
+], async (req, res) => {
   const { id } = req.params;
   try {
+    // Begin a transaction
+    await db.query('BEGIN');
+
+    // Check if team has any games
+    const gamesCheck = await db.query(
+      'SELECT id FROM games WHERE home_team_id = $1 OR away_team_id = $1 LIMIT 1',
+      [id]
+    );
+
+    if (gamesCheck.rows.length > 0) {
+      await db.query('ROLLBACK');
+      return res.status(409).json({ 
+        error: 'Cannot delete team',
+        details: 'Team has associated games. Please delete games first.'
+      });
+    }
+
+    // Delete team and associated players
     const result = await db.query('DELETE FROM teams WHERE id = $1 RETURNING *', [id]);
+    
     if (result.rows.length === 0) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ error: 'Team not found' });
     }
-    res.json({ message: 'Team deleted successfully' });
+
+    await db.query('COMMIT');
+    res.json({ 
+      message: 'Team deleted successfully',
+      details: 'All associated players have been removed'
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to delete team' });
+    await db.query('ROLLBACK');
+    res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
 

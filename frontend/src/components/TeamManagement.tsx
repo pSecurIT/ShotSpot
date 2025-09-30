@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 interface Team {
   id: number;
@@ -9,6 +9,7 @@ interface Team {
 const TeamManagement: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [newTeamName, setNewTeamName] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTeams();
@@ -16,9 +17,11 @@ const TeamManagement: React.FC = () => {
 
   const fetchTeams = async () => {
     try {
-      const response = await axios.get('http://localhost:3001/api/teams');
+      setError(null);
+      const response = await api.get('/teams');
       setTeams(response.data);
-    } catch (error) {
+    } catch (error: any) {
+      setError(error.response?.data?.error || 'Error fetching teams');
       console.error('Error fetching teams:', error);
     }
   };
@@ -26,12 +29,14 @@ const TeamManagement: React.FC = () => {
   const handleAddTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:3001/api/teams', {
+      setError(null);
+      const response = await api.post('/teams', {
         name: newTeamName
       });
       setTeams([...teams, response.data]);
       setNewTeamName('');
-    } catch (error) {
+    } catch (error: any) {
+      setError(error.response?.data?.error || 'Error adding team');
       console.error('Error adding team:', error);
     }
   };
@@ -39,6 +44,12 @@ const TeamManagement: React.FC = () => {
   return (
     <div>
       <h2>Team Management</h2>
+      
+      {error && (
+        <div className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>
+          {error}
+        </div>
+      )}
       
       <form onSubmit={handleAddTeam}>
         <input

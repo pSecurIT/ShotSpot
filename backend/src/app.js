@@ -2,9 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import slowDown from 'express-slow-down';
 import authRoutes from './routes/auth.js';
 import teamRoutes from './routes/teams.js';
 import playerRoutes from './routes/players.js';
+import matchEventsRoutes from './routes/match-events.js';
 
 const app = express();
 
@@ -146,6 +148,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);
+app.use('/api/match-events', matchEventsRoutes);
 
 // Global error handling middleware
 app.use((err, req, res, next) => {
