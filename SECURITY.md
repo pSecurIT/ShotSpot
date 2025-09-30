@@ -1,9 +1,56 @@
 # Security Policy
 
-## Security Configuration
+## Reporting Security Issues
 
-### Environment Variables
-Create a `.env` file in both the `backend` and `frontend` directories based on the provided `.env.example` templates. Never commit actual `.env` files to version control.
+If you discover a security vulnerability, please DO NOT create a public issue. Instead:
+
+1. Start a new discussion in the Report security issue section at https://github.com/pSecurIT/ShotSpot/discussions/categories/report-security-issue
+2. Include detailed description and steps to reproduce
+3. Allow up to 48 hours for initial response
+4. Do not disclose publicly until patched
+
+## Security Features
+
+### Authentication
+
+- JWT-based authentication
+- Token rotation every 1 hour
+- Refresh tokens valid for 7 days
+- Rate limiting on auth endpoints
+- Password requirements:
+  - Minimum 12 characters
+  - Mix of uppercase, lowercase, numbers, symbols
+  - Password breach check
+  - Bcrypt hashing with work factor 12
+
+### Authorization
+
+- Role-based access control (RBAC)
+- Roles:
+  - Admin: Full system access
+  - Coach: Team and player management
+  - Assistant: Event recording only
+  - Viewer: Read-only access
+- Resource-level permissions
+- Action audit logging
+
+### API Security
+
+#### Rate Limiting
+- 100 requests per 15 minutes per IP
+- Progressive delays after 50 requests
+- Custom error responses with retry-after headers
+- Separate limits for auth endpoints
+
+#### Request Validation
+- JSON schema validation
+- Input sanitization
+- SQL injection prevention
+- XSS protection
+- File upload restrictions
+
+
+```
 
 ### Database Security
 - Connection pooling is configured with limits to prevent resource exhaustion
@@ -25,41 +72,67 @@ JWT-based authentication with:
 - Password hashing using bcrypt
 - Role-based access control
 
-## Development Security Guidelines
+### Data Protection
 
-1. Never commit sensitive data
-   - Use environment variables for secrets
-   - Follow the `.gitignore` configuration
-   - Regularly audit git history for secrets
+#### Database Security
+- Parameterized queries only
+- Limited database user permissions
+- Connection pooling with limits
+- Regular security audits
+- Encrypted backups
 
-2. Code Security
-   - Use input validation for all user inputs
-   - Implement proper error handling
-   - Follow the principle of least privilege
-   - Keep dependencies updated
+#### Transport Security
+- HTTPS required
+- TLS 1.3 preferred
+- Strong cipher suites
+- HSTS preloading
+- Certificate pinning
 
-3. Testing
-   - Include security test cases
-   - Test for common vulnerabilities
-   - Validate authentication flows
+### Monitoring & Auditing
 
-## Security Contacts
+#### Security Events
+- Failed login attempts
+- Password changes
+- Permission changes
+- Data export requests
+- Admin actions
 
-Report security vulnerabilities to [security@yourcompany.com]
+#### Alerts
+- Unusual traffic patterns
+- Multiple failed logins
+- Unauthorized access attempts
+- Database connection issues
+- Certificate expiration warnings
+
+## Security Checklist
+
+### Development
+- [ ] Dependencies scanned for vulnerabilities
+- [ ] Security linting enabled
+- [ ] SAST/DAST tools configured
+- [ ] Secrets detection in commits
+- [ ] Code review security checklist
+
+### Deployment
+- [ ] Environment variables verified
+- [ ] Production configurations tested
+- [ ] SSL/TLS certificates valid
+- [ ] Firewall rules configured
+- [ ] Logging enabled and verified
+
+### Maintenance
+- [ ] Regular security updates
+- [ ] Dependency audits
+- [ ] Log review procedures
+- [ ] Incident response plan
+- [ ] Backup verification
 
 ## Incident Response
 
-1. Immediate Actions
-   - Remove sensitive data if exposed
-   - Rotate compromised credentials
-   - Document the incident
+### Steps
+1. Identify and isolate affected systems
+2. Document incident details
+3. Assess impact and data exposure
+4. Implement fixes and patches
+5. Review and improve security measures
 
-2. Investigation
-   - Review security logs
-   - Analyze attack vectors
-   - Document findings
-
-3. Prevention
-   - Update security measures
-   - Implement additional controls
-   - Update documentation
