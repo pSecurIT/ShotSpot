@@ -1,0 +1,21 @@
+{
+  "name": "shotspot",
+  "version": "1.0.0",
+  "description": "ShotSpot - Korfball Game Statistics Application",
+  "scripts": {
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "setup-db": "cd backend && npm run setup-db",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "test": "cd backend && npm test",
+    "test:watch": "cd backend && npm run test:watch",
+    "test:coverage": "cd backend && npm run test:coverage"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.1"
+  }
+}

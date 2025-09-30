@@ -13,37 +13,28 @@
 ## 🧱 Core Features (MVP)
 ### 1. Team & Player Management
 
-Add players, assign to teams
-
-Set starting lineup and substitutes
-
-Edit players’ info
+- Add players, assign to teams
+- Set starting lineup and substitutes
+- Edit players’ info
 
 ### 2. Live Match Dashboard
 
-Game timer (with periods and pause)
-
-Real-time event buttons:
-
-Shot attempt → pick player → select location → result (goal/miss/hit korf)
-
-Faults → player/team → fault type
-
-Substitution → in/out player
-
-Visual half-court or full-court map for shot tracking
+- Game timer (with periods and pause)
+- Real-time event buttons:
+- Shot attempt → pick player → select location → result (goal/miss/hit korf)
+- Faults → player/team → fault type
+- Substitution → in/out player
+- Visual half-court or full-court map for shot tracking
 
 ### 3. Event History / Match Log
 
-Timeline of all events
-
-Ability to edit/delete events in real-time
+- Timeline of all events
+- Ability to edit/delete events in real-time
 
 ### 4. Analytics & Export
 
-Summarized match stats (per player, team)
-
-Download/export CSV or PDF report
+- Summarized match stats (per player, team)
+- Download/export CSV or PDF report
 
 ## 🎯 Target Users
 

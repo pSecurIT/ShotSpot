@@ -1,13 +1,1 @@
-.App {
-  text-align: center;
-}
-
-.App-header {
-  background-color: #282c34;
-  padding: 20px;
-  color: white;
-}
-
-main {
-  padding: 20px;
-}
+@import './styles/main.css';

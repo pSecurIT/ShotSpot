@@ -81,6 +81,32 @@ debug/
 /dist
 
 # Package manager locks
-# Uncomment if you want to ignore lock files
+# Keep lock files for consistent installs
 # package-lock.json
 # yarn.lock
+
+# Test databases
+backend/test.db
+backend/test.sqlite
+backend/*.db-journal
+
+# Local configuration overrides
+backend/config.local.js
+frontend/config.local.ts
+
+# Generated TypeScript types
+frontend/src/types/generated/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.npm/
+
+# Test snapshots
+**/__snapshots__/
+**/*.snap
+
+# Local certificates
+*.pem
+*.key
+*.crt

@@ -1,4 +1,5 @@
-const { Pool } = require('pg');
+import pkg from 'pg';
+const { Pool } = pkg;
 
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -45,7 +46,7 @@ const healthCheck = async () => {
   }
 };
 
-module.exports = {
+export default {
   query,
   healthCheck,
   pool // Exported for testing purposes
