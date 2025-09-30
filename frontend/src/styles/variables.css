@@ -1,0 +1,38 @@
+:root {
+  /* Color Palette - Fresh and Sporty */
+  --primary-color: #2962ff;      /* Vibrant blue for primary actions */
+  --secondary-color: #00c853;    /* Energy green for success/progress */
+  --accent-color: #ff3d00;       /* Dynamic orange for highlights/alerts */
+  --background-light: #f5f7fa;   /* Light gray background */
+  --background-dark: #1a1a1a;    /* Dark mode background */
+  --text-primary: #2c3e50;       /* Main text color */
+  --text-secondary: #666666;     /* Secondary text color */
+  --text-light: #ffffff;         /* Light text for dark backgrounds */
+  --border-color: #e0e6ed;       /* Subtle borders */
+  
+  /* Typography */
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Montserrat', var(--font-primary);
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  
+  /* Border Radius */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+}

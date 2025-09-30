@@ -1,23 +1,48 @@
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import TeamManagement from './components/TeamManagement';
 import PlayerManagement from './components/PlayerManagement';
+import Login from './components/Login';
+import Register from './components/Register';
+import ProtectedRoute from './components/ProtectedRoute';
+import Navigation from './components/Navigation.tsx';
 
-function App() {
+const App: React.FC = () => {
   return (
-    <Router>
-      <div className="App">
-        <header className="App-header">
-          <h1>Korfball Game Statistics</h1>
-        </header>
-        <main>
-          <Routes>
-            <Route path="/teams" element={<TeamManagement />} />
-            <Route path="/players" element={<PlayerManagement />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="App">
+          <header className="App-header">
+            <h1>ShotSpot - Korfball Statistics</h1>
+            <Navigation />
+          </header>
+          <main>
+            <Routes>
+              <Route path="/" element={<Navigate to="/teams" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route 
+                path="/teams" 
+                element={
+                  <ProtectedRoute>
+                    <TeamManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/players" 
+                element={
+                  <ProtectedRoute>
+                    <PlayerManagement />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+          </main>
+        </div>
+      </Router>
+    </AuthProvider>
   );
-}
+};
 
 export default App;

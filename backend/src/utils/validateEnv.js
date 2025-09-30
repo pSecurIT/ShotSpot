@@ -67,8 +67,9 @@ function validateEnvVars() {
 }
 
 // Execute validation if this file is run directly
-if (require.main === module) {
+import { fileURLToPath } from 'url';
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   validateEnvVars();
 }
 
-module.exports = validateEnvVars;
+export default validateEnvVars;

@@ -1,6 +1,12 @@
-const express = require('express');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import db from '../db.js';
+import { auth, requireRole } from '../middleware/auth.js';
+
 const router = express.Router();
-const db = require('../db');
+
+// Apply authentication middleware to all routes
+router.use(auth);
 
 // Get all teams
 router.get('/', async (req, res) => {
@@ -13,7 +19,20 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new team
-router.post('/', async (req, res) => {
+router.post('/', [
+  body('name')
+    .trim()
+    .notEmpty()
+    .withMessage('Team name is required')
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Team name must be between 2 and 100 characters')
+], async (req, res) => {
+  // Check for validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
   const { name } = req.body;
   try {
     const result = await db.query(
@@ -58,4 +77,4 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
