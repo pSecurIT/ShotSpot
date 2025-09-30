@@ -3,10 +3,24 @@ import { exec } from 'child_process';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { promisify } from 'util';
 import readline from 'readline';
 
-dotenv.config();
+// Set up proper paths for environment file
+const scriptPath = fileURLToPath(import.meta.url);
+const scriptDir = dirname(scriptPath);
+const envPath = path.join(scriptDir, '..', '.env');
+
+// Load environment variables from the correct path
+dotenv.config({ path: envPath });
+
+// Verify environment variables are loaded
+if (!process.env.DB_USER || !process.env.DB_NAME) {
+  console.error('Failed to load environment variables from:', envPath);
+  console.error('Please ensure the .env file exists and contains the required variables.');
+  process.exit(1);
+}
 const execPromise = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,12 +54,29 @@ async function getPostgresPassword() {
   return password;
 }
 
+
+
+// Extract database configuration from environment
+const dbConfig = {
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  name: process.env.DB_NAME,
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT
+};
+
+// Verify required configuration
+if (!dbConfig.user || !dbConfig.password || !dbConfig.name) {
+  console.error('Missing required database configuration');
+  process.exit(1);
+}
+
 // Create temporary SQL file with the password from environment
 const setupSQL = `
 -- Terminate existing connections to the database
 SELECT pg_terminate_backend(pid)
 FROM pg_stat_activity
-WHERE datname = '${DB_NAME}'
+WHERE datname = '${dbConfig.name}'
   AND pid <> pg_backend_pid();
 
 -- Drop and recreate database
@@ -65,9 +96,30 @@ BEGIN
 END
 $$;
 
--- Create new user and database
-CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';
-CREATE DATABASE ${DB_NAME} WITH OWNER = ${DB_USER};
+-- Drop existing connections and recreate user with new password
+DO $$
+BEGIN
+  -- Terminate existing connections
+  PERFORM pg_terminate_backend(pid) 
+  FROM pg_stat_activity 
+  WHERE usename = '${dbConfig.user}';
+
+  -- Recreate user with new password
+  DROP USER IF EXISTS ${dbConfig.user};
+  CREATE USER ${dbConfig.user} WITH PASSWORD '${dbConfig.password}' LOGIN;
+END
+$$;
+
+-- Recreate database
+DROP DATABASE IF EXISTS ${dbConfig.name};
+CREATE DATABASE ${dbConfig.name} WITH OWNER = ${dbConfig.user};
+
+-- Connect to the new database and set up permissions
+\\c ${DB_NAME}
+
+-- Grant all privileges
+GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
+ALTER USER ${DB_USER} WITH SUPERUSER;
 
 -- Connect to the new database
 \\c ${DB_NAME}
@@ -95,7 +147,6 @@ async function executeSqlFile(file, password) {
     return;
   }
   
-  console.log(`Executing ${file}...`);
   // Use environment variable instead of setting it in command
   const options = {
     env: {
@@ -106,23 +157,44 @@ async function executeSqlFile(file, password) {
   const command = `psql -U postgres -d ${DB_NAME} -f "${filePath}"`;
   const { stdout, stderr } = await execPromise(command, options);
   
-  if (stderr) {
+  if (stderr && !stderr.includes('NOTICE')) {
     console.warn(`Warnings while executing ${file}:`, stderr);
   }
-  console.log(`Successfully executed ${file}:`, stdout);
 }
 
 async function main() {
   try {
-    // Get postgres password once
-    const postgresPassword = await getPostgresPassword();
+    // Get environment variables
+    const postgresPassword = process.env.POSTGRES_PASSWORD;
+    const appDbUser = process.env.APP_DB_USER;
+    const appDbPassword = process.env.APP_DB_PASSWORD;
+
+    // Validate environment variables
+    const missingVars = [];
+    if (!postgresPassword) missingVars.push('POSTGRES_PASSWORD');
+    if (!appDbUser) missingVars.push('APP_DB_USER');
+    if (!appDbPassword) missingVars.push('APP_DB_PASSWORD');
+
+    if (missingVars.length > 0) {
+      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    }
+
+    // Validate credential format
+    if (typeof postgresPassword !== 'string' || postgresPassword.length === 0) {
+      throw new Error('POSTGRES_PASSWORD must be a non-empty string');
+    }
+    if (typeof appDbPassword !== 'string' || appDbPassword.length === 0) {
+      throw new Error('APP_DB_PASSWORD must be a non-empty string');
+    }
+    if (typeof appDbUser !== 'string' || appDbUser.length === 0) {
+      throw new Error('APP_DB_USER must be a non-empty string');
+    }
     const tempFile = path.join(__dirname, 'temp-setup.sql');
     
     // Create temporary setup file
     await fs.writeFile(tempFile, setupSQL);
 
     // Execute the setup SQL
-    console.log('Setting up database...');
     try {
       const options = {
         env: {
@@ -132,10 +204,9 @@ async function main() {
       };
       const command = `psql -U postgres -f "${tempFile}"`;
       const { stdout, stderr } = await execPromise(command, options);
-      if (stderr) {
+      if (stderr && !stderr.includes('NOTICE')) {
         console.warn('Database setup warnings:', stderr);
       }
-      console.log('Database setup complete:', stdout);
     } finally {
       // Always clean up the temporary file
       try {

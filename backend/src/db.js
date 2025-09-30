@@ -1,15 +1,47 @@
 import pkg from 'pg';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Load environment variables
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, '..', '.env') });
+
 const { Pool } = pkg;
 
-const pool = new Pool({
+// Log the configuration (without sensitive data)
+console.log('Database configuration:', {
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
+  hasPassword: !!process.env.DB_PASSWORD,
+  max: parseInt(process.env.DB_MAX_CONNECTIONS) || 20,
+  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
+});
+
+// Validate required database configuration
+const requiredDbConfig = {
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-  max: parseInt(process.env.DB_MAX_CONNECTIONS) || 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT_MS) || 30000, // How long a client is allowed to remain idle before being closed
-  connectionTimeoutMillis: 2000, // How long to wait for a connection
+  port: parseInt(process.env.DB_PORT) || 5432
+};
+
+// Validate all required fields are present
+Object.entries(requiredDbConfig).forEach(([key, value]) => {
+  if (!value) {
+    throw new Error(`Missing required database configuration: ${key}`);
+  }
+});
+
+const pool = new Pool({
+  ...requiredDbConfig,
+  max: parseInt(process.env.DB_MAX_CONNECTIONS) || 20,
+  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
+  connectionTimeoutMillis: 2000,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false
 });
 
@@ -18,6 +50,24 @@ pool.on('error', (err, client) => {
   console.error('Unexpected error on idle client', err);
   process.exit(-1);
 });
+
+// Test connection on startup
+(async () => {
+  try {
+    const client = await pool.connect();
+    console.log('Successfully connected to the database');
+    client.release();
+  } catch (err) {
+    console.error('Error connecting to the database:', err.message);
+    console.error('Connection details:', {
+      user: process.env.DB_USER,
+      host: process.env.DB_HOST,
+      database: process.env.DB_NAME,
+      port: process.env.DB_PORT,
+      hasPassword: !!process.env.DB_PASSWORD
+    });
+  }
+})();
 
 const query = async (text, params) => {
   const client = await pool.connect();

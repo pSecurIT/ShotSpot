@@ -6,6 +6,13 @@ import app from './app.js';
 dotenv.config();
 validateEnv();
 
+// Test database connection before starting server
+import db from './db.js';
+await db.healthCheck().catch(err => {
+  console.error('Failed to connect to database:', err);
+  process.exit(1);
+});
+
 const PORT = process.env.PORT || 3002;
 
 app.listen(PORT, () => {

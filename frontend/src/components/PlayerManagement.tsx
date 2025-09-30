@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 interface Player {
   id: number;
@@ -34,26 +34,26 @@ const PlayerManagement: React.FC = () => {
 
   const fetchTeams = async () => {
     try {
-      const response = await axios.get('http://localhost:3001/api/teams');
+      const response = await api.get('/teams');
       setTeams(response.data);
-    } catch (error) {
-      console.error('Error fetching teams:', error);
+    } catch (error: any) {
+      console.error('Error fetching teams:', error.response?.data?.error || error.message);
     }
   };
 
   const fetchPlayers = async () => {
     try {
-      const response = await axios.get('http://localhost:3001/api/players');
+      const response = await api.get('/players');
       setPlayers(response.data);
-    } catch (error) {
-      console.error('Error fetching players:', error);
+    } catch (error: any) {
+      console.error('Error fetching players:', error.response?.data?.error || error.message);
     }
   };
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:3001/api/players', {
+      const response = await api.post('/players', {
         ...newPlayer,
         jersey_number: parseInt(newPlayer.jersey_number),
         team_id: parseInt(newPlayer.team_id)
@@ -66,8 +66,8 @@ const PlayerManagement: React.FC = () => {
         position: '',
         team_id: ''
       });
-    } catch (error) {
-      console.error('Error adding player:', error);
+    } catch (error: any) {
+      console.error('Error adding player:', error.response?.data?.error || error.message);
     }
   };
 

@@ -32,9 +32,24 @@ function validateEnvVars() {
     insecure.push('JWT_SECRET (too short, minimum 32 characters)');
   }
 
-  if (process.env.DB_PASSWORD && process.env.DB_PASSWORD.length < 12) {
+  // Validate database password
+  if (!process.env.DB_PASSWORD) {
+    insecure.push('DB_PASSWORD is required');
+  } else if (typeof process.env.DB_PASSWORD !== 'string') {
+    insecure.push('DB_PASSWORD must be a string');
+  } else if (process.env.DB_PASSWORD.length < 12) {
     insecure.push('DB_PASSWORD (too short, minimum 12 characters)');
   }
+  
+  // Log database configuration for debugging
+  console.log('Database configuration validation:', {
+    DB_USER: process.env.DB_USER,
+    DB_HOST: process.env.DB_HOST,
+    DB_NAME: process.env.DB_NAME,
+    DB_PORT: process.env.DB_PORT,
+    hasPassword: !!process.env.DB_PASSWORD,
+    passwordType: typeof process.env.DB_PASSWORD
+  });
 
   // Validate numeric values
   const numericVars = ['PORT', 'DB_PORT', 'DB_MAX_CONNECTIONS', 'DB_IDLE_TIMEOUT_MS', 'RATE_LIMIT_MAX'];
