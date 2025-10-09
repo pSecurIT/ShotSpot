@@ -16,6 +16,6 @@
     "test:coverage": "cd backend && npm run test:coverage"
   },
   "devDependencies": {
-    "concurrently": "^8.2.1"
+    "concurrently": "^9.2.1"
   }
 }
