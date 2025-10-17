@@ -29,12 +29,12 @@ const validatePlayer = [
     .withMessage('Jersey number is required')
     .isInt({ min: 1, max: 99 })
     .withMessage('Jersey number must be between 1 and 99'),
-  body('position')
+  body('role')
     .trim()
     .notEmpty()
-    .withMessage('Position is required')
-    .isIn(['attack', 'defense'])
-    .withMessage('Position must be either attack or defense')
+    .withMessage('Role is required')
+    .isIn(['Captain', 'Player'])
+    .withMessage('Role must be either Captain or Player')
 ];
 
 // Apply authentication middleware to all routes
@@ -116,7 +116,7 @@ router.post('/', [requireRole(['admin', 'coach']), validatePlayer], async (req, 
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { team_id, first_name, last_name, jersey_number, position } = req.body;
+  const { team_id, first_name, last_name, jersey_number, role } = req.body;
   
   try {
     // Check for duplicate jersey number in the same team
@@ -139,7 +139,7 @@ router.post('/', [requireRole(['admin', 'coach']), validatePlayer], async (req, 
 
     const result = await db.query(
       'INSERT INTO players (team_id, first_name, last_name, jersey_number, position) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [team_id, first_name, last_name, jersey_number, position]
+      [team_id, first_name, last_name, jersey_number, role]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -159,7 +159,7 @@ router.put('/:id', [requireRole(['admin', 'coach']), validatePlayer], async (req
   }
 
   const { id } = req.params;
-  const { team_id, first_name, last_name, jersey_number, position, is_active } = req.body;
+  const { team_id, first_name, last_name, jersey_number, role, is_active } = req.body;
   
   try {
     // Check for duplicate jersey number in the same team, excluding current player
@@ -180,7 +180,7 @@ router.put('/:id', [requireRole(['admin', 'coach']), validatePlayer], async (req
            jersey_number = $4, position = $5, is_active = $6,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $7 RETURNING *`,
-      [team_id, first_name, last_name, jersey_number, position, is_active, id]
+      [team_id, first_name, last_name, jersey_number, role, is_active, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Player not found' });

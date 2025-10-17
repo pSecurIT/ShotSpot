@@ -7,9 +7,11 @@ interface Player {
   first_name: string;
   last_name: string;
   jersey_number: number;
-  position: string;
+  role: string;
   is_active: boolean;
 }
+
+type PlayerRole = 'captain' | 'player';
 
 interface Team {
   id: number;
@@ -23,7 +25,7 @@ const PlayerManagement: React.FC = () => {
     first_name: '',
     last_name: '',
     jersey_number: '',
-    position: '',
+    role: 'player',
     team_id: ''
   });
 
@@ -63,7 +65,7 @@ const PlayerManagement: React.FC = () => {
         first_name: '',
         last_name: '',
         jersey_number: '',
-        position: '',
+        role: '',
         team_id: ''
       });
     } catch (error: any) {
@@ -133,25 +135,30 @@ const PlayerManagement: React.FC = () => {
         </div>
 
         <div>
-          <label>Position:</label>
-          <input
-            type="text"
-            name="position"
-            value={newPlayer.position}
+          <label>Role:</label>
+          <select
+            name="role"
+            value={newPlayer.role}
             onChange={handleInputChange}
             required
-          />
+          >
+            <option value="Player">Player</option>
+            <option value="Captain">Captain</option>
+          </select>
         </div>
 
-        <button type="submit">Add Player</button>
+        <button type="submit" className="primary-button">
+          Add Player
+        </button>
       </form>
 
       <div className="players-list">
         <h3>Players</h3>
         {players.map(player => (
           <div key={player.id} className="player-item">
-            {player.first_name} {player.last_name} - #{player.jersey_number}
-            {teams.find(team => team.id === player.team_id)?.name}
+            {player.first_name} {player.last_name} - #{player.jersey_number} - {player.role}
+            {teams.find(team => team.id === player.team_id)?.name && 
+              ` - Team: ${teams.find(team => team.id === player.team_id)?.name}`}
           </div>
         ))}
       </div>
