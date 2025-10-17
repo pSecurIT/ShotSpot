@@ -20,8 +20,9 @@ const TeamManagement: React.FC = () => {
       setError(null);
       const response = await api.get('/teams');
       setTeams(response.data);
-    } catch (error: any) {
-      setError(error.response?.data?.error || 'Error fetching teams');
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string } }; message?: string };
+      setError(err.response?.data?.error || 'Error fetching teams');
       console.error('Error fetching teams:', error);
     }
   };
@@ -35,8 +36,9 @@ const TeamManagement: React.FC = () => {
       });
       setTeams([...teams, response.data]);
       setNewTeamName('');
-    } catch (error: any) {
-      setError(error.response?.data?.error || 'Error adding team');
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string } }; message?: string };
+      setError(err.response?.data?.error || 'Error adding team');
       console.error('Error adding team:', error);
     }
   };

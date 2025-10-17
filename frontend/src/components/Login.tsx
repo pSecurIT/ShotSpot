@@ -20,7 +20,7 @@ const Login: React.FC = () => {
       } else {
         setError(result.error || 'An error occurred during login');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Login error:', err);
       setError('An unexpected error occurred during login');
     }
