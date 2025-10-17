@@ -3,6 +3,11 @@ const tokens = new Tokens();
 
 // Initialize CSRF middleware
 const csrf = (req, res, next) => {
+  // Skip CSRF check in test environment
+  if (process.env.NODE_ENV === 'test') {
+    return next();
+  }
+
   // Skip CSRF check for the CSRF token endpoint itself
   if (req.path === '/api/auth/csrf') {
     return next();

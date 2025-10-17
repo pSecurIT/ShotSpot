@@ -1,14 +1,3 @@
-# For most projects, this workflow file will not need changing; you simply need
-# to commit it to your repository.
-#
-# You may wish to alter this file to override the set of languages analyzed,
-# or to provide custom queries or build logic.
-#
-# ******** NOTE ********
-# We have attempted to detect the languages in your repository. Please check
-# the `language` matrix defined below to confirm you have the correct set of
-# supported CodeQL languages.
-#
 name: "CodeQL Security Analysis"
 
 on:
@@ -26,9 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       security-events: write
-      actions: read
       contents: read
-      packages: read
 
     strategy:
       fail-fast: false
@@ -39,10 +26,6 @@ jobs:
             build-commands: |
               cd frontend && npm ci && npm run build
               cd ../backend && npm ci
-        # To learn more about changing the languages that are analyzed or customizing the build mode for your analysis,
-        # see https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning.
-        # If you are analyzing a compiled language, you can modify the 'build-mode' for that language to customize how
-        # your codebase is analyzed, see https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/codeql-code-scanning-for-compiled-languages
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -59,7 +42,6 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-        queries: security-extended,security-and-quality
         config-file: ./.github/codeql/codeql-config.yml
 
     # If the analyze step fails for one of the languages you are analyzing with

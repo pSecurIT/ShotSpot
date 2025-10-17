@@ -1,0 +1,281 @@
+import request from 'supertest';
+import app from '../src/app.js';
+import db from '../src/db.js';
+import { generateTestToken } from './helpers/testHelpers.js';
+
+describe('Player Routes', () => {
+  let testTeamId;
+
+  let authToken;
+
+  beforeAll(async () => {
+    // Generate test auth token with coach role
+    authToken = generateTestToken('coach');
+
+    // Create a test team to use for player tests
+    const teamRes = await db.query(
+      'INSERT INTO teams (name) VALUES ($1) RETURNING id',
+      ['Test Team']
+    );
+    testTeamId = teamRes.rows[0].id;
+  });
+
+  beforeEach(async () => {
+    // Clear the players table before each test
+    await db.query('DELETE FROM players');
+  });
+
+  afterAll(async () => {
+    // Clean up test data
+    await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
+    // Pool will be closed by global teardown
+  });
+
+  describe('GET /api/players', () => {
+    it('should return an empty array when no players exist', async () => {
+      const response = await request(app)
+        .get('/api/players')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect('Content-Type', /json/)
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+
+    it('should return all players', async () => {
+      // Insert test players
+      await db.query(
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
+        [testTeamId, 'John', 'Doe', 10, 'Player']
+      );
+      await db.query(
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
+        [testTeamId, 'Jane', 'Smith', 20, 'Captain']
+      );
+
+      const response = await request(app)
+        .get('/api/players')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect('Content-Type', /json/)
+        .expect(200);
+
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0].first_name).toBe('John');
+      expect(response.body[1].first_name).toBe('Jane');
+    });
+
+    it('should filter players by team_id', async () => {
+      // Insert players for different teams
+      await db.query(
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
+        [testTeamId, 'John', 'Doe', 10, 'Player']
+      );
+
+      const otherTeamRes = await db.query(
+        'INSERT INTO teams (name) VALUES ($1) RETURNING id',
+        ['Other Team']
+      );
+      const otherTeamId = otherTeamRes.rows[0].id;
+
+      await db.query(
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
+        [otherTeamId, 'Jane', 'Smith', 20, 'Player']
+      );
+
+      const response = await request(app)
+        .get(`/api/players?team_id=${testTeamId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect('Content-Type', /json/)
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].first_name).toBe('John');
+
+      // Clean up
+      await db.query('DELETE FROM teams WHERE id = $1', [otherTeamId]);
+    });
+  });
+
+  describe('POST /api/players', () => {
+    it('should create a new player', async () => {
+      const newPlayer = {
+        team_id: testTeamId,
+        first_name: 'Test',
+        last_name: 'Player',
+        jersey_number: 30,
+        role: 'player'
+      };
+
+      const response = await request(app)
+        .post('/api/players')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .send(newPlayer)
+        .expect('Content-Type', /json/)
+        .expect(201);
+
+      expect(response.body.first_name).toBe('Test');
+      expect(response.body.last_name).toBe('Player');
+      expect(response.body.jersey_number).toBe(30);
+      expect(response.body.team_id).toBe(testTeamId);
+
+      // Verify player was created in database
+      const dbResponse = await db.query('SELECT * FROM players WHERE id = $1', [response.body.id]);
+      expect(dbResponse.rows[0].first_name).toBe('Test');
+    });
+
+    it('should validate required fields', async () => {
+      const response = await request(app)
+        .post('/api/players')
+        .send({
+          team_id: testTeamId,
+          // Missing first_name and last_name
+          jersey_number: 30,
+          role: 'player'
+        })
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect('Content-Type', /json/)
+        .expect(400);
+
+      expect(response.body.errors).toBeDefined();
+    });
+
+    it('should validate jersey number uniqueness within team', async () => {
+      // Create first player
+      await request(app)
+        .post('/api/players')
+        .send({
+          team_id: testTeamId,
+          first_name: 'First',
+          last_name: 'Player',
+          jersey_number: 30,
+          role: 'player'
+        })
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect(201);
+
+      // Try to create second player with same jersey number in same team
+      const response = await request(app)
+        .post('/api/players')
+        .send({
+          team_id: testTeamId,
+          first_name: 'Second',
+          last_name: 'Player',
+          jersey_number: 30,
+          role: 'player'
+        })
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect(409);
+
+      expect(response.body.error).toContain('Jersey number');
+    });
+  });
+
+  describe('PUT /api/players/:id', () => {
+    it('should update an existing player', async () => {
+      // Create a player first
+      const createRes = await request(app)
+        .post('/api/players')
+        .send({
+          team_id: testTeamId,
+          first_name: 'Old',
+          last_name: 'Name',
+          jersey_number: 30,
+          role: 'player'
+        })
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect(201);
+
+      const playerId = createRes.body.id;
+
+      // Update the player
+      const response = await request(app)
+        .put(`/api/players/${playerId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          team_id: testTeamId,
+          first_name: 'New',
+          last_name: 'Name',
+          jersey_number: 31,
+          role: 'captain'
+        })
+        .expect('Content-Type', /json/)
+        .expect(200);
+
+      expect(response.body.first_name).toBe('New');
+      expect(response.body.last_name).toBe('Name');
+      expect(response.body.jersey_number).toBe(31);
+      expect(response.body.role).toBe('captain');
+
+      // Verify update in database
+      const dbResponse = await db.query('SELECT * FROM players WHERE id = $1', [playerId]);
+      expect(dbResponse.rows[0].first_name).toBe('New');
+    });
+
+    it('should return 404 for non-existent player', async () => {
+      const response = await request(app)
+        .put('/api/players/999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          team_id: testTeamId,
+          first_name: 'New',
+          last_name: 'Name',
+          jersey_number: 31,
+          role: 'player'
+        })
+        .expect('Content-Type', /json/)
+        .expect(404);
+
+      expect(response.body.error).toContain('not found');
+    });
+  });
+
+  describe('DELETE /api/players/:id', () => {
+    it('should delete an existing player', async () => {
+      // Create a player first
+      const createRes = await request(app)
+        .post('/api/players')
+        .send({
+          team_id: testTeamId,
+          first_name: 'To',
+          last_name: 'Delete',
+          jersey_number: 99,
+          role: 'player'
+        })
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect(201);
+
+      const playerId = createRes.body.id;
+
+      // Delete the player
+      await request(app)
+        .delete(`/api/players/${playerId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect(204);
+
+      // Verify player was deleted
+      const dbResponse = await db.query('SELECT * FROM players WHERE id = $1', [playerId]);
+      expect(dbResponse.rows).toHaveLength(0);
+    });
+
+    it('should return 404 for non-existent player', async () => {
+      const response = await request(app)
+        .delete('/api/players/999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect('Content-Type', /json/)
+        .expect(404);
+
+      expect(response.body.error).toContain('not found');
+    });
+  });
+});
