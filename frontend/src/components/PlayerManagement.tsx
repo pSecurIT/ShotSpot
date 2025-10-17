@@ -11,8 +11,6 @@ interface Player {
   is_active: boolean;
 }
 
-type PlayerRole = 'captain' | 'player';
-
 interface Team {
   id: number;
   name: string;
