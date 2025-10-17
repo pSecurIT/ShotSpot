@@ -36,8 +36,9 @@ const PlayerManagement: React.FC = () => {
     try {
       const response = await api.get('/teams');
       setTeams(response.data);
-    } catch (error: any) {
-      console.error('Error fetching teams:', error.response?.data?.error || error.message);
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string } }; message?: string };
+      console.error('Error fetching teams:', err.response?.data?.error || err.message);
     }
   };
 
@@ -45,8 +46,9 @@ const PlayerManagement: React.FC = () => {
     try {
       const response = await api.get('/players');
       setPlayers(response.data);
-    } catch (error: any) {
-      console.error('Error fetching players:', error.response?.data?.error || error.message);
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string } }; message?: string };
+      console.error('Error fetching players:', err.response?.data?.error || err.message);
     }
   };
 
@@ -66,8 +68,9 @@ const PlayerManagement: React.FC = () => {
         role: '',
         team_id: ''
       });
-    } catch (error: any) {
-      console.error('Error adding player:', error.response?.data?.error || error.message);
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string } }; message?: string };
+      console.error('Error adding player:', err.response?.data?.error || err.message);
     }
   };
 

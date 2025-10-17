@@ -24,7 +24,7 @@
     "express-rate-limit": "^7.5.1",
     "express-session": "^1.18.2",
     "express-slow-down": "^3.0.0",
-    "express-validator": "^7.0.1",
+    "express-validator": "^13.12.0",
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.3"

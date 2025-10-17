@@ -26,8 +26,9 @@ const UserManagement: React.FC = () => {
       setError(null);
       const response = await api.get('/users');
       setUsers(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch users');
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to fetch users');
     }
   };
 
@@ -36,7 +37,7 @@ const UserManagement: React.FC = () => {
       setError(null);
       setSuccess(null);
 
-      // Don't allow changing own role
+      // Don&apos;t allow changing own role
       if (userId === currentUser?.id) {
         setError('Cannot change your own role');
         return;
@@ -45,8 +46,9 @@ const UserManagement: React.FC = () => {
       await api.put(`/users/${userId}/role`, { role: newRole });
       setSuccess('User role updated successfully');
       fetchUsers(); // Refresh user list
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update user role');
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to update user role');
     }
   };
 

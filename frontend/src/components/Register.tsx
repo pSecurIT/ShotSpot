@@ -51,9 +51,10 @@ const Register: React.FC = () => {
         password: formData.password
       });
       navigate('/login');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 
-        (err.response?.data?.errors ? err.response.data.errors[0].msg : 'Registration failed'));
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string; errors?: Array<{ msg: string }> } } };
+      setError(error.response?.data?.error || 
+        (error.response?.data?.errors ? error.response.data.errors[0].msg : 'Registration failed'));
     }
   };
 
