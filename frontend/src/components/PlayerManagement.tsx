@@ -19,6 +19,7 @@ interface Team {
 const PlayerManagement: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [error, setError] = useState<string>('');
   const [newPlayer, setNewPlayer] = useState({
     first_name: '',
     last_name: '',
@@ -54,6 +55,7 @@ const PlayerManagement: React.FC = () => {
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     try {
       const response = await api.post('/players', {
         ...newPlayer,
@@ -70,6 +72,8 @@ const PlayerManagement: React.FC = () => {
       });
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to add player';
+      setError(errorMessage);
       console.error('Error adding player:', err.response?.data?.error || err.message);
     }
   };
@@ -86,10 +90,13 @@ const PlayerManagement: React.FC = () => {
     <div>
       <h2>Player Management</h2>
       
+      {error && <div className="error-message">{error}</div>}
+      
       <form onSubmit={handleAddPlayer}>
         <div>
-          <label>Team:</label>
+          <label htmlFor="team_id">Team:</label>
           <select
+            id="team_id"
             name="team_id"
             value={newPlayer.team_id}
             onChange={handleInputChange}
@@ -103,8 +110,9 @@ const PlayerManagement: React.FC = () => {
         </div>
 
         <div>
-          <label>First Name:</label>
+          <label htmlFor="first_name">First Name:</label>
           <input
+            id="first_name"
             type="text"
             name="first_name"
             value={newPlayer.first_name}
@@ -114,8 +122,9 @@ const PlayerManagement: React.FC = () => {
         </div>
 
         <div>
-          <label>Last Name:</label>
+          <label htmlFor="last_name">Last Name:</label>
           <input
+            id="last_name"
             type="text"
             name="last_name"
             value={newPlayer.last_name}
@@ -125,8 +134,9 @@ const PlayerManagement: React.FC = () => {
         </div>
 
         <div>
-          <label>Jersey Number:</label>
+          <label htmlFor="jersey_number">Jersey Number:</label>
           <input
+            id="jersey_number"
             type="number"
             name="jersey_number"
             value={newPlayer.jersey_number}
@@ -136,8 +146,9 @@ const PlayerManagement: React.FC = () => {
         </div>
 
         <div>
-          <label>Role:</label>
+          <label htmlFor="role">Role:</label>
           <select
+            id="role"
             name="role"
             value={newPlayer.role}
             onChange={handleInputChange}
