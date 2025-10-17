@@ -33,11 +33,11 @@ describe('Team Routes', () => {
 
     it('should return all teams', async () => {
       // Insert test teams
-      const team1 = await db.query(
+      await db.query(
         'INSERT INTO teams (name) VALUES ($1) RETURNING *',
         ['Team Alpha']
       );
-      const team2 = await db.query(
+      await db.query(
         'INSERT INTO teams (name) VALUES ($1) RETURNING *',
         ['Team Beta']
       );

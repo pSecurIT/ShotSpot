@@ -108,7 +108,7 @@ router.post('/shots', [requireRole(['admin', 'coach']), validateShot], async (re
       return res.status(400).json({ error: 'Player does not belong to the specified team' });
     }
 
-    const result = await db.query(`
+    const shotResult = await db.query(`
       INSERT INTO shots (
         game_id, player_id, team_id, x_coord, y_coord,
         result, period, time_remaining, shot_type, distance
@@ -120,7 +120,7 @@ router.post('/shots', [requireRole(['admin', 'coach']), validateShot], async (re
     ]);
 
     // If it's a goal, update the game score
-    if (result.rows[0].result === 'goal') {
+    if (shotResult.rows[0].result === 'goal') {
       const gameResult = await db.query(
         'SELECT home_team_id FROM games WHERE id = $1',
         [game_id]
@@ -137,7 +137,7 @@ router.post('/shots', [requireRole(['admin', 'coach']), validateShot], async (re
       `, [game_id]);
     }
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(shotResult.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Database error', details: err.message });
   }

@@ -128,7 +128,7 @@ router.get('/team/:teamId', async (req, res) => {
       [teamId]
     );
     res.json(result.rows);
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch team players' });
   }
 });

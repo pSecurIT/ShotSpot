@@ -5,7 +5,6 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { promisify } from 'util';
-import readline from 'readline';
 
 // Set up proper paths for environment file
 const scriptPath = fileURLToPath(import.meta.url);
@@ -28,33 +27,8 @@ const __dirname = path.dirname(__filename);
 // Get environment variables
 const {
   DB_USER,
-  DB_PASSWORD,
-  DB_NAME,
-  DB_HOST,
-  DB_PORT,
-  POSTGRES_PASSWORD
+  DB_NAME
 } = process.env;
-
-// Function to prompt for password if not in environment
-async function getPostgresPassword() {
-  if (POSTGRES_PASSWORD) {
-    return POSTGRES_PASSWORD;
-  }
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  const password = await new Promise(resolve => {
-    rl.question('Enter PostgreSQL superuser (postgres) password: ', resolve);
-  });
-  
-  rl.close();
-  return password;
-}
-
-
 
 // Extract database configuration from environment
 const dbConfig = {
@@ -155,7 +129,7 @@ async function executeSqlFile(file, password) {
     }
   };
   const command = `psql -U postgres -d ${DB_NAME} -f "${filePath}"`;
-  const { stdout, stderr } = await execPromise(command, options);
+  const { stderr } = await execPromise(command, options);
   
   if (stderr && !stderr.includes('NOTICE')) {
     console.warn(`Warnings while executing ${file}:`, stderr);
@@ -203,7 +177,7 @@ async function main() {
         }
       };
       const command = `psql -U postgres -f "${tempFile}"`;
-      const { stdout, stderr } = await execPromise(command, options);
+      const { stderr } = await execPromise(command, options);
       if (stderr && !stderr.includes('NOTICE')) {
         console.warn('Database setup warnings:', stderr);
       }

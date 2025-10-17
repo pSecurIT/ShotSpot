@@ -7,7 +7,7 @@ import { dirname, join } from 'path';
 let currentFilePath;
 try {
   currentFilePath = fileURLToPath(import.meta.url);
-} catch (error) {
+} catch (_error) {
   // Fallback for test environment
   currentFilePath = __filename;
 }
@@ -52,7 +52,7 @@ const pool = new Pool({
 });
 
 // Error handling
-pool.on('error', (err, client) => {
+pool.on('error', (err, _client) => {
   console.error('Unexpected error on idle client', err);
   process.exit(-1);
 });
