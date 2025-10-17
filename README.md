@@ -182,10 +182,42 @@ For detailed security information, see [SECURITY.md](./SECURITY.md).
 
 ### Environment Variables
 
+#### Security Variables
+```bash
+# Authentication & Session
+JWT_SECRET=your-super-secure-jwt-secret
+SESSION_SECRET=your-super-secure-session-secret
+CSRF_SECRET=your-super-secure-csrf-secret
+
+# API Security
+CORS_ORIGIN=http://localhost:3000
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=100
+RATE_LIMIT_SKIP_TRUSTED=true
+API_MAX_PAYLOAD_SIZE=10kb
+TRUSTED_IPS=127.0.0.1
+
+# Security Headers
+ENABLE_HSTS=true
+HSTS_MAX_AGE=31536000
+CSP_REPORT_URI=/api/csp-report
+
+# Error Handling & Logging
+LOG_LEVEL=info
+LOG_FORMAT=combined
+LOG_FILE_PATH=logs/app.log
+ENABLE_REQUEST_LOGGING=true
+ENABLE_ERROR_LOGGING=true
+ENABLE_SECURITY_LOGGING=true
+ERROR_NOTIFICATION_WEBHOOK=https://your-webhook
+ERROR_NOTIFICATION_EMAIL=admin@example.com
+```
+
 - Production secrets managed via secure environment variables
 - Local development uses .env files (not committed to git)
 - Required variables documented in .env.example
 - Separate configurations for development/testing/production
+- Regular secret rotation in production
 
 ### Sensitive Data
 

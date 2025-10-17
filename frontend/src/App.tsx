@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import TeamManagement from './components/TeamManagement';
 import PlayerManagement from './components/PlayerManagement';
+import UserManagement from './components/UserManagement';
 import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -34,6 +35,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <PlayerManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/users" 
+                element={
+                  <ProtectedRoute>
+                    <UserManagement />
                   </ProtectedRoute>
                 } 
               />

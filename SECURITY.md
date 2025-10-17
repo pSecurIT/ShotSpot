@@ -37,10 +37,30 @@ If you discover a security vulnerability, please DO NOT create a public issue. I
 ### API Security
 
 #### Rate Limiting
-- 100 requests per 15 minutes per IP
-- Progressive delays after 50 requests
+- 100 requests per 15 minutes per IP (configurable via RATE_LIMIT_MAX)
+- Progressive delays after 50 requests using express-slow-down
+- Trusted IP bypass support (configurable via TRUSTED_IPS)
 - Custom error responses with retry-after headers
 - Separate limits for auth endpoints
+- IP and user-based rate limiting
+- Configurable window size (RATE_LIMIT_WINDOW_MS)
+
+#### CSRF Protection
+- Token-based CSRF protection using 'csrf' package
+- Secure token generation and validation
+- Automatic token rotation
+- Token validation on all state-changing requests
+- Custom CSRF middleware implementation
+- Configurable via CSRF_SECRET environment variable
+
+#### Content Security Policy
+- Strict CSP configuration with no unsafe-inline
+- Default-src restricted to self
+- Frame ancestors disabled
+- Base URI restrictions
+- Form action restrictions
+- Configurable report URI (CSP_REPORT_URI)
+- CSP violation reporting endpoint
 
 #### Request Validation
 - JSON schema validation
@@ -48,6 +68,10 @@ If you discover a security vulnerability, please DO NOT create a public issue. I
 - SQL injection prevention
 - XSS protection
 - File upload restrictions
+- Content-Type validation
+- Circular reference detection
+- Empty payload detection
+- Configurable payload size limits (API_MAX_PAYLOAD_SIZE)
 
 
 ```
@@ -65,12 +89,23 @@ If you discover a security vulnerability, please DO NOT create a public issue. I
 - Helmet.js is configured for secure HTTP headers
 - HTTPS is required in production
 
-### Authentication
+### Authentication & Session Management
 JWT-based authentication with:
-- Secure token storage
+- Secure token storage in HttpOnly cookies
 - Token expiration and refresh mechanisms
 - Password hashing using bcrypt
 - Role-based access control
+
+Session security:
+- Secure session storage with express-session
+- Session secret management (SESSION_SECRET)
+- Secure cookie settings:
+  - HttpOnly: true
+  - Secure: true in production
+  - SameSite: strict
+  - Custom domain in production
+- Session rotation and timeout
+- Rolling session updates
 
 ### Data Protection
 
@@ -96,13 +131,25 @@ JWT-based authentication with:
 - Permission changes
 - Data export requests
 - Admin actions
+- CSP violations
+- Rate limit violations
+- CSRF token failures
 
-#### Alerts
-- Unusual traffic patterns
-- Multiple failed logins
-- Unauthorized access attempts
-- Database connection issues
-- Certificate expiration warnings
+#### Logging & Alerts
+- Structured error logging with unique IDs
+- Configurable log levels (LOG_LEVEL)
+- Separate security event logging
+- Multiple log destinations:
+  - File logging (LOG_FILE_PATH)
+  - Console output in development
+  - External logging service in production
+- Error notification system:
+  - Webhook notifications (ERROR_NOTIFICATION_WEBHOOK)
+  - Email alerts (ERROR_NOTIFICATION_EMAIL)
+- Environment-specific logging:
+  - Development: detailed error information
+  - Production: sanitized error messages
+- Regular log rotation and archiving
 
 ## Security Checklist
 

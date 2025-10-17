@@ -2,9 +2,20 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
+import Tokens from 'csrf';
 import db from '../db.js';
 
 const router = express.Router();
+const tokens = new Tokens();
+
+// CSRF token endpoint
+router.get('/csrf', (req, res) => {
+  if (!req.session.csrfSecret) {
+    req.session.csrfSecret = tokens.secretSync();
+  }
+  const token = tokens.create(req.session.csrfSecret);
+  res.json({ csrfToken: token });
+});
 
 // Validation middleware
 const validateRegistration = [
@@ -79,9 +90,13 @@ router.post('/login', [
 
     const { username, password } = req.body;
 
-    // Find user
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    // Find user by username or email
     const result = await db.query(
-      'SELECT id, username, email, password_hash, role FROM users WHERE username = $1',
+      'SELECT id, username, email, password_hash, role FROM users WHERE username = $1 OR email = $1',
       [username]
     );
 
