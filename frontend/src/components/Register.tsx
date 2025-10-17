@@ -20,9 +20,24 @@ const Register: React.FC = () => {
     }));
   };
 
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) return 'Password must be at least 8 characters long';
+    if (!/[a-z]/.test(password)) return 'Password must include at least one lowercase letter';
+    if (!/[A-Z]/.test(password)) return 'Password must include at least one uppercase letter';
+    if (!/\d/.test(password)) return 'Password must include at least one number';
+    if (!/[^a-zA-Z0-9]/.test(password)) return 'Password must include at least one special character';
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    const passwordError = validatePassword(formData.password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
@@ -37,7 +52,8 @@ const Register: React.FC = () => {
       });
       navigate('/login');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed');
+      setError(err.response?.data?.error || 
+        (err.response?.data?.errors ? err.response.data.errors[0].msg : 'Registration failed'));
     }
   };
 
@@ -80,6 +96,10 @@ const Register: React.FC = () => {
             required
             minLength={8}
           />
+          <small className="form-help">
+            Password must contain at least 8 characters, one uppercase letter,<br/>
+            one lowercase letter, one number, and one special character.
+          </small>
         </div>
         <div className="form-group">
           <label htmlFor="confirmPassword">Confirm Password</label>

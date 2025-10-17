@@ -59,7 +59,7 @@ const TeamManagement: React.FC = () => {
           placeholder="Enter team name"
           required
         />
-        <button type="submit">Add Team</button>
+        <button type="submit" className="primary-button">Add Team</button>
       </form>
 
       <div className="teams-list">
