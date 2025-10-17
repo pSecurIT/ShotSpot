@@ -248,7 +248,7 @@ app.use('/api/players', playerRoutes);
 app.use('/api/match-events', matchEventsRoutes);
 
 // Global error handling middleware with enhanced security
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   // Log error details securely
   const errorId = crypto.randomUUID();
   const logError = {

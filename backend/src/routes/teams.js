@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
   try {
     const result = await db.query('SELECT * FROM teams ORDER BY name');
     res.json(result.rows);
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch teams' });
   }
 });

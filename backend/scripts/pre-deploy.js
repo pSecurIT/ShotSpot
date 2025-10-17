@@ -76,7 +76,7 @@ async function runPreDeploymentChecks() {
     // Run npm audit
     execSync('npm audit --production --json', { stdio: 'pipe' });
     console.log('✅ Security audit passed\n');
-  } catch (error) {
+  } catch (_error) {
     console.error('❌ Security vulnerabilities found');
     console.error('Run npm audit for details');
     process.exit(1);

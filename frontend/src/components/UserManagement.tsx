@@ -53,7 +53,7 @@ const UserManagement: React.FC = () => {
   };
 
   if (!currentUser || currentUser.role !== 'admin') {
-    return <div>You don't have permission to access this page.</div>;
+    return <div>You don&apos;t have permission to access this page.</div>;
   }
 
   return (

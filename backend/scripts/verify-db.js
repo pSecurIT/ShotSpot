@@ -31,7 +31,7 @@ async function verifyConnection() {
     console.log('Successfully connected to database!');
     
     // Test permissions
-    const testResult = await client.query('CREATE TABLE _test_ (id int); DROP TABLE _test_;');
+    await client.query('CREATE TABLE _test_ (id int); DROP TABLE _test_;');
     console.log('Successfully tested write permissions');
 
     client.release();
