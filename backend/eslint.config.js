@@ -53,7 +53,7 @@ export default [
   },
   {
     // CommonJS files
-    files: ['**/*.cjs', 'jest.*.cjs', '**/middleware/csrf.js', 'scripts/pre-deploy.js'],
+    files: ['**/*.cjs', 'jest.*.cjs', 'scripts/pre-deploy.js'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: {
