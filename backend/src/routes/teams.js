@@ -31,7 +31,7 @@ router.post('/', [
   // Check for validation errors
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
   const { name } = req.body;
@@ -96,7 +96,7 @@ router.put('/:id', [
   // Check for validation errors
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
   const { id } = req.params;
@@ -150,10 +150,7 @@ router.delete('/:id', [
     }
 
     await db.query('COMMIT');
-    res.json({ 
-      message: 'Team deleted successfully',
-      details: 'All associated players have been removed'
-    });
+    res.status(204).send();
   } catch (err) {
     await db.query('ROLLBACK');
     res.status(500).json({ error: 'Database error', details: err.message });

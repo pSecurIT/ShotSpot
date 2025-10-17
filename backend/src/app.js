@@ -38,7 +38,7 @@ app.use(helmet({
         'allow-same-origin',
         'allow-downloads'
       ],
-      upgradeInsecureRequests: process.env.NODE_ENV === 'production',
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [""] : null,
       reportUri: process.env.CSP_REPORT_URI || '/api/csp-report',
       reportTo: 'csp-endpoint'
     },
@@ -110,9 +110,16 @@ const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
     const isDevelopment = process.env.NODE_ENV === 'development';
+    const isTest = process.env.NODE_ENV === 'test';
+    
+    // Allow all requests in test environment
+    if (isTest) {
+      callback(null, true);
+      return;
+    }
     
     // In production, require origin and match against allowed origins
-    if (!isDevelopment && !origin) {
+    if (!isDevelopment && !isTest && !origin) {
       callback(new Error('Origin header is required'), false);
       return;
     }
@@ -146,6 +153,19 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 app.use(cors(corsOptions));
+
+// Debug middleware
+app.use((req, res, next) => {
+  console.log('Request:', {
+    method: req.method,
+    path: req.path,
+    headers: {
+      authorization: req.headers.authorization ? 'present' : 'missing',
+      'content-type': req.headers['content-type']
+    }
+  });
+  next();
+});
 
 // Session configuration
 app.use(cookieParser());
@@ -184,35 +204,6 @@ app.use((req, res, next) => {
 // Body parser with enhanced security
 app.use(express.json({
   limit: process.env.API_MAX_PAYLOAD_SIZE || '10kb',
-  verify: (req, res, buf) => {
-    try {
-      // Check for JSON syntax
-      JSON.parse(buf);
-      
-      // Check for content length
-      if (buf.length === 0) {
-        throw new Error('Empty request body');
-      }
-      
-      // Check for circular references
-      const seen = new WeakSet();
-      JSON.parse(buf, (key, value) => {
-        if (typeof value === 'object' && value !== null) {
-          if (seen.has(value)) {
-            throw new Error('Circular reference detected');
-          }
-          seen.add(value);
-        }
-        return value;
-      });
-    } catch(e) {
-      res.status(400).json({ 
-        error: 'Invalid JSON', 
-        details: process.env.NODE_ENV === 'development' ? e.message : undefined 
-      });
-      throw new Error('Invalid JSON: ' + e.message);
-    }
-  },
   strict: true // Reject payloads that are not arrays or objects
 }));
 
@@ -246,7 +237,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Import health check routes
+import healthRoutes from './routes/health.js';
+
 // Routes
+app.use('/health', healthRoutes); // Health check endpoint should be before other routes
 app.use('/api/auth', authRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);

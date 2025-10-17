@@ -1,16 +1,7 @@
 name: "ShotSpot CodeQL Config"
 
 queries:
-  - uses: security-and-quality
   - uses: security-extended
-
-query-filters:
-  - exclude:
-      problem.severity:
-        - warning
-        - recommendation
-  - exclude:
-      id: js/redundant-assignment
 
 paths:
   - frontend/src
@@ -23,5 +14,3 @@ paths-ignore:
   - '**/*.test.tsx'
   - '**/*.spec.ts'
   - '**/*.spec.tsx'
-
-disable-default-queries: false

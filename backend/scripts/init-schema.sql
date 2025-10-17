@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS players (
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     jersey_number INTEGER,
-    position VARCHAR(20),
+    role VARCHAR(20),
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

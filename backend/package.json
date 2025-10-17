@@ -10,9 +10,9 @@
     "setup-db": "node scripts/setup-db.js",
     "setup-test-db": "node scripts/setup-test-db.js",
     "pretest": "npm run setup-test-db",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --no-cache",
-    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch --no-cache",
-    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --no-cache"
+    "test": "jest --config jest.config.js --no-cache",
+    "test:watch": "jest --config jest.config.js --watch --no-cache",
+    "test:coverage": "jest --config jest.config.js --coverage --no-cache"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -30,9 +30,14 @@
     "pg": "^8.11.3"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.4",
+    "@babel/plugin-syntax-import-attributes": "^7.27.1",
+    "@babel/preset-env": "^7.28.3",
     "@types/express": "^4.17.18",
     "@types/jest": "^29.5.5",
     "@types/node": "^20.8.2",
+    "babel-jest": "^30.2.0",
+    "babel-plugin-transform-import-meta": "^2.3.3",
     "jest": "^29.7.0",
     "nodemon": "^3.0.1",
     "supertest": "^7.1.3",

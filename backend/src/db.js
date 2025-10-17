@@ -4,9 +4,15 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 // Load environment variables
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-dotenv.config({ path: join(__dirname, '..', '.env') });
+let currentFilePath;
+try {
+  currentFilePath = fileURLToPath(import.meta.url);
+} catch (error) {
+  // Fallback for test environment
+  currentFilePath = __filename;
+}
+const currentDirPath = dirname(currentFilePath);
+dotenv.config({ path: join(currentDirPath, '..', '.env') });
 
 const { Pool } = pkg;
 
@@ -85,19 +91,33 @@ const query = async (text, params) => {
   }
 };
 
-// Healthcheck query
-const healthCheck = async () => {
+// Database health check function that throws error on failure
+export async function dbHealthCheck() {
   try {
-    await query('SELECT 1');
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
     return true;
   } catch (err) {
     console.error('Database health check failed:', err);
-    return false;
+    throw new Error(`Database connection failed: ${err.message}`);
   }
-};
+}
+
+// Function to close all database connections
+export async function closePool() {
+  try {
+    await pool.end();
+    console.log('Database pool has been closed');
+  } catch (err) {
+    console.error('Error closing database pool:', err);
+    throw err;
+  }
+}
 
 export default {
   query,
-  healthCheck,
-  pool // Exported for testing purposes
+  healthCheck: dbHealthCheck,
+  pool, // Exported for testing purposes
+  closePool // Export for test cleanup
 };

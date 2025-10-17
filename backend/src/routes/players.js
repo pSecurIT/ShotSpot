@@ -33,22 +33,46 @@ const validatePlayer = [
     .trim()
     .notEmpty()
     .withMessage('Role is required')
-    .isIn(['Captain', 'Player'])
-    .withMessage('Role must be either Captain or Player')
+    .customSanitizer(value => value.toLowerCase())
+    .isIn(['captain', 'player'])
+    .withMessage('Role must be either captain or player')
 ];
 
 // Apply authentication middleware to all routes
 router.use(auth);
 
+// Debug middleware to log all requests
+router.use((req, res, next) => {
+  console.log('Player Route Request:', {
+    method: req.method,
+    path: req.path,
+    user: req.user,
+    token: req.headers.authorization ? 'present' : 'missing',
+  });
+  next();
+});
+
 // Get all players
 router.get('/', async (req, res) => {
   try {
-    const result = await db.query(`
-      SELECT players.*, teams.name as team_name 
-      FROM players 
-      LEFT JOIN teams ON players.team_id = teams.id 
-      ORDER BY team_id, last_name, first_name
-    `);
+    // Add optional team_id filter
+    const { team_id } = req.query;
+    const query = team_id
+      ? `
+        SELECT players.*, teams.name as team_name 
+        FROM players 
+        LEFT JOIN teams ON players.team_id = teams.id 
+        WHERE team_id = $1
+        ORDER BY team_id, last_name, first_name
+      `
+      : `
+        SELECT players.*, teams.name as team_name 
+        FROM players 
+        LEFT JOIN teams ON players.team_id = teams.id 
+        ORDER BY team_id, last_name, first_name
+      `;
+    
+    const result = await db.query(query, team_id ? [team_id] : []);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: 'Database error', details: err.message });
@@ -110,13 +134,22 @@ router.get('/team/:teamId', async (req, res) => {
 });
 
 // Create a new player
-router.post('/', [requireRole(['admin', 'coach']), validatePlayer], async (req, res) => {
+// Create a new player - allow either admin or coach role
+router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { team_id, first_name, last_name, jersey_number, role } = req.body;
+  // Get data from request body, convert player role to lowercase
+  // Handle both camelCase and snake_case property names
+  const {
+    team_id = req.body.teamId,
+    first_name = req.body.firstName,
+    last_name = req.body.lastName,
+    jersey_number = req.body.jerseyNumber
+  } = req.body;
+  const role = (req.body.role || '').toLowerCase(); // Normalize the player's team role
   
   try {
     // Check for duplicate jersey number in the same team
@@ -126,7 +159,7 @@ router.post('/', [requireRole(['admin', 'coach']), validatePlayer], async (req, 
     );
 
     if (existingPlayer.rows.length > 0) {
-      return res.status(400).json({
+      return res.status(409).json({
         error: 'Jersey number already in use for this team'
       });
     }
@@ -138,7 +171,7 @@ router.post('/', [requireRole(['admin', 'coach']), validatePlayer], async (req, 
     }
 
     const result = await db.query(
-      'INSERT INTO players (team_id, first_name, last_name, jersey_number, position) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [team_id, first_name, last_name, jersey_number, role]
     );
     res.status(201).json(result.rows[0]);
@@ -152,14 +185,22 @@ router.post('/', [requireRole(['admin', 'coach']), validatePlayer], async (req, 
 });
 
 // Update a player
-router.put('/:id', [requireRole(['admin', 'coach']), validatePlayer], async (req, res) => {
+router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
   const { id } = req.params;
-  const { team_id, first_name, last_name, jersey_number, role, is_active } = req.body;
+  // Handle both camelCase and snake_case property names
+  const {
+    team_id = req.body.teamId,
+    first_name = req.body.firstName,
+    last_name = req.body.lastName,
+    jersey_number = req.body.jerseyNumber,
+    is_active = req.body.isActive
+  } = req.body;
+  const role = (req.body.role || '').toLowerCase(); // Normalize the player's team role
   
   try {
     // Check for duplicate jersey number in the same team, excluding current player
@@ -169,7 +210,7 @@ router.put('/:id', [requireRole(['admin', 'coach']), validatePlayer], async (req
     );
 
     if (existingPlayer.rows.length > 0) {
-      return res.status(400).json({
+      return res.status(409).json({
         error: 'Jersey number already in use for this team'
       });
     }
@@ -177,7 +218,7 @@ router.put('/:id', [requireRole(['admin', 'coach']), validatePlayer], async (req
     const result = await db.query(
       `UPDATE players 
        SET team_id = $1, first_name = $2, last_name = $3, 
-           jersey_number = $4, position = $5, is_active = $6,
+           jersey_number = $4, role = $5, is_active = $6,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $7 RETURNING *`,
       [team_id, first_name, last_name, jersey_number, role, is_active, id]
@@ -226,7 +267,7 @@ router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
     }
 
     await db.query('COMMIT');
-    res.json({ message: 'Player deleted successfully' });
+    res.status(204).send();
   } catch (err) {
     await db.query('ROLLBACK');
     res.status(500).json({ error: 'Database error', details: err.message });

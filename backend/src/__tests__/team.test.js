@@ -36,7 +36,7 @@ describe('Team Management API', () => {
     // Clean up after tests
     await db.query('DELETE FROM players');
     await db.query('DELETE FROM teams');
-    await db.pool.end();
+    // Pool will be closed by global teardown
   });
 
   // Test GET /api/teams
@@ -156,7 +156,7 @@ describe('Team Management API', () => {
         .delete(`/api/teams/${teamId}`)
         .set('Authorization', `Bearer ${authToken}`);
       
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(204);
 
       // Verify team was deleted
       const checkTeam = await db.query('SELECT * FROM teams WHERE id = $1', [teamId]);
