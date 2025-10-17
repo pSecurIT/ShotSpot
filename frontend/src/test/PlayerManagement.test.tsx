@@ -164,7 +164,7 @@ describe('PlayerManagement', () => {
     await waitFor(() => {
       expect(firstNameInput).toHaveValue('');
       expect(lastNameInput).toHaveValue('');
-      expect(jerseyInput).toHaveValue('');
+      expect(jerseyInput).toHaveValue(null);
       expect(teamSelect).toHaveValue('');
     });
   });
