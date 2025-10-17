@@ -1,4 +1,5 @@
-const Tokens = require('csrf');
+import Tokens from 'csrf';
+
 const tokens = new Tokens();
 
 // Initialize CSRF middleware
@@ -23,4 +24,4 @@ const csrf = (req, res, next) => {
   next();
 };
 
-module.exports = csrf;
+export default csrf;
