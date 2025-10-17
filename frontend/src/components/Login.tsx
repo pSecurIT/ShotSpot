@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import api from '../utils/api';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -15,12 +14,15 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      const response = await api.post('/auth/login', { username, password });
-      const { token, user } = response.data;
-      login(token, user);
-      navigate('/teams');
+      const result = await login(username, password);
+      if (result.success) {
+        navigate('/teams');
+      } else {
+        setError(result.error || 'An error occurred during login');
+      }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'An error occurred during login');
+      console.error('Login error:', err);
+      setError('An unexpected error occurred during login');
     }
   };
 
@@ -30,13 +32,14 @@ const Login: React.FC = () => {
       {error && <div className="alert alert-error">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label htmlFor="username">Username</label>
+          <label htmlFor="username">Username or Email</label>
           <input
             type="text"
             id="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
+            placeholder="Enter your username or email"
           />
         </div>
         <div className="form-group">
@@ -49,7 +52,7 @@ const Login: React.FC = () => {
             required
           />
         </div>
-        <button type="submit" className="btn">Login</button>
+        <button type="submit" className="primary-button">Login</button>
       </form>
     </div>
   );

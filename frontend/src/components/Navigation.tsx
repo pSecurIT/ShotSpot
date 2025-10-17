@@ -17,8 +17,9 @@ const Navigation: React.FC = () => {
         <>
           <Link to="/teams">Teams</Link>
           <Link to="/players">Players</Link>
+          {user.role === 'admin' && <Link to="/users">Users</Link>}
           <span className="user-info">
-            Welcome, {user.username}!
+            Welcome, {user.username} ({user.role})!
           </span>
           <button onClick={handleLogout}>Logout</button>
         </>
