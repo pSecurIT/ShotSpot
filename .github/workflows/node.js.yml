@@ -48,6 +48,8 @@ jobs:
       working-directory: backend
       env:
         NODE_ENV: test
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
         DB_USER: postgres
         DB_PASSWORD: postgres
         DB_HOST: localhost
@@ -189,6 +191,8 @@ jobs:
       working-directory: backend
       env:
         NODE_ENV: test
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
         DB_USER: postgres
         DB_PASSWORD: postgres
         DB_HOST: localhost

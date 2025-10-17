@@ -7,16 +7,28 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load test environment variables
-dotenv.config({ path: join(__dirname, '../.env.test') });
+// Load test environment variables (only if .env.test exists)
+const envPath = join(__dirname, '../.env.test');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
 
 async function setupTestDb() {
+  // Use environment variables directly (works in CI/CD and local)
+  const adminUser = process.env.POSTGRES_USER || 'postgres';
+  const adminPassword = process.env.POSTGRES_PASSWORD || 'postgres';
+  const dbUser = process.env.DB_USER || 'shotspot_test_user';
+  const dbPassword = process.env.DB_PASSWORD || 'test_password';
+  const dbHost = process.env.DB_HOST || 'localhost';
+  const dbPort = process.env.DB_PORT || '5432';
+  const dbName = process.env.DB_NAME || 'shotspot_test_db';
+
   // Connect as postgres superuser to create test database and user
   const adminPool = new pg.Pool({
-    user: process.env.POSTGRES_USER,
-    password: process.env.POSTGRES_PASSWORD,
-    host: 'localhost',
-    port: 5432,
+    user: adminUser,
+    password: String(adminPassword), // Ensure password is a string
+    host: dbHost,
+    port: parseInt(dbPort),
     database: 'postgres'
   });
 
@@ -25,29 +37,29 @@ async function setupTestDb() {
     await adminPool.query(`
       DO $$ 
       BEGIN
-        IF NOT EXISTS (SELECT FROM pg_user WHERE usename = '${process.env.DB_USER}') THEN
-          CREATE USER ${process.env.DB_USER} WITH PASSWORD '${process.env.DB_PASSWORD}';
+        IF NOT EXISTS (SELECT FROM pg_user WHERE usename = '${dbUser}') THEN
+          CREATE USER ${dbUser} WITH PASSWORD '${dbPassword}';
         END IF;
       END $$;
     `);
 
     // Drop test database if it exists
     await adminPool.query(`
-      DROP DATABASE IF EXISTS ${process.env.DB_NAME};
+      DROP DATABASE IF EXISTS ${dbName};
     `);
 
     // Create test database
     await adminPool.query(`
-      CREATE DATABASE ${process.env.DB_NAME} OWNER ${process.env.DB_USER};
+      CREATE DATABASE ${dbName} OWNER ${dbUser};
     `);
 
     // Connect to test database
     const testPool = new pg.Pool({
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      database: process.env.DB_NAME
+      user: dbUser,
+      password: String(dbPassword), // Ensure password is a string
+      host: dbHost,
+      port: parseInt(dbPort),
+      database: dbName
     });
 
     // Read and execute schema
