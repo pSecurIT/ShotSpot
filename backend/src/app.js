@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js';
 import teamRoutes from './routes/teams.js';
 import playerRoutes from './routes/players.js';
 import matchEventsRoutes from './routes/match-events.js';
+import gamesRoutes from './routes/games.js';
 
 const app = express();
 
@@ -81,10 +82,6 @@ const limiter = rateLimit({
       error: 'Too many requests, please try again later.',
       retryAfter: Math.ceil(req.rateLimit.resetTime / 1000) - Date.now() / 1000
     });
-  },
-  keyGenerator: (req) => {
-    // Use both IP and user ID (if available) for rate limiting
-    return req.user ? `${req.ip}-${req.user.id}` : req.ip;
   },
   skip: (req) => {
     // Skip rate limiting for certain trusted IPs or health checks
@@ -173,12 +170,12 @@ app.use(cookieParser());
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true, // Changed to true to create session for CSRF token
   name: 'sessionId', // Change from default 'connect.sid'
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // Allow cross-site in development
     maxAge: parseInt(process.env.SESSION_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
     domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined
@@ -245,6 +242,7 @@ app.use('/health', healthRoutes); // Health check endpoint should be before othe
 app.use('/api/auth', authRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);
+app.use('/api/games', gamesRoutes);
 app.use('/api/match-events', matchEventsRoutes);
 
 // Global error handling middleware with enhanced security

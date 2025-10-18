@@ -9,18 +9,44 @@ const csrf = (req, res, next) => {
     return next();
   }
 
+  // Skip CSRF check for GET requests (they should be safe operations)
+  if (req.method === 'GET') {
+    return next();
+  }
+
   // Skip CSRF check for the CSRF token endpoint itself
   if (req.path === '/api/auth/csrf') {
     return next();
   }
 
-  // Verify CSRF token for all other POST/PUT/DELETE requests
-  if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+  // Verify CSRF token for all POST/PUT/DELETE/PATCH requests
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
     const csrfToken = req.headers['x-csrf-token'];
+    
+    // Check if session has a CSRF secret
+    if (!req.session || !req.session.csrfSecret) {
+      console.error('CSRF validation failed: No CSRF secret in session');
+      return res.status(403).json({ 
+        error: 'Invalid CSRF token',
+        details: 'Session not initialized. Please refresh and try again.'
+      });
+    }
+
+    // Verify the token
     if (!csrfToken || !tokens.verify(req.session.csrfSecret, csrfToken)) {
-      return res.status(403).json({ error: 'Invalid CSRF token' });
+      console.error('CSRF validation failed:', {
+        hasToken: !!csrfToken,
+        hasSecret: !!req.session.csrfSecret,
+        path: req.path,
+        method: req.method
+      });
+      return res.status(403).json({ 
+        error: 'Invalid CSRF token',
+        details: 'Please refresh the page and try again.'
+      });
     }
   }
+  
   next();
 };
 
