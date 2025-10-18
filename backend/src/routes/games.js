@@ -204,7 +204,19 @@ router.put('/:id', [
   body('date')
     .optional()
     .isISO8601()
-    .withMessage('Date must be in ISO 8601 format')
+    .withMessage('Date must be in ISO 8601 format'),
+  body('home_attacking_side')
+    .optional()
+    .isIn(['left', 'right'])
+    .withMessage('Home attacking side must be either "left" or "right"'),
+  body('number_of_periods')
+    .optional()
+    .isInt({ min: 1, max: 10 })
+    .withMessage('Number of periods must be between 1 and 10'),
+  body('period_duration')
+    .optional()
+    .matches(/^\d{2}:\d{2}:\d{2}$/)
+    .withMessage('Period duration must be in format HH:MM:SS')
 ], async (req, res) => {
   // Check for validation errors
   const errors = validationResult(req);
@@ -213,7 +225,7 @@ router.put('/:id', [
   }
 
   const { id } = req.params;
-  const { status, home_score, away_score, date } = req.body;
+  const { status, home_score, away_score, date, home_attacking_side, number_of_periods, period_duration } = req.body;
 
   try {
     // Check if game exists
@@ -251,6 +263,24 @@ router.put('/:id', [
       paramCount++;
     }
 
+    if (home_attacking_side !== undefined) {
+      updates.push(`home_attacking_side = $${paramCount}`);
+      params.push(home_attacking_side);
+      paramCount++;
+    }
+
+    if (number_of_periods !== undefined) {
+      updates.push(`number_of_periods = $${paramCount}`);
+      params.push(number_of_periods);
+      paramCount++;
+    }
+
+    if (period_duration !== undefined) {
+      updates.push(`period_duration = $${paramCount}`);
+      params.push(period_duration);
+      paramCount++;
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
@@ -265,7 +295,7 @@ router.put('/:id', [
       RETURNING *
     `;
 
-    const result = await db.query(query, params);
+    const _result = await db.query(query, params);
 
     // Fetch updated game with team names
     const gameResult = await db.query(`
@@ -313,7 +343,7 @@ router.post('/:id/start', [
       return res.status(400).json({ error: 'Cannot start a cancelled game' });
     }
 
-    const result = await db.query(`
+    const _result = await db.query(`
       UPDATE games 
       SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
@@ -362,7 +392,7 @@ router.post('/:id/end', [
       return res.status(400).json({ error: 'Cannot end a cancelled game' });
     }
 
-    const result = await db.query(`
+    const _result = await db.query(`
       UPDATE games 
       SET status = 'completed', updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
@@ -411,7 +441,7 @@ router.post('/:id/cancel', [
       return res.status(400).json({ error: 'Game is already cancelled' });
     }
 
-    const result = await db.query(`
+    const _result = await db.query(`
       UPDATE games 
       SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
@@ -494,7 +524,7 @@ router.post('/:id/reschedule', [
       queryParams = [id];
     }
 
-    const result = await db.query(updateQuery, queryParams);
+    const _result = await db.query(updateQuery, queryParams);
 
     // Fetch updated game with team names
     const gameResult = await db.query(`

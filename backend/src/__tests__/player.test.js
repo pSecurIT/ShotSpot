@@ -74,8 +74,8 @@ describe('Player Management API', () => {
     it('should get players by team', async () => {
       // First create a test player
       await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
-        [testTeamId, 'John', 'Doe', 10, 'Player']
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+        [testTeamId, 'John', 'Doe', 10]
       );
 
       const response = await request(app)
@@ -102,8 +102,7 @@ describe('Player Management API', () => {
       team_id: null, // Will be set in beforeEach
       first_name: 'Jane',
       last_name: 'Smith',
-      jersey_number: 7,
-      role: 'Player'
+      jersey_number: 7
     };
 
     beforeEach(() => {
@@ -141,8 +140,8 @@ describe('Player Management API', () => {
     it('should validate jersey number uniqueness within team', async () => {
       // First create a player directly in the database with the test team
       await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
-        [testTeamId, 'First', 'Player', 7, 'Player']
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+        [testTeamId, 'First', 'Player', 7]
       );
 
       // Try to create another player with the same jersey number in the same team
@@ -150,8 +149,7 @@ describe('Player Management API', () => {
         team_id: testTeamId,
         first_name: 'Another',
         last_name: 'Player',
-        jersey_number: 7,
-        role: 'Player'
+        jersey_number: 7
       };
 
       const response = await request(app)
@@ -169,8 +167,8 @@ describe('Player Management API', () => {
 
     beforeEach(async () => {
       const result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-        [testTeamId, 'Update', 'Test', 15, 'Player']
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING id',
+        [testTeamId, 'Update', 'Test', 15]
       );
       playerId = result.rows[0].id;
     });
@@ -181,7 +179,6 @@ describe('Player Management API', () => {
         first_name: 'Updated',
         last_name: 'Name',
         jersey_number: 16,
-        role: 'Player',
         is_active: false
       };
 
@@ -212,8 +209,7 @@ describe('Player Management API', () => {
           team_id: teamId,
           first_name: 'Test',
           last_name: 'Player',
-          jersey_number: 20,
-          role: 'Player'
+          jersey_number: 20
         });
       
       expect(response.status).toBe(404);
@@ -225,8 +221,8 @@ describe('Player Management API', () => {
 
     beforeEach(async () => {
       const result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-        [testTeamId, 'Delete', 'Test', 25, 'Player']
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING id',
+        [testTeamId, 'Delete', 'Test', 25]
       );
       playerId = result.rows[0].id;
     });

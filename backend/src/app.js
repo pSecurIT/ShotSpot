@@ -11,6 +11,11 @@ import teamRoutes from './routes/teams.js';
 import playerRoutes from './routes/players.js';
 import matchEventsRoutes from './routes/match-events.js';
 import gamesRoutes from './routes/games.js';
+import shotsRoutes from './routes/shots.js';
+import eventsRoutes from './routes/events.js';
+import timerRoutes from './routes/timer.js';
+import possessionsRoutes from './routes/possessions.js';
+import gameRostersRoutes from './routes/game-rosters.js';
 
 const app = express();
 
@@ -72,7 +77,7 @@ app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), (r
 // Rate limiting with enhanced security
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 100, // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX) || 5000, // Increased for development with timer polling
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count all requests
@@ -84,9 +89,15 @@ const limiter = rateLimit({
     });
   },
   skip: (req) => {
-    // Skip rate limiting for certain trusted IPs or health checks
+    // Skip rate limiting for certain trusted IPs, health checks, and timer endpoints (frequent polling)
     const trustedIPs = (process.env.TRUSTED_IPS || '').split(',');
-    return trustedIPs.includes(req.ip) || req.path === '/health';
+    const isTimerEndpoint = req.path.startsWith('/api/timer');
+    const isHealthCheck = req.path === '/health';
+    const isTrustedIP = trustedIPs.includes(req.ip);
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    // In development, skip rate limiting for timer endpoints and localhost
+    return isHealthCheck || isTrustedIP || (isDevelopment && (isTimerEndpoint || req.ip === '127.0.0.1' || req.ip === '::1'));
   }
 });
 
@@ -134,7 +145,7 @@ const corsOptions = {
       callback(new Error('Origin not allowed by CORS'), false);
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
     'Authorization',
@@ -244,6 +255,11 @@ app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/games', gamesRoutes);
 app.use('/api/match-events', matchEventsRoutes);
+app.use('/api/shots', shotsRoutes);
+app.use('/api/events', eventsRoutes);
+app.use('/api/timer', timerRoutes);
+app.use('/api/possessions', possessionsRoutes);
+app.use('/api/game-rosters', gameRostersRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {
@@ -286,7 +302,10 @@ app.use((err, req, res, _next) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(logError)
-        }).catch(console.error);
+        }).catch(webhookErr => {
+          // Log webhook failures but don't crash the app
+          console.error('Failed to send error notification to webhook:', webhookErr.message);
+        });
       }
     } else {
       // Development logging
