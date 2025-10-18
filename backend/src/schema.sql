@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS games (
     home_team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
     away_team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
     date TIMESTAMP WITH TIME ZONE NOT NULL,
-    status VARCHAR(20) DEFAULT 'scheduled', -- scheduled, in_progress, completed, cancelled
+    status VARCHAR(20) DEFAULT 'scheduled', -- scheduled, to_reschedule, in_progress, completed, cancelled
     home_score INTEGER DEFAULT 0,
     away_score INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

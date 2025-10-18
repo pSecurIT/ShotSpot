@@ -15,6 +15,7 @@ const Navigation: React.FC = () => {
     <nav className="navigation">
       {user ? (
         <>
+          <Link to="/games">Games</Link>
           <Link to="/teams">Teams</Link>
           <Link to="/players">Players</Link>
           {user.role === 'admin' && <Link to="/users">Users</Link>}

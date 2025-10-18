@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import TeamManagement from './components/TeamManagement';
 import PlayerManagement from './components/PlayerManagement';
 import UserManagement from './components/UserManagement';
+import GameManagement from './components/GameManagement';
 import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -20,8 +21,17 @@ const App: React.FC = () => {
           <main>
             <Routes>
               <Route path="/" element={<Navigate to="/teams" replace />} />
+              <Route path="/" element={<Navigate to="/games" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route 
+                path="/games" 
+                element={
+                  <ProtectedRoute>
+                    <GameManagement />
+                  </ProtectedRoute>
+                } 
+              />
               <Route 
                 path="/teams" 
                 element={
