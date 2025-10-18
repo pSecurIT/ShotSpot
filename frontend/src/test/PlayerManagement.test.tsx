@@ -72,8 +72,8 @@ describe('PlayerManagement', () => {
       expect(screen.getByText('Select a team')).toBeInTheDocument();
     });
 
-    // Fill in the form
-    const teamSelect = screen.getByRole('combobox', { name: /team/i });
+    // Fill in the form - use getByLabelText to avoid ambiguity with filter dropdown
+    const teamSelect = screen.getByLabelText(/^team:$/i);
     const firstNameInput = screen.getByRole('textbox', { name: /first name/i });
     const lastNameInput = screen.getByRole('textbox', { name: /last name/i });
     const jerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });
@@ -94,7 +94,8 @@ describe('PlayerManagement', () => {
         first_name: 'New',
         last_name: 'Player',
         jersey_number: 30,
-        role: 'Player'
+        gender: null,
+        role: 'player'
       });
     });
   });
@@ -121,8 +122,8 @@ describe('PlayerManagement', () => {
       expect(screen.getByText('Select a team')).toBeInTheDocument();
     });
 
-    // Fill in the form
-    const teamSelect = screen.getByRole('combobox', { name: /team/i });
+    // Fill in the form - use getByLabelText to avoid ambiguity with filter dropdown
+    const teamSelect = screen.getByLabelText(/^team:$/i);
     const firstNameInput = screen.getByRole('textbox', { name: /first name/i });
     const lastNameInput = screen.getByRole('textbox', { name: /last name/i });
     const jerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });
@@ -147,8 +148,8 @@ describe('PlayerManagement', () => {
       expect(screen.getByText('Select a team')).toBeInTheDocument();
     });
 
-    // Fill in the form
-    const teamSelect = screen.getByRole('combobox', { name: /team/i });
+    // Fill in the form - use getByLabelText to avoid ambiguity with filter dropdown
+    const teamSelect = screen.getByLabelText(/^team:$/i);
     const firstNameInput = screen.getByRole('textbox', { name: /first name/i });
     const lastNameInput = screen.getByRole('textbox', { name: /last name/i });
     const jerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });

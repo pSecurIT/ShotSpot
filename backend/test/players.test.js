@@ -46,12 +46,12 @@ describe('Player Routes', () => {
     it('should return all players', async () => {
       // Insert test players
       await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
-        [testTeamId, 'John', 'Doe', 10, 'Player']
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+        [testTeamId, 'John', 'Doe', 10]
       );
       await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
-        [testTeamId, 'Jane', 'Smith', 20, 'Captain']
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+        [testTeamId, 'Jane', 'Smith', 20]
       );
 
       const response = await request(app)
@@ -68,8 +68,8 @@ describe('Player Routes', () => {
     it('should filter players by team_id', async () => {
       // Insert players for different teams
       await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
-        [testTeamId, 'John', 'Doe', 10, 'Player']
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+        [testTeamId, 'John', 'Doe', 10]
       );
 
       const otherTeamRes = await db.query(
@@ -79,8 +79,8 @@ describe('Player Routes', () => {
       const otherTeamId = otherTeamRes.rows[0].id;
 
       await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, role) VALUES ($1, $2, $3, $4, $5)',
-        [otherTeamId, 'Jane', 'Smith', 20, 'Player']
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+        [otherTeamId, 'Jane', 'Smith', 20]
       );
 
       const response = await request(app)
@@ -103,8 +103,7 @@ describe('Player Routes', () => {
         team_id: testTeamId,
         first_name: 'Test',
         last_name: 'Player',
-        jersey_number: 30,
-        role: 'player'
+        jersey_number: 30
       };
 
       const response = await request(app)
@@ -131,15 +130,14 @@ describe('Player Routes', () => {
         .send({
           team_id: testTeamId,
           // Missing first_name and last_name
-          jersey_number: 30,
-          role: 'player'
+          jersey_number: 30
         })
         .set('Authorization', `Bearer ${authToken}`)
         .set('Content-Type', 'application/json')
         .expect('Content-Type', /json/)
         .expect(400);
 
-      expect(response.body.errors).toBeDefined();
+      expect(response.body.validationErrors).toBeDefined();
     });
 
     it('should validate jersey number uniqueness within team', async () => {
@@ -150,8 +148,7 @@ describe('Player Routes', () => {
           team_id: testTeamId,
           first_name: 'First',
           last_name: 'Player',
-          jersey_number: 30,
-          role: 'player'
+          jersey_number: 30
         })
         .set('Authorization', `Bearer ${authToken}`)
         .set('Content-Type', 'application/json')
@@ -164,8 +161,7 @@ describe('Player Routes', () => {
           team_id: testTeamId,
           first_name: 'Second',
           last_name: 'Player',
-          jersey_number: 30,
-          role: 'player'
+          jersey_number: 30
         })
         .set('Authorization', `Bearer ${authToken}`)
         .set('Content-Type', 'application/json')
@@ -184,8 +180,7 @@ describe('Player Routes', () => {
           team_id: testTeamId,
           first_name: 'Old',
           last_name: 'Name',
-          jersey_number: 30,
-          role: 'player'
+          jersey_number: 30
         })
         .set('Authorization', `Bearer ${authToken}`)
         .set('Content-Type', 'application/json')
@@ -202,8 +197,7 @@ describe('Player Routes', () => {
           team_id: testTeamId,
           first_name: 'New',
           last_name: 'Name',
-          jersey_number: 31,
-          role: 'captain'
+          jersey_number: 31
         })
         .expect('Content-Type', /json/)
         .expect(200);
@@ -211,7 +205,6 @@ describe('Player Routes', () => {
       expect(response.body.first_name).toBe('New');
       expect(response.body.last_name).toBe('Name');
       expect(response.body.jersey_number).toBe(31);
-      expect(response.body.role).toBe('captain');
 
       // Verify update in database
       const dbResponse = await db.query('SELECT * FROM players WHERE id = $1', [playerId]);
@@ -227,8 +220,7 @@ describe('Player Routes', () => {
           team_id: testTeamId,
           first_name: 'New',
           last_name: 'Name',
-          jersey_number: 31,
-          role: 'player'
+          jersey_number: 31
         })
         .expect('Content-Type', /json/)
         .expect(404);
@@ -246,8 +238,7 @@ describe('Player Routes', () => {
           team_id: testTeamId,
           first_name: 'To',
           last_name: 'Delete',
-          jersey_number: 99,
-          role: 'player'
+          jersey_number: 99
         })
         .set('Authorization', `Bearer ${authToken}`)
         .set('Content-Type', 'application/json')

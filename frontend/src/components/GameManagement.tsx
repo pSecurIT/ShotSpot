@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
 interface Team {
@@ -21,6 +22,7 @@ interface Game {
 }
 
 const GameManagement: React.FC = () => {
+  const navigate = useNavigate();
   const [games, setGames] = useState<Game[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -40,16 +42,7 @@ const GameManagement: React.FC = () => {
   const [rescheduleGameId, setRescheduleGameId] = useState<number | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
 
-  useEffect(() => {
-    fetchTeams();
-    fetchGames();
-  }, []);
-
-  useEffect(() => {
-    fetchGames();
-  }, [filterStatus]);
-
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async () => {
     try {
       const response = await api.get('/teams');
       setTeams(response.data);
@@ -57,9 +50,9 @@ const GameManagement: React.FC = () => {
       console.error('Error fetching teams:', error);
       setError('Failed to fetch teams');
     }
-  };
+  }, []);
 
-  const fetchGames = async () => {
+  const fetchGames = useCallback(async () => {
     try {
       setError(null);
       const params = filterStatus ? { status: filterStatus } : {};
@@ -70,7 +63,16 @@ const GameManagement: React.FC = () => {
       setError(err.response?.data?.error || 'Error fetching games');
       console.error('Error fetching games:', error);
     }
-  };
+  }, [filterStatus]);
+
+  useEffect(() => {
+    fetchTeams();
+    fetchGames();
+  }, [fetchTeams, fetchGames]);
+
+  useEffect(() => {
+    fetchGames();
+  }, [filterStatus, fetchGames]);
 
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,20 +105,6 @@ const GameManagement: React.FC = () => {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error creating game');
       console.error('Error creating game:', error);
-    }
-  };
-
-  const handleStartGame = async (gameId: number) => {
-    try {
-      setError(null);
-      setSuccess(null);
-      const response = await api.post(`/games/${gameId}/start`, {});
-      setGames(games.map(game => game.id === gameId ? response.data : game));
-      setSuccess('Game started successfully');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (error) {
-      const err = error as { response?: { data?: { error?: string } }; message?: string };
-      setError(err.response?.data?.error || 'Error starting game');
     }
   };
 
@@ -326,7 +314,7 @@ const GameManagement: React.FC = () => {
             <div className="reschedule-options">
               <div className="reschedule-option">
                 <h4>Option 1: Mark as Needs Reschedule</h4>
-                <p>Set the game status to "To Reschedule" without specifying a date yet.</p>
+                <p>Set the game status to &quot;To Reschedule&quot; without specifying a date yet.</p>
                 <button 
                   onClick={() => handleRescheduleGame(false)}
                   className="secondary-button"
@@ -398,34 +386,42 @@ const GameManagement: React.FC = () => {
                 )}
 
                 <div className="game-actions">
+                  {game.status === 'in_progress' && (
+                    <>
+                      <button 
+                        onClick={() => navigate(`/match/${game.id}`)}
+                        className="primary-button"
+                      >
+                        View Live Match
+                      </button>
+                      <button 
+                        onClick={() => handleEndGame(game.id)}
+                        className="secondary-button"
+                      >
+                        End Game
+                      </button>
+                    </>
+                  )}
+
                   {game.status === 'scheduled' && (
                     <button 
-                      onClick={() => handleStartGame(game.id)}
+                      onClick={() => navigate(`/match/${game.id}`)}
                       className="primary-button"
                     >
-                      Start Game
+                      Prepare Match
                     </button>
                   )}
 
                   {game.status === 'to_reschedule' && (
                     <button 
-                      onClick={() => handleStartGame(game.id)}
+                      onClick={() => navigate(`/match/${game.id}`)}
                       className="primary-button"
                     >
-                      Start Game
+                      Prepare Match
                     </button>
                   )}
 
-                  {game.status === 'in_progress' && (
-                    <button 
-                      onClick={() => handleEndGame(game.id)}
-                      className="primary-button"
-                    >
-                      End Game
-                    </button>
-                  )}
-
-                  {(game.status === 'scheduled' || game.status === 'to_reschedule') && (
+                  {(game.status === 'scheduled' || game.status === 'to_reschedule' || game.status === 'in_progress') && (
                     <button 
                       onClick={() => openRescheduleModal(game.id)}
                       className="secondary-button"

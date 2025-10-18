@@ -4,10 +4,12 @@ import TeamManagement from './components/TeamManagement';
 import PlayerManagement from './components/PlayerManagement';
 import UserManagement from './components/UserManagement';
 import GameManagement from './components/GameManagement';
+import LiveMatch from './components/LiveMatch';
 import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
+import logo from './img/ShotSpot_logo.png';
 
 const App: React.FC = () => {
   return (
@@ -15,8 +17,13 @@ const App: React.FC = () => {
       <Router>
         <div className="App">
           <header className="App-header">
-            <h1>ShotSpot - Korfball Statistics</h1>
-            <Navigation />
+            <div className="header-content">
+              <div className="header-branding">
+                <img src={logo} alt="ShotSpot Logo" className="header-logo" />
+                <h1>ShotSpot - Korfball Statistics</h1>
+              </div>
+              <Navigation />
+            </div>
           </header>
           <main>
             <Routes>
@@ -29,6 +36,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <GameManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/match/:gameId" 
+                element={
+                  <ProtectedRoute>
+                    <LiveMatch />
                   </ProtectedRoute>
                 } 
               />

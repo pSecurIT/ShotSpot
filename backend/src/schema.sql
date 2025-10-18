@@ -27,12 +27,15 @@ CREATE TABLE IF NOT EXISTS players (
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     jersey_number INTEGER,
-    role VARCHAR(20),
+    gender VARCHAR(10),
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(team_id, jersey_number) -- Ensure unique jersey numbers within a team
+    UNIQUE(team_id, jersey_number), -- Ensure unique jersey numbers within a team
+    CHECK (gender IN ('male', 'female') OR gender IS NULL)
 );
+
+COMMENT ON TABLE players IS 'Player information. Note: Captain role is game-specific and stored in game_rosters table.';
 
 -- Games table
 CREATE TABLE IF NOT EXISTS games (
@@ -43,9 +46,21 @@ CREATE TABLE IF NOT EXISTS games (
     status VARCHAR(20) DEFAULT 'scheduled', -- scheduled, to_reschedule, in_progress, completed, cancelled
     home_score INTEGER DEFAULT 0,
     away_score INTEGER DEFAULT 0,
+    current_period INTEGER DEFAULT 1,
+    period_duration INTERVAL DEFAULT '10 minutes',
+    time_remaining INTERVAL,
+    timer_state VARCHAR(20) DEFAULT 'stopped', -- stopped, running, paused
+    timer_started_at TIMESTAMP WITH TIME ZONE,
+    timer_paused_at TIMESTAMP WITH TIME ZONE,
+    home_attacking_side VARCHAR(10), -- 'left' or 'right' - which korf the home team attacks initially
+    number_of_periods INTEGER DEFAULT 4, -- 1-10 periods, teams switch sides every period
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CHECK (home_team_id != away_team_id)
+    CHECK (home_team_id != away_team_id),
+    CHECK (current_period >= 1 AND current_period <= 10),
+    CHECK (timer_state IN ('stopped', 'running', 'paused')),
+    CHECK (home_attacking_side IN ('left', 'right') OR home_attacking_side IS NULL),
+    CHECK (number_of_periods >= 1 AND number_of_periods <= 10)
 );
 
 -- Shots table
@@ -76,6 +91,41 @@ CREATE TABLE IF NOT EXISTS game_events (
     details JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ball possessions table (track attack duration and shots per attack)
+CREATE TABLE IF NOT EXISTS ball_possessions (
+    id SERIAL PRIMARY KEY,
+    game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
+    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
+    period INTEGER NOT NULL,
+    started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP WITH TIME ZONE,
+    duration_seconds INTEGER,
+    shots_taken INTEGER DEFAULT 0,
+    result VARCHAR(20), -- goal, turnover, out_of_bounds, timeout, period_end
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for faster queries
+CREATE INDEX IF NOT EXISTS idx_ball_possessions_game_id ON ball_possessions(game_id);
+CREATE INDEX IF NOT EXISTS idx_ball_possessions_team_id ON ball_possessions(team_id);
+
+-- Game rosters table (track which players are active for each game and captain)
+CREATE TABLE IF NOT EXISTS game_rosters (
+    id SERIAL PRIMARY KEY,
+    game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
+    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
+    player_id INTEGER REFERENCES players(id) ON DELETE CASCADE NOT NULL,
+    is_captain BOOLEAN DEFAULT false,
+    is_starting BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(game_id, player_id)
+);
+
+-- Indexes for game rosters
+CREATE INDEX IF NOT EXISTS idx_game_rosters_game_id ON game_rosters(game_id);
+CREATE INDEX IF NOT EXISTS idx_game_rosters_team_id ON game_rosters(team_id);
+CREATE INDEX IF NOT EXISTS idx_game_rosters_player_id ON game_rosters(player_id);
 
 -- Create updated_at triggers
 CREATE OR REPLACE FUNCTION update_updated_at_column()
