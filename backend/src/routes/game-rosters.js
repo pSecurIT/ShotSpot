@@ -70,7 +70,8 @@ router.post(
     body('players.*.team_id').isInt().withMessage('Team ID must be an integer'),
     body('players.*.player_id').isInt().withMessage('Player ID must be an integer'),
     body('players.*.is_captain').optional().isBoolean(),
-    body('players.*.is_starting').optional().isBoolean()
+    body('players.*.is_starting').optional().isBoolean(),
+    body('players.*.starting_position').optional().isIn(['offense', 'defense']).withMessage('Starting position must be offense or defense')
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -112,15 +113,16 @@ router.post(
       const insertedPlayers = [];
       for (const player of players) {
         const result = await pool.query(
-          `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting)
-           VALUES ($1, $2, $3, $4, $5)
+          `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING *`,
           [
             gameId,
             player.team_id,
             player.player_id,
             player.is_captain || false,
-            player.is_starting !== undefined ? player.is_starting : true
+            player.is_starting !== undefined ? player.is_starting : true,
+            player.starting_position || null
           ]
         );
         insertedPlayers.push(result.rows[0]);

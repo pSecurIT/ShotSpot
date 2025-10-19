@@ -9,6 +9,76 @@ const router = express.Router();
 router.use(auth);
 
 /**
+ * Helper function to parse PostgreSQL interval to seconds
+ * PostgreSQL intervals can be returned as objects with various properties
+ */
+function intervalToSeconds(interval) {
+  if (!interval) return 0;
+  
+  console.log('intervalToSeconds input:', { interval, type: typeof interval });
+  
+  // If it's already a number, return it
+  if (typeof interval === 'number') return interval;
+  
+  // If it's an object with time components
+  if (typeof interval === 'object') {
+    // PostgreSQL node-pg returns intervals as objects with properties like:
+    // { years, months, days, hours, minutes, seconds, milliseconds }
+    // Note: milliseconds might represent the TOTAL time in ms, not additional ms!
+    
+    // Check if it's a simple time-only interval (no days/months/years)
+    const hasTimeComponents = ('hours' in interval || 'minutes' in interval || 'seconds' in interval);
+    const hasMilliseconds = 'milliseconds' in interval;
+    
+    if (hasMilliseconds && !hasTimeComponents) {
+      // If ONLY milliseconds is present, it's the total duration
+      const totalSeconds = Math.floor(interval.milliseconds / 1000);
+      console.log('intervalToSeconds: milliseconds-only format', { 
+        interval, 
+        totalSeconds 
+      });
+      return totalSeconds;
+    }
+    
+    // Otherwise, sum up all components
+    const hours = parseInt(interval.hours) || 0;
+    const minutes = parseInt(interval.minutes) || 0;
+    const seconds = parseInt(interval.seconds) || 0;
+    const days = parseInt(interval.days) || 0;
+    
+    // Convert everything to seconds (don't add milliseconds separately)
+    const totalSeconds = 
+      (days * 86400) +  // days to seconds
+      (hours * 3600) +  // hours to seconds
+      (minutes * 60) +  // minutes to seconds
+      seconds;          // seconds
+    
+    console.log('intervalToSeconds: object format', { 
+      interval, 
+      parsed: { days, hours, minutes, seconds },
+      totalSeconds 
+    });
+    return totalSeconds;
+  }
+  
+  // If it's a string like "00:10:00" (HH:MM:SS) or "01:00:00"
+  if (typeof interval === 'string') {
+    const parts = interval.split(':');
+    if (parts.length === 3) {
+      const hours = parseInt(parts[0]) || 0;
+      const minutes = parseInt(parts[1]) || 0;
+      const seconds = parseInt(parts[2]) || 0;
+      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+      console.log('intervalToSeconds: string format', { interval, parts, totalSeconds });
+      return totalSeconds;
+    }
+  }
+  
+  console.log('intervalToSeconds: unknown format', { interval, type: typeof interval });
+  return 0;
+}
+
+/**
  * Get timer state for a game
  * GET /api/timer/:gameId
  */
@@ -36,6 +106,14 @@ router.get('/:gameId', async (req, res) => {
 
     const game = result.rows[0];
 
+    console.log('Timer GET - Raw game data:', {
+      period_duration: game.period_duration,
+      period_duration_type: typeof game.period_duration,
+      time_remaining: game.time_remaining,
+      time_remaining_type: typeof game.time_remaining,
+      timer_state: game.timer_state
+    });
+
     // Calculate current time remaining if timer is running
     let currentTimeRemaining = game.time_remaining;
     
@@ -43,10 +121,17 @@ router.get('/:gameId', async (req, res) => {
       const elapsed = Date.now() - new Date(game.timer_started_at).getTime();
       const elapsedSeconds = Math.floor(elapsed / 1000);
       
-      // If time_remaining is null, start from period_duration
+      // Convert intervals to seconds
       const startingSeconds = game.time_remaining 
-        ? game.time_remaining.minutes * 60 + game.time_remaining.seconds
-        : game.period_duration.minutes * 60 + (game.period_duration.seconds || 0);
+        ? intervalToSeconds(game.time_remaining)
+        : intervalToSeconds(game.period_duration);
+      
+      console.log('Timer GET - Calculated:', {
+        elapsed,
+        elapsedSeconds,
+        startingSeconds,
+        remainingSeconds: Math.max(0, startingSeconds - elapsedSeconds)
+      });
       
       const remainingSeconds = Math.max(0, startingSeconds - elapsedSeconds);
       currentTimeRemaining = {
@@ -88,6 +173,13 @@ router.post('/:gameId/start', [
     }
 
     const game = gameResult.rows[0];
+
+    console.log('Timer START - Game state:', {
+      period_duration: game.period_duration,
+      period_duration_type: typeof game.period_duration,
+      time_remaining: game.time_remaining,
+      timer_state: game.timer_state
+    });
 
     // Can only start timer if game is in progress
     if (game.status !== 'in_progress') {
@@ -166,10 +258,10 @@ router.post('/:gameId/pause', [
     const elapsed = Date.now() - new Date(game.timer_started_at).getTime();
     const elapsedSeconds = Math.floor(elapsed / 1000);
     
-    // Calculate remaining time
+    // Calculate remaining time using helper function
     const startingSeconds = game.time_remaining 
-      ? game.time_remaining.minutes * 60 + (game.time_remaining.seconds || 0)
-      : game.period_duration.minutes * 60 + (game.period_duration.seconds || 0);
+      ? intervalToSeconds(game.time_remaining)
+      : intervalToSeconds(game.period_duration);
     
     const remainingSeconds = Math.max(0, startingSeconds - elapsedSeconds);
     

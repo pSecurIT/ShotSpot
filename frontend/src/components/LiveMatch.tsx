@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import CourtVisualization from './CourtVisualization';
+import MatchTimeline from './MatchTimeline';
 import { useTimer } from '../hooks/useTimer';
+
 
 interface Game {
   id: number;
@@ -39,6 +41,7 @@ interface Player {
   role: string;
   is_active: boolean;
   gender?: string;
+  starting_position?: 'offense' | 'defense'; // Position at match start
 }
 
 interface Possession {
@@ -88,6 +91,10 @@ const LiveMatch: React.FC = () => {
   const [selectedAwayPlayers, setSelectedAwayPlayers] = useState<Set<number>>(new Set());
   const [homeCaptainId, setHomeCaptainId] = useState<number | null>(null);
   const [awayCaptainId, setAwayCaptainId] = useState<number | null>(null);
+  
+  // Starting position state (offense/defense)
+  const [homeOffensePlayers, setHomeOffensePlayers] = useState<Set<number>>(new Set());
+  const [awayOffensePlayers, setAwayOffensePlayers] = useState<Set<number>>(new Set());
 
   // Possession tracking state
   const [activePossession, setActivePossession] = useState<Possession | null>(null);
@@ -119,29 +126,68 @@ const LiveMatch: React.FC = () => {
     if (!game) return;
     
     try {
-      const [homeResponse, awayResponse] = await Promise.all([
-        api.get(`/players?team_id=${game.home_team_id}`),
-        api.get(`/players?team_id=${game.away_team_id}`)
-      ]);
-      
-      // Filter active players and sort by jersey number
-      const sortedHomePlayers = homeResponse.data
-        .filter((p: Player) => p.is_active)
-        .sort((a: Player, b: Player) => a.jersey_number - b.jersey_number);
-      
-      const sortedAwayPlayers = awayResponse.data
-        .filter((p: Player) => p.is_active)
-        .sort((a: Player, b: Player) => a.jersey_number - b.jersey_number);
-      
-      setHomePlayers(sortedHomePlayers);
-      setAwayPlayers(sortedAwayPlayers);
+      // Use different endpoints based on game status
+      if (game.status === 'in_progress') {
+        // During match: Fetch from game roster to get starting_position data
+        const rosterResponse = await api.get(`/game-rosters/${game.id}`);
+        const rosterPlayers = rosterResponse.data;
+        
+        // Separate by team and include starting_position
+        const homePlayers = rosterPlayers
+          .filter((p: Player & { is_starting: boolean; player_id: number }) => p.team_id === game.home_team_id && p.is_starting)
+          .map((p: Player & { is_starting: boolean; player_id: number }) => ({
+            id: p.player_id,
+            team_id: p.team_id,
+            first_name: p.first_name,
+            last_name: p.last_name,
+            jersey_number: p.jersey_number,
+            gender: p.gender,
+            role: 'player',
+            is_active: true,
+            starting_position: p.starting_position
+          }))
+          .sort((a: Player, b: Player) => a.jersey_number - b.jersey_number);
+        
+        const awayPlayers = rosterPlayers
+          .filter((p: Player & { is_starting: boolean; player_id: number }) => p.team_id === game.away_team_id && p.is_starting)
+          .map((p: Player & { is_starting: boolean; player_id: number }) => ({
+            id: p.player_id,
+            team_id: p.team_id,
+            first_name: p.first_name,
+            last_name: p.last_name,
+            jersey_number: p.jersey_number,
+            gender: p.gender,
+            role: 'player',
+            is_active: true,
+            starting_position: p.starting_position
+          }))
+          .sort((a: Player, b: Player) => a.jersey_number - b.jersey_number);
+        
+        setHomePlayers(homePlayers);
+        setAwayPlayers(awayPlayers);
+      } else {
+        // Pre-match: Fetch ALL players from both teams
+        const [homeResponse, awayResponse] = await Promise.all([
+          api.get(`/players?team_id=${game.home_team_id}`),
+          api.get(`/players?team_id=${game.away_team_id}`)
+        ]);
+        
+        const homePlayers = homeResponse.data
+          .sort((a: Player, b: Player) => a.jersey_number - b.jersey_number);
+        const awayPlayers = awayResponse.data
+          .sort((a: Player, b: Player) => a.jersey_number - b.jersey_number);
+        
+        setHomePlayers(homePlayers);
+        setAwayPlayers(awayPlayers);
+      }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         console.error('Error fetching players:', error);
       }
       setError('Failed to load players');
     }
-  }, [game]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.id, game?.status, game?.home_team_id, game?.away_team_id]);
 
   // Check if teams meet minimum player requirements
   const checkTeamRequirements = (): { valid: boolean; message: string } => {
@@ -193,8 +239,64 @@ const LiveMatch: React.FC = () => {
         message: `Please select a captain for ${game?.away_team_name}`
       };
     }
+
+    // Check offense/defense assignment for home team
+    const homeOffenseCount = homeOffensePlayers.size;
+    if (homeOffenseCount !== 4) {
+      return {
+        valid: false,
+        message: `${game?.home_team_name} must assign exactly 4 players to offense (currently ${homeOffenseCount})`
+      };
+    }
+
+    // Check gender composition in home offense
+    const homeOffenseGenderCount = getGenderCount(Array.from(homeOffensePlayers), homePlayers);
+    if (homeOffenseGenderCount.male !== 2 || homeOffenseGenderCount.female !== 2) {
+      return {
+        valid: false,
+        message: `${game?.home_team_name} offense must have 2 males and 2 females. Currently: ${homeOffenseGenderCount.male} males, ${homeOffenseGenderCount.female} females`
+      };
+    }
+
+    // Check gender composition in home defense (remaining 4 players)
+    const homeDefensePlayers = Array.from(selectedHomePlayers).filter(id => !homeOffensePlayers.has(id));
+    const homeDefenseGenderCount = getGenderCount(homeDefensePlayers, homePlayers);
+    if (homeDefenseGenderCount.male !== 2 || homeDefenseGenderCount.female !== 2) {
+      return {
+        valid: false,
+        message: `${game?.home_team_name} defense must have 2 males and 2 females. Currently: ${homeDefenseGenderCount.male} males, ${homeDefenseGenderCount.female} females`
+      };
+    }
+
+    // Check offense/defense assignment for away team
+    const awayOffenseCount = awayOffensePlayers.size;
+    if (awayOffenseCount !== 4) {
+      return {
+        valid: false,
+        message: `${game?.away_team_name} must assign exactly 4 players to offense (currently ${awayOffenseCount})`
+      };
+    }
+
+    // Check gender composition in away offense
+    const awayOffenseGenderCount = getGenderCount(Array.from(awayOffensePlayers), awayPlayers);
+    if (awayOffenseGenderCount.male !== 2 || awayOffenseGenderCount.female !== 2) {
+      return {
+        valid: false,
+        message: `${game?.away_team_name} offense must have 2 males and 2 females. Currently: ${awayOffenseGenderCount.male} males, ${awayOffenseGenderCount.female} females`
+      };
+    }
+
+    // Check gender composition in away defense (remaining 4 players)
+    const awayDefensePlayers = Array.from(selectedAwayPlayers).filter(id => !awayOffensePlayers.has(id));
+    const awayDefenseGenderCount = getGenderCount(awayDefensePlayers, awayPlayers);
+    if (awayDefenseGenderCount.male !== 2 || awayDefenseGenderCount.female !== 2) {
+      return {
+        valid: false,
+        message: `${game?.away_team_name} defense must have 2 males and 2 females. Currently: ${awayDefenseGenderCount.male} males, ${awayDefenseGenderCount.female} females`
+      };
+    }
     
-    return { valid: true, message: 'Both teams meet minimum requirements' };
+    return { valid: true, message: 'Both teams meet all requirements' };
   };
 
   // Helper function to count genders in selected players
@@ -298,6 +400,76 @@ const LiveMatch: React.FC = () => {
     }
   };
 
+  // Toggle offense assignment (can only assign selected players)
+  const toggleOffenseAssignment = (playerId: number, teamId: number) => {
+    const player = (teamId === game?.home_team_id ? homePlayers : awayPlayers).find(p => p.id === playerId);
+    if (!player) return;
+
+    if (teamId === game?.home_team_id) {
+      setHomeOffensePlayers(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(playerId)) {
+          // Remove from offense (will be defense)
+          newSet.delete(playerId);
+        } else {
+          // Check if we already have 4 offense players
+          if (newSet.size >= 4) {
+            setError(`${game?.home_team_name} can only have 4 offense players`);
+            setTimeout(() => setError(null), 3000);
+            return prev;
+          }
+          
+          // Check gender limits for offense (2 males, 2 females)
+          const currentOffenseCounts = getGenderCount(Array.from(newSet), homePlayers);
+          if (player.gender === 'male' && currentOffenseCounts.male >= 2) {
+            setError('Offense can only have 2 male players');
+            setTimeout(() => setError(null), 3000);
+            return prev;
+          }
+          if (player.gender === 'female' && currentOffenseCounts.female >= 2) {
+            setError('Offense can only have 2 female players');
+            setTimeout(() => setError(null), 3000);
+            return prev;
+          }
+          
+          newSet.add(playerId);
+        }
+        return newSet;
+      });
+    } else {
+      setAwayOffensePlayers(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(playerId)) {
+          // Remove from offense (will be defense)
+          newSet.delete(playerId);
+        } else {
+          // Check if we already have 4 offense players
+          if (newSet.size >= 4) {
+            setError(`${game?.away_team_name} can only have 4 offense players`);
+            setTimeout(() => setError(null), 3000);
+            return prev;
+          }
+          
+          // Check gender limits for offense (2 males, 2 females)
+          const currentOffenseCounts = getGenderCount(Array.from(newSet), awayPlayers);
+          if (player.gender === 'male' && currentOffenseCounts.male >= 2) {
+            setError('Offense can only have 2 male players');
+            setTimeout(() => setError(null), 3000);
+            return prev;
+          }
+          if (player.gender === 'female' && currentOffenseCounts.female >= 2) {
+            setError('Offense can only have 2 female players');
+            setTimeout(() => setError(null), 3000);
+            return prev;
+          }
+          
+          newSet.add(playerId);
+        }
+        return newSet;
+      });
+    }
+  };
+
   // Start the match
   const handleStartMatch = async () => {
     const requirements = checkTeamRequirements();
@@ -316,37 +488,60 @@ const LiveMatch: React.FC = () => {
           team_id: game!.home_team_id,
           player_id: playerId,
           is_captain: playerId === homeCaptainId,
-          is_starting: true
+          is_starting: true,
+          starting_position: homeOffensePlayers.has(playerId) ? 'offense' : 'defense'
         })),
         ...Array.from(selectedAwayPlayers).map(playerId => ({
           team_id: game!.away_team_id,
           player_id: playerId,
           is_captain: playerId === awayCaptainId,
-          is_starting: true
+          is_starting: true,
+          starting_position: awayOffensePlayers.has(playerId) ? 'offense' : 'defense'
         }))
       ];
 
-      // Save game roster
-      await api.post(`/game-rosters/${gameId}`, {
-        players: rosterPlayers
-      });
+      // Format period duration
+      const hours = Math.floor(periodDurationMinutes / 60);
+      const minutes = periodDurationMinutes % 60;
+      const periodDurationFormatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
       
-      // Set game configuration (attacking side, periods, duration)
-      const periodDurationFormatted = `${String(periodDurationMinutes).padStart(2, '0')}:00:00`;
-      await api.put(`/games/${gameId}`, {
-        home_attacking_side: homeAttackingSide,
-        number_of_periods: numberOfPeriods,
-        period_duration: periodDurationFormatted,
-        status: 'in_progress'
-      });
-      
-      await fetchGame();
+      // IMMEDIATELY hide pre-match setup and show match screen (instant UI response)
       setShowPreMatchSetup(false);
-      setSuccess('Match started! Good luck to both teams!');
-      setTimeout(() => setSuccess(null), 3000);
+      setSuccess('Match started! Setting up game...');
+      
+      // Execute ALL operations in background (completely non-blocking)
+      Promise.all([
+        api.post(`/game-rosters/${gameId}`, { players: rosterPlayers }),
+        api.put(`/games/${gameId}`, {
+          home_attacking_side: homeAttackingSide,
+          number_of_periods: numberOfPeriods,
+          period_duration: periodDurationFormatted,
+          status: 'in_progress'
+        })
+      ])
+        .then(() => {
+          // After API calls complete, fetch updated data
+          return Promise.all([
+            fetchGame(),
+            fetchTimerState(),
+            fetchPlayers() // Reload players with starting_position data
+          ]);
+        })
+        .then(() => {
+          setSuccess('Match ready! Good luck to both teams!');
+          setTimeout(() => setSuccess(null), 3000);
+        })
+        .catch(err => {
+          const error = err as { response?: { data?: { error?: string } }; message?: string };
+          setError(error.response?.data?.error || 'Error starting match');
+          // If error, show pre-match setup again
+          setShowPreMatchSetup(true);
+        });
     } catch (error) {
+      // Handle synchronous errors (e.g., validation errors)
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error starting match');
+      setShowPreMatchSetup(true);
     }
   };
 
@@ -361,7 +556,7 @@ const LiveMatch: React.FC = () => {
     loadData();
   }, [gameId, fetchGame]);
 
-  // Fetch players when game is loaded
+  // Fetch players when game is loaded or status changes
   useEffect(() => {
     if (game) {
       fetchPlayers();
@@ -377,7 +572,7 @@ const LiveMatch: React.FC = () => {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.id, game?.status, game?.home_attacking_side, fetchPlayers]);
+  }, [game?.id, game?.status, game?.home_attacking_side]);
 
   // Timer control handlers
   const handleStartTimer = async () => {
@@ -397,13 +592,19 @@ const LiveMatch: React.FC = () => {
         setTimeout(() => setSuccess(null), 3000);
       }
       
-      // Start timer and fetch state in parallel, don't block UI
-      api.post(`/timer/${gameId}/start`, {})
-        .then(() => fetchTimerState())
+      // Start timer API call and immediately refresh state (don't wait for API)
+      // This makes the pause overlay disappear instantly
+      const startPromise = api.post(`/timer/${gameId}/start`, {})
         .catch(err => {
           const error = err as { response?: { data?: { error?: string } }; message?: string };
           setError(error.response?.data?.error || 'Error starting timer');
         });
+      
+      // Fetch timer state immediately (optimistically) for instant UI update
+      fetchTimerState();
+      
+      // Wait for API to complete in background
+      await startPromise;
       
       if (!wasFirstStart) {
         setSuccess('Timer started');
@@ -419,17 +620,14 @@ const LiveMatch: React.FC = () => {
     try {
       setError(null);
       
-      // Optimistically show paused state immediately
+      // Pause timer and wait for it to complete
+      await api.post(`/timer/${gameId}/pause`, {});
+      
+      // Fetch updated timer state
+      await fetchTimerState();
+      
       setSuccess('Timer paused');
       setTimeout(() => setSuccess(null), 2000);
-      
-      // Update backend asynchronously
-      api.post(`/timer/${gameId}/pause`, {})
-        .then(() => fetchTimerState())
-        .catch(err => {
-          const error = err as { response?: { data?: { error?: string } }; message?: string };
-          setError(error.response?.data?.error || 'Error pausing timer');
-        });
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error pausing timer');
@@ -502,8 +700,12 @@ const LiveMatch: React.FC = () => {
     try {
       const response = await api.get(`/possessions/${gameId}/active`);
       setActivePossession(response.data);
-    } catch (error) {
-      // No active possession is normal
+    } catch (error: unknown) {
+      // 404 is expected when there's no active possession (before game starts or between possessions)
+      const err = error as { response?: { status?: number } };
+      if (err?.response?.status !== 404 && process.env.NODE_ENV === 'development') {
+        console.error('Error fetching active possession:', error);
+      }
       setActivePossession(null);
     }
   }, [gameId]);
@@ -543,43 +745,42 @@ const LiveMatch: React.FC = () => {
   }, [game, timerState?.current_period, gameId, fetchActivePossession]);
 
   const handleShotRecorded = useCallback(async (shotInfo: { result: 'goal' | 'miss' | 'blocked'; teamId: number; opposingTeamId: number }) => {
-    // Increment shot counter for active possession
+    // Increment shot counter for active possession (for ALL shots, not just goals)
     if (activePossession) {
-      try {
-        await api.patch(`/possessions/${gameId}/${activePossession.id}/increment-shots`);
-        await fetchActivePossession();
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error incrementing shot counter:', error);
-        }
-      }
+      api.patch(`/possessions/${gameId}/${activePossession.id}/increment-shots`, {})
+        .catch(error => {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error incrementing shot counter:', error);
+          }
+        });
     }
     
-    // If it's a goal, pause the timer and switch possession to opposing team
+    // Handle goal-specific actions (pause is now handled in CourtVisualization)
     if (shotInfo.result === 'goal') {
-      try {
-        // Pause the timer
-        if (timerState?.timer_state === 'running') {
-          await api.post(`/timer/${gameId}/pause`, {});
-          await fetchTimerState();
-        }
-        
-        // Give possession to the opposing team automatically
-        await handleCenterLineCross(shotInfo.opposingTeamId);
-        
-        setSuccess('⚽ GOAL! Timer paused. Press Start to resume with opposing team possession.');
-        setTimeout(() => setSuccess(null), 5000);
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error handling goal:', error);
-        }
-      }
+      // Give possession to the opposing team (non-blocking)
+      handleCenterLineCross(shotInfo.opposingTeamId)
+        .catch(error => {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error switching possession:', error);
+          }
+        });
+      
+      setSuccess('⚽ GOAL! Timer paused. Click on the court to resume.');
+      setTimeout(() => setSuccess(null), 5000);
     }
     
-    // Refresh game data
-    await fetchGame();
-    await fetchPossessionStats();
-  }, [activePossession, gameId, timerState?.timer_state, handleCenterLineCross, fetchActivePossession, fetchTimerState, fetchGame, fetchPossessionStats]);
+    // Refresh game data in parallel (non-blocking)
+    Promise.all([
+      fetchGame(),
+      fetchPossessionStats(),
+      fetchActivePossession(),
+      fetchTimerState()
+    ]).catch(error => {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error refreshing game data:', error);
+      }
+    });
+  }, [activePossession, gameId, handleCenterLineCross, fetchActivePossession, fetchTimerState, fetchGame, fetchPossessionStats]);
 
   // Load possession data
   useEffect(() => {
@@ -675,7 +876,7 @@ const LiveMatch: React.FC = () => {
           <div className="team-requirements">
             <h4>Select Team Rosters</h4>
             <p className="requirement-note">
-              Select at least 8 players per team (4 males and 4 females) and designate a captain for each team.
+              Select 8 players per team (4 males and 4 females), designate a captain, and assign 4 players to offense (2M + 2F) and 4 to defense (2M + 2F).
             </p>
             
             <div className="team-roster-grid">
@@ -693,6 +894,27 @@ const LiveMatch: React.FC = () => {
                     </span>
                   </div>
                   {homeCaptainId && <span className="captain-selected">👑 Captain selected</span>}
+                  {selectedHomePlayers.size === 8 && (
+                    <div className="position-count">
+                      {(() => {
+                        const offenseCount = getGenderCount(Array.from(homeOffensePlayers), homePlayers);
+                        const defenseCount = getGenderCount(
+                          Array.from(selectedHomePlayers).filter(id => !homeOffensePlayers.has(id)),
+                          homePlayers
+                        );
+                        return (
+                          <>
+                            <span className={offenseCount.male === 2 && offenseCount.female === 2 ? 'position-valid' : 'position-invalid'}>
+                              ⚔️ Offense: {offenseCount.male}M {offenseCount.female}F
+                            </span>
+                            <span className={defenseCount.male === 2 && defenseCount.female === 2 ? 'position-valid' : 'position-invalid'}>
+                              🛡️ Defense: {defenseCount.male}M {defenseCount.female}F
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="player-selection-list">
@@ -719,13 +941,22 @@ const LiveMatch: React.FC = () => {
                         </span>
                       </label>
                       {selectedHomePlayers.has(player.id) && (
-                        <button
-                          className={`captain-button ${homeCaptainId === player.id ? 'active' : ''}`}
-                          onClick={() => setCaptain(player.id, game.home_team_id)}
-                          title="Set as captain"
-                        >
-                          {homeCaptainId === player.id ? '👑 Captain' : 'Make Captain'}
-                        </button>
+                        <>
+                          <button
+                            className={`captain-button ${homeCaptainId === player.id ? 'active' : ''}`}
+                            onClick={() => setCaptain(player.id, game.home_team_id)}
+                            title="Set as captain"
+                          >
+                            {homeCaptainId === player.id ? '👑 Captain' : 'Make Captain'}
+                          </button>
+                          <button
+                            className={`offense-button ${homeOffensePlayers.has(player.id) ? 'active' : ''}`}
+                            onClick={() => toggleOffenseAssignment(player.id, game.home_team_id)}
+                            title="Assign to offense (need 2M + 2F)"
+                          >
+                            {homeOffensePlayers.has(player.id) ? '⚔️ Offense' : '🛡️ Defense'}
+                          </button>
+                        </>
                       )}
                     </div>
                   ))}
@@ -746,6 +977,27 @@ const LiveMatch: React.FC = () => {
                     </span>
                   </div>
                   {awayCaptainId && <span className="captain-selected">👑 Captain selected</span>}
+                  {selectedAwayPlayers.size === 8 && (
+                    <div className="position-count">
+                      {(() => {
+                        const offenseCount = getGenderCount(Array.from(awayOffensePlayers), awayPlayers);
+                        const defenseCount = getGenderCount(
+                          Array.from(selectedAwayPlayers).filter(id => !awayOffensePlayers.has(id)),
+                          awayPlayers
+                        );
+                        return (
+                          <>
+                            <span className={offenseCount.male === 2 && offenseCount.female === 2 ? 'position-valid' : 'position-invalid'}>
+                              ⚔️ Offense: {offenseCount.male}M {offenseCount.female}F
+                            </span>
+                            <span className={defenseCount.male === 2 && defenseCount.female === 2 ? 'position-valid' : 'position-invalid'}>
+                              🛡️ Defense: {defenseCount.male}M {defenseCount.female}F
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="player-selection-list">
@@ -772,13 +1024,22 @@ const LiveMatch: React.FC = () => {
                         </span>
                       </label>
                       {selectedAwayPlayers.has(player.id) && (
-                        <button
-                          className={`captain-button ${awayCaptainId === player.id ? 'active' : ''}`}
-                          onClick={() => setCaptain(player.id, game.away_team_id)}
-                          title="Set as captain"
-                        >
-                          {awayCaptainId === player.id ? '👑 Captain' : 'Make Captain'}
-                        </button>
+                        <>
+                          <button
+                            className={`captain-button ${awayCaptainId === player.id ? 'active' : ''}`}
+                            onClick={() => setCaptain(player.id, game.away_team_id)}
+                            title="Set as captain"
+                          >
+                            {awayCaptainId === player.id ? '👑 Captain' : 'Make Captain'}
+                          </button>
+                          <button
+                            className={`offense-button ${awayOffensePlayers.has(player.id) ? 'active' : ''}`}
+                            onClick={() => toggleOffenseAssignment(player.id, game.away_team_id)}
+                            title="Assign to offense (need 2M + 2F)"
+                          >
+                            {awayOffensePlayers.has(player.id) ? '⚔️ Offense' : '🛡️ Defense'}
+                          </button>
+                        </>
                       )}
                     </div>
                   ))}
@@ -917,7 +1178,11 @@ const LiveMatch: React.FC = () => {
           </div>
           <div className="timer-display">
             <div className="time-remaining">
-              {formatTime(timerState?.time_remaining || game.time_remaining)}
+              {formatTime(
+                timerState?.time_remaining || 
+                game.time_remaining || 
+                game.period_duration
+              )}
             </div>
             <div className="timer-status">
               {timerState?.timer_state || game.timer_state}
@@ -994,24 +1259,25 @@ const LiveMatch: React.FC = () => {
           onCenterLineCross={handleCenterLineCross}
           homePlayers={homePlayers}
           awayPlayers={awayPlayers}
+          timerState={timerState?.timer_state}
+          onResumeTimer={handleStartTimer}
+          onPauseTimer={handlePauseTimer}
         />
       </div>
 
       {/* Main content area - placeholders for future components */}
       <div className="match-content">
-        <div className="content-section">
-          <h3>Game Events</h3>
-          <div className="placeholder-box">
-            <p>Event logging forms will appear here</p>
-            <p>Record fouls, substitutions, and timeouts</p>
-          </div>
-        </div>
-
         <div className="content-section full-width">
-          <h3>Match Timeline</h3>
-          <div className="placeholder-box">
-            <p>Chronological list of all shots and events will appear here</p>
-          </div>
+          <MatchTimeline
+            gameId={game.id}
+            homeTeamId={game.home_team_id}
+            awayTeamId={game.away_team_id}
+            homeTeamName={game.home_team_name}
+            awayTeamName={game.away_team_name}
+            homePlayers={homePlayers}
+            awayPlayers={awayPlayers}
+            onRefresh={fetchGame}
+          />
         </div>
       </div>
     </div>

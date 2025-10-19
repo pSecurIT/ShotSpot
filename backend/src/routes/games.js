@@ -547,19 +547,39 @@ router.post('/:id/reschedule', [
 
 /**
  * Delete a game
+ * Requires admin or coach role
+ * Cascading deletes will automatically remove:
+ * - All shots associated with the game
+ * - All game events (fouls, substitutions, timeouts)
+ * - All ball possessions
+ * - All game roster entries
  */
 router.delete('/:id', [
-  requireRole(['admin'])
+  requireRole(['admin', 'coach'])
 ], async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await db.query('DELETE FROM games WHERE id = $1 RETURNING *', [id]);
+    // First check if game exists
+    const gameCheck = await db.query(
+      'SELECT id, status, home_team_name, away_team_name FROM (SELECT g.id, g.status, ht.name as home_team_name, at.name as away_team_name FROM games g JOIN teams ht ON g.home_team_id = ht.id JOIN teams at ON g.away_team_id = at.id WHERE g.id = $1) AS game_info',
+      [id]
+    );
     
-    if (result.rows.length === 0) {
+    if (gameCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Game not found' });
     }
 
+    const game = gameCheck.rows[0];
+    
+    // Log the deletion for audit purposes
+    console.log(`Deleting game ${id}: ${game.home_team_name} vs ${game.away_team_name} (Status: ${game.status})`);
+    
+    // Delete the game (cascade will handle related records)
+    const result = await db.query('DELETE FROM games WHERE id = $1 RETURNING id', [id]);
+    
+    console.log(`Successfully deleted game ${id} and all related records`);
+    
     res.status(204).send();
   } catch (err) {
     console.error('Error deleting game:', err);
