@@ -71,70 +71,117 @@
 - Video tagging integration
 - Integration with competition platforms or league databases
 
-## 🚀 Deployment
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 18+ and npm
-- PostgreSQL 14+
-- Git
+- **Node.js** 18+ and npm ([Download here](https://nodejs.org/))
+- **PostgreSQL** 14+ ([Download here](https://www.postgresql.org/download/))
+- **Git** ([Download here](https://git-scm.com/downloads))
 
-### Environment Setup
+### Installation (5 minutes)
 
-1. Clone the repository:
+1. **Clone and install**:
    ```bash
    git clone https://github.com/pSecurIT/Korfball-game-statistics.git
    cd Korfball-game-statistics
+   npm run install:all
    ```
 
-2. Install dependencies:
+2. **Set up environment**:
    ```bash
-   # Backend
-   cd backend
-   npm install
-
-   # Frontend
-   cd ../frontend
-   npm install
-   ```
-
-3. Configure environment variables:
-   ```bash
-   # Backend
+   # Copy example environment file
    cp backend/.env.example backend/.env
-   # Frontend
-   cp frontend/.env.example frontend/.env
+   
+   # Edit backend/.env and set your PostgreSQL password:
+   # - DB_PASSWORD=your_secure_password
+   # - POSTGRES_PASSWORD=your_postgres_password (if needed)
+   # - JWT_SECRET=generate_a_random_32_character_string
    ```
 
-### Database Setup
-
-1. Create PostgreSQL database and user:
+3. **Set up database**:
    ```bash
-   cd backend/scripts
-   node setup-db.js
+   npm run setup-db
    ```
 
-2. Run migrations:
+4. **Start the application**:
    ```bash
-   cd ..
-   npm run migrate
+   npm run dev
    ```
 
-### Production Deployment
+The app will automatically open at http://localhost:3000 🎉
 
-1. Build frontend:
-   ```bash
-   cd frontend
-   npm run build
-   ```
+### Running the Application
 
-2. Start production server:
-   ```bash
-   cd ../backend
-   npm start
-   ```
+**Development mode** (with hot-reload):
+```bash
+npm run dev
+```
 
-For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+**Production mode** (optimized):
+```bash
+# Build frontend
+cd frontend && npm run build && cd ..
+
+# Start backend
+cd backend && npm start
+```
+
+Access at:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:3001/api
+- **Network Access**: http://[your-ip]:3000 (for tablets/phones)
+
+### Testing
+
+```bash
+# Backend tests
+cd backend && npm test
+
+# Frontend tests
+cd frontend && npm test
+
+# Frontend tests with coverage
+cd frontend && npm run coverage
+
+# Run linting
+npm run lint
+```
+
+## 📖 Documentation
+
+### Quick Navigation
+
+**👋 Getting Started**
+- 🚀 **New User?** Start with [QUICKSTART.md](QUICKSTART.md) (5 minutes)
+- 💻 **Installing for field testing?** See [INSTALLATION.md](INSTALLATION.md) (Complete guide)
+- 🔧 **Need commands?** Check [BUILD.md](BUILD.md) (Command reference)
+
+**🎯 By Use Case**
+- **Coach/Field Testing**: [INSTALLATION.md](INSTALLATION.md) → Everything you need for match day
+- **Developer**: [BUILD.md](BUILD.md) + [frontend/README.md](frontend/README.md) → Dev workflow
+- **Production Deployment**: [DEPLOYMENT.md](DEPLOYMENT.md) → Server deployment guide
+- **Having Issues?**: [INSTALLATION.md#troubleshooting](INSTALLATION.md#troubleshooting) → 15+ solutions
+
+### All Documentation
+
+📚 **Complete Documentation Set**:
+
+| Document | Purpose | Time to Read |
+|----------|---------|--------------|
+| **[QUICKSTART.md](QUICKSTART.md)** | Get running in 5 minutes | 5 min |
+| **[INSTALLATION.md](INSTALLATION.md)** | Complete installation & troubleshooting | 15 min |
+| **[BUILD.md](BUILD.md)** | Build/run command reference | 10 min |
+| **[DEPLOYMENT.md](DEPLOYMENT.md)** | Production deployment guide | 20 min |
+| **[SECURITY.md](SECURITY.md)** | Security best practices | 10 min |
+| **[SECRETS.md](SECRETS.md)** | Secrets management | 5 min |
+| **[frontend/README.md](frontend/README.md)** | Frontend development | 10 min |
+| **[CHANGES_SUMMARY.md](CHANGES_SUMMARY.md)** | Recent updates | 5 min |
+| **[DOCUMENTATION_SUMMARY.md](DOCUMENTATION_SUMMARY.md)** | Doc update summary | 5 min |
+
+**Total Documentation**: 90 minutes of comprehensive guides
+
+For detailed installation instructions (including troubleshooting), see **[INSTALLATION.md](INSTALLATION.md)**.
 
 ## 🔒 Security
 

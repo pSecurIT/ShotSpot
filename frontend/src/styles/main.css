@@ -999,6 +999,37 @@ select.error:focus {
   background-color: #f5f5f5;
 }
 
+.court-container.paused {
+  cursor: pointer;
+}
+
+.pause-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.pause-icon {
+  font-size: 5rem;
+  margin-bottom: 1rem;
+}
+
+.pause-text {
+  font-size: 1.5rem;
+  color: white;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
 .court-image {
   width: 100%;
   height: auto;
@@ -1050,6 +1081,64 @@ select.error:focus {
     transform: translate(-50%, -50%) scale(1.2);
     opacity: 0.8;
   }
+}
+
+.shot-type-buttons {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.shot-type-label {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #333;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.shot-type-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.75rem 1rem;
+  border: 2px solid #1976D2;
+  background-color: white;
+  color: #1976D2;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.shot-type-btn:hover {
+  background-color: #E3F2FD;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(25, 118, 210, 0.2);
+}
+
+.shot-type-btn.active {
+  background-color: #1976D2;
+  color: white;
+  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4);
+}
+
+.helper-text {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: #666;
+  font-style: italic;
 }
 
 .shot-controls {
@@ -1249,9 +1338,33 @@ select.error:focus {
 }
 
 .shot-stats h4 {
-  margin: 0 0 0.75rem 0;
-  font-size: 1rem;
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
   color: #333;
+  text-align: center;
+}
+
+.team-shot-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.team-stat-section {
+  background: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+}
+
+.team-stat-section h5 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #ddd;
 }
 
 .stats-grid {
@@ -1299,6 +1412,11 @@ select.error:focus {
   .legend-items {
     flex-direction: column;
     gap: 0.75rem;
+  }
+
+  .team-shot-stats {
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .stats-grid {
@@ -2056,6 +2174,32 @@ select.error:focus {
   font-size: 0.95rem;
 }
 
+.position-count {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.position-count span {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+}
+
+.position-valid {
+  background-color: #e3f2fd !important;
+  color: #1565c0;
+  font-weight: 600;
+}
+
+.position-invalid {
+  background-color: #fff3e0 !important;
+  color: #e65100;
+  font-weight: 600;
+}
+
 .player-selection-list {
   max-height: 400px;
   overflow-y: auto;
@@ -2146,6 +2290,30 @@ select.error:focus {
   color: white;
 }
 
+.offense-button {
+  padding: 0.4rem 0.8rem;
+  border: 2px solid #1976D2;
+  background-color: #1976D2;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.offense-button:hover {
+  background-color: #1565C0;
+  border-color: #1565C0;
+}
+
+.offense-button.active {
+  background-color: #D32F2F;
+  border-color: #D32F2F;
+  color: white;
+}
+
 /* Responsive adjustments for roster selection */
 @media (max-width: 1024px) {
   .team-roster-grid {
@@ -2164,7 +2332,8 @@ select.error:focus {
     gap: 0.5rem;
   }
 
-  .captain-button {
+  .captain-button,
+  .offense-button {
     width: 100%;
   }
 }

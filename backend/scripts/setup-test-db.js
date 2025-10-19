@@ -23,6 +23,16 @@ async function setupTestDb() {
   const dbPort = process.env.DB_PORT || '5432';
   const dbName = process.env.DB_NAME || 'shotspot_test_db';
 
+  console.log('Setting up test database with config:', {
+    adminUser,
+    dbUser,
+    dbHost,
+    dbPort,
+    dbName,
+    hasAdminPassword: !!adminPassword,
+    hasDbPassword: !!dbPassword
+  });
+
   // Connect as postgres superuser to create test database and user
   const adminPool = new pg.Pool({
     user: adminUser,
@@ -33,30 +43,36 @@ async function setupTestDb() {
   });
 
   try {
-    // Create test user if it doesn't exist
-    await adminPool.query(`
-      DO $$ 
-      BEGIN
-        IF NOT EXISTS (SELECT FROM pg_user WHERE usename = '${dbUser}') THEN
-          CREATE USER ${dbUser} WITH PASSWORD '${dbPassword}';
-        END IF;
-      END $$;
-    `);
+    // Create test user if it doesn't exist (only if different from admin user)
+    if (dbUser !== adminUser) {
+      await adminPool.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (SELECT FROM pg_user WHERE usename = '${dbUser}') THEN
+            CREATE USER ${dbUser} WITH PASSWORD '${dbPassword}';
+          END IF;
+        END $$;
+      `);
+      console.log(`Ensured user ${dbUser} exists`);
+    }
 
     // Drop test database if it exists
     await adminPool.query(`
       DROP DATABASE IF EXISTS ${dbName};
     `);
+    console.log(`Dropped database ${dbName} if it existed`);
 
-    // Create test database
+    // Create test database with appropriate owner
+    const owner = (dbUser !== adminUser) ? dbUser : adminUser;
     await adminPool.query(`
-      CREATE DATABASE ${dbName} OWNER ${dbUser};
+      CREATE DATABASE ${dbName} OWNER ${owner};
     `);
+    console.log(`Created database ${dbName} with owner ${owner}`);
 
-    // Connect to test database
+    // Connect to test database (use admin credentials if dbUser is same as admin)
     const testPool = new pg.Pool({
-      user: dbUser,
-      password: String(dbPassword), // Ensure password is a string
+      user: (dbUser === adminUser) ? adminUser : dbUser,
+      password: String((dbUser === adminUser) ? adminPassword : dbPassword),
       host: dbHost,
       port: parseInt(dbPort),
       database: dbName

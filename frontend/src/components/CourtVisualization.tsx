@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import api from '../utils/api';
-import courtImageUrl from '../img/Korfbalveld-breed.PNG?url';
+import courtImageUrl from '../img/Korfbalveld-breed.PNG';
 
 interface Player {
   id: number;
@@ -10,6 +10,7 @@ interface Player {
   jersey_number: number;
   role: string;
   is_active: boolean;
+  starting_position?: 'offense' | 'defense'; // Position at match start
 }
 
 interface Shot {
@@ -57,6 +58,9 @@ interface CourtVisualizationProps {
   onCenterLineCross: (teamId: number) => void;
   homePlayers?: Player[]; // Optional: If provided, won't fetch
   awayPlayers?: Player[]; // Optional: If provided, won't fetch
+  timerState?: string; // 'running' | 'paused' | 'stopped'
+  onResumeTimer?: () => void; // Resume timer when clicking court
+  onPauseTimer?: () => Promise<void>; // Pause timer immediately when goal scored
 }
 
 const CourtVisualization: React.FC<CourtVisualizationProps> = ({
@@ -72,7 +76,10 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   possessionDuration,
   onCenterLineCross,
   homePlayers: homePlayersProps,
-  awayPlayers: awayPlayersProps
+  awayPlayers: awayPlayersProps,
+  timerState,
+  onResumeTimer,
+  onPauseTimer
 }) => {
   const [homePlayers, setHomePlayers] = useState<Player[]>(homePlayersProps || []);
   const [awayPlayers, setAwayPlayers] = useState<Player[]>(awayPlayersProps || []);
@@ -80,11 +87,15 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
+  // Track if we've logged the "no starting_position" warning to avoid console spam
+  const hasLoggedPositionWarning = useRef({ home: false, away: false });
+  
   // Form state
   const [selectedTeam, setSelectedTeam] = useState<'home' | 'away'>('home');
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
-  const [shotType, setShotType] = useState<string>('');
+  const [shotType, setShotType] = useState<string>('running_shot'); // Default to most common shot type
   const [clickedCoords, setClickedCoords] = useState<{ x: number; y: number } | null>(null);
+  const [lastSelectedPlayerId, setLastSelectedPlayerId] = useState<number | null>(null); // Remember last player
   
   // Korf (goal) positions on the field - these are constants, no need to recalculate
   const KORF_LEFT = useMemo(() => ({ x: 13, y: 50 }), []);  // Left korf at 13% from left, center height
@@ -137,17 +148,46 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     }
 
     try {
-      const [homeResponse, awayResponse] = await Promise.all([
-        api.get(`/players?team_id=${homeTeamId}`),
-        api.get(`/players?team_id=${awayTeamId}`)
-      ]);
+      // Fetch from game roster to get starting_position data
+      const rosterResponse = await api.get(`/game-rosters/${gameId}`);
+      const rosterPlayers = rosterResponse.data;
       
-      setHomePlayers(homeResponse.data.filter((p: Player) => p.is_active));
-      setAwayPlayers(awayResponse.data.filter((p: Player) => p.is_active));
+      // Separate by team and include starting_position
+      const homePlayers = rosterPlayers
+        .filter((p: Player & { is_starting: boolean; player_id: number }) => p.team_id === homeTeamId && p.is_starting)
+        .map((p: Player & { is_starting: boolean; player_id: number }) => ({
+          id: p.player_id,
+          team_id: p.team_id,
+          first_name: p.first_name,
+          last_name: p.last_name,
+          jersey_number: p.jersey_number,
+          role: 'player',
+          is_active: true,
+          starting_position: p.starting_position
+        }));
       
-      // Auto-select first player
-      if (homeResponse.data.length > 0) {
-        setSelectedPlayerId(homeResponse.data[0].id);
+      const awayPlayers = rosterPlayers
+        .filter((p: Player & { is_starting: boolean; player_id: number }) => p.team_id === awayTeamId && p.is_starting)
+        .map((p: Player & { is_starting: boolean; player_id: number }) => ({
+          id: p.player_id,
+          team_id: p.team_id,
+          first_name: p.first_name,
+          last_name: p.last_name,
+          jersey_number: p.jersey_number,
+          role: 'player',
+          is_active: true,
+          starting_position: p.starting_position
+        }));
+      
+      setHomePlayers(homePlayers);
+      setAwayPlayers(awayPlayers);
+      
+      // Auto-select first offensive player
+      const firstOffensivePlayer = homePlayers.find((p: Player) => p.starting_position === 'offense');
+      if (firstOffensivePlayer) {
+        setSelectedPlayerId(firstOffensivePlayer.id);
+      } else if (homePlayers.length > 0) {
+        setSelectedPlayerId(homePlayers[0].id);
       }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
@@ -155,7 +195,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       }
       setError('Failed to load players');
     }
-  }, [homeTeamId, awayTeamId, homePlayersProps, awayPlayersProps]);
+  }, [gameId, homeTeamId, awayTeamId, homePlayersProps, awayPlayersProps]);
 
   const fetchShots = useCallback(async () => {
     try {
@@ -190,6 +230,28 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     fetchShots();
   }, [fetchPlayers, fetchShots, homePlayersProps, awayPlayersProps]);
 
+  // Auto-select first offensive player when players or shots change
+  useEffect(() => {
+    if (!selectedPlayerId && (homePlayers.length > 0 || awayPlayers.length > 0)) {
+      const teamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
+      
+      // Calculate current offensive players inline
+      const teamPlayers = teamId === homeTeamId ? homePlayers : awayPlayers;
+      const teamGoals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+      const switches = Math.floor(teamGoals / 2);
+      const positionsSwapped = switches % 2 === 1;
+      
+      const offensivePlayers = teamPlayers.filter(player => {
+        const isStartingOffense = player.starting_position === 'offense';
+        return positionsSwapped ? !isStartingOffense : isStartingOffense;
+      });
+      
+      if (offensivePlayers.length > 0) {
+        setSelectedPlayerId(offensivePlayers[0].id);
+      }
+    }
+  }, [homePlayers, awayPlayers, shots, selectedPlayerId, selectedTeam, homeTeamId, awayTeamId]);
+
   // Calculate distance from a point to the nearest korf in meters - memoize with useCallback
   const calculateDistanceToKorf = useCallback((x: number, y: number): number => {
     const distToLeft = Math.sqrt(
@@ -206,9 +268,56 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     return Math.round(Math.min(distToLeft, distToRight) * 10) / 10;
   }, [KORF_LEFT, KORF_RIGHT]);
 
+  // Calculate which players are currently in offense for a team
+  // Offense and defense switch every 2 goals scored by that team
+  const getCurrentOffensivePlayers = useCallback((teamId: number): Player[] => {
+    const teamPlayers = teamId === homeTeamId ? homePlayers : awayPlayers;
+    
+    // If no players have starting_position data, return all players as fallback
+    const hasPositionData = teamPlayers.some(p => p.starting_position);
+    if (!hasPositionData) {
+      // Only log once per team to avoid console spam
+      const teamKey = teamId === homeTeamId ? 'home' : 'away';
+      if (process.env.NODE_ENV === 'development' && teamPlayers.length > 0 && !hasLoggedPositionWarning.current[teamKey]) {
+        console.warn(`[${teamKey === 'home' ? 'Home' : 'Away'} Team] No starting_position data, showing all ${teamPlayers.length} players`);
+        hasLoggedPositionWarning.current[teamKey] = true;
+      }
+      return teamPlayers;
+    }
+    
+    // Count goals scored by this team
+    const teamGoals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+    
+    // Number of position switches (every 2 goals)
+    const switches = Math.floor(teamGoals / 2);
+    
+    // If odd number of switches, offense and defense are swapped
+    const positionsSwapped = switches % 2 === 1;
+    
+    // Filter players based on current position
+    const offensivePlayers = teamPlayers.filter(player => {
+      const isStartingOffense = player.starting_position === 'offense';
+      // If positions swapped, starting defense is now offense and vice versa
+      return positionsSwapped ? !isStartingOffense : isStartingOffense;
+    });
+    
+    // Fallback: if no offensive players found, return all players
+    if (offensivePlayers.length === 0) {
+      console.warn('No offensive players found, showing all players');
+      return teamPlayers;
+    }
+    
+    return offensivePlayers;
+  }, [homeTeamId, homePlayers, awayPlayers, shots]);
+
   // Handle court click to record coordinates - memoize with useCallback
   const handleCourtClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!imageRef.current || !courtRef.current) return;
+
+    // Don't register shots when timer is paused (overlay will handle resume)
+    if (timerState === 'paused') {
+      return;
+    }
 
     const rect = courtRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
@@ -233,10 +342,20 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     // Auto-select the correct team
     setSelectedTeam(teamInfo.side);
     
-    // Auto-select first player from that team
-    const players = teamInfo.side === 'home' ? homePlayers : awayPlayers;
-    if (players.length > 0) {
-      setSelectedPlayerId(players[0].id);
+    // Auto-select first OFFENSIVE player from that team
+    const offensivePlayers = getCurrentOffensivePlayers(teamInfo.teamId);
+    if (offensivePlayers.length > 0) {
+      // If last selected player is still in offense, keep them selected
+      const lastPlayerStillOffense = lastSelectedPlayerId && 
+        offensivePlayers.some(p => p.id === lastSelectedPlayerId);
+      
+      setSelectedPlayerId(lastPlayerStillOffense ? lastSelectedPlayerId : offensivePlayers[0].id);
+    } else {
+      // Fallback to any player if no offensive players found
+      const players = teamInfo.side === 'home' ? homePlayers : awayPlayers;
+      if (players.length > 0) {
+        setSelectedPlayerId(players[0].id);
+      }
     }
 
     setClickedCoords({ x: clampedX, y: clampedY });
@@ -245,7 +364,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     // Show info about automatic team selection
     setSuccess(`Shot position: ${teamInfo.teamName} attacking half`);
     setTimeout(() => setSuccess(null), 2000);
-  }, [getTeamFromPosition, homePlayers, awayPlayers]);
+  }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, timerState]);
 
   // Record shot with specific result - memoize with useCallback
   const handleRecordShot = useCallback(async (result: 'goal' | 'miss' | 'blocked') => {
@@ -262,6 +381,11 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     try {
       setError(null);
       
+      // PAUSE TIMER IMMEDIATELY if this is a goal
+      if (result === 'goal' && onPauseTimer && timerState === 'running') {
+        await onPauseTimer();
+      }
+      
       // Calculate distance to nearest korf automatically
       const calculatedDistance = calculateDistanceToKorf(clickedCoords.x, clickedCoords.y);
       
@@ -273,17 +397,21 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         result: result,
         period: currentPeriod,
         distance: calculatedDistance,
-        ...(shotType && { shot_type: shotType }) // Only add shot_type if provided
+        shot_type: shotType // Always include shot_type (defaults to running_shot)
       };
 
       await api.post(`/shots/${gameId}`, shotData);
       
       setSuccess(`${result === 'goal' ? 'Goal' : result === 'miss' ? 'Miss' : 'Blocked shot'} recorded!`);
-      setTimeout(() => setSuccess(null), 3000);
+      setTimeout(() => setSuccess(null), 2000);
       
-      // Reset form
+      // Remember the selected player for next shot
+      setLastSelectedPlayerId(selectedPlayerId);
+      
+      // Reset form but keep player and shot type
       setClickedCoords(null);
-      setShotType('');
+      // Keep shotType for next shot (don't reset)
+      // Keep selectedPlayerId for quick repeat shots
       
       // Refresh data
       await fetchShots();
@@ -296,13 +424,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error recording shot');
     }
-  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded]);
-
-  // Get current team players - memoize to avoid recalculation
-  const currentPlayers = useMemo(() => 
-    selectedTeam === 'home' ? homePlayers : awayPlayers,
-    [selectedTeam, homePlayers, awayPlayers]
-  );
+  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, onPauseTimer, timerState]);
 
   // Render shot markers on court
   const renderShotMarkers = () => {
@@ -421,7 +543,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       {/* Court Image with Click Handling */}
       <div 
         ref={courtRef}
-        className="court-container"
+        className={`court-container ${timerState === 'paused' ? 'paused' : ''}`}
         onClick={handleCourtClick}
       >
         <img 
@@ -434,10 +556,65 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         {renderKorfMarkers()}
         {renderShotMarkers()}
         {renderClickedPosition()}
+        
+        {/* Pause Overlay - Show when timer is paused */}
+        {timerState === 'paused' && (
+          <div 
+            className="pause-overlay"
+            onClick={async (e) => {
+              e.stopPropagation(); // Prevent court click handler
+              if (onResumeTimer) {
+                setSuccess('⏯️ Resuming timer...');
+                await onResumeTimer();
+                setTimeout(() => setSuccess(null), 2000);
+              }
+            }}
+          >
+            <div className="pause-icon">⏸️</div>
+            <div className="pause-text">Click to Resume</div>
+          </div>
+        )}
       </div>
 
       {/* Shot Recording Controls */}
       <div className="shot-controls">
+        {/* Shot Type Buttons - Prominent and always visible */}
+        <div className="shot-type-buttons">
+          <label className="shot-type-label">Shot Type:</label>
+          <div className="button-group">
+            <button
+              className={`shot-type-btn ${shotType === 'running_shot' ? 'active' : ''}`}
+              onClick={() => setShotType('running_shot')}
+            >
+              🏃 Running
+            </button>
+            <button
+              className={`shot-type-btn ${shotType === 'standing_shot' ? 'active' : ''}`}
+              onClick={() => setShotType('standing_shot')}
+            >
+              🧍 Standing
+            </button>
+            <button
+              className={`shot-type-btn ${shotType === 'free_throw' ? 'active' : ''}`}
+              onClick={() => setShotType('free_throw')}
+            >
+              🎯 Free Throw
+            </button>
+            <button
+              className={`shot-type-btn ${shotType === 'penalty' ? 'active' : ''}`}
+              onClick={() => setShotType('penalty')}
+            >
+              ⚠️ Penalty
+            </button>
+            <button
+              className={`shot-type-btn ${shotType === 'rebound' ? 'active' : ''}`}
+              onClick={() => setShotType('rebound')}
+            >
+              ↩️ Rebound
+            </button>
+          </div>
+        </div>
+
         <div className="control-row">
           {/* Team Selection */}
           <div className="form-group">
@@ -445,10 +622,12 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
             <select
               value={selectedTeam}
               onChange={(e) => {
-                setSelectedTeam(e.target.value as 'home' | 'away');
-                // Reset player selection when switching teams
-                const players = e.target.value === 'home' ? homePlayers : awayPlayers;
-                setSelectedPlayerId(players.length > 0 ? players[0].id : null);
+                const newTeam = e.target.value as 'home' | 'away';
+                setSelectedTeam(newTeam);
+                // Auto-select first offensive player from new team
+                const teamId = newTeam === 'home' ? homeTeamId : awayTeamId;
+                const offensivePlayers = getCurrentOffensivePlayers(teamId);
+                setSelectedPlayerId(offensivePlayers.length > 0 ? offensivePlayers[0].id : null);
               }}
             >
               <option value="home">{homeTeamName} (Home)</option>
@@ -456,35 +635,32 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
             </select>
           </div>
 
-          {/* Player Selection */}
+          {/* Player Selection - Only show OFFENSIVE players */}
           <div className="form-group">
-            <label>Player:</label>
+            <label>Offensive Player:</label>
             <select
               value={selectedPlayerId || ''}
-              onChange={(e) => setSelectedPlayerId(parseInt(e.target.value))}
+              onChange={(e) => {
+                const playerId = parseInt(e.target.value);
+                setSelectedPlayerId(playerId);
+                setLastSelectedPlayerId(playerId);
+              }}
             >
               <option value="">Select player</option>
-              {currentPlayers.map((player) => (
+              {getCurrentOffensivePlayers(selectedTeam === 'home' ? homeTeamId : awayTeamId).map((player) => (
                 <option key={player.id} value={player.id}>
                   #{player.jersey_number} {player.first_name} {player.last_name}
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Shot Type (Optional) */}
-          <div className="form-group">
-            <label>Shot Type:</label>
-            <select
-              value={shotType}
-              onChange={(e) => setShotType(e.target.value)}
-            >
-              <option value="">Not specified</option>
-              <option value="running_shot">Running Shot</option>
-              <option value="standing_shot">Standing Shot</option>
-              <option value="penalty">Penalty</option>
-              <option value="rebound">Rebound</option>
-            </select>
+            <small className="helper-text">
+              {(() => {
+                const teamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
+                const goals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+                const nextSwitch = 2 - (goals % 2);
+                return `${nextSwitch} goal${nextSwitch !== 1 ? 's' : ''} until position switch`;
+              })()}
+            </small>
           </div>
 
           {/* Auto-calculated Distance Display */}
@@ -574,29 +750,96 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <strong> Korfs:</strong> Located at 13% and 87% horizontally, center vertically • 
           <strong> Note:</strong> Within each team, attacking and defending players switch sides every 2 goals
         </p>
-      </div>      {/* Shot Statistics */}
+      </div>      {/* Shot Statistics by Team */}
       <div className="shot-stats">
-        <h4>Match Shots: {shots.length}</h4>
-        <div className="stats-grid">
-          <div className="stat-item">
-            <span className="stat-label">Goals:</span>
-            <span className="stat-value">{shots.filter(s => s.result === 'goal').length}</span>
+        <h4>Match Shots by Team</h4>
+        <div className="team-shot-stats">
+          {/* Home Team Stats */}
+          <div className="team-stat-section">
+            <h5>{homeTeamName}</h5>
+            {(() => {
+              const teamShots = shots.filter(s => s.team_id === homeTeamId);
+              const goals = teamShots.filter(s => s.result === 'goal').length;
+              const avgDistance = teamShots.length > 0
+                ? (teamShots.reduce((sum, s) => sum + (s.distance || 0), 0) / teamShots.length).toFixed(1)
+                : '0.0';
+              return (
+                <div className="stats-grid">
+                  <div className="stat-item">
+                    <span className="stat-label">Total Shots:</span>
+                    <span className="stat-value">{teamShots.length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Goals:</span>
+                    <span className="stat-value">{goals}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Misses:</span>
+                    <span className="stat-value">{teamShots.filter(s => s.result === 'miss').length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Blocked:</span>
+                    <span className="stat-value">{teamShots.filter(s => s.result === 'blocked').length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Success Rate:</span>
+                    <span className="stat-value">
+                      {teamShots.length > 0 
+                        ? Math.round((goals / teamShots.length) * 100) 
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Avg Distance:</span>
+                    <span className="stat-value">{avgDistance}m</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
-          <div className="stat-item">
-            <span className="stat-label">Misses:</span>
-            <span className="stat-value">{shots.filter(s => s.result === 'miss').length}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Blocked:</span>
-            <span className="stat-value">{shots.filter(s => s.result === 'blocked').length}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Success Rate:</span>
-            <span className="stat-value">
-              {shots.length > 0 
-                ? Math.round((shots.filter(s => s.result === 'goal').length / shots.length) * 100) 
-                : 0}%
-            </span>
+
+          {/* Away Team Stats */}
+          <div className="team-stat-section">
+            <h5>{awayTeamName}</h5>
+            {(() => {
+              const teamShots = shots.filter(s => s.team_id === awayTeamId);
+              const goals = teamShots.filter(s => s.result === 'goal').length;
+              const avgDistance = teamShots.length > 0
+                ? (teamShots.reduce((sum, s) => sum + (s.distance || 0), 0) / teamShots.length).toFixed(1)
+                : '0.0';
+              return (
+                <div className="stats-grid">
+                  <div className="stat-item">
+                    <span className="stat-label">Total Shots:</span>
+                    <span className="stat-value">{teamShots.length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Goals:</span>
+                    <span className="stat-value">{goals}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Misses:</span>
+                    <span className="stat-value">{teamShots.filter(s => s.result === 'miss').length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Blocked:</span>
+                    <span className="stat-value">{teamShots.filter(s => s.result === 'blocked').length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Success Rate:</span>
+                    <span className="stat-value">
+                      {teamShots.length > 0 
+                        ? Math.round((goals / teamShots.length) * 100) 
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Avg Distance:</span>
+                    <span className="stat-value">{avgDistance}m</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
