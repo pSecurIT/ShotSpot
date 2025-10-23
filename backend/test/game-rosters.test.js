@@ -15,9 +15,9 @@ describe('Game Rosters API', () => {
   let testGame;
   let homePlayer1;
   let homePlayer2;
-  let homePlayer3;
-  let awayPlayer1;
-  let awayPlayer2;
+  let _homePlayer3;
+  let _awayPlayer1;
+  let _awayPlayer2;
 
   beforeAll(async () => {
     // Create test users
@@ -75,19 +75,19 @@ describe('Game Rosters API', () => {
       'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [homeTeam.id, 'Bob', 'Johnson', 20, 'male']
     );
-    homePlayer3 = hp3.rows[0];
+    _homePlayer3 = hp3.rows[0];
 
     const ap1 = await db.query(
       'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [awayTeam.id, 'Alice', 'Williams', 12, 'female']
     );
-    awayPlayer1 = ap1.rows[0];
+    _awayPlayer1 = ap1.rows[0];
 
     const ap2 = await db.query(
       'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [awayTeam.id, 'Charlie', 'Brown', 18, 'male']
     );
-    awayPlayer2 = ap2.rows[0];
+    _awayPlayer2 = ap2.rows[0];
 
     // Create test game
     const gameResult = await db.query(
@@ -148,7 +148,7 @@ describe('Game Rosters API', () => {
 
     it('should reject if game does not exist', async () => {
       const response = await request(app)
-        .post(`/api/game-rosters/99999`)
+        .post('/api/game-rosters/99999')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           players: [

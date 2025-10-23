@@ -24,6 +24,7 @@ export default {
   },
   rootDir: '.',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
+  globalTeardown: '<rootDir>/jest.teardown.cjs',
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },

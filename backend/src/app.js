@@ -16,6 +16,7 @@ import eventsRoutes from './routes/events.js';
 import timerRoutes from './routes/timer.js';
 import possessionsRoutes from './routes/possessions.js';
 import gameRostersRoutes from './routes/game-rosters.js';
+import substitutionsRoutes from './routes/substitutions.js';
 
 const app = express();
 
@@ -24,27 +25,27 @@ app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'"],
-      imgSrc: ["'self'"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
-      baseUri: ["'none'"],
-      formAction: ["'self'"],
-      frameAncestors: ["'none'"],
-      manifestSrc: ["'none'"],
-      workerSrc: ["'none'"],
+      defaultSrc: ['\'self\''],
+      scriptSrc: ['\'self\''],
+      styleSrc: ['\'self\''],
+      imgSrc: ['\'self\''],
+      connectSrc: ['\'self\''],
+      fontSrc: ['\'self\''],
+      objectSrc: ['\'none\''],
+      mediaSrc: ['\'self\''],
+      frameSrc: ['\'none\''],
+      baseUri: ['\'none\''],
+      formAction: ['\'self\''],
+      frameAncestors: ['\'none\''],
+      manifestSrc: ['\'none\''],
+      workerSrc: ['\'none\''],
       sandbox: [
         'allow-forms',
         'allow-scripts',
         'allow-same-origin',
         'allow-downloads'
       ],
-      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [""] : null,
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [''] : null,
       reportUri: process.env.CSP_REPORT_URI || '/api/csp-report',
       reportTo: 'csp-endpoint'
     },
@@ -260,6 +261,7 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/timer', timerRoutes);
 app.use('/api/possessions', possessionsRoutes);
 app.use('/api/game-rosters', gameRostersRoutes);
+app.use('/api/substitutions', substitutionsRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {
@@ -324,38 +326,38 @@ app.use((err, req, res, _next) => {
   
   // Handle specific error types
   switch (err.name) {
-    case 'ValidationError':
-      error.status = 400;
-      error.message = isProd ? 'Invalid input' : err.message;
-      break;
-    case 'UnauthorizedError':
-      error.status = 401;
-      error.message = 'Authentication required';
-      break;
-    case 'ForbiddenError':
-      error.status = 403;
-      error.message = 'Access denied';
-      break;
-    case 'NotFoundError':
-      error.status = 404;
-      error.message = 'Resource not found';
-      break;
-    case 'ConflictError':
-      error.status = 409;
-      error.message = 'Resource conflict';
-      break;
-    case 'PayloadTooLargeError':
-      error.status = 413;
-      error.message = 'Request entity too large';
-      break;
-    case 'UnsupportedMediaTypeError':
-      error.status = 415;
-      error.message = 'Unsupported media type';
-      break;
-    case 'TooManyRequestsError':
-      error.status = 429;
-      error.message = 'Too many requests';
-      break;
+  case 'ValidationError':
+    error.status = 400;
+    error.message = isProd ? 'Invalid input' : err.message;
+    break;
+  case 'UnauthorizedError':
+    error.status = 401;
+    error.message = 'Authentication required';
+    break;
+  case 'ForbiddenError':
+    error.status = 403;
+    error.message = 'Access denied';
+    break;
+  case 'NotFoundError':
+    error.status = 404;
+    error.message = 'Resource not found';
+    break;
+  case 'ConflictError':
+    error.status = 409;
+    error.message = 'Resource conflict';
+    break;
+  case 'PayloadTooLargeError':
+    error.status = 413;
+    error.message = 'Request entity too large';
+    break;
+  case 'UnsupportedMediaTypeError':
+    error.status = 415;
+    error.message = 'Unsupported media type';
+    break;
+  case 'TooManyRequestsError':
+    error.status = 429;
+    error.message = 'Too many requests';
+    break;
   }
   
   // Clear any sensitive headers

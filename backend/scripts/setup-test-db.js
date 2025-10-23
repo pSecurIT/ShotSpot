@@ -30,7 +30,8 @@ async function setupTestDb() {
     dbPort,
     dbName,
     hasAdminPassword: !!adminPassword,
-    hasDbPassword: !!dbPassword
+    hasDbPassword: !!dbPassword,
+    usingSameUser: dbUser === adminUser
   });
 
   // Connect as postgres superuser to create test database and user
@@ -43,6 +44,20 @@ async function setupTestDb() {
   });
 
   try {
+    // Terminate any existing connections to the database
+    try {
+      await adminPool.query(`
+        SELECT pg_terminate_backend(pid)
+        FROM pg_stat_activity
+        WHERE datname = '${dbName}'
+          AND pid <> pg_backend_pid();
+      `);
+      console.log('Terminated existing connections to database');
+    } catch (err) {
+      // Database might not exist yet, which is fine
+      console.log('No existing connections to terminate');
+    }
+
     // Create test user if it doesn't exist (only if different from admin user)
     if (dbUser !== adminUser) {
       await adminPool.query(`
@@ -54,6 +69,8 @@ async function setupTestDb() {
         END $$;
       `);
       console.log(`Ensured user ${dbUser} exists`);
+    } else {
+      console.log('Using admin user for database operations (CI/CD mode)');
     }
 
     // Drop test database if it exists
@@ -87,6 +104,11 @@ async function setupTestDb() {
     await testPool.end();
   } catch (error) {
     console.error('Error setting up test database:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail
+    });
     process.exit(1);
   } finally {
     await adminPool.end();

@@ -176,8 +176,6 @@ npm run lint
 | **[SECURITY.md](SECURITY.md)** | Security best practices | 10 min |
 | **[SECRETS.md](SECRETS.md)** | Secrets management | 5 min |
 | **[frontend/README.md](frontend/README.md)** | Frontend development | 10 min |
-| **[CHANGES_SUMMARY.md](CHANGES_SUMMARY.md)** | Recent updates | 5 min |
-| **[DOCUMENTATION_SUMMARY.md](DOCUMENTATION_SUMMARY.md)** | Doc update summary | 5 min |
 
 **Total Documentation**: 90 minutes of comprehensive guides
 
