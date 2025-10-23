@@ -35,6 +35,14 @@ export const useTimer = (gameId: string | undefined) => {
   // Server sync interval when timer is running (sync every 5 seconds)
   const SERVER_SYNC_INTERVAL = 5000;
 
+  // 🔥 NEW: Function to manually update timer state (optimistic updates)
+  const setTimerStateOptimistic = useCallback((updates: Partial<TimerState>) => {
+    setServerTimerState(prev => {
+      if (!prev) return null;
+      return { ...prev, ...updates };
+    });
+  }, []);
+
   const fetchTimerState = useCallback(async (force: boolean = false) => {
     if (!gameId) return;
     
@@ -148,6 +156,7 @@ export const useTimer = (gameId: string | undefined) => {
     timerState,
     loading,
     error,
-    refetch: fetchTimerState
+    refetch: fetchTimerState,
+    setTimerStateOptimistic // 🔥 NEW: Allow manual state updates
   };
 };

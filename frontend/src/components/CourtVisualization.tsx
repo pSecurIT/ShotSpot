@@ -2,6 +2,46 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import api from '../utils/api';
 import courtImageUrl from '../img/Korfbalveld-breed.PNG';
 
+/**
+ * Retry utility for API calls with exponential backoff
+ */
+const retryApiCall = async <T,>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000
+): Promise<T> => {
+  let lastError: Error | unknown;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: unknown) {
+      lastError = error;
+      
+      // Don't retry on 4xx errors (client errors)
+      const axiosError = error as { response?: { status?: number } };
+      if (axiosError.response && axiosError.response.status && axiosError.response.status >= 400 && axiosError.response.status < 500) {
+        throw error;
+      }
+      
+      if (attempt === maxRetries) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`API call failed after ${maxRetries + 1} attempts:`, error);
+        }
+        throw error;
+      }
+      
+      const waitTime = delayMs * Math.pow(2, attempt);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`API call failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${waitTime}ms...`);
+      }
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+  
+  throw lastError;
+};
+
 interface Player {
   id: number;
   team_id: number;
@@ -208,6 +248,42 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     }
   }, [gameId]);
 
+  // Memoize getCurrentOffensivePlayers to avoid recalculation on every render
+  const getCurrentOffensivePlayers = useMemo(() => {
+    return (teamId: number) => {
+      const teamPlayers = teamId === homeTeamId ? homePlayers : awayPlayers;
+      
+      // If no players have starting_position data, return all players as fallback
+      const hasPositionData = teamPlayers.some(p => p.starting_position);
+      if (!hasPositionData) {
+        // Only log once per team to avoid console spam
+        const teamKey = teamId === homeTeamId ? 'home' : 'away';
+        if (process.env.NODE_ENV === 'development' && teamPlayers.length > 0 && !hasLoggedPositionWarning.current[teamKey]) {
+          console.warn(`[${teamKey === 'home' ? 'Home' : 'Away'} Team] No starting_position data, showing all ${teamPlayers.length} players`);
+          hasLoggedPositionWarning.current[teamKey] = true;
+        }
+        return teamPlayers;
+      }
+      
+      const teamGoals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+      const switches = Math.floor(teamGoals / 2);
+      const positionsSwapped = switches % 2 === 1;
+
+      const offensivePlayers = teamPlayers.filter(player => {
+        const isStartingOffense = player.starting_position === 'offense';
+        return positionsSwapped ? !isStartingOffense : isStartingOffense;
+      });
+      
+      // Fallback: if no offensive players found, return all players
+      if (offensivePlayers.length === 0) {
+        console.warn('No offensive players found, showing all players');
+        return teamPlayers;
+      }
+      
+      return offensivePlayers;
+    };
+  }, [homeTeamId, awayTeamId, homePlayers, awayPlayers, shots]);
+
   // Update players when props change
   useEffect(() => {
     if (homePlayersProps) {
@@ -270,46 +346,6 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
 
   // Calculate which players are currently in offense for a team
   // Offense and defense switch every 2 goals scored by that team
-  const getCurrentOffensivePlayers = useCallback((teamId: number): Player[] => {
-    const teamPlayers = teamId === homeTeamId ? homePlayers : awayPlayers;
-    
-    // If no players have starting_position data, return all players as fallback
-    const hasPositionData = teamPlayers.some(p => p.starting_position);
-    if (!hasPositionData) {
-      // Only log once per team to avoid console spam
-      const teamKey = teamId === homeTeamId ? 'home' : 'away';
-      if (process.env.NODE_ENV === 'development' && teamPlayers.length > 0 && !hasLoggedPositionWarning.current[teamKey]) {
-        console.warn(`[${teamKey === 'home' ? 'Home' : 'Away'} Team] No starting_position data, showing all ${teamPlayers.length} players`);
-        hasLoggedPositionWarning.current[teamKey] = true;
-      }
-      return teamPlayers;
-    }
-    
-    // Count goals scored by this team
-    const teamGoals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
-    
-    // Number of position switches (every 2 goals)
-    const switches = Math.floor(teamGoals / 2);
-    
-    // If odd number of switches, offense and defense are swapped
-    const positionsSwapped = switches % 2 === 1;
-    
-    // Filter players based on current position
-    const offensivePlayers = teamPlayers.filter(player => {
-      const isStartingOffense = player.starting_position === 'offense';
-      // If positions swapped, starting defense is now offense and vice versa
-      return positionsSwapped ? !isStartingOffense : isStartingOffense;
-    });
-    
-    // Fallback: if no offensive players found, return all players
-    if (offensivePlayers.length === 0) {
-      console.warn('No offensive players found, showing all players');
-      return teamPlayers;
-    }
-    
-    return offensivePlayers;
-  }, [homeTeamId, homePlayers, awayPlayers, shots]);
-
   // Handle court click to record coordinates - memoize with useCallback
   const handleCourtClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!imageRef.current || !courtRef.current) return;
@@ -361,9 +397,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     setClickedCoords({ x: clampedX, y: clampedY });
     setError(null);
     
-    // Show info about automatic team selection
-    setSuccess(`Shot position: ${teamInfo.teamName} attacking half`);
-    setTimeout(() => setSuccess(null), 2000);
+    // Team selection is automatic based on possession - no need to show message
+    // (Possession buttons already indicate which team is attacking)
   }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, timerState]);
 
   // Record shot with specific result - memoize with useCallback
@@ -381,10 +416,10 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     try {
       setError(null);
       
-      // PAUSE TIMER IMMEDIATELY if this is a goal
-      if (result === 'goal' && onPauseTimer && timerState === 'running') {
-        await onPauseTimer();
-      }
+      // PAUSE TIMER ON GOAL - TEMPORARILY DISABLED (not used in current league)
+      // if (result === 'goal' && onPauseTimer && timerState === 'running') {
+      //   await onPauseTimer();
+      // }
       
       // Calculate distance to nearest korf automatically
       const calculatedDistance = calculateDistanceToKorf(clickedCoords.x, clickedCoords.y);
@@ -400,9 +435,26 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         shot_type: shotType // Always include shot_type (defaults to running_shot)
       };
 
-      await api.post(`/shots/${gameId}`, shotData);
+      // 🔥 OPTIMISTIC UPDATE: Add shot to UI immediately
+      const optimisticShot: Shot = {
+        id: Date.now(), // Temporary ID
+        game_id: gameId,
+        team_id: shotData.team_id,
+        player_id: shotData.player_id,
+        x_coord: shotData.x_coord,
+        y_coord: shotData.y_coord,
+        result: shotData.result,
+        shot_type: shotData.shot_type,
+        distance: shotData.distance,
+        period: shotData.period,
+        time_remaining: null,
+        created_at: new Date().toISOString(),
+        player_first_name: homePlayers.concat(awayPlayers).find(p => p.id === selectedPlayerId)?.first_name,
+        player_last_name: homePlayers.concat(awayPlayers).find(p => p.id === selectedPlayerId)?.last_name
+      };
+      setShots(prev => [...prev, optimisticShot]);
       
-      setSuccess(`${result === 'goal' ? 'Goal' : result === 'miss' ? 'Miss' : 'Blocked shot'} recorded!`);
+      setSuccess(`${result === 'goal' ? '⚽ Goal' : result === 'miss' ? '✗ Miss' : '🛡️ Blocked shot'} recorded!`);
       setTimeout(() => setSuccess(null), 2000);
       
       // Remember the selected player for next shot
@@ -413,13 +465,23 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       // Keep shotType for next shot (don't reset)
       // Keep selectedPlayerId for quick repeat shots
       
-      // Refresh data
-      await fetchShots();
-      
-      // Notify parent with shot information
+      // Notify parent with shot information immediately
       const scoringTeamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
       const opposingTeamId = selectedTeam === 'home' ? awayTeamId : homeTeamId;
       onShotRecorded({ result, teamId: scoringTeamId, opposingTeamId });
+      
+      // 🔥 Fire API in background WITH RETRY for reliability
+      retryApiCall(() => api.post(`/shots/${gameId}`, shotData))
+        .then(() => {
+          // Refresh shots from server to get real ID
+          setTimeout(() => fetchShots(), 100);
+        })
+        .catch(err => {
+          const error = err as { response?: { data?: { error?: string } }; message?: string };
+          setError(error.response?.data?.error || 'Error recording shot after retries');
+          // Revert optimistic update on error
+          setShots(prev => prev.filter(s => s.id !== optimisticShot.id));
+        });
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error recording shot');
@@ -476,7 +538,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           }}
           title="Left Korf (Goal)"
         >
-          🥅
+          <div className="korf-post"></div>
+          <div className="korf-basket">🥅</div>
         </div>
         <div
           className="korf-marker"
@@ -486,7 +549,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           }}
           title="Right Korf (Goal)"
         >
-          🥅
+          <div className="korf-post"></div>
+          <div className="korf-basket">🥅</div>
         </div>
       </>
     );
@@ -595,6 +659,12 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
               🧍 Standing
             </button>
             <button
+              className={`shot-type-btn ${shotType === 'rebound' ? 'active' : ''}`}
+              onClick={() => setShotType('rebound')}
+            >
+              ↩️ Rebound
+            </button>
+            <button
               className={`shot-type-btn ${shotType === 'free_throw' ? 'active' : ''}`}
               onClick={() => setShotType('free_throw')}
             >
@@ -605,12 +675,6 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
               onClick={() => setShotType('penalty')}
             >
               ⚠️ Penalty
-            </button>
-            <button
-              className={`shot-type-btn ${shotType === 'rebound' ? 'active' : ''}`}
-              onClick={() => setShotType('rebound')}
-            >
-              ↩️ Rebound
             </button>
           </div>
         </div>
@@ -760,8 +824,10 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
             {(() => {
               const teamShots = shots.filter(s => s.team_id === homeTeamId);
               const goals = teamShots.filter(s => s.result === 'goal').length;
-              const avgDistance = teamShots.length > 0
-                ? (teamShots.reduce((sum, s) => sum + (s.distance || 0), 0) / teamShots.length).toFixed(1)
+              // Calculate average distance only from shots with valid distance values
+              const shotsWithDistance = teamShots.filter(s => s.distance != null && s.distance > 0);
+              const avgDistance = shotsWithDistance.length > 0
+                ? (shotsWithDistance.reduce((sum, s) => sum + (s.distance || 0), 0) / shotsWithDistance.length).toFixed(1)
                 : '0.0';
               return (
                 <div className="stats-grid">
@@ -804,8 +870,10 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
             {(() => {
               const teamShots = shots.filter(s => s.team_id === awayTeamId);
               const goals = teamShots.filter(s => s.result === 'goal').length;
-              const avgDistance = teamShots.length > 0
-                ? (teamShots.reduce((sum, s) => sum + (s.distance || 0), 0) / teamShots.length).toFixed(1)
+              // Calculate average distance only from shots with valid distance values
+              const shotsWithDistance = teamShots.filter(s => s.distance != null && s.distance > 0);
+              const avgDistance = shotsWithDistance.length > 0
+                ? (shotsWithDistance.reduce((sum, s) => sum + (s.distance || 0), 0) / shotsWithDistance.length).toFixed(1)
                 : '0.0';
               return (
                 <div className="stats-grid">

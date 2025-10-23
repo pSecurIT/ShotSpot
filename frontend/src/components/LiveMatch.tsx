@@ -3,8 +3,54 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import CourtVisualization from './CourtVisualization';
 import MatchTimeline from './MatchTimeline';
+import SubstitutionPanel from './SubstitutionPanel';
 import { useTimer } from '../hooks/useTimer';
 
+/**
+ * Retry utility for API calls with exponential backoff
+ * @param fn - The async function to retry
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @param delayMs - Initial delay in milliseconds (default: 1000)
+ * @returns Promise that resolves with the function result or rejects after max retries
+ */
+const retryApiCall = async <T,>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000
+): Promise<T> => {
+  let lastError: Error | unknown;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: unknown) {
+      lastError = error;
+      
+      // Don't retry on 4xx errors (client errors) - only retry server/network errors
+      const axiosError = error as { response?: { status?: number } };
+      if (axiosError.response && axiosError.response.status && axiosError.response.status >= 400 && axiosError.response.status < 500) {
+        throw error;
+      }
+      
+      // If we've exhausted retries, throw the error
+      if (attempt === maxRetries) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`API call failed after ${maxRetries + 1} attempts:`, error);
+        }
+        throw error;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      const waitTime = delayMs * Math.pow(2, attempt);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`API call failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${waitTime}ms...`);
+      }
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+  
+  throw lastError;
+};
 
 interface Game {
   id: number;
@@ -70,8 +116,8 @@ const LiveMatch: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   
-  // Use custom timer hook with request deduplication
-  const { timerState, refetch: fetchTimerState } = useTimer(gameId);
+  // Use custom timer hook with request deduplication and optimistic updates
+  const { timerState, refetch: fetchTimerState, setTimerStateOptimistic } = useTimer(gameId);
   
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +137,10 @@ const LiveMatch: React.FC = () => {
   const [selectedAwayPlayers, setSelectedAwayPlayers] = useState<Set<number>>(new Set());
   const [homeCaptainId, setHomeCaptainId] = useState<number | null>(null);
   const [awayCaptainId, setAwayCaptainId] = useState<number | null>(null);
+  
+  // Bench players state (not starting)
+  const [homeBenchPlayers, setHomeBenchPlayers] = useState<Set<number>>(new Set());
+  const [awayBenchPlayers, setAwayBenchPlayers] = useState<Set<number>>(new Set());
   
   // Starting position state (offense/defense)
   const [homeOffensePlayers, setHomeOffensePlayers] = useState<Set<number>>(new Set());
@@ -387,6 +437,43 @@ const LiveMatch: React.FC = () => {
     }
   };
 
+  // Toggle bench player selection (no gender/count limits)
+  const toggleBenchPlayerSelection = (playerId: number, teamId: number) => {
+    if (teamId === game?.home_team_id) {
+      setHomeBenchPlayers(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(playerId)) {
+          newSet.delete(playerId);
+        } else {
+          // Check if player is not in starting lineup
+          if (selectedHomePlayers.has(playerId)) {
+            setError('Player is already in the starting lineup');
+            setTimeout(() => setError(null), 3000);
+            return prev;
+          }
+          newSet.add(playerId);
+        }
+        return newSet;
+      });
+    } else {
+      setAwayBenchPlayers(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(playerId)) {
+          newSet.delete(playerId);
+        } else {
+          // Check if player is not in starting lineup
+          if (selectedAwayPlayers.has(playerId)) {
+            setError('Player is already in the starting lineup');
+            setTimeout(() => setError(null), 3000);
+            return prev;
+          }
+          newSet.add(playerId);
+        }
+        return newSet;
+      });
+    }
+  };
+
   // Set captain (can only select from selected players)
   const setCaptain = (playerId: number, teamId: number) => {
     if (teamId === game?.home_team_id) {
@@ -484,6 +571,7 @@ const LiveMatch: React.FC = () => {
 
       // Prepare roster data
       const rosterPlayers = [
+        // Starting players
         ...Array.from(selectedHomePlayers).map(playerId => ({
           team_id: game!.home_team_id,
           player_id: playerId,
@@ -497,6 +585,19 @@ const LiveMatch: React.FC = () => {
           is_captain: playerId === awayCaptainId,
           is_starting: true,
           starting_position: awayOffensePlayers.has(playerId) ? 'offense' : 'defense'
+        })),
+        // Bench players (don't include starting_position field at all)
+        ...Array.from(homeBenchPlayers).map(playerId => ({
+          team_id: game!.home_team_id,
+          player_id: playerId,
+          is_captain: false,
+          is_starting: false
+        })),
+        ...Array.from(awayBenchPlayers).map(playerId => ({
+          team_id: game!.away_team_id,
+          player_id: playerId,
+          is_captain: false,
+          is_starting: false
         }))
       ];
 
@@ -505,11 +606,10 @@ const LiveMatch: React.FC = () => {
       const minutes = periodDurationMinutes % 60;
       const periodDurationFormatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
       
-      // IMMEDIATELY hide pre-match setup and show match screen (instant UI response)
-      setShowPreMatchSetup(false);
-      setSuccess('Match started! Setting up game...');
+      // Show loading state
+      setSuccess('Starting match...');
       
-      // Execute ALL operations in background (completely non-blocking)
+      // Execute API operations first, THEN hide pre-match setup
       Promise.all([
         api.post(`/game-rosters/${gameId}`, { players: rosterPlayers }),
         api.put(`/games/${gameId}`, {
@@ -528,14 +628,14 @@ const LiveMatch: React.FC = () => {
           ]);
         })
         .then(() => {
+          // NOW hide pre-match setup after everything is updated
+          setShowPreMatchSetup(false);
           setSuccess('Match ready! Good luck to both teams!');
           setTimeout(() => setSuccess(null), 3000);
         })
         .catch(err => {
           const error = err as { response?: { data?: { error?: string } }; message?: string };
           setError(error.response?.data?.error || 'Error starting match');
-          // If error, show pre-match setup again
-          setShowPreMatchSetup(true);
         });
     } catch (error) {
       // Handle synchronous errors (e.g., validation errors)
@@ -579,40 +679,41 @@ const LiveMatch: React.FC = () => {
     try {
       setError(null);
       
-      // Optimistically update UI first for instant feedback
+      // Check if this is the first start
       const wasFirstStart = timerState?.timer_state === 'stopped' && timerState?.current_period === 1 && !activePossession;
       
-      // If this is the first start, give home team possession (don't wait)
-      if (wasFirstStart) {
-        // Start possession creation in background
-        handleCenterLineCross(game!.home_team_id).catch(err => {
+      // 🔥 INSTANT OPTIMISTIC UPDATE: Change UI immediately before API call
+      setTimerStateOptimistic({ timer_state: 'running' });
+      
+      // 🔥 Fire API calls in background WITH RETRY for reliability
+      retryApiCall(() => api.post(`/timer/${gameId}/start`, {}))
+        .then(() => {
+          // Sync with server after successful start (background refresh)
+          setTimeout(() => fetchTimerState(), 100);
+        })
+        .catch(err => {
+          const error = err as { response?: { data?: { error?: string } }; message?: string };
+          setError(error.response?.data?.error || 'Error starting timer after retries');
+          // Revert optimistic update on error
+          setTimerStateOptimistic({ timer_state: 'paused' });
+        });
+      
+      // If this is the first start, give home team possession (fire and forget)
+      if (wasFirstStart && game) {
+        handleCenterLineCross(game.home_team_id).catch(err => {
           console.error('Error creating initial possession:', err);
         });
         setSuccess('Game started! Home team has possession.');
         setTimeout(() => setSuccess(null), 3000);
-      }
-      
-      // Start timer API call and immediately refresh state (don't wait for API)
-      // This makes the pause overlay disappear instantly
-      const startPromise = api.post(`/timer/${gameId}/start`, {})
-        .catch(err => {
-          const error = err as { response?: { data?: { error?: string } }; message?: string };
-          setError(error.response?.data?.error || 'Error starting timer');
-        });
-      
-      // Fetch timer state immediately (optimistically) for instant UI update
-      fetchTimerState();
-      
-      // Wait for API to complete in background
-      await startPromise;
-      
-      if (!wasFirstStart) {
+      } else {
         setSuccess('Timer started');
         setTimeout(() => setSuccess(null), 2000);
       }
+      
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error starting timer');
+      setTimerStateOptimistic({ timer_state: 'paused' });
     }
   };
 
@@ -620,17 +721,27 @@ const LiveMatch: React.FC = () => {
     try {
       setError(null);
       
-      // Pause timer and wait for it to complete
-      await api.post(`/timer/${gameId}/pause`, {});
+      // 🔥 INSTANT OPTIMISTIC UPDATE: Pause UI immediately
+      setTimerStateOptimistic({ timer_state: 'paused' });
       
-      // Fetch updated timer state
-      await fetchTimerState();
+      // Pause timer in background WITH RETRY
+      retryApiCall(() => api.post(`/timer/${gameId}/pause`, {}))
+        .then(() => {
+          setTimeout(() => fetchTimerState(), 100);
+        })
+        .catch(err => {
+          const error = err as { response?: { data?: { error?: string } }; message?: string };
+          setError(error.response?.data?.error || 'Error pausing timer after retries');
+          // Revert on error
+          setTimerStateOptimistic({ timer_state: 'running' });
+        });
       
       setSuccess('Timer paused');
       setTimeout(() => setSuccess(null), 2000);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error pausing timer');
+      setTimerStateOptimistic({ timer_state: 'running' });
     }
   };
 
@@ -642,22 +753,48 @@ const LiveMatch: React.FC = () => {
     try {
       setError(null);
       
-      // Call the comprehensive reset endpoint
-      await api.post(`/timer/${gameId}/reset-match`, {});
+      // 🔥 OPTIMISTIC UPDATE: Reset UI immediately
+      setTimerStateOptimistic({ 
+        current_period: 1, 
+        timer_state: 'stopped',
+        time_remaining: timerState?.period_duration || { minutes: 10, seconds: 0 }
+      });
+      setGame(prev => prev ? { 
+        ...prev, 
+        current_period: 1, 
+        home_score: 0, 
+        away_score: 0 
+      } : null);
+      setActivePossession(null);
       
       // Increment reset key to force CourtVisualization to remount and clear shots
       setCourtResetKey(prev => prev + 1);
       
-      // Refresh all game data
-      await Promise.all([
-        fetchTimerState(),
-        fetchGame(),
-        fetchActivePossession(),
-        fetchPossessionStats()
-      ]);
+      setSuccess('Resetting match...');
       
-      setSuccess('Match reset successfully - all data cleared');
-      setTimeout(() => setSuccess(null), 3000);
+      // Fire API in background WITH RETRY
+      retryApiCall(() => api.post(`/timer/${gameId}/reset-match`, {}))
+        .then(() => {
+          // Refresh all game data after API success
+          setTimeout(() => {
+            Promise.all([
+              fetchTimerState(),
+              fetchGame(),
+              fetchActivePossession(),
+              fetchPossessionStats()
+            ]);
+          }, 100);
+          setSuccess('Match reset successfully - all data cleared');
+          setTimeout(() => setSuccess(null), 3000);
+        })
+        .catch(err => {
+          const error = err as { response?: { data?: { error?: string } }; message?: string };
+          setError(error.response?.data?.error || 'Error resetting match after retries');
+          // Revert on error
+          fetchTimerState();
+          fetchGame();
+          fetchActivePossession();
+        });
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error resetting match');
@@ -667,8 +804,35 @@ const LiveMatch: React.FC = () => {
   const handleNextPeriod = async () => {
     try {
       setError(null);
-      await api.post(`/timer/${gameId}/next-period`, {});
-      await Promise.all([fetchTimerState(), fetchGame()]);
+      
+      // 🔥 OPTIMISTIC UPDATE: Increment period immediately
+      if (timerState && game) {
+        const nextPeriod = timerState.current_period + 1;
+        setTimerStateOptimistic({ 
+          current_period: nextPeriod,
+          timer_state: 'stopped',
+          time_remaining: timerState.period_duration
+        });
+        // Optimistically update game state
+        setGame(prev => prev ? { ...prev, current_period: nextPeriod } : null);
+      }
+      
+      // Fire API in background WITH RETRY
+      retryApiCall(() => api.post(`/timer/${gameId}/next-period`, {}))
+        .then(() => {
+          setTimeout(() => {
+            fetchTimerState();
+            fetchGame();
+          }, 100);
+        })
+        .catch(err => {
+          const error = err as { response?: { data?: { error?: string } }; message?: string };
+          setError(error.response?.data?.error || 'Error advancing period after retries');
+          // Revert on error
+          fetchTimerState();
+          fetchGame();
+        });
+      
       setSuccess('Advanced to next period');
       setTimeout(() => setSuccess(null), 2000);
     } catch (error) {
@@ -684,11 +848,25 @@ const LiveMatch: React.FC = () => {
 
     try {
       setError(null);
-      await api.post(`/games/${gameId}/end`, {});
-      setSuccess('Game ended successfully');
-      setTimeout(() => {
-        navigate('/games');
-      }, 2000);
+      
+      // 🔥 OPTIMISTIC UPDATE: Set game status to completed immediately
+      setGame(prev => prev ? { ...prev, status: 'completed' } : null);
+      setSuccess('Ending game...');
+      
+      // Fire API in background WITH RETRY
+      retryApiCall(() => api.post(`/games/${gameId}/end`, {}))
+        .then(() => {
+          setSuccess('Game ended successfully');
+          setTimeout(() => {
+            navigate('/games');
+          }, 2000);
+        })
+        .catch(err => {
+          const error = err as { response?: { data?: { error?: string } }; message?: string };
+          setError(error.response?.data?.error || 'Error ending game after retries');
+          // Revert on error
+          fetchGame();
+        });
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error ending game');
@@ -703,6 +881,7 @@ const LiveMatch: React.FC = () => {
     } catch (error: unknown) {
       // 404 is expected when there's no active possession (before game starts or between possessions)
       const err = error as { response?: { status?: number } };
+      // Silently handle 404, only log other errors in development
       if (err?.response?.status !== 404 && process.env.NODE_ENV === 'development') {
         console.error('Error fetching active possession:', error);
       }
@@ -731,11 +910,40 @@ const LiveMatch: React.FC = () => {
       // Use timerState period if available, fallback to game period
       const currentPeriod = timerState?.current_period || game.current_period || 1;
       
-      await api.post(`/possessions/${gameId}`, {
+      // 🔥 OPTIMISTIC UPDATE: Create possession object immediately
+      const optimisticPossession: Possession = {
+        id: Date.now(), // Temporary ID
+        game_id: parseInt(gameId || '0'),
+        team_id: teamId,
+        period: currentPeriod,
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        shots_taken: 0,
+        team_name: game.home_team_id === teamId ? game.home_team_name : game.away_team_name
+      };
+      setActivePossession(optimisticPossession);
+      
+      // Fire API in background WITH RETRY
+      retryApiCall(() => api.post(`/possessions/${gameId}`, {
         team_id: teamId,
         period: currentPeriod
-      });
-      await fetchActivePossession();
+      }))
+        .then((response) => {
+          // Update with real possession data immediately
+          if (response.data) {
+            setActivePossession(response.data);
+          } else {
+            // Fallback: fetch if response doesn't include data
+            fetchActivePossession();
+          }
+        })
+        .catch(err => {
+          const error = err as { response?: { data?: { error?: string } }; message?: string };
+          setError(error.response?.data?.error || 'Error starting possession after retries');
+          // Revert on error
+          setActivePossession(null);
+        });
+      
       setSuccess('New attack started');
       setTimeout(() => setSuccess(null), 2000);
     } catch (error) {
@@ -745,17 +953,33 @@ const LiveMatch: React.FC = () => {
   }, [game, timerState?.current_period, gameId, fetchActivePossession]);
 
   const handleShotRecorded = useCallback(async (shotInfo: { result: 'goal' | 'miss' | 'blocked'; teamId: number; opposingTeamId: number }) => {
-    // Increment shot counter for active possession (for ALL shots, not just goals)
+    // 🔥 OPTIMISTIC UPDATE: Increment shot counter immediately
     if (activePossession) {
-      api.patch(`/possessions/${gameId}/${activePossession.id}/increment-shots`, {})
-        .catch(error => {
-          if (process.env.NODE_ENV === 'development') {
-            console.error('Error incrementing shot counter:', error);
-          }
-        });
+      setActivePossession(prev => {
+        if (!prev) return null;
+        return { ...prev, shots_taken: prev.shots_taken + 1 };
+      });
+      
+      // Only fire API if we have a real possession ID (not the temporary optimistic one)
+      // Temporary IDs are large timestamps (> 1 billion), real IDs are sequential (< 10000)
+      if (activePossession.id < 1000000000) {
+        // Fire API in background WITH RETRY
+        retryApiCall(() => api.patch(`/possessions/${gameId}/${activePossession.id}/increment-shots`, {}))
+          .catch(error => {
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Error incrementing shot counter after retries:', error);
+            }
+            // Revert on error
+            setActivePossession(prev => {
+              if (!prev) return null;
+              return { ...prev, shots_taken: Math.max(0, prev.shots_taken - 1) };
+            });
+          });
+      }
+      // If using temporary ID, the counter will sync when real possession is fetched
     }
     
-    // Handle goal-specific actions (pause is now handled in CourtVisualization)
+    // Handle goal-specific actions
     if (shotInfo.result === 'goal') {
       // Give possession to the opposing team (non-blocking)
       handleCenterLineCross(shotInfo.opposingTeamId)
@@ -765,8 +989,8 @@ const LiveMatch: React.FC = () => {
           }
         });
       
-      setSuccess('⚽ GOAL! Timer paused. Click on the court to resume.');
-      setTimeout(() => setSuccess(null), 5000);
+      setSuccess('⚽ GOAL! Possession switched to opposing team.');
+      setTimeout(() => setSuccess(null), 3000);
     }
     
     // Refresh game data in parallel (non-blocking)
@@ -1052,6 +1276,90 @@ const LiveMatch: React.FC = () => {
                 {requirements.message}
               </div>
             )}
+
+            {/* Bench Players Section */}
+            <div className="bench-players-section">
+              <h4>Bench Players (Optional)</h4>
+              <p className="requirement-note">
+                Select additional players who will start on the bench and can be substituted during the match.
+              </p>
+              
+              <div className="team-roster-grid">
+                {/* Home Team Bench */}
+                <div className="team-roster-section">
+                  <h5>{game.home_team_name} Bench</h5>
+                  <div className="roster-count">
+                    <div>{homeBenchPlayers.size} bench player{homeBenchPlayers.size !== 1 ? 's' : ''}</div>
+                  </div>
+                  
+                  <div className="player-selection-list">
+                    {homePlayers
+                      .filter(p => !selectedHomePlayers.has(p.id))
+                      .map(player => (
+                        <div
+                          key={player.id}
+                          className={`player-selection-item ${homeBenchPlayers.has(player.id) ? 'selected bench-player' : ''}`}
+                        >
+                          <label className="player-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={homeBenchPlayers.has(player.id)}
+                              onChange={() => toggleBenchPlayerSelection(player.id, game.home_team_id)}
+                            />
+                            <span className="player-info">
+                              <span className="player-name-jersey">
+                                {player.first_name} {player.last_name} #{player.jersey_number}
+                              </span>
+                              {player.gender && (
+                                <span className="player-gender-badge">
+                                  {player.gender === 'male' ? '♂️ Male' : '♀️ Female'}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Away Team Bench */}
+                <div className="team-roster-section">
+                  <h5>{game.away_team_name} Bench</h5>
+                  <div className="roster-count">
+                    <div>{awayBenchPlayers.size} bench player{awayBenchPlayers.size !== 1 ? 's' : ''}</div>
+                  </div>
+                  
+                  <div className="player-selection-list">
+                    {awayPlayers
+                      .filter(p => !selectedAwayPlayers.has(p.id))
+                      .map(player => (
+                        <div
+                          key={player.id}
+                          className={`player-selection-item ${awayBenchPlayers.has(player.id) ? 'selected bench-player' : ''}`}
+                        >
+                          <label className="player-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={awayBenchPlayers.has(player.id)}
+                              onChange={() => toggleBenchPlayerSelection(player.id, game.away_team_id)}
+                            />
+                            <span className="player-info">
+                              <span className="player-name-jersey">
+                                {player.first_name} {player.last_name} #{player.jersey_number}
+                              </span>
+                              {player.gender && (
+                                <span className="player-gender-badge">
+                                  {player.gender === 'male' ? '♂️ Male' : '♀️ Female'}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Attacking Side Selection */}
@@ -1262,6 +1570,23 @@ const LiveMatch: React.FC = () => {
           timerState={timerState?.timer_state}
           onResumeTimer={handleStartTimer}
           onPauseTimer={handlePauseTimer}
+        />
+      </div>
+
+      {/* Substitution Panel */}
+      <div className="substitution-section">
+        <SubstitutionPanel
+          gameId={parseInt(gameId!)}
+          homeTeamId={game.home_team_id}
+          awayTeamId={game.away_team_id}
+          homeTeamName={game.home_team_name}
+          awayTeamName={game.away_team_name}
+          currentPeriod={timerState?.current_period || game.current_period}
+          timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+          onSubstitutionRecorded={() => {
+            fetchPlayers();
+            fetchGame();
+          }}
         />
       </div>
 

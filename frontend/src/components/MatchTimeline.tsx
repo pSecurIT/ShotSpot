@@ -42,6 +42,25 @@ interface Shot {
   team_name: string;
 }
 
+interface Substitution {
+  id: number;
+  game_id: number;
+  team_id: number;
+  player_in_id: number;
+  player_out_id: number;
+  period: number;
+  time_remaining: string | null;
+  reason: string;
+  player_in_first_name: string;
+  player_in_last_name: string;
+  player_in_jersey_number: number;
+  player_out_first_name: string;
+  player_out_last_name: string;
+  player_out_jersey_number: number;
+  team_name: string;
+  created_at: string;
+}
+
 interface MatchTimelineProps {
   gameId: number;
   homeTeamId: number;
@@ -63,6 +82,7 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
 }) => {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
+  const [substitutions, setSubstitutions] = useState<Substitution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<number | null>(null);
@@ -89,12 +109,21 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
     }
   }, [gameId]);
 
+  const fetchSubstitutions = useCallback(async () => {
+    try {
+      const response = await api.get(`/substitutions/${gameId}`);
+      setSubstitutions(response.data);
+    } catch (err) {
+      console.error('Error fetching substitutions:', err);
+    }
+  }, [gameId]);
+
   const fetchTimeline = useCallback(async () => {
     setLoading(true);
     setError(null);
-    await Promise.all([fetchEvents(), fetchShots()]);
+    await Promise.all([fetchEvents(), fetchShots(), fetchSubstitutions()]);
     setLoading(false);
-  }, [fetchEvents, fetchShots]);
+  }, [fetchEvents, fetchShots, fetchSubstitutions]);
 
   useEffect(() => {
     fetchTimeline();
@@ -139,18 +168,24 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
     }
   };
 
-  // Combine and sort events and shots by timestamp
+  // Combine and sort events, shots, and substitutions by timestamp
   const combinedTimeline = React.useMemo(() => {
-    const timeline: Array<{ type: 'event' | 'shot'; data: TimelineEvent | Shot; timestamp: string }> = [
+    const timeline: Array<{ 
+      type: 'event' | 'shot' | 'substitution'; 
+      data: TimelineEvent | Shot | Substitution; 
+      timestamp: string 
+    }> = [
       ...events.map(e => ({ type: 'event' as const, data: e, timestamp: e.created_at })),
-      ...shots.map(s => ({ type: 'shot' as const, data: s, timestamp: s.created_at }))
+      ...shots.map(s => ({ type: 'shot' as const, data: s, timestamp: s.created_at })),
+      ...substitutions.map(sub => ({ type: 'substitution' as const, data: sub, timestamp: sub.created_at }))
     ];
 
     // Apply filters
     const filtered = timeline.filter(item => {
       if (filterType !== 'all') {
         if (filterType === 'shots' && item.type !== 'shot') return false;
-        if (filterType !== 'shots' && (item.type !== 'event' || (item.data as TimelineEvent).event_type !== filterType)) return false;
+        if (filterType === 'substitutions' && item.type !== 'substitution') return false;
+        if (filterType !== 'shots' && filterType !== 'substitutions' && (item.type !== 'event' || (item.data as TimelineEvent).event_type !== filterType)) return false;
       }
 
       if (filterTeam !== 'all') {
@@ -170,7 +205,7 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
     filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     return filtered;
-  }, [events, shots, filterType, filterTeam, filterPeriod, homeTeamId, awayTeamId]);
+  }, [events, shots, substitutions, filterType, filterTeam, filterPeriod, homeTeamId, awayTeamId]);
 
   const formatTime = (timeString: string | null) => {
     if (!timeString) return 'N/A';
@@ -268,8 +303,8 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
           <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
             <option value="all">All</option>
             <option value="shots">Shots</option>
+            <option value="substitutions">Substitutions</option>
             <option value="foul">Fouls</option>
-            <option value="substitution">Substitutions</option>
             <option value="timeout">Timeouts</option>
             <option value="period_start">Period Start</option>
             <option value="period_end">Period End</option>
@@ -297,7 +332,7 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
         </div>
 
         <div className="filter-stats">
-          Showing {combinedTimeline.length} of {events.length + shots.length} events
+          Showing {combinedTimeline.length} of {events.length + shots.length + substitutions.length} events
         </div>
       </div>
 
@@ -307,7 +342,42 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
           <div className="timeline-empty">No events to display</div>
         ) : (
           combinedTimeline.map((item) => {
-            if (item.type === 'shot') {
+            if (item.type === 'substitution') {
+              const sub = item.data as Substitution;
+              const isHome = sub.team_id === homeTeamId;
+              
+              return (
+                <div key={`sub-${sub.id}`} className={`timeline-item substitution ${isHome ? 'home' : 'away'}`}>
+                  <div className="timeline-icon">🔄</div>
+                  <div className="timeline-content">
+                    <div className="timeline-header-row">
+                      <div className="timeline-info">
+                        <span className="event-type">SUBSTITUTION</span>
+                        <span className="team-badge">{sub.team_name}</span>
+                      </div>
+                      <div className="timeline-meta">
+                        <span className="period">P{sub.period}</span>
+                        {sub.time_remaining && <span className="time">{formatTime(sub.time_remaining)}</span>}
+                      </div>
+                    </div>
+                    <div className="substitution-details">
+                      <div className="player-change">
+                        <span className="player-out">
+                          ⬇️ #{sub.player_out_jersey_number} {sub.player_out_first_name} {sub.player_out_last_name}
+                        </span>
+                        <span className="sub-arrow">→</span>
+                        <span className="player-in">
+                          ⬆️ #{sub.player_in_jersey_number} {sub.player_in_first_name} {sub.player_in_last_name}
+                        </span>
+                      </div>
+                      <div className="sub-reason">
+                        <span className="reason-badge">{sub.reason}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            } else if (item.type === 'shot') {
               const shot = item.data as Shot;
               const isHome = shot.team_id === homeTeamId;
               

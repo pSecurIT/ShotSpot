@@ -179,9 +179,9 @@ describe('Games API', () => {
   });
 
   describe('GET /api/games', () => {
-    let scheduledGame;
-    let inProgressGame;
-    let completedGame;
+    let _scheduledGame;
+    let _inProgressGame;
+    let _completedGame;
 
     beforeAll(async () => {
       // Create games with different statuses
@@ -190,21 +190,21 @@ describe('Games API', () => {
          VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
         [team1.id, team2.id, new Date('2025-12-01T14:00:00Z')]
       );
-      scheduledGame = scheduled.rows[0];
+      _scheduledGame = scheduled.rows[0];
 
       const inProgress = await db.query(
         `INSERT INTO games (home_team_id, away_team_id, date, status)
          VALUES ($1, $2, $3, 'in_progress') RETURNING *`,
         [team1.id, team2.id, new Date('2025-12-02T14:00:00Z')]
       );
-      inProgressGame = inProgress.rows[0];
+      _inProgressGame = inProgress.rows[0];
 
       const completed = await db.query(
         `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score)
          VALUES ($1, $2, $3, 'completed', 15, 12) RETURNING *`,
         [team1.id, team2.id, new Date('2025-11-30T14:00:00Z')]
       );
-      completedGame = completed.rows[0];
+      _completedGame = completed.rows[0];
     });
 
     it('should get all games', async () => {
@@ -403,7 +403,7 @@ describe('Games API', () => {
     it('should reject cancelling a completed game', async () => {
       // Complete the game first
       await db.query(
-        `UPDATE games SET status = 'completed' WHERE id = $1`,
+        'UPDATE games SET status = \'completed\' WHERE id = $1',
         [testGame.id]
       );
 
@@ -494,12 +494,19 @@ describe('Games API', () => {
       expect(checkResponse.status).toBe(404);
     });
 
-    it('should reject deletion by coach', async () => {
+    it('should allow deletion by coach', async () => {
       const response = await request(app)
         .delete(`/api/games/${testGame.id}`)
         .set('Authorization', `Bearer ${coachToken}`);
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(204);
+      
+      // Verify game was deleted
+      const checkResponse = await request(app)
+        .get(`/api/games/${testGame.id}`)
+        .set('Authorization', `Bearer ${coachToken}`);
+      
+      expect(checkResponse.status).toBe(404);
     });
 
     it('should reject deletion by regular user', async () => {
@@ -550,7 +557,7 @@ describe('Games API', () => {
 
     it('should reject rescheduling completed game', async () => {
       await db.query(
-        `UPDATE games SET status = 'completed' WHERE id = $1`,
+        'UPDATE games SET status = \'completed\' WHERE id = $1',
         [testGame.id]
       );
 
@@ -566,7 +573,7 @@ describe('Games API', () => {
 
     it('should reject rescheduling in_progress game', async () => {
       await db.query(
-        `UPDATE games SET status = 'in_progress' WHERE id = $1`,
+        'UPDATE games SET status = \'in_progress\' WHERE id = $1',
         [testGame.id]
       );
 

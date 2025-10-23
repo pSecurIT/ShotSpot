@@ -576,7 +576,7 @@ router.delete('/:id', [
     console.log(`Deleting game ${id}: ${game.home_team_name} vs ${game.away_team_name} (Status: ${game.status})`);
     
     // Delete the game (cascade will handle related records)
-    const result = await db.query('DELETE FROM games WHERE id = $1 RETURNING id', [id]);
+    const _result = await db.query('DELETE FROM games WHERE id = $1 RETURNING id', [id]);
     
     console.log(`Successfully deleted game ${id} and all related records`);
     
