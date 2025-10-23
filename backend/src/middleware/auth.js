@@ -14,12 +14,28 @@ const auth = (req, res, next) => {
       return res.status(401).json({ error: 'Invalid token format' });
     }
 
+    // Validate JWT token structure (must have 3 parts: header.payload.signature)
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      console.error('auth: Malformed JWT token - expected 3 parts, got', tokenParts.length);
+      return res.status(401).json({ error: 'Invalid token format' });
+    }
+
     const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
     
     // Decode token payload for logging (without verification)
-    const payloadB64 = token.split('.')[1];
-    const rawPayload = Buffer.from(payloadB64, 'base64').toString();
-    console.log('Auth: Raw token payload:', rawPayload);
+    const payloadB64 = tokenParts[1];
+    let rawPayload;
+    try {
+      if (!payloadB64 || payloadB64.length === 0) {
+        throw new Error('Empty payload');
+      }
+      rawPayload = Buffer.from(payloadB64, 'base64').toString();
+      console.log('Auth: Raw token payload:', rawPayload);
+    } catch (err) {
+      console.error('auth: Error decoding token payload:', err.message);
+      return res.status(401).json({ error: 'Invalid token format' });
+    }
 
     // Verify and decode token
     const decoded = jwt.verify(token, jwtSecret);
