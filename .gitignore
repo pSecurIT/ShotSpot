@@ -41,6 +41,8 @@ backend/scripts/setup-db.sql
 backend/scripts/*-credentials.sql
 backend/scripts/*-secrets.sql
 backend/*.log
+backend/*.txt
+backend/test-*.txt
 backend/tmp/
 
 # Frontend specific

@@ -100,6 +100,7 @@ interface CourtVisualizationProps {
   awayPlayers?: Player[]; // Optional: If provided, won't fetch
   timerState?: string; // 'running' | 'paused' | 'stopped'
   onResumeTimer?: () => void; // Resume timer when clicking court
+  onPauseTimer?: () => void; // Pause timer when needed
 }
 
 const CourtVisualization: React.FC<CourtVisualizationProps> = ({
@@ -117,7 +118,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   homePlayers: homePlayersProps,
   awayPlayers: awayPlayersProps,
   timerState,
-  onResumeTimer
+  onResumeTimer,
+  onPauseTimer: _onPauseTimer // eslint-disable-line @typescript-eslint/no-unused-vars
 }) => {
   const [homePlayers, setHomePlayers] = useState<Player[]>(homePlayersProps || []);
   const [awayPlayers, setAwayPlayers] = useState<Player[]>(awayPlayersProps || []);
