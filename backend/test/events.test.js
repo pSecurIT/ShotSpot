@@ -1,7 +1,7 @@
 import request from 'supertest';
 import app from '../src/app.js';
 import db from '../src/db.js';
-import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 describe('Events API', () => {
   let adminToken, coachToken, userToken;
@@ -12,47 +12,30 @@ describe('Events API', () => {
     // Use unique identifiers to prevent conflicts in CI
     const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
     
-    // Create test users with unique names
-    const hashedPassword = await bcrypt.hash('password123', 10);
-    
+    // Create test users with unique names (no password needed for JWT-based tests)
     const adminResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
-      [`admin_events_${uniqueId}`, `admin_events_${uniqueId}@test.com`, hashedPassword, 'admin']
+      [`admin_events_${uniqueId}`, `admin_events_${uniqueId}@test.com`, 'hash', 'admin']
     );
     adminUser = adminResult.rows[0];
 
     const coachResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
-      [`coach_events_${uniqueId}`, `coach_events_${uniqueId}@test.com`, hashedPassword, 'coach']
+      [`coach_events_${uniqueId}`, `coach_events_${uniqueId}@test.com`, 'hash', 'coach']
     );
     coachUser = coachResult.rows[0];
 
     const userResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
-      [`user_events_${uniqueId}`, `user_events_${uniqueId}@test.com`, hashedPassword, 'user']
+      [`user_events_${uniqueId}`, `user_events_${uniqueId}@test.com`, 'hash', 'user']
     );
     regularUser = userResult.rows[0];
 
-    // Get auth tokens
-    const adminLogin = await request(app)
-      .post('/api/auth/login')
-      .send({ username: `admin_events_${uniqueId}`, password: 'password123' });
-    adminToken = adminLogin.body.token;
-
-    const coachLogin = await request(app)
-      .post('/api/auth/login')
-      .send({ username: `coach_events_${uniqueId}`, password: 'password123' });
-    coachToken = coachLogin.body.token;
-
-    const userLogin = await request(app)
-      .post('/api/auth/login')
-      .send({ username: `user_events_${uniqueId}`, password: 'password123' });
-    userToken = userLogin.body.token;
-
-    // Validate tokens were acquired successfully
-    if (!adminToken || !coachToken || !userToken) {
-      throw new Error('Failed to acquire one or more JWT tokens for test users');
-    }
+    // Create JWT tokens directly (no dependency on login endpoint)
+    const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+    adminToken = jwt.sign({ id: adminUser.id, role: adminUser.role }, jwtSecret, { expiresIn: '1h' });
+    coachToken = jwt.sign({ id: coachUser.id, role: coachUser.role }, jwtSecret, { expiresIn: '1h' });
+    userToken = jwt.sign({ id: regularUser.id, role: regularUser.role }, jwtSecret, { expiresIn: '1h' });
 
     // Create teams with unique names
     const team1Result = await db.query(
