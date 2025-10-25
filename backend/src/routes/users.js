@@ -13,9 +13,9 @@ const userRateLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 
-// Apply authentication and rate limiting middleware to all routes
-router.use(auth);
+// Apply rate limiting and authentication middleware to all routes
 router.use(userRateLimiter);
+router.use(auth);
 
 // Get all users (admin only)
 router.get('/', requireRole(['admin']), async (req, res) => {
