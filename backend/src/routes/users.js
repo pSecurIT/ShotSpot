@@ -2,11 +2,20 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
 
-// Apply authentication middleware to all routes
+// Rate limiting: max 100 requests per 15 min per IP
+const userRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+// Apply authentication and rate limiting middleware to all routes
 router.use(auth);
+router.use(userRateLimiter);
 
 // Get all users (admin only)
 router.get('/', requireRole(['admin']), async (req, res) => {
