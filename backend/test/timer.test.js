@@ -76,11 +76,26 @@ describe('Timer API', () => {
   });
 
   afterAll(async () => {
-    // Cleanup in reverse order of dependencies
-    await db.query('DELETE FROM game_events WHERE game_id = $1', [game.id]);
-    await db.query('DELETE FROM games WHERE id = $1', [game.id]);
-    await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [team1.id, team2.id]);
-    await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
+    try {
+      // Clean up in reverse order of dependencies, with null checks
+      if (game && game.id) {
+        await db.query('DELETE FROM game_events WHERE game_id = $1', [game.id]);
+        await db.query('DELETE FROM games WHERE id = $1', [game.id]);
+      }
+
+      const teamIds = [team1?.id, team2?.id].filter(Boolean);
+      if (teamIds.length > 0) {
+        await db.query('DELETE FROM teams WHERE id = ANY($1::int[])', [teamIds]);
+      }
+
+      const userIds = [adminUser?.id, coachUser?.id, regularUser?.id].filter(Boolean);
+      if (userIds.length > 0) {
+        await db.query('DELETE FROM users WHERE id = ANY($1::int[])', [userIds]);
+      }
+    } catch (err) {
+      // Log and continue cleanup, don't throw from afterAll
+      console.error('Cleanup error in timer test afterAll:', err.message);
+    }
   });
 
   describe('GET /api/timer/:gameId', () => {
