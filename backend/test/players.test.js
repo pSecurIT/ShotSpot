@@ -12,6 +12,16 @@ describe('Player Routes', () => {
     // Generate test auth token with coach role
     authToken = generateTestToken('coach');
 
+    // Clear all tables first to ensure clean state
+    await db.query('DELETE FROM substitutions');
+    await db.query('DELETE FROM game_rosters');
+    await db.query('DELETE FROM ball_possessions');
+    await db.query('DELETE FROM shots');
+    await db.query('DELETE FROM game_events');
+    await db.query('DELETE FROM games');
+    await db.query('DELETE FROM players');
+    await db.query('DELETE FROM teams');
+
     // Create a test team to use for player tests
     const teamRes = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING id',
@@ -21,12 +31,13 @@ describe('Player Routes', () => {
   });
 
   beforeEach(async () => {
-    // Clear the players table before each test
-    await db.query('DELETE FROM players');
+    // Clear only players table before each test (team persists)
+    await db.query('DELETE FROM players WHERE team_id = $1', [testTeamId]);
   });
 
   afterAll(async () => {
-    // Clean up test data
+    // Clean up test data in correct order
+    await db.query('DELETE FROM players WHERE team_id = $1', [testTeamId]);
     await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
     // Pool will be closed by global teardown
   });

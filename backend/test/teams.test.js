@@ -12,7 +12,14 @@ describe('Team Routes', () => {
   });
 
   beforeEach(async () => {
-    // Clear the teams table before each test
+    // Clear all tables in correct order (child tables first due to foreign keys)
+    await db.query('DELETE FROM substitutions');
+    await db.query('DELETE FROM game_rosters');
+    await db.query('DELETE FROM ball_possessions');
+    await db.query('DELETE FROM shots');
+    await db.query('DELETE FROM game_events');
+    await db.query('DELETE FROM games');
+    await db.query('DELETE FROM players');
     await db.query('DELETE FROM teams');
   });
 
