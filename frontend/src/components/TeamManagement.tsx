@@ -11,10 +11,6 @@ const TeamManagement: React.FC = () => {
   const [newTeamName, setNewTeamName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTeams();
-  }, []);
-
   const fetchTeams = async () => {
     try {
       setError(null);
@@ -26,6 +22,11 @@ const TeamManagement: React.FC = () => {
       console.error('Error fetching teams:', error);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTeams();
+  }, []);
 
   const handleAddTeam = async (e: React.FormEvent) => {
     e.preventDefault();

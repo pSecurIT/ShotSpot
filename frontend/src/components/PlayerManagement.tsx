@@ -34,11 +34,6 @@ const PlayerManagement: React.FC = () => {
     gender: ''
   });
 
-  useEffect(() => {
-    fetchTeams();
-    fetchPlayers();
-  }, []);
-
   const fetchTeams = async () => {
     try {
       const response = await api.get('/teams');
@@ -58,6 +53,12 @@ const PlayerManagement: React.FC = () => {
       console.error('Error fetching players:', err.response?.data?.error || err.message);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTeams();
+    fetchPlayers();
+  }, []);
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
