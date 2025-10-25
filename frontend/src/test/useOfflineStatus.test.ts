@@ -18,7 +18,7 @@ const localStorageMock = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 };
-global.localStorage = localStorageMock as any;
+global.localStorage = localStorageMock as unknown as Storage;
 
 describe('useOfflineStatus Hook', () => {
   beforeEach(async () => {
@@ -27,7 +27,7 @@ describe('useOfflineStatus Hook', () => {
     
     // Reset mocks
     vi.clearAllMocks();
-    (global.fetch as any).mockClear();
+    vi.mocked(global.fetch).mockClear();
     
     // Mock navigator.onLine
     Object.defineProperty(global.navigator, 'onLine', {
@@ -151,11 +151,11 @@ describe('useOfflineStatus Hook', () => {
       }, { timeout: 5000 });
       
       // Mock successful sync
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({})
-      });
+      } as Response);
       
       // Process queue
       await act(async () => {
@@ -192,11 +192,11 @@ describe('useOfflineStatus Hook', () => {
       }, { timeout: 5000 });
       
       // Mock successful sync
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({})
-      });
+      } as Response);
       
       // Trigger manual sync
       await act(async () => {
@@ -227,12 +227,12 @@ describe('useOfflineStatus Hook', () => {
       }, { timeout: 5000 });
       
       // Mock slow sync
-      (global.fetch as any).mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({
+      vi.mocked(global.fetch).mockImplementation(() => 
+        new Promise<Response>(resolve => setTimeout(() => resolve({
           ok: true,
           status: 200,
           json: async () => ({})
-        }), 100))
+        } as Response), 100))
       );
       
       // Start sync (don't await to check isSyncing state)
@@ -291,7 +291,7 @@ describe('useOfflineStatus Hook', () => {
       }, { timeout: 5000 });
       
       // Mock failed sync
-      (global.fetch as any).mockRejectedValue(new Error('Network error'));
+      vi.mocked(global.fetch).mockRejectedValue(new Error('Network error'));
       
       await act(async () => {
         await result.current.sync();
@@ -316,10 +316,6 @@ describe('useOfflineStatus Hook', () => {
       await act(async () => {
         // Since service worker event dispatching is complex in tests,
         // we can verify the hook responds to window events instead
-        const event = new MessageEvent('message', {
-          data: { type: 'SYNC_START' }
-        });
-        
         // Note: Service Worker message handling is tested in integration tests
         // For unit tests, we'll verify the hook's state management works
         expect(result.current.isSyncing).toBeDefined();
@@ -335,11 +331,11 @@ describe('useOfflineStatus Hook', () => {
       });
       
       // Mock sync completion
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({})
-      });
+      } as Response);
       
       await act(async () => {
         await processQueue();
@@ -366,11 +362,11 @@ describe('useOfflineStatus Hook', () => {
         await queueAction('POST', '/api/shots', { player_id: 1 });
       });
       
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({})
-      });
+      } as Response);
       
       await act(async () => {
         await processQueue();
