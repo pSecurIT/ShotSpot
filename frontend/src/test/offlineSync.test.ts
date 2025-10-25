@@ -23,7 +23,7 @@ const localStorageMock = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 };
-global.localStorage = localStorageMock as any;
+global.localStorage = localStorageMock as unknown as Storage;
 
 // Mock navigator.serviceWorker
 const mockServiceWorker = {
@@ -31,7 +31,7 @@ const mockServiceWorker = {
     sync: {
       register: vi.fn()
     }
-  } as any)
+  })
 };
 Object.defineProperty(global.navigator, 'serviceWorker', {
   value: mockServiceWorker,
@@ -46,7 +46,7 @@ describe('Offline Sync Manager', () => {
     
     // Reset mocks
     vi.clearAllMocks();
-    (global.fetch as any).mockClear();
+    vi.mocked(global.fetch).mockClear();
     localStorageMock.getItem.mockReturnValue('mock-token');
   });
 
@@ -94,7 +94,7 @@ describe('Offline Sync Manager', () => {
       };
       
       // Replace the promise before queueAction is called
-      (mockServiceWorker.ready as any) = Promise.resolve(mockRegistration);
+      mockServiceWorker.ready = Promise.resolve(mockRegistration);
 
       await queueAction('POST', '/api/shots', { player_id: 1 });
       
@@ -105,7 +105,7 @@ describe('Offline Sync Manager', () => {
       // In production, this works reliably
       try {
         expect(registerSyncSpy).toHaveBeenCalledWith('offline-sync');
-      } catch (error) {
+      } catch {
         console.warn('Background sync test timing issue - works correctly in production');
         // Don't fail the test - this is a known test environment limitation
         expect(registerSyncSpy).toHaveBeenCalledTimes(0); // Accept either outcome
@@ -120,11 +120,11 @@ describe('Offline Sync Manager', () => {
       await queueAction('PUT', '/api/teams/1', { name: 'Updated' });
       
       // Mock successful fetch responses
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({ success: true })
-      });
+      } as Response);
       
       const result = await processQueue();
       
@@ -141,11 +141,11 @@ describe('Offline Sync Manager', () => {
       await queueAction('POST', '/api/shots', { player_id: 1 });
       
       // Mock failed fetch
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error'
-      });
+      } as Response);
       
       const result = await processQueue();
       
@@ -162,7 +162,7 @@ describe('Offline Sync Manager', () => {
       await queueAction('POST', '/api/shots', { player_id: 1 });
       
       // Mock network error
-      (global.fetch as any).mockRejectedValue(new Error('Network error'));
+      vi.mocked(global.fetch).mockRejectedValue(new Error('Network error'));
       
       const result = await processQueue();
       
@@ -178,11 +178,11 @@ describe('Offline Sync Manager', () => {
       
       await queueAction('POST', '/api/shots', { player_id: 1 });
       
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({})
-      });
+      } as Response);
       
       await processQueue();
       
@@ -200,11 +200,11 @@ describe('Offline Sync Manager', () => {
       const data = { player_id: 1, result: 'goal' };
       await queueAction('POST', '/api/shots', data);
       
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({})
-      });
+      } as Response);
       
       await processQueue();
       
@@ -220,11 +220,11 @@ describe('Offline Sync Manager', () => {
     it('should not send body for DELETE requests', async () => {
       await queueAction('DELETE', '/api/players/5', null);
       
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({})
-      });
+      } as Response);
       
       await processQueue();
       
@@ -250,11 +250,11 @@ describe('Offline Sync Manager', () => {
     it('should retry processing the queue', async () => {
       await queueAction('POST', '/api/shots', { player_id: 1 });
       
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({})
-      });
+      } as Response);
       
       await retryFailedActions();
       
@@ -304,11 +304,11 @@ describe('Offline Sync Manager', () => {
     it('should trigger sync when going online', async () => {
       await queueAction('POST', '/api/shots', { player_id: 1 });
       
-      (global.fetch as any).mockResolvedValue({
+      vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({})
-      });
+      } as Response);
       
       startAutoSync();
       
