@@ -53,7 +53,7 @@ async function setupTestDb() {
           AND pid <> pg_backend_pid();
       `);
       console.log('Terminated existing connections to database');
-    } catch (err) {
+    } catch (_err) {
       // Database might not exist yet, which is fine
       console.log('No existing connections to terminate');
     }

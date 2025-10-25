@@ -58,6 +58,11 @@ jobs:
         NODE_ENV: test
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: postgres
+        PGUSER: postgres
+        PGPASSWORD: postgres
+        PGHOST: localhost
+        PGPORT: 5432
+        PGDATABASE: shotspot_test_db
         DB_USER: postgres
         DB_PASSWORD: postgres
         DB_HOST: localhost
@@ -75,6 +80,11 @@ jobs:
         NODE_ENV: test
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: postgres
+        PGUSER: postgres
+        PGPASSWORD: postgres
+        PGHOST: localhost
+        PGPORT: 5432
+        PGDATABASE: shotspot_test_db
         DB_USER: postgres
         DB_PASSWORD: postgres
         DB_HOST: localhost
