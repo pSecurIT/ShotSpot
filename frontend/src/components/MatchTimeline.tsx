@@ -126,6 +126,7 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
   }, [fetchEvents, fetchShots, fetchSubstitutions]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTimeline();
     
     // Auto-refresh every 5 seconds

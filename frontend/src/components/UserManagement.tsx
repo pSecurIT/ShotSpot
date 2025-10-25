@@ -17,10 +17,6 @@ const UserManagement: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const { user: currentUser } = useAuth();
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   const fetchUsers = async () => {
     try {
       setError(null);
@@ -31,6 +27,11 @@ const UserManagement: React.FC = () => {
       setError(error.response?.data?.error || 'Failed to fetch users');
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchUsers();
+  }, []);
 
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {

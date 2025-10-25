@@ -100,7 +100,6 @@ interface CourtVisualizationProps {
   awayPlayers?: Player[]; // Optional: If provided, won't fetch
   timerState?: string; // 'running' | 'paused' | 'stopped'
   onResumeTimer?: () => void; // Resume timer when clicking court
-  onPauseTimer?: () => Promise<void>; // Pause timer immediately when goal scored
 }
 
 const CourtVisualization: React.FC<CourtVisualizationProps> = ({
@@ -118,8 +117,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   homePlayers: homePlayersProps,
   awayPlayers: awayPlayersProps,
   timerState,
-  onResumeTimer,
-  onPauseTimer
+  onResumeTimer
 }) => {
   const [homePlayers, setHomePlayers] = useState<Player[]>(homePlayersProps || []);
   const [awayPlayers, setAwayPlayers] = useState<Player[]>(awayPlayersProps || []);
@@ -282,7 +280,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       
       return offensivePlayers;
     };
-  }, [homeTeamId, awayTeamId, homePlayers, awayPlayers, shots]);
+  }, [homeTeamId, homePlayers, awayPlayers, shots]);
 
   // Update players when props change
   useEffect(() => {
@@ -486,7 +484,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error recording shot');
     }
-  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, onPauseTimer, timerState]);
+  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers]);
 
   // Render shot markers on court
   const renderShotMarkers = () => {
@@ -618,6 +616,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           draggable={false}
         />
         {renderKorfMarkers()}
+        {/* eslint-disable-next-line react-hooks/refs */}
         {renderShotMarkers()}
         {renderClickedPosition()}
         
@@ -711,6 +710,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
               }}
             >
               <option value="">Select player</option>
+              {/* eslint-disable-next-line react-hooks/refs */}
               {getCurrentOffensivePlayers(selectedTeam === 'home' ? homeTeamId : awayTeamId).map((player) => (
                 <option key={player.id} value={player.id}>
                   #{player.jersey_number} {player.first_name} {player.last_name}

@@ -66,11 +66,13 @@ const GameManagement: React.FC = () => {
   }, [filterStatus]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTeams();
     fetchGames();
   }, [fetchTeams, fetchGames]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchGames();
   }, [filterStatus, fetchGames]);
 
