@@ -99,6 +99,17 @@ async function setupTestDb() {
     const schema = fs.readFileSync(join(__dirname, '../src/schema.sql'), 'utf8');
     await testPool.query(schema);
 
+    // Grant permissions to test user on all tables (if different from admin)
+    if (dbUser !== adminUser) {
+      await testPool.query(`
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${dbUser};
+        GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${dbUser};
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${dbUser};
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${dbUser};
+      `);
+      console.log(`Granted all privileges to user ${dbUser}`);
+    }
+
     console.log('Test database setup completed successfully');
 
     await testPool.end();
