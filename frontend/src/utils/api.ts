@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { queueAction } from './offlineSync';
 
 const api = axios.create({
   baseURL: 'http://localhost:3001/api',
@@ -53,6 +54,39 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // If offline, queue the request for later
+    if (!navigator.onLine && ['POST', 'PUT', 'DELETE'].includes(originalRequest.method?.toUpperCase() || '')) {
+      const endpoint = originalRequest.url || '';
+      const fullUrl = endpoint.startsWith('http') ? endpoint : `${api.defaults.baseURL}${endpoint}`;
+      
+      try {
+        await queueAction(
+          originalRequest.method.toUpperCase() as 'POST' | 'PUT' | 'DELETE',
+          fullUrl,
+          originalRequest.data
+        );
+        
+        // Return a special response indicating the action was queued
+        return Promise.resolve({
+          data: {
+            queued: true,
+            message: 'Action queued for sync when online'
+          },
+          status: 202,
+          statusText: 'Queued',
+          headers: {},
+          config: originalRequest
+        });
+      } catch (queueError) {
+        console.error('Failed to queue offline action:', queueError);
+        return Promise.reject({
+          ...error,
+          offline: true,
+          message: 'Offline and failed to queue action'
+        });
+      }
+    }
 
     // If CSRF token is invalid, try to get a new one and retry
     if (error.response?.status === 403 && 
