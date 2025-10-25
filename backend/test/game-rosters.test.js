@@ -20,11 +20,14 @@ describe('Game Rosters API', () => {
   let _awayPlayer2;
 
   beforeAll(async () => {
-    // Create test users
+    // Use unique identifiers to prevent conflicts in CI
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    // Create test users with unique names
     const adminResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['admin_roster', 'admin_roster@test.com', 'hash', 'admin']
+      [`admin_roster_${uniqueId}`, `admin_roster_${uniqueId}@test.com`, 'hash', 'admin']
     );
     adminUser = adminResult.rows[0];
     authToken = jwt.sign({ id: adminUser.id, username: adminUser.username, role: 'admin' }, process.env.JWT_SECRET);
@@ -32,7 +35,7 @@ describe('Game Rosters API', () => {
     const coachResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['coach_roster', 'coach_roster@test.com', 'hash', 'coach']
+      [`coach_roster_${uniqueId}`, `coach_roster_${uniqueId}@test.com`, 'hash', 'coach']
     );
     coachUser = coachResult.rows[0];
     coachToken = jwt.sign({ id: coachUser.id, username: coachUser.username, role: 'coach' }, process.env.JWT_SECRET);
@@ -40,21 +43,26 @@ describe('Game Rosters API', () => {
     const viewerResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['viewer_roster', 'viewer_roster@test.com', 'hash', 'viewer']
+      [`viewer_roster_${uniqueId}`, `viewer_roster_${uniqueId}@test.com`, 'hash', 'viewer']
     );
     viewerUser = viewerResult.rows[0];
     viewerToken = jwt.sign({ id: viewerUser.id, username: viewerUser.username, role: 'viewer' }, process.env.JWT_SECRET);
 
-    // Create test teams
+    // Validate tokens were created successfully
+    if (!authToken || !coachToken || !viewerToken) {
+      throw new Error('Failed to create one or more JWT tokens for test users');
+    }
+
+    // Create test teams with unique names
     const homeResult = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Roster Home Team']
+      [`Roster Home Team ${uniqueId}`]
     );
     homeTeam = homeResult.rows[0];
 
     const awayResult = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Roster Away Team']
+      [`Roster Away Team ${uniqueId}`]
     );
     awayTeam = awayResult.rows[0];
 

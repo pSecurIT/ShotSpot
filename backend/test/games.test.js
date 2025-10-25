@@ -14,11 +14,14 @@ describe('Games API', () => {
   let team2;
 
   beforeAll(async () => {
-    // Create test users with different roles
+    // Use unique identifiers to prevent conflicts in CI
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    // Create test users with different roles and unique names
     const adminResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['admin_games', 'admin_games@test.com', 'hash', 'admin']
+      [`admin_games_${uniqueId}`, `admin_games_${uniqueId}@test.com`, 'hash', 'admin']
     );
     adminUser = adminResult.rows[0];
     authToken = jwt.sign({ id: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
@@ -26,7 +29,7 @@ describe('Games API', () => {
     const coachResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['coach_games', 'coach_games@test.com', 'hash', 'coach']
+      [`coach_games_${uniqueId}`, `coach_games_${uniqueId}@test.com`, 'hash', 'coach']
     );
     coachUser = coachResult.rows[0];
     coachToken = jwt.sign({ id: coachUser.id, role: 'coach' }, process.env.JWT_SECRET);
@@ -34,21 +37,26 @@ describe('Games API', () => {
     const userResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['user_games', 'user_games@test.com', 'hash', 'user']
+      [`user_games_${uniqueId}`, `user_games_${uniqueId}@test.com`, 'hash', 'user']
     );
     regularUser = userResult.rows[0];
     userToken = jwt.sign({ id: regularUser.id, role: 'user' }, process.env.JWT_SECRET);
 
-    // Create test teams
+    // Validate tokens were created successfully
+    if (!authToken || !coachToken || !userToken) {
+      throw new Error('Failed to create one or more JWT tokens for test users');
+    }
+
+    // Create test teams with unique names
     const team1Result = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Test Team Alpha']
+      [`Test Team Alpha ${uniqueId}`]
     );
     team1 = team1Result.rows[0];
 
     const team2Result = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Test Team Beta']
+      [`Test Team Beta ${uniqueId}`]
     );
     team2 = team2Result.rows[0];
   });
@@ -78,8 +86,8 @@ describe('Games API', () => {
       expect(response.body).toHaveProperty('id');
       expect(response.body.home_team_id).toBe(team1.id);
       expect(response.body.away_team_id).toBe(team2.id);
-      expect(response.body.home_team_name).toBe('Test Team Alpha');
-      expect(response.body.away_team_name).toBe('Test Team Beta');
+      expect(response.body.home_team_name).toBe(team1.name);
+      expect(response.body.away_team_name).toBe(team2.name);
       expect(response.body.status).toBe('scheduled');
       expect(response.body.home_score).toBe(0);
       expect(response.body.away_score).toBe(0);

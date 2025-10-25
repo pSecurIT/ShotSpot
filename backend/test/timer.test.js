@@ -9,53 +9,61 @@ describe('Timer API', () => {
   let team1, team2, game;
 
   beforeAll(async () => {
-    // Create test users
+    // Use unique identifiers to prevent conflicts in CI
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    // Create test users with unique names
     const hashedPassword = await bcrypt.hash('password123', 10);
     
     const adminResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
-      ['admin_timer', 'admin_timer@test.com', hashedPassword, 'admin']
+      [`admin_timer_${uniqueId}`, `admin_timer_${uniqueId}@test.com`, hashedPassword, 'admin']
     );
     adminUser = adminResult.rows[0];
 
     const coachResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
-      ['coach_timer', 'coach_timer@test.com', hashedPassword, 'coach']
+      [`coach_timer_${uniqueId}`, `coach_timer_${uniqueId}@test.com`, hashedPassword, 'coach']
     );
     coachUser = coachResult.rows[0];
 
     const userResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
-      ['user_timer', 'user_timer@test.com', hashedPassword, 'user']
+      [`user_timer_${uniqueId}`, `user_timer_${uniqueId}@test.com`, hashedPassword, 'user']
     );
     regularUser = userResult.rows[0];
 
     // Get auth tokens
     const adminLogin = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'admin_timer', password: 'password123' });
+      .send({ username: `admin_timer_${uniqueId}`, password: 'password123' });
     adminToken = adminLogin.body.token;
 
     const coachLogin = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'coach_timer', password: 'password123' });
+      .send({ username: `coach_timer_${uniqueId}`, password: 'password123' });
     coachToken = coachLogin.body.token;
 
     const userLogin = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'user_timer', password: 'password123' });
+      .send({ username: `user_timer_${uniqueId}`, password: 'password123' });
     userToken = userLogin.body.token;
 
-    // Create teams
+    // Validate tokens were acquired successfully
+    if (!adminToken || !coachToken || !userToken) {
+      throw new Error('Failed to acquire one or more JWT tokens for test users');
+    }
+
+    // Create teams with unique names
     const team1Result = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Test Team Timer 1']
+      [`Test Team Timer 1 ${uniqueId}`]
     );
     team1 = team1Result.rows[0];
 
     const team2Result = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Test Team Timer 2']
+      [`Test Team Timer 2 ${uniqueId}`]
     );
     team2 = team2Result.rows[0];
 
