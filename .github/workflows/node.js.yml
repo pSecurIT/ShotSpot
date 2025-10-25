@@ -44,6 +44,31 @@ jobs:
       working-directory: backend
       run: npm run lint
 
+    - name: Wait for PostgreSQL
+      run: |
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL to be ready..."
+          sleep 2
+        done
+        echo "PostgreSQL is ready!"
+
+    - name: Setup Test Database
+      working-directory: backend
+      env:
+        NODE_ENV: test
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: shotspot_test_db
+        DB_MAX_CONNECTIONS: 5
+        DB_IDLE_TIMEOUT_MS: 1000
+        JWT_SECRET: test_jwt_secret_key_min_32_chars_long_for_testing
+        SESSION_SECRET: test-session-secret
+      run: npm run migrate
+
     - name: Run Backend Tests
       working-directory: backend
       env:
@@ -59,9 +84,7 @@ jobs:
         DB_IDLE_TIMEOUT_MS: 1000
         JWT_SECRET: test_jwt_secret_key_min_32_chars_long_for_testing
         SESSION_SECRET: test-session-secret
-      run: |
-        npm run migrate
-        npm test -- --coverage
+      run: npm test -- --coverage
 
     # Coverage reporting can be added later with Codecov or similar services
 
