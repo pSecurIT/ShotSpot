@@ -17,11 +17,14 @@ describe('Shots API', () => {
   let testGame;
 
   beforeAll(async () => {
-    // Create test users with different roles
+    // Use unique identifiers to prevent conflicts in CI
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    // Create test users with different roles and unique names
     const adminResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['admin_shots', 'admin_shots@test.com', 'hash', 'admin']
+      [`admin_shots_${uniqueId}`, `admin_shots_${uniqueId}@test.com`, 'hash', 'admin']
     );
     adminUser = adminResult.rows[0];
     authToken = jwt.sign({ id: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
@@ -29,7 +32,7 @@ describe('Shots API', () => {
     const coachResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['coach_shots', 'coach_shots@test.com', 'hash', 'coach']
+      [`coach_shots_${uniqueId}`, `coach_shots_${uniqueId}@test.com`, 'hash', 'coach']
     );
     coachUser = coachResult.rows[0];
     coachToken = jwt.sign({ id: coachUser.id, role: 'coach' }, process.env.JWT_SECRET);
@@ -37,21 +40,26 @@ describe('Shots API', () => {
     const userResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['user_shots', 'user_shots@test.com', 'hash', 'user']
+      [`user_shots_${uniqueId}`, `user_shots_${uniqueId}@test.com`, 'hash', 'user']
     );
     regularUser = userResult.rows[0];
     userToken = jwt.sign({ id: regularUser.id, role: 'user' }, process.env.JWT_SECRET);
 
-    // Create test teams
+    // Validate tokens were created successfully
+    if (!authToken || !coachToken || !userToken) {
+      throw new Error('Failed to create one or more JWT tokens for test users');
+    }
+
+    // Create test teams with unique names
     const team1Result = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Shot Test Team 1']
+      [`Shot Test Team 1 ${uniqueId}`]
     );
     team1 = team1Result.rows[0];
 
     const team2Result = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Shot Test Team 2']
+      [`Shot Test Team 2 ${uniqueId}`]
     );
     team2 = team2Result.rows[0];
 

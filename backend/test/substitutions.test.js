@@ -21,11 +21,14 @@ describe('Substitutions API', () => {
   let awayPlayer2; // On bench
 
   beforeAll(async () => {
-    // Create test users
+    // Use unique identifiers to prevent conflicts in CI
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    // Create test users with unique names
     const adminResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['admin_sub', 'admin_sub@test.com', 'hash', 'admin']
+      [`admin_sub_${uniqueId}`, `admin_sub_${uniqueId}@test.com`, 'hash', 'admin']
     );
     adminUser = adminResult.rows[0];
     authToken = jwt.sign({ id: adminUser.id, username: adminUser.username, role: 'admin' }, process.env.JWT_SECRET);
@@ -33,7 +36,7 @@ describe('Substitutions API', () => {
     const coachResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['coach_sub', 'coach_sub@test.com', 'hash', 'coach']
+      [`coach_sub_${uniqueId}`, `coach_sub_${uniqueId}@test.com`, 'hash', 'coach']
     );
     coachUser = coachResult.rows[0];
     coachToken = jwt.sign({ id: coachUser.id, username: coachUser.username, role: 'coach' }, process.env.JWT_SECRET);
@@ -41,21 +44,26 @@ describe('Substitutions API', () => {
     const viewerResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      ['viewer_sub', 'viewer_sub@test.com', 'hash', 'viewer']
+      [`viewer_sub_${uniqueId}`, `viewer_sub_${uniqueId}@test.com`, 'hash', 'viewer']
     );
     viewerUser = viewerResult.rows[0];
     viewerToken = jwt.sign({ id: viewerUser.id, username: viewerUser.username, role: 'viewer' }, process.env.JWT_SECRET);
 
-    // Create test teams
+    // Validate tokens were created successfully
+    if (!authToken || !coachToken || !viewerToken) {
+      throw new Error('Failed to create one or more JWT tokens for test users');
+    }
+
+    // Create test teams with unique names
     const homeResult = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Sub Home Team']
+      [`Sub Home Team ${uniqueId}`]
     );
     homeTeam = homeResult.rows[0];
 
     const awayResult = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      ['Sub Away Team']
+      [`Sub Away Team ${uniqueId}`]
     );
     awayTeam = awayResult.rows[0];
 
