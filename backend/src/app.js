@@ -5,7 +5,9 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
+import crypto from 'crypto';
 import csrf from './middleware/csrf.js';
+import { errorNotificationService } from './utils/errorNotification.js';
 import authRoutes from './routes/auth.js';
 import teamRoutes from './routes/teams.js';
 import playerRoutes from './routes/players.js';
@@ -367,9 +369,11 @@ app.use((err, req, res, _next) => {
   res.status(error.status).json({ error });
   
   // If this is a critical error, notify the team
-  if (error.status === 500) {
-    // TODO: Implement error notification system
-    // notifyTeam(logError);
+  if (error.status >= 500 || error.status === 429 || error.status === 401) {
+    errorNotificationService.notifyTeam(logError).catch(notifyErr => {
+      // Don't crash the app if notification fails
+      console.error('Failed to send error notification:', notifyErr.message);
+    });
   }
 });
 

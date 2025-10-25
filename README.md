@@ -61,7 +61,8 @@
 - Quick-access event buttons (e.g. drag & drop player to court to log a shot)
 - Court visualization to tap/click shot locations
 - Undo/Edit options for fast corrections during live play
-- Auto-saving and offline support (essential for unstable connections)
+- **✅ Offline support**: Full functionality without internet connection (see [OFFLINE.md](OFFLINE.md))
+- Auto-saving and data persistence
 
 ## Next up (features to come)
 
@@ -173,11 +174,12 @@ npm run lint
 | **[INSTALLATION.md](INSTALLATION.md)** | Complete installation & troubleshooting | 15 min |
 | **[BUILD.md](BUILD.md)** | Build/run command reference | 10 min |
 | **[DEPLOYMENT.md](DEPLOYMENT.md)** | Production deployment guide | 20 min |
+| **[OFFLINE.md](OFFLINE.md)** | Offline functionality guide | 15 min |
 | **[SECURITY.md](SECURITY.md)** | Security best practices | 10 min |
 | **[SECRETS.md](SECRETS.md)** | Secrets management | 5 min |
 | **[frontend/README.md](frontend/README.md)** | Frontend development | 10 min |
 
-**Total Documentation**: 90 minutes of comprehensive guides
+**Total Documentation**: 105 minutes of comprehensive guides
 
 For detailed installation instructions (including troubleshooting), see **[INSTALLATION.md](INSTALLATION.md)**.
 

@@ -9,6 +9,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
+import OfflineIndicator from './components/OfflineIndicator';
 import logo from './img/ShotSpot_logo.png';
 
 const App: React.FC = () => {
@@ -16,6 +17,7 @@ const App: React.FC = () => {
     <AuthProvider>
       <Router>
         <div className="App">
+          <OfflineIndicator />
           <header className="App-header">
             <div className="header-content">
               <div className="header-branding">
