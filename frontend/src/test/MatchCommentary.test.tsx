@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MatchCommentary from '../components/MatchCommentary';
 import api from '../utils/api';
@@ -338,7 +338,9 @@ describe('MatchCommentary', () => {
     const { rerender } = render(<MatchCommentary {...mockProps} />);
     
     // Update time remaining
-    rerender(<MatchCommentary {...mockProps} timeRemaining="00:05:00" />);
+    act(() => {
+      rerender(<MatchCommentary {...mockProps} timeRemaining="00:05:00" />);
+    });
     
     // Component should handle the updated time
     expect(screen.getByText('Match Commentary')).toBeInTheDocument();

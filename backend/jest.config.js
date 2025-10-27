@@ -3,7 +3,7 @@ export default {
   verbose: true,
   testEnvironment: 'node',
   maxWorkers: 1, // Run tests serially to avoid database conflicts
-  testTimeout: 10000, // Increase timeout for database operations
+  testTimeout: 15000, // Increase timeout for database operations
   transform: {
     '^.+\\.js$': [
       'babel-jest',
