@@ -19,6 +19,9 @@ import timerRoutes from './routes/timer.js';
 import possessionsRoutes from './routes/possessions.js';
 import gameRostersRoutes from './routes/game-rosters.js';
 import substitutionsRoutes from './routes/substitutions.js';
+import freeShotsRoutes from './routes/free-shots.js';
+import timeoutsRoutes from './routes/timeouts.js';
+import matchCommentaryRoutes from './routes/match-commentary.js';
 
 const app = express();
 
@@ -264,6 +267,9 @@ app.use('/api/timer', timerRoutes);
 app.use('/api/possessions', possessionsRoutes);
 app.use('/api/game-rosters', gameRostersRoutes);
 app.use('/api/substitutions', substitutionsRoutes);
+app.use('/api/free-shots', freeShotsRoutes);
+app.use('/api/timeouts', timeoutsRoutes);
+app.use('/api/match-commentary', matchCommentaryRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {

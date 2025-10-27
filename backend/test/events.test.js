@@ -72,7 +72,10 @@ describe('Events API', () => {
   });
 
   afterAll(async () => {
-    // Cleanup in reverse order of dependencies
+    // Cleanup in reverse order of dependencies (Enhanced Events first)
+    await db.query('DELETE FROM match_commentary WHERE game_id = $1', [game.id]);
+    await db.query('DELETE FROM timeouts WHERE game_id = $1', [game.id]);
+    await db.query('DELETE FROM free_shots WHERE game_id = $1', [game.id]);
     await db.query('DELETE FROM game_events WHERE game_id = $1', [game.id]);
     await db.query('DELETE FROM games WHERE id = $1', [game.id]);
     await db.query('DELETE FROM players WHERE id IN ($1, $2)', [player1.id, player2.id]);
@@ -490,6 +493,595 @@ describe('Events API', () => {
         .set('Authorization', `Bearer ${userToken}`);
 
       expect(response.status).toBe(403);
+    });
+  });
+
+  // Enhanced Match Events Tests
+  describe('Enhanced Match Events - Fault Events', () => {
+    beforeEach(async () => {
+      await db.query('DELETE FROM game_events WHERE game_id = $1', [game.id]);
+    });
+
+    it('should create fault_offensive event with detailed information', async () => {
+      const response = await request(app)
+        .post(`/api/events/${game.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          event_type: 'fault_offensive',
+          player_id: player1.id,
+          team_id: team1.id,
+          period: 1,
+          time_remaining: '00:08:30',
+          details: { 
+            reason: 'running_with_ball', 
+            description: 'Player took more than 3 steps with ball',
+            location: 'center_court'
+          }
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.event_type).toBe('fault_offensive');
+      expect(response.body.details).toMatchObject({
+        reason: 'running_with_ball',
+        description: 'Player took more than 3 steps with ball',
+        location: 'center_court'
+      });
+    });
+
+    it('should create fault_defensive event', async () => {
+      const response = await request(app)
+        .post(`/api/events/${game.id}`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          event_type: 'fault_defensive',
+          player_id: player2.id,
+          team_id: team2.id,
+          period: 2,
+          details: { 
+            reason: 'hindering_shot',
+            description: 'Defended player too closely during shot attempt'
+          }
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.event_type).toBe('fault_defensive');
+    });
+
+    it('should create fault_out_of_bounds event', async () => {
+      const response = await request(app)
+        .post(`/api/events/${game.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          event_type: 'fault_out_of_bounds',
+          player_id: player1.id,
+          team_id: team1.id,
+          period: 1,
+          details: { 
+            reason: 'ball_out',
+            description: 'Ball went out of bounds on sideline'
+          }
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.event_type).toBe('fault_out_of_bounds');
+    });
+
+    it('should reject fault event with invalid reason', async () => {
+      const response = await request(app)
+        .post(`/api/events/${game.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          event_type: 'fault_offensive',
+          player_id: player1.id,
+          team_id: team1.id,
+          period: 1,
+          details: { reason: 'invalid_reason' }
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Invalid fault reason');
+    });
+  });
+
+  describe('Enhanced Match Events - Free Shots API', () => {
+    beforeEach(async () => {
+      await db.query('DELETE FROM free_shots WHERE game_id = $1', [game.id]);
+    });
+
+    it('should create a free shot event', async () => {
+      const response = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player1.id,
+          team_id: team1.id,
+          period: 1,
+          time_remaining: '00:05:30',
+          free_shot_type: 'free_shot',
+          reason: 'Defensive fault',
+          x_coord: 15.5,
+          y_coord: 10.2,
+          result: 'goal',
+          distance: 8.5
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        free_shot_type: 'free_shot',
+        result: 'goal',
+        distance: 8.5,
+        reason: 'Defensive fault'
+      });
+    });
+
+    it('should create a penalty shot', async () => {
+      const response = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player2.id,
+          team_id: team2.id,
+          period: 2,
+          free_shot_type: 'penalty',
+          reason: 'Serious foul',
+          result: 'miss'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.free_shot_type).toBe('penalty');
+      expect(response.body.result).toBe('miss');
+    });
+
+    it('should get all free shots for a game', async () => {
+      // Create test data
+      await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player1.id,
+          team_id: team1.id,
+          period: 1,
+          free_shot_type: 'free_shot',
+          result: 'goal'
+        });
+
+      const response = await request(app)
+        .get(`/api/free-shots/${game.id}`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.length).toBe(1);
+      expect(response.body[0]).toHaveProperty('team_name');
+      expect(response.body[0]).toHaveProperty('first_name');
+    });
+
+    it('should reject invalid free shot type', async () => {
+      const response = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player1.id,
+          team_id: team1.id,
+          period: 1,
+          free_shot_type: 'invalid_type',
+          result: 'goal'
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('should reject invalid result', async () => {
+      const response = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player1.id,
+          team_id: team1.id,
+          period: 1,
+          free_shot_type: 'free_shot',
+          result: 'invalid_result'
+        });
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('Enhanced Match Events - Timeouts API', () => {
+    beforeEach(async () => {
+      await db.query('DELETE FROM timeouts WHERE game_id = $1', [game.id]);
+    });
+
+    it('should create a team timeout', async () => {
+      const response = await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          team_id: team1.id,
+          timeout_type: 'team',
+          period: 1,
+          time_remaining: '00:05:00',
+          duration: '00:01:00',
+          reason: 'Strategic timeout',
+          called_by: 'Head Coach Smith'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        timeout_type: 'team',
+        reason: 'Strategic timeout',
+        called_by: 'Head Coach Smith'
+      });
+    });
+
+    it('should create an injury timeout', async () => {
+      const response = await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          game_id: game.id,
+          team_id: team2.id,
+          timeout_type: 'injury',
+          period: 2,
+          duration: '00:03:00',
+          reason: 'Player ankle injury',
+          called_by: 'Referee'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.timeout_type).toBe('injury');
+    });
+
+    it('should create an official timeout without team', async () => {
+      const response = await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          timeout_type: 'official',
+          period: 3,
+          duration: '00:02:00',
+          reason: 'Equipment check',
+          called_by: 'Head Referee'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.timeout_type).toBe('official');
+      expect(response.body.team_id).toBeNull();
+    });
+
+    it('should get all timeouts for a game', async () => {
+      // Create test data
+      await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          team_id: team1.id,
+          timeout_type: 'team',
+          period: 1
+        });
+
+      const response = await request(app)
+        .get(`/api/timeouts/${game.id}`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.length).toBe(1);
+      expect(response.body[0]).toHaveProperty('timeout_type');
+    });
+
+    it('should reject invalid timeout type', async () => {
+      const response = await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          timeout_type: 'invalid_type',
+          period: 1
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('should require team_id for team timeouts', async () => {
+      const response = await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          timeout_type: 'team',
+          period: 1
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('team_id is required for team timeouts');
+    });
+  });
+
+  describe('Enhanced Match Events - Match Commentary API', () => {
+    beforeEach(async () => {
+      await db.query('DELETE FROM match_commentary WHERE game_id = $1', [game.id]);
+    });
+
+    it('should create a general note commentary', async () => {
+      const response = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          time_remaining: '00:08:30',
+          commentary_type: 'note',
+          title: 'Game Flow',
+          content: 'Both teams showing good ball movement and defensive positioning.',
+          created_by: adminUser.id
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        commentary_type: 'note',
+        title: 'Game Flow',
+        content: 'Both teams showing good ball movement and defensive positioning.'
+      });
+    });
+
+    it('should create a highlight commentary', async () => {
+      const response = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          game_id: game.id,
+          period: 2,
+          commentary_type: 'highlight',
+          title: 'Spectacular Shot',
+          content: 'Amazing long-distance goal from the 18-meter line!',
+          created_by: coachUser.id
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.commentary_type).toBe('highlight');
+    });
+
+    it('should create an injury commentary', async () => {
+      const response = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 3,
+          commentary_type: 'injury',
+          title: 'Player Injury',
+          content: 'Player #10 appears to have twisted ankle, receiving medical attention.',
+          created_by: adminUser.id
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.commentary_type).toBe('injury');
+    });
+
+    it('should get all commentary for a game', async () => {
+      // Create test data
+      await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          commentary_type: 'note',
+          title: 'Test Note',
+          content: 'Test content',
+          created_by: adminUser.id
+        });
+
+      const response = await request(app)
+        .get(`/api/match-commentary/${game.id}`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.length).toBe(1);
+      expect(response.body[0]).toHaveProperty('commentary_type');
+      expect(response.body[0]).toHaveProperty('title');
+    });
+
+    it('should update commentary', async () => {
+      // Create commentary
+      const createResponse = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          commentary_type: 'note',
+          title: 'Original Title',
+          content: 'Original content',
+          created_by: adminUser.id
+        });
+
+      const commentaryId = createResponse.body.id;
+
+      // Update commentary
+      const updateResponse = await request(app)
+        .put(`/api/match-commentary/${commentaryId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Updated Title',
+          content: 'Updated content with more details'
+        });
+
+      expect(updateResponse.status).toBe(200);
+      expect(updateResponse.body.title).toBe('Updated Title');
+      expect(updateResponse.body.content).toBe('Updated content with more details');
+    });
+
+    it('should reject invalid commentary type', async () => {
+      const response = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          commentary_type: 'invalid_type',
+          title: 'Test',
+          content: 'Test content',
+          created_by: adminUser.id
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('should require title and content', async () => {
+      const response = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          commentary_type: 'note',
+          created_by: adminUser.id
+        });
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('Enhanced Match Events - Comprehensive Events API', () => {
+    beforeEach(async () => {
+      // Clean up all event types
+      await db.query('DELETE FROM match_commentary WHERE game_id = $1', [game.id]);
+      await db.query('DELETE FROM timeouts WHERE game_id = $1', [game.id]);
+      await db.query('DELETE FROM free_shots WHERE game_id = $1', [game.id]);
+      await db.query('DELETE FROM game_events WHERE game_id = $1', [game.id]);
+    });
+
+    it('should get comprehensive events from all tables', async () => {
+      // Create events of different types
+      await request(app)
+        .post(`/api/events/${game.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          event_type: 'fault_offensive',
+          player_id: player1.id,
+          team_id: team1.id,
+          period: 1
+        });
+
+      await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player2.id,
+          team_id: team2.id,
+          period: 1,
+          free_shot_type: 'free_shot',
+          result: 'goal'
+        });
+
+      await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          team_id: team1.id,
+          timeout_type: 'team',
+          period: 2
+        });
+
+      await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 2,
+          commentary_type: 'highlight',
+          title: 'Great Play',
+          content: 'Excellent team coordination',
+          created_by: adminUser.id
+        });
+
+      const response = await request(app)
+        .get(`/api/events/comprehensive/${game.id}`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.length).toBe(4);
+      
+      // Check that we have all event types
+      const eventTypes = response.body.map(event => event.type);
+      expect(eventTypes).toContain('fault_offensive');
+      expect(eventTypes).toContain('free_shot_free_shot');
+      expect(eventTypes).toContain('timeout_team');
+      expect(eventTypes).toContain('commentary_highlight');
+    });
+
+    it('should filter comprehensive events by type', async () => {
+      // Create test events
+      await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player1.id,
+          team_id: team1.id,
+          period: 1,
+          free_shot_type: 'free_shot',
+          result: 'goal'
+        });
+
+      await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          team_id: team1.id,
+          timeout_type: 'team',
+          period: 1
+        });
+
+      const response = await request(app)
+        .get(`/api/events/comprehensive/${game.id}?type=free_shot_free_shot`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.length).toBe(1);
+      expect(response.body[0].type).toBe('free_shot_free_shot');
+    });
+
+    it('should filter comprehensive events by period', async () => {
+      // Create events in different periods
+      await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          team_id: team1.id,
+          timeout_type: 'team',
+          period: 1
+        });
+
+      await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          team_id: team2.id,
+          timeout_type: 'team',
+          period: 2
+        });
+
+      const response = await request(app)
+        .get(`/api/events/comprehensive/${game.id}?period=1`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.length).toBe(1);
+      expect(response.body[0].period).toBe(1);
     });
   });
 });

@@ -665,18 +665,6 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
             >
               ↩️ Rebound
             </button>
-            <button
-              className={`shot-type-btn ${shotType === 'free_throw' ? 'active' : ''}`}
-              onClick={() => setShotType('free_throw')}
-            >
-              🎯 Free Throw
-            </button>
-            <button
-              className={`shot-type-btn ${shotType === 'penalty' ? 'active' : ''}`}
-              onClick={() => setShotType('penalty')}
-            >
-              ⚠️ Penalty
-            </button>
           </div>
         </div>
 
