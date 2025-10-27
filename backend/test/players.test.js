@@ -3,6 +3,14 @@ import app from '../src/app.js';
 import db from '../src/db.js';
 import { generateTestToken } from './helpers/testHelpers.js';
 
+// Helper function to generate truly unique names
+const generateUniqueTeamName = (prefix = 'Team') => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 15);
+  const processId = process.pid;
+  return `${prefix}_${timestamp}_${random}_${processId}`;
+};
+
 describe('Player Routes', () => {
   let testTeamId;
 
@@ -23,9 +31,10 @@ describe('Player Routes', () => {
     await db.query('DELETE FROM teams');
 
     // Create a test team to use for player tests
+    const uniqueTeamName = generateUniqueTeamName('TestTeamPlayers');
     const teamRes = await db.query(
       'INSERT INTO teams (name) VALUES ($1) RETURNING id',
-      ['Test Team']
+      [uniqueTeamName]
     );
     testTeamId = teamRes.rows[0].id;
   });
@@ -83,9 +92,10 @@ describe('Player Routes', () => {
         [testTeamId, 'John', 'Doe', 10]
       );
 
+      const uniqueOtherTeamName = generateUniqueTeamName('OtherTeamPlayers');
       const otherTeamRes = await db.query(
         'INSERT INTO teams (name) VALUES ($1) RETURNING id',
-        ['Other Team']
+        [uniqueOtherTeamName]
       );
       const otherTeamId = otherTeamRes.rows[0].id;
 

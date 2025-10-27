@@ -3,7 +3,15 @@ import app from '../src/app.js';
 import db from '../src/db.js';
 import jwt from 'jsonwebtoken';
 
-describe('Shots API', () => {
+// Helper function to generate truly unique names
+const generateUniqueTeamName = (prefix = 'Team') => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 15);
+  const processId = process.pid;
+  return `${prefix}_${timestamp}_${random}_${processId}`;
+};
+
+describe('Shot Routes', () => {
   let authToken;
   let coachToken;
   let userToken;
@@ -262,7 +270,8 @@ describe('Shots API', () => {
 
     it('should reject player from non-participating team', async () => {
       // Create another team and player
-      const otherTeam = await db.query('INSERT INTO teams (name) VALUES ($1) RETURNING *', ['Other Team']);
+      const uniqueOtherTeamName = generateUniqueTeamName('OtherTeamShots');
+      const otherTeam = await db.query('INSERT INTO teams (name) VALUES ($1) RETURNING *', [uniqueOtherTeamName]);
       const otherPlayer = await db.query(
         'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
         [otherTeam.rows[0].id, 'Other', 'Player', 99]
