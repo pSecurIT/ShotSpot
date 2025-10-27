@@ -99,6 +99,11 @@ async function setupTestDb() {
     const schema = fs.readFileSync(join(__dirname, '../src/schema.sql'), 'utf8');
     await testPool.query(schema);
 
+    // Apply Enhanced Events migration
+    const enhancedEventsMigration = fs.readFileSync(join(__dirname, '../src/migrations/add_enhanced_events.sql'), 'utf8');
+    await testPool.query(enhancedEventsMigration);
+    console.log('Applied Enhanced Events migration');
+
     // Grant permissions to test user on all tables (if different from admin)
     if (dbUser !== adminUser) {
       await testPool.query(`

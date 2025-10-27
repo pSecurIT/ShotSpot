@@ -4,6 +4,10 @@ import api from '../utils/api';
 import CourtVisualization from './CourtVisualization';
 import MatchTimeline from './MatchTimeline';
 import SubstitutionPanel from './SubstitutionPanel';
+import FaultManagement from './FaultManagement';
+import TimeoutManagement from './TimeoutManagement';
+import FreeShotPanel from './FreeShotPanel';
+import MatchCommentary from './MatchCommentary';
 import { useTimer } from '../hooks/useTimer';
 
 /**
@@ -153,6 +157,9 @@ const LiveMatch: React.FC = () => {
 
   // Reset tracking - incrementing this key forces CourtVisualization to remount and refetch shots
   const [courtResetKey, setCourtResetKey] = useState<number>(0);
+
+  // Active tab for Enhanced Match Events
+  const [activeTab, setActiveTab] = useState<'timeline' | 'faults' | 'timeouts' | 'freeshots' | 'commentary'>('timeline');
 
   // Fetch game data
   const fetchGame = useCallback(async () => {
@@ -1590,19 +1597,121 @@ const LiveMatch: React.FC = () => {
         />
       </div>
 
-      {/* Main content area - placeholders for future components */}
+      {/* Enhanced Match Events Dashboard */}
       <div className="match-content">
         <div className="content-section full-width">
-          <MatchTimeline
-            gameId={game.id}
-            homeTeamId={game.home_team_id}
-            awayTeamId={game.away_team_id}
-            homeTeamName={game.home_team_name}
-            awayTeamName={game.away_team_name}
-            homePlayers={homePlayers}
-            awayPlayers={awayPlayers}
-            onRefresh={fetchGame}
-          />
+          <div className="enhanced-events-dashboard">
+            <div className="dashboard-header">
+              <h3>Match Events Dashboard</h3>
+              <div className="tab-navigation">
+                <button
+                  className={`tab-button ${activeTab === 'timeline' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('timeline')}
+                >
+                  📊 Timeline
+                </button>
+                <button
+                  className={`tab-button ${activeTab === 'faults' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('faults')}
+                >
+                  ⚠️ Faults
+                </button>
+                <button
+                  className={`tab-button ${activeTab === 'timeouts' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('timeouts')}
+                >
+                  ⏸️ Timeouts
+                </button>
+                <button
+                  className={`tab-button ${activeTab === 'freeshots' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('freeshots')}
+                >
+                  🎯 Free Shots
+                </button>
+                <button
+                  className={`tab-button ${activeTab === 'commentary' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('commentary')}
+                >
+                  📝 Commentary
+                </button>
+              </div>
+            </div>
+
+            <div className="tab-content">
+              {activeTab === 'timeline' && (
+                <MatchTimeline
+                  gameId={game.id}
+                  homeTeamId={game.home_team_id}
+                  awayTeamId={game.away_team_id}
+                  homeTeamName={game.home_team_name}
+                  awayTeamName={game.away_team_name}
+                  homePlayers={homePlayers}
+                  awayPlayers={awayPlayers}
+                  onRefresh={fetchGame}
+                />
+              )}
+
+              {activeTab === 'faults' && (
+                <FaultManagement
+                  gameId={game.id}
+                  homeTeamId={game.home_team_id}
+                  awayTeamId={game.away_team_id}
+                  homeTeamName={game.home_team_name}
+                  awayTeamName={game.away_team_name}
+                  currentPeriod={timerState?.current_period || game.current_period}
+                  timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                  onFaultRecorded={() => {
+                    // Refresh timeline to show new fault events
+                    fetchGame();
+                  }}
+                />
+              )}
+
+              {activeTab === 'timeouts' && (
+                <TimeoutManagement
+                  gameId={game.id}
+                  homeTeamId={game.home_team_id}
+                  awayTeamId={game.away_team_id}
+                  homeTeamName={game.home_team_name}
+                  awayTeamName={game.away_team_name}
+                  currentPeriod={timerState?.current_period || game.current_period}
+                  timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                  onTimeoutRecorded={() => {
+                    // Refresh timeline to show new timeout events
+                    fetchGame();
+                  }}
+                />
+              )}
+
+              {activeTab === 'freeshots' && (
+                <FreeShotPanel
+                  gameId={game.id}
+                  homeTeamId={game.home_team_id}
+                  awayTeamId={game.away_team_id}
+                  homeTeamName={game.home_team_name}
+                  awayTeamName={game.away_team_name}
+                  currentPeriod={timerState?.current_period || game.current_period}
+                  timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                  onFreeShotRecorded={() => {
+                    // Refresh timeline and game data to show new free shot events
+                    fetchGame();
+                  }}
+                />
+              )}
+
+              {activeTab === 'commentary' && (
+                <MatchCommentary
+                  gameId={game.id}
+                  currentPeriod={timerState?.current_period || game.current_period}
+                  timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                  onCommentaryAdded={() => {
+                    // Refresh game data to update any match state
+                    fetchGame();
+                  }}
+                />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

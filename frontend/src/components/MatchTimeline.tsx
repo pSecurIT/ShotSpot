@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
-import './MatchTimeline.css';
 
 interface Player {
   id: number;
@@ -12,9 +11,13 @@ interface Player {
 interface TimelineEvent {
   id: number;
   game_id: number;
-  event_type: 'foul' | 'substitution' | 'timeout' | 'period_start' | 'period_end';
+  event_type: 'foul' | 'substitution' | 'timeout' | 'period_start' | 'period_end' | 
+              'fault_offensive' | 'fault_defensive' | 'fault_out_of_bounds' |
+              'free_shot_free_shot' | 'free_shot_penalty' |
+              'timeout_team' | 'timeout_injury' | 'timeout_official' | 'timeout_tv' |
+              'commentary_note' | 'commentary_highlight' | 'commentary_injury' | 'commentary_weather' | 'commentary_technical';
   player_id: number | null;
-  team_id: number;
+  team_id: number | null;
   period: number;
   time_remaining: string | null;
   details: Record<string, unknown> | null;
@@ -22,7 +25,7 @@ interface TimelineEvent {
   first_name: string | null;
   last_name: string | null;
   jersey_number: number | null;
-  team_name: string;
+  team_name: string | null;
 }
 
 interface Shot {
@@ -92,11 +95,18 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
 
   const fetchEvents = useCallback(async () => {
     try {
-      const response = await api.get(`/events/${gameId}`);
+      // Fetch from comprehensive events view that includes enhanced match events
+      const response = await api.get(`/events/${gameId}/comprehensive`);
       setEvents(response.data);
     } catch (err) {
-      console.error('Error fetching events:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch events');
+      // Fallback to regular events if comprehensive endpoint doesn't exist yet
+      try {
+        const fallbackResponse = await api.get(`/events/${gameId}`);
+        setEvents(fallbackResponse.data);
+      } catch (fallbackErr) {
+        console.error('Error fetching events:', err);
+        setError(fallbackErr instanceof Error ? fallbackErr.message : 'Failed to fetch events');
+      }
     }
   }, [gameId]);
 
@@ -216,12 +226,35 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
 
   const getEventIcon = (eventType: string) => {
     const icons = {
+      // Original event types
       foul: '⚠️',
       substitution: '🔄',
       timeout: '⏸️',
       period_start: '▶️',
       period_end: '⏹️',
-      shot: '🏀'
+      shot: '🏀',
+      
+      // Enhanced Match Events - Faults
+      fault_offensive: '🔴',
+      fault_defensive: '🟡',
+      fault_out_of_bounds: '⚪',
+      
+      // Enhanced Match Events - Free Shots
+      free_shot_free_shot: '🎯',
+      free_shot_penalty: '🥅',
+      
+      // Enhanced Match Events - Timeouts
+      timeout_team: '⏸️',
+      timeout_injury: '🏥',
+      timeout_official: '👔',
+      timeout_tv: '📺',
+      
+      // Enhanced Match Events - Commentary
+      commentary_note: '📝',
+      commentary_highlight: '⭐',
+      commentary_injury: '🚑',
+      commentary_weather: '🌤️',
+      commentary_technical: '⚙️'
     };
     return icons[eventType as keyof typeof icons] || '📝';
   };
@@ -277,6 +310,80 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
             </div>
           );
         }
+      // Enhanced Match Events - Faults
+      case 'fault_offensive':
+      case 'fault_defensive':
+      case 'fault_out_of_bounds':
+        {
+          const reason = getStringProp(details, 'reason');
+          const description = getStringProp(details, 'description');
+          
+          return (
+            <div className="event-details">
+              {reason && <span className="detail-badge">{reason}</span>}
+              {description && <span className="detail-text">{description}</span>}
+            </div>
+          );
+        }
+      // Enhanced Match Events - Free Shots
+      case 'free_shot_free_shot':
+      case 'free_shot_penalty':
+        {
+          const result = getStringProp(details, 'result');
+          const reason = getStringProp(details, 'reason');
+          const distance = getNumberProp(details, 'distance');
+          
+          return (
+            <div className="event-details">
+              {result && (
+                <span className={`detail-badge ${result === 'goal' ? 'success' : result === 'miss' ? 'danger' : 'warning'}`}>
+                  {result === 'goal' ? '✅ GOAL' : result === 'miss' ? '❌ MISS' : '⚪ BLOCKED'}
+                </span>
+              )}
+              {distance && <span className="detail-text">Distance: {distance}m</span>}
+              {reason && <span className="detail-text">Reason: {reason}</span>}
+            </div>
+          );
+        }
+      // Enhanced Match Events - Timeouts
+      case 'timeout_team':
+      case 'timeout_injury':
+      case 'timeout_official':
+      case 'timeout_tv':
+        {
+          const duration = getStringProp(details, 'duration');
+          const reason = getStringProp(details, 'reason');
+          const calledBy = getStringProp(details, 'called_by');
+          
+          return (
+            <div className="event-details">
+              {duration && <span className="detail-badge">Duration: {duration}</span>}
+              {calledBy && <span className="detail-text">Called by: {calledBy}</span>}
+              {reason && <span className="detail-text">Reason: {reason}</span>}
+            </div>
+          );
+        }
+      // Enhanced Match Events - Commentary
+      case 'commentary_note':
+      case 'commentary_highlight':
+      case 'commentary_injury':
+      case 'commentary_weather':
+      case 'commentary_technical':
+        {
+          const title = getStringProp(details, 'title');
+          const content = getStringProp(details, 'content');
+          
+          return (
+            <div className="event-details">
+              {title && <span className="detail-badge commentary-title">{title}</span>}
+              {content && (
+                <div className="detail-text commentary-content">
+                  {content.length > 100 ? `${content.substring(0, 100)}...` : content}
+                </div>
+              )}
+            </div>
+          );
+        }
       default:
         return null;
     }
@@ -305,10 +412,34 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
             <option value="all">All</option>
             <option value="shots">Shots</option>
             <option value="substitutions">Substitutions</option>
-            <option value="foul">Fouls</option>
-            <option value="timeout">Timeouts</option>
-            <option value="period_start">Period Start</option>
-            <option value="period_end">Period End</option>
+            <optgroup label="Original Events">
+              <option value="foul">Fouls</option>
+              <option value="timeout">Timeouts</option>
+              <option value="period_start">Period Start</option>
+              <option value="period_end">Period End</option>
+            </optgroup>
+            <optgroup label="Enhanced Events - Faults">
+              <option value="fault_offensive">Offensive Faults</option>
+              <option value="fault_defensive">Defensive Faults</option>
+              <option value="fault_out_of_bounds">Out of Bounds</option>
+            </optgroup>
+            <optgroup label="Enhanced Events - Free Shots">
+              <option value="free_shot_free_shot">Free Shots</option>
+              <option value="free_shot_penalty">Penalties</option>
+            </optgroup>
+            <optgroup label="Enhanced Events - Timeouts">
+              <option value="timeout_team">Team Timeouts</option>
+              <option value="timeout_injury">Injury Timeouts</option>
+              <option value="timeout_official">Official Timeouts</option>
+              <option value="timeout_tv">TV Timeouts</option>
+            </optgroup>
+            <optgroup label="Enhanced Events - Commentary">
+              <option value="commentary_note">Notes</option>
+              <option value="commentary_highlight">Highlights</option>
+              <option value="commentary_injury">Injury Reports</option>
+              <option value="commentary_weather">Weather</option>
+              <option value="commentary_technical">Technical</option>
+            </optgroup>
           </select>
         </div>
 

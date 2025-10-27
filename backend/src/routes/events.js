@@ -16,7 +16,12 @@ router.use(auth);
 router.get('/:gameId', [
   query('event_type')
     .optional()
-    .isIn(['foul', 'substitution', 'timeout', 'period_start', 'period_end'])
+    .isIn([
+      'foul', 'substitution', 'timeout', 'period_start', 'period_end',
+      'fault_offensive', 'fault_defensive', 'fault_out_of_bounds',
+      'free_shot', 'timeout_team', 'timeout_injury', 'timeout_official',
+      'match_commentary'
+    ])
     .withMessage('Invalid event type'),
   query('team_id')
     .optional()
@@ -98,8 +103,13 @@ router.post('/:gameId', [
   requireRole(['admin', 'coach']),
   body('event_type')
     .notEmpty()
-    .isIn(['foul', 'substitution', 'timeout', 'period_start', 'period_end'])
-    .withMessage('Event type must be one of: foul, substitution, timeout, period_start, period_end'),
+    .isIn([
+      'foul', 'substitution', 'timeout', 'period_start', 'period_end',
+      'fault_offensive', 'fault_defensive', 'fault_out_of_bounds',
+      'free_shot', 'timeout_team', 'timeout_injury', 'timeout_official',
+      'match_commentary'
+    ])
+    .withMessage('Event type must be one of: foul, substitution, timeout, period_start, period_end, fault_offensive, fault_defensive, fault_out_of_bounds, free_shot, timeout_team, timeout_injury, timeout_official, match_commentary'),
   body('team_id')
     .notEmpty()
     .isInt({ min: 1 })
@@ -173,6 +183,23 @@ router.post('/:gameId', [
       }
     }
 
+    // Validate fault event details
+    if (event_type.startsWith('fault_') && details && details.reason) {
+      const validFaultReasons = [
+        'running_with_ball', 'hindering_shot', 'ball_out',
+        'traveling', 'offensive_foul', 'defensive_foul', 'illegal_contact',
+        'out_of_bounds', 'shot_clock_violation', 'technical_foul'
+      ];
+      
+      if (!validFaultReasons.includes(details.reason)) {
+        return res.status(400).json({ 
+          error: 'Invalid fault reason',
+          providedReason: details.reason,
+          validReasons: validFaultReasons
+        });
+      }
+    }
+
     // Insert the event
     const insertQuery = `
       INSERT INTO game_events (game_id, event_type, player_id, team_id, period, time_remaining, details)
@@ -220,8 +247,13 @@ router.put('/:gameId/:eventId', [
   requireRole(['admin', 'coach']),
   body('event_type')
     .optional()
-    .isIn(['foul', 'substitution', 'timeout', 'period_start', 'period_end'])
-    .withMessage('Event type must be one of: foul, substitution, timeout, period_start, period_end'),
+    .isIn([
+      'foul', 'substitution', 'timeout', 'period_start', 'period_end',
+      'fault_offensive', 'fault_defensive', 'fault_out_of_bounds',
+      'free_shot', 'timeout_team', 'timeout_injury', 'timeout_official',
+      'match_commentary'
+    ])
+    .withMessage('Event type must be one of: foul, substitution, timeout, period_start, period_end, fault_offensive, fault_defensive, fault_out_of_bounds, free_shot, timeout_team, timeout_injury, timeout_official, match_commentary'),
   body('team_id')
     .optional()
     .isInt({ min: 1 })
@@ -365,6 +397,220 @@ router.delete('/:gameId/:eventId', [
   } catch (error) {
     console.error('Error deleting event:', error);
     res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
+/**
+ * Get comprehensive events from all Enhanced Match Events tables
+ * GET /api/events/comprehensive/:gameId
+ * Query params: type, period
+ */
+router.get('/comprehensive/:gameId', [
+  query('type')
+    .optional()
+    .isString()
+    .withMessage('Type filter must be a string'),
+  query('period')
+    .optional()
+    .isInt({ min: 1, max: 10 })
+    .withMessage('Period must be between 1 and 10')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const { gameId } = req.params;
+  const { type, period } = req.query;
+
+  try {
+    const allEvents = [];
+
+    // Query game_events
+    let gameEventsQuery = `
+      SELECT 
+        'game_event' as source_table,
+        ge.id,
+        ge.game_id,
+        ge.event_type as type,
+        ge.team_id,
+        ge.player_id,
+        ge.period,
+        ge.time_remaining,
+        ge.details,
+        ge.created_at,
+        t.name as team_name,
+        p.first_name,
+        p.last_name,
+        p.jersey_number
+      FROM game_events ge
+      JOIN teams t ON ge.team_id = t.id
+      LEFT JOIN players p ON ge.player_id = p.id
+      WHERE ge.game_id = $1
+    `;
+    let params = [gameId];
+    let paramIndex = 2;
+
+    if (type && (type.startsWith('fault_') || type === 'substitution' || type === 'period_start' || type === 'period_end')) {
+      gameEventsQuery += ` AND ge.event_type = $${paramIndex}`;
+      params.push(type);
+      paramIndex++;
+    }
+
+    if (period) {
+      gameEventsQuery += ` AND ge.period = $${paramIndex}`;
+      params.push(period);
+      paramIndex++;
+    }
+
+    const gameEventsResult = await db.query(gameEventsQuery, params);
+    allEvents.push(...gameEventsResult.rows);
+
+    // Query free_shots
+    if (!type || type.startsWith('free_shot_')) {
+      let freeShotsQuery = `
+        SELECT 
+          'free_shot' as source_table,
+          fs.id,
+          fs.game_id,
+          CONCAT('free_shot_', fs.free_shot_type) as type,
+          fs.team_id,
+          fs.player_id,
+          fs.period,
+          fs.time_remaining,
+          jsonb_build_object(
+            'result', fs.result,
+            'reason', fs.reason,
+            'x_coord', fs.x_coord,
+            'y_coord', fs.y_coord,
+            'distance', fs.distance
+          ) as details,
+          fs.created_at,
+          t.name as team_name,
+          p.first_name,
+          p.last_name,
+          p.jersey_number
+        FROM free_shots fs
+        JOIN teams t ON fs.team_id = t.id
+        JOIN players p ON fs.player_id = p.id
+        WHERE fs.game_id = $1
+      `;
+      let fsParams = [gameId];
+      let fsParamIndex = 2;
+
+      if (type && type.startsWith('free_shot_')) {
+        const freeShotType = type.replace('free_shot_', '');
+        freeShotsQuery += ` AND fs.free_shot_type = $${fsParamIndex}`;
+        fsParams.push(freeShotType);
+        fsParamIndex++;
+      }
+
+      if (period) {
+        freeShotsQuery += ` AND fs.period = $${fsParamIndex}`;
+        fsParams.push(period);
+      }
+
+      const freeShotsResult = await db.query(freeShotsQuery, fsParams);
+      allEvents.push(...freeShotsResult.rows);
+    }
+
+    // Query timeouts
+    if (!type || type.startsWith('timeout_')) {
+      let timeoutsQuery = `
+        SELECT 
+          'timeout' as source_table,
+          t.id,
+          t.game_id,
+          CONCAT('timeout_', t.timeout_type) as type,
+          t.team_id,
+          NULL as player_id,
+          t.period,
+          t.time_remaining,
+          jsonb_build_object(
+            'duration', t.duration,
+            'reason', t.reason,
+            'called_by', t.called_by,
+            'ended_at', t.ended_at
+          ) as details,
+          t.created_at,
+          teams.name as team_name,
+          NULL as first_name,
+          NULL as last_name,
+          NULL as jersey_number
+        FROM timeouts t
+        LEFT JOIN teams ON t.team_id = teams.id
+        WHERE t.game_id = $1
+      `;
+      let toParams = [gameId];
+      let toParamIndex = 2;
+
+      if (type && type.startsWith('timeout_')) {
+        const timeoutType = type.replace('timeout_', '');
+        timeoutsQuery += ` AND t.timeout_type = $${toParamIndex}`;
+        toParams.push(timeoutType);
+        toParamIndex++;
+      }
+
+      if (period) {
+        timeoutsQuery += ` AND t.period = $${toParamIndex}`;
+        toParams.push(period);
+      }
+
+      const timeoutsResult = await db.query(timeoutsQuery, toParams);
+      allEvents.push(...timeoutsResult.rows);
+    }
+
+    // Query match_commentary
+    if (!type || type.startsWith('commentary_')) {
+      let commentaryQuery = `
+        SELECT 
+          'commentary' as source_table,
+          mc.id,
+          mc.game_id,
+          CONCAT('commentary_', mc.commentary_type) as type,
+          NULL as team_id,
+          NULL as player_id,
+          mc.period,
+          mc.time_remaining,
+          jsonb_build_object(
+            'title', mc.title,
+            'content', mc.content,
+            'created_by', mc.created_by
+          ) as details,
+          mc.created_at,
+          NULL as team_name,
+          NULL as first_name,
+          NULL as last_name,
+          NULL as jersey_number
+        FROM match_commentary mc
+        WHERE mc.game_id = $1
+      `;
+      let mcParams = [gameId];
+      let mcParamIndex = 2;
+
+      if (type && type.startsWith('commentary_')) {
+        const commentaryType = type.replace('commentary_', '');
+        commentaryQuery += ` AND mc.commentary_type = $${mcParamIndex}`;
+        mcParams.push(commentaryType);
+        mcParamIndex++;
+      }
+
+      if (period) {
+        commentaryQuery += ` AND mc.period = $${mcParamIndex}`;
+        mcParams.push(period);
+      }
+
+      const commentaryResult = await db.query(commentaryQuery, mcParams);
+      allEvents.push(...commentaryResult.rows);
+    }
+
+    // Sort all events by created_at descending
+    allEvents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json(allEvents);
+  } catch (error) {
+    console.error('Error fetching comprehensive events:', error);
+    res.status(500).json({ error: 'Failed to fetch comprehensive events' });
   }
 });
 
