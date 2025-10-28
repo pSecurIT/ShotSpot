@@ -960,50 +960,52 @@ describe('Events API', () => {
     });
 
     it('should get comprehensive events from all tables', async () => {
-      // Create events of different types
-      await request(app)
-        .post(`/api/events/${game.id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          event_type: 'fault_offensive',
-          player_id: player1.id,
-          team_id: team1.id,
-          period: 1
-        });
+      // Create events of different types in parallel for better performance
+      await Promise.all([
+        request(app)
+          .post(`/api/events/${game.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            event_type: 'fault_offensive',
+            player_id: player1.id,
+            team_id: team1.id,
+            period: 1
+          }),
 
-      await request(app)
-        .post('/api/free-shots')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          game_id: game.id,
-          player_id: player2.id,
-          team_id: team2.id,
-          period: 1,
-          free_shot_type: 'free_shot',
-          result: 'goal'
-        });
+        request(app)
+          .post('/api/free-shots')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            game_id: game.id,
+            player_id: player2.id,
+            team_id: team2.id,
+            period: 1,
+            free_shot_type: 'free_shot',
+            result: 'goal'
+          }),
 
-      await request(app)
-        .post('/api/timeouts')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          game_id: game.id,
-          team_id: team1.id,
-          timeout_type: 'team',
-          period: 2
-        });
+        request(app)
+          .post('/api/timeouts')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            game_id: game.id,
+            team_id: team1.id,
+            timeout_type: 'team',
+            period: 2
+          }),
 
-      await request(app)
-        .post('/api/match-commentary')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          game_id: game.id,
-          period: 2,
-          commentary_type: 'highlight',
-          title: 'Great Play',
-          content: 'Excellent team coordination',
-          created_by: adminUser.id
-        });
+        request(app)
+          .post('/api/match-commentary')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            game_id: game.id,
+            period: 2,
+            commentary_type: 'highlight',
+            title: 'Great Play',
+            content: 'Excellent team coordination',
+            created_by: adminUser.id
+          })
+      ]);
 
       const response = await request(app)
         .get(`/api/events/comprehensive/${game.id}`)
@@ -1021,28 +1023,30 @@ describe('Events API', () => {
     });
 
     it('should filter comprehensive events by type', async () => {
-      // Create test events
-      await request(app)
-        .post('/api/free-shots')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          game_id: game.id,
-          player_id: player1.id,
-          team_id: team1.id,
-          period: 1,
-          free_shot_type: 'free_shot',
-          result: 'goal'
-        });
+      // Create test events in parallel for better performance
+      await Promise.all([
+        request(app)
+          .post('/api/free-shots')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            game_id: game.id,
+            player_id: player1.id,
+            team_id: team1.id,
+            period: 1,
+            free_shot_type: 'free_shot',
+            result: 'goal'
+          }),
 
-      await request(app)
-        .post('/api/timeouts')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          game_id: game.id,
-          team_id: team1.id,
-          timeout_type: 'team',
-          period: 1
-        });
+        request(app)
+          .post('/api/timeouts')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            game_id: game.id,
+            team_id: team1.id,
+            timeout_type: 'team',
+            period: 1
+          })
+      ]);
 
       const response = await request(app)
         .get(`/api/events/comprehensive/${game.id}?type=free_shot_free_shot`)
@@ -1054,26 +1058,28 @@ describe('Events API', () => {
     });
 
     it('should filter comprehensive events by period', async () => {
-      // Create events in different periods
-      await request(app)
-        .post('/api/timeouts')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          game_id: game.id,
-          team_id: team1.id,
-          timeout_type: 'team',
-          period: 1
-        });
+      // Create events in different periods in parallel for better performance
+      await Promise.all([
+        request(app)
+          .post('/api/timeouts')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            game_id: game.id,
+            team_id: team1.id,
+            timeout_type: 'team',
+            period: 1
+          }),
 
-      await request(app)
-        .post('/api/timeouts')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          game_id: game.id,
-          team_id: team2.id,
-          timeout_type: 'team',
-          period: 2
-        });
+        request(app)
+          .post('/api/timeouts')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            game_id: game.id,
+            team_id: team2.id,
+            timeout_type: 'team',
+            period: 2
+          })
+      ]);
 
       const response = await request(app)
         .get(`/api/events/comprehensive/${game.id}?period=1`)

@@ -289,6 +289,12 @@ describe('FaultManagement', () => {
       expect(api.get).toHaveBeenCalled();
     });
     
+    // Wait for player options to be rendered before selecting
+    await waitFor(() => {
+      const playerSelect = screen.getByDisplayValue('Select player');
+      expect(playerSelect.querySelector('option[value="1"]')).toBeInTheDocument();
+    });
+    
     // Select player and submit
     const playerSelect = screen.getByDisplayValue('Select player');
     await user.selectOptions(playerSelect, '1');
