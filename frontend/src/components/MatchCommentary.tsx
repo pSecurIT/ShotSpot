@@ -34,7 +34,7 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
   const [success, setSuccess] = useState<string | null>(null);
   
   // Ref for timeout cleanup
-  const successTimeoutRef = useRef<number | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Form state
   const [commentaryType, setCommentaryType] = useState<'note' | 'highlight' | 'injury' | 'weather' | 'technical'>('note');
