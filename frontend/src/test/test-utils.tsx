@@ -16,11 +16,12 @@ const customRender = (
     result = render(ui, options);
   });
   
-  // @ts-ignore - result is definitely assigned in the act block
+  // @ts-expect-error - result is definitely assigned in the act block above
   return result;
 };
 
 // Re-export everything from testing-library/react
+// eslint-disable-next-line react-refresh/only-export-components
 export * from '@testing-library/react';
 
 // Override the default render method
