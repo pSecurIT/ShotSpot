@@ -15,15 +15,20 @@ interface TimerState {
   timer_started_at?: string;
 }
 
+interface UseTimerOptions {
+  onPeriodEnd?: () => void;
+}
+
 /**
  * Custom hook for managing game timer state with client-side countdown
  * Calculates time remaining locally for smooth countdown, syncs with server periodically
  */
-export const useTimer = (gameId: string | undefined) => {
+export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) => {
   const [serverTimerState, setServerTimerState] = useState<TimerState | null>(null);
   const [clientTimeRemaining, setClientTimeRemaining] = useState<{ minutes: number; seconds: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [periodHasEnded, setPeriodHasEnded] = useState(false);
   
   // Track in-flight requests to prevent duplicates
   const fetchingRef = useRef(false);
@@ -41,6 +46,11 @@ export const useTimer = (gameId: string | undefined) => {
       if (!prev) return null;
       return { ...prev, ...updates };
     });
+  }, []);
+
+  // 🔥 NEW: Function to reset period end state (when continuing after period end)
+  const resetPeriodEndState = useCallback(() => {
+    setPeriodHasEnded(false);
   }, []);
 
   const fetchTimerState = useCallback(async (force: boolean = false) => {
@@ -62,6 +72,12 @@ export const useTimer = (gameId: string | undefined) => {
       const response = await api.get(`/timer/${gameId}`);
       setServerTimerState(response.data);
       
+      // Reset period end flag when timer is started fresh
+      if (response.data.timer_state === 'running' && 
+          (!serverTimerState || serverTimerState.timer_state !== 'running')) {
+        setPeriodHasEnded(false);
+      }
+      
       // Initialize client-side timer with server data
       // Use time_remaining if available, otherwise fall back to period_duration
       const timeToDisplay = response.data.time_remaining || response.data.period_duration;
@@ -82,7 +98,7 @@ export const useTimer = (gameId: string | undefined) => {
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [gameId]);
+  }, [gameId, serverTimerState]);
 
   // Client-side countdown (runs every second, no network calls)
   useEffect(() => {
@@ -105,7 +121,24 @@ export const useTimer = (gameId: string | undefined) => {
             minutes--;
             seconds = 59;
           } else {
-            // Timer reached 0
+            // Timer reached 0:0 - Period has ended!
+            setPeriodHasEnded(true);
+            
+            // Trigger period end callback if provided
+            if (options?.onPeriodEnd) {
+              setTimeout(() => options.onPeriodEnd!(), 100); // Small delay to ensure state updates
+            }
+            
+            // Stop the timer automatically by making API call
+            if (gameId) {
+              api.post(`/timer/${gameId}/pause`)
+                .catch(err => {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.error('Error auto-pausing timer at period end:', err);
+                  }
+                });
+            }
+            
             return { minutes: 0, seconds: 0 };
           }
           
@@ -120,7 +153,7 @@ export const useTimer = (gameId: string | undefined) => {
         clientIntervalRef.current = null;
       }
     };
-  }, [serverTimerState?.timer_state, clientTimeRemaining]);
+  }, [serverTimerState?.timer_state, clientTimeRemaining, gameId, options]);
 
   // Periodic server sync when timer is running (every 5 seconds)
   useEffect(() => {
@@ -157,6 +190,8 @@ export const useTimer = (gameId: string | undefined) => {
     loading,
     error,
     refetch: fetchTimerState,
-    setTimerStateOptimistic // 🔥 NEW: Allow manual state updates
+    setTimerStateOptimistic, // 🔥 NEW: Allow manual state updates
+    periodHasEnded, // 🔥 NEW: Indicates if period has ended
+    resetPeriodEndState // 🔥 NEW: Reset period end state
   };
 };
