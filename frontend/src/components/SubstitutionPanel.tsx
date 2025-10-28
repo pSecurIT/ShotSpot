@@ -50,6 +50,7 @@ interface SubstitutionPanelProps {
   currentPeriod: number;
   timeRemaining?: string;
   onSubstitutionRecorded?: () => void;
+  canAddEvents?: () => boolean; // Period end check function
 }
 
 const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
@@ -60,7 +61,8 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
   awayTeamName,
   currentPeriod,
   timeRemaining,
-  onSubstitutionRecorded
+  onSubstitutionRecorded,
+  canAddEvents
 }) => {
   const [activePlayers, setActivePlayers] = useState<ActivePlayersResponse | null>(null);
   const [recentSubstitutions, setRecentSubstitutions] = useState<Substitution[]>([]);
@@ -118,6 +120,11 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
     if (playerOut === playerIn) {
       setError('Player in and player out must be different');
       return;
+    }
+
+    // Check if period has ended and require confirmation
+    if (canAddEvents && !canAddEvents()) {
+      return; // User cancelled, don't record the substitution
     }
 
     setLoading(true);
