@@ -19,6 +19,7 @@ interface FaultManagementProps {
   currentPeriod: number;
   timeRemaining?: string;
   onFaultRecorded?: () => void;
+  canAddEvents?: () => boolean; // Period end check function
 }
 
 interface Fault {
@@ -47,7 +48,8 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
   awayTeamName,
   currentPeriod,
   timeRemaining,
-  onFaultRecorded
+  onFaultRecorded,
+  canAddEvents
 }) => {
   const [players, setPlayers] = useState<{ home: Player[]; away: Player[] }>({ home: [], away: [] });
   const [recentFaults, setRecentFaults] = useState<Fault[]>([]);
@@ -102,6 +104,11 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
     if ((faultType === 'fault_offensive' || faultType === 'fault_defensive') && !selectedPlayer) {
       setError('Please select a player for this fault type');
       return;
+    }
+
+    // Check if period has ended and require confirmation
+    if (canAddEvents && !canAddEvents()) {
+      return; // User cancelled, don't record the fault
     }
 
     setLoading(true);
