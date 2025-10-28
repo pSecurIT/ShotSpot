@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FreeShotPanel from '../components/FreeShotPanel';
 import api from '../utils/api';
@@ -221,7 +221,9 @@ describe('FreeShotPanel', () => {
   });
 
   it('disables submit button when required fields are missing', async () => {
-    render(<FreeShotPanel {...mockProps} />);
+    act(() => {
+      render(<FreeShotPanel {...mockProps} />);
+    });
     
     const recordButton = screen.getByRole('button', { name: 'Record Free Shot' });
     expect(recordButton).toBeDisabled();
@@ -356,7 +358,9 @@ describe('FreeShotPanel', () => {
     const { rerender } = render(<FreeShotPanel {...mockProps} />);
     
     // Update time remaining
-    rerender(<FreeShotPanel {...mockProps} timeRemaining="00:05:00" />);
+    act(() => {
+      rerender(<FreeShotPanel {...mockProps} timeRemaining="00:05:00" />);
+    });
     
     // Component should handle the updated time
     expect(screen.getByText('Record Free Shot / Penalty')).toBeInTheDocument();

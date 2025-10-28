@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 
 interface MatchCommentaryProps {
@@ -32,6 +32,9 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  // Ref for timeout cleanup
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Form state
   const [commentaryType, setCommentaryType] = useState<'note' | 'highlight' | 'injury' | 'weather' | 'technical'>('note');
@@ -46,6 +49,15 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
   useEffect(() => {
     fetchCommentaries();
   }, [gameId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchCommentaries = async () => {
     try {
@@ -104,7 +116,10 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
       }
 
       // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to add commentary');
@@ -121,7 +136,10 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
       if (onCommentaryAdded) {
         onCommentaryAdded();
       }
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to delete commentary');

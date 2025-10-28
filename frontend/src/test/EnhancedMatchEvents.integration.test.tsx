@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import api from '../utils/api';
 
@@ -264,14 +264,16 @@ describe('Enhanced Match Events Integration', () => {
       // Update time for all components
       const newProps = { ...mockGameProps, timeRemaining: '00:05:00' };
       
-      rerender(
-        <div>
-          <FaultManagement {...newProps} />
-          <FreeShotPanel {...newProps} />
-          <TimeoutManagement {...newProps} />
-          <MatchCommentary {...newProps} />
-        </div>
-      );
+      act(() => {
+        rerender(
+          <div>
+            <FaultManagement {...newProps} />
+            <FreeShotPanel {...newProps} />
+            <TimeoutManagement {...newProps} />
+            <MatchCommentary {...newProps} />
+          </div>
+        );
+      });
 
       // All components should handle the time update gracefully
       expect(screen.getByText('Record Fault')).toBeInTheDocument();

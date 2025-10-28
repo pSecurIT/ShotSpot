@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TeamManagement from '../components/TeamManagement';
 import api from '../utils/api';
@@ -28,7 +28,9 @@ describe('TeamManagement', () => {
   });
 
   it('renders the team management interface', () => {
-    render(<TeamManagement />);
+    act(() => {
+      render(<TeamManagement />);
+    });
     expect(screen.getByText('Team Management')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Enter team name')).toBeInTheDocument();
     expect(screen.getByText('Add Team')).toBeInTheDocument();
