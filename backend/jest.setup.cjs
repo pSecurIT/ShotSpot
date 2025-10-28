@@ -22,3 +22,9 @@ dotenv.config({ path: path.join(__dirname, '.env.test') });
 beforeEach(() => {
   jest.clearAllMocks();
 });
+
+// Add timeout handling for async operations
+afterEach(async () => {
+  // Give time for any pending async operations to complete
+  await new Promise(resolve => setTimeout(resolve, 100));
+});

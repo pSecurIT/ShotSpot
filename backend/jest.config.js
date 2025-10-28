@@ -3,7 +3,10 @@ export default {
   verbose: true,
   testEnvironment: 'node',
   maxWorkers: 1, // Run tests serially to avoid database conflicts
-  testTimeout: 10000, // Increase timeout for database operations
+  testTimeout: 15000, // Increase timeout for database operations
+  globalSetup: '<rootDir>/jest.globalSetup.cjs',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
+  globalTeardown: '<rootDir>/jest.teardown.cjs',
   transform: {
     '^.+\\.js$': [
       'babel-jest',
@@ -23,8 +26,6 @@ export default {
     url: 'http://localhost'
   },
   rootDir: '.',
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
-  globalTeardown: '<rootDir>/jest.teardown.cjs',
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },
