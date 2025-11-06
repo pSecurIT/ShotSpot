@@ -138,8 +138,14 @@ describe('FaultManagement', () => {
     // Offensive fault is selected by default
     expect(screen.getByText('🔴 Offensive')).toHaveClass('active');
     
-    // Select player
+    // Select player — wait for the player option to be rendered before selecting
     const playerSelect = screen.getByDisplayValue('Select player');
+
+    // Wait until the option with value "1" exists in the select
+    await waitFor(() => {
+      expect(playerSelect.querySelector('option[value="1"]')).toBeInTheDocument();
+    });
+
     await user.selectOptions(playerSelect, '1');
     
     // Add reason
@@ -184,8 +190,14 @@ describe('FaultManagement', () => {
     const teamSelect = screen.getByDisplayValue('Team Alpha (Home)');
     await user.selectOptions(teamSelect, '2');
     
-    // Select player
+    // Select player — wait for the player option to be rendered before selecting
     const playerSelect = screen.getByDisplayValue('Select player');
+
+    // Wait until the option with value "3" exists in the select
+    await waitFor(() => {
+      expect(playerSelect.querySelector('option[value="3"]')).toBeInTheDocument();
+    });
+
     await user.selectOptions(playerSelect, '3');
     
     // Submit fault
@@ -266,8 +278,14 @@ describe('FaultManagement', () => {
       expect(api.get).toHaveBeenCalled();
     });
     
-    // Select player for offensive fault
+    // Select player for offensive fault — wait for the player option to be rendered
     const playerSelect = screen.getByDisplayValue('Select player');
+
+    // Wait until the option with value "1" exists in the select
+    await waitFor(() => {
+      expect(playerSelect.querySelector('option[value="1"]')).toBeInTheDocument();
+    });
+
     await user.selectOptions(playerSelect, '1');
     
     // Button should now be enabled
@@ -319,8 +337,14 @@ describe('FaultManagement', () => {
       expect(api.get).toHaveBeenCalled();
     });
     
-    // Fill and submit form
+    // Fill and submit form — wait for the player option to be rendered first
     const playerSelect = screen.getByDisplayValue('Select player');
+
+    // Wait until the option with value "1" exists in the select
+    await waitFor(() => {
+      expect(playerSelect.querySelector('option[value="1"]')).toBeInTheDocument();
+    });
+
     await user.selectOptions(playerSelect, '1');
     
     const reasonInput = screen.getByPlaceholderText('Brief description of the fault');
