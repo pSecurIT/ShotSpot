@@ -11,7 +11,7 @@ const generateUniqueTeamName = (prefix = 'Team') => {
   return `${prefix}_${timestamp}_${random}_${processId}`;
 };
 
-describe('Shot Routes', () => {
+describe('🏀 Shot Routes', () => {
   let authToken;
   let coachToken;
   let userToken;
@@ -25,10 +25,12 @@ describe('Shot Routes', () => {
   let testGame;
 
   beforeAll(async () => {
-    // Use unique identifiers to prevent conflicts in CI
-    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    
-    // Create test users with different roles and unique names
+    console.log('🔧 Setting up Shot Routes tests...');
+    try {
+      // Use unique identifiers to prevent conflicts in CI
+      const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      
+      // Create test users with different roles and unique names
     const adminResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
@@ -91,216 +93,263 @@ describe('Shot Routes', () => {
       [team1.id, team2.id, new Date('2025-11-01T14:00:00Z')]
     );
     testGame = gameResult.rows[0];
+    } catch (error) {
+      global.testContext.logTestError(error, 'Shot Routes setup failed');
+      throw error;
+    }
   });
 
   afterAll(async () => {
-    // Clean up test data
-    await db.query('DELETE FROM shots WHERE game_id = $1', [testGame.id]);
-    await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
-    await db.query('DELETE FROM players WHERE id IN ($1, $2)', [player1.id, player2.id]);
-    await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [team1.id, team2.id]);
-    await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
+    console.log('✅ Shot Routes tests completed');
+    try {
+      // Clean up test data
+      await db.query('DELETE FROM shots WHERE game_id = $1', [testGame.id]);
+      await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
+      await db.query('DELETE FROM players WHERE id IN ($1, $2)', [player1.id, player2.id]);
+      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [team1.id, team2.id]);
+      await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
+    } catch (error) {
+      console.error('⚠️ Shot Routes cleanup failed:', error.message);
+    }
   });
 
-  describe('POST /api/shots/:gameId', () => {
-    it('should create a shot as admin', async () => {
-      const shotData = {
-        player_id: player1.id,
-        team_id: team1.id,
-        x_coord: 45.5,
-        y_coord: 30.2,
-        result: 'goal',
-        period: 1,
-        time_remaining: '10:00:00',
-        shot_type: 'jump shot',
-        distance: 5.5
-      };
+  describe('📝 POST /api/shots/:gameId', () => {
+    it('✅ should create a shot as admin', async () => {
+      try {
+        const shotData = {
+          player_id: player1.id,
+          team_id: team1.id,
+          x_coord: 45.5,
+          y_coord: 30.2,
+          result: 'goal',
+          period: 1,
+          time_remaining: '10:00:00',
+          shot_type: 'jump shot',
+          distance: 5.5
+        };
 
-      const response = await request(app)
-        .post(`/api/shots/${testGame.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send(shotData);
+        const response = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
 
-      expect(response.status).toBe(201);
-      expect(response.body).toHaveProperty('id');
-      expect(response.body.player_id).toBe(player1.id);
-      expect(response.body.team_id).toBe(team1.id);
-      expect(response.body.result).toBe('goal');
-      expect(parseFloat(response.body.x_coord)).toBeCloseTo(45.5);
-      expect(parseFloat(response.body.y_coord)).toBeCloseTo(30.2);
-      expect(response.body.first_name).toBe('John');
-      expect(response.body.last_name).toBe('Shooter');
+        expect(response.status).toBe(201);
+        expect(response.body).toHaveProperty('id');
+        expect(response.body.player_id).toBe(player1.id);
+        expect(response.body.team_id).toBe(team1.id);
+        expect(response.body.result).toBe('goal');
+        expect(parseFloat(response.body.x_coord)).toBeCloseTo(45.5);
+        expect(parseFloat(response.body.y_coord)).toBeCloseTo(30.2);
+        expect(response.body.first_name).toBe('John');
+        expect(response.body.last_name).toBe('Shooter');
 
-      // Verify score was updated
-      const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
-      expect(gameCheck.rows[0].home_score).toBe(1);
+        // Verify score was updated
+        const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
+        expect(gameCheck.rows[0].home_score).toBe(1);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST create shot as admin failed');
+        throw error;
+      }
     });
 
-    it('should create a miss shot as coach', async () => {
-      const shotData = {
-        player_id: player2.id,
-        team_id: team2.id,
-        x_coord: 50.0,
-        y_coord: 40.0,
-        result: 'miss',
-        period: 1,
-        time_remaining: '09:30:00'
-      };
+    it('✅ should create a miss shot as coach', async () => {
+      try {
+        const shotData = {
+          player_id: player2.id,
+          team_id: team2.id,
+          x_coord: 50.0,
+          y_coord: 40.0,
+          result: 'miss',
+          period: 1,
+          time_remaining: '09:30:00'
+        };
 
-      const response = await request(app)
-        .post(`/api/shots/${testGame.id}`)
-        .set('Authorization', `Bearer ${coachToken}`)
-        .set('Content-Type', 'application/json')
-        .send(shotData);
+        const response = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${coachToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
 
-      expect(response.status).toBe(201);
-      expect(response.body.result).toBe('miss');
+        expect(response.status).toBe(201);
+        expect(response.body.result).toBe('miss');
 
-      // Verify score was NOT updated
-      const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
-      expect(gameCheck.rows[0].away_score).toBe(0);
+        // Verify score was NOT updated
+        const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
+        expect(gameCheck.rows[0].away_score).toBe(0);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST create miss shot as coach failed');
+        throw error;
+      }
     });
 
-    it('should reject creation by regular user', async () => {
-      const shotData = {
-        player_id: player1.id,
-        team_id: team1.id,
-        x_coord: 45.5,
-        y_coord: 30.2,
-        result: 'goal',
-        period: 1
-      };
+    it('❌ should reject creation by regular user', async () => {
+      try {
+        const shotData = {
+          player_id: player1.id,
+          team_id: team1.id,
+          x_coord: 45.5,
+          y_coord: 30.2,
+          result: 'goal',
+          period: 1
+        };
 
-      const response = await request(app)
-        .post(`/api/shots/${testGame.id}`)
-        .set('Authorization', `Bearer ${userToken}`)
-        .set('Content-Type', 'application/json')
-        .send(shotData);
+        const response = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
 
-      expect(response.status).toBe(403);
+        expect(response.status).toBe(403);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST user authorization rejection failed');
+        throw error;
+      }
     });
 
-    it('should reject shot for non-existent game', async () => {
-      const shotData = {
-        player_id: player1.id,
-        team_id: team1.id,
-        x_coord: 45.5,
-        y_coord: 30.2,
-        result: 'goal',
-        period: 1
-      };
+    it('❌ should reject shot for non-existent game', async () => {
+      try {
+        const shotData = {
+          player_id: player1.id,
+          team_id: team1.id,
+          x_coord: 45.5,
+          y_coord: 30.2,
+          result: 'goal',
+          period: 1
+        };
 
-      const response = await request(app)
-        .post('/api/shots/99999')
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send(shotData);
+        const response = await request(app)
+          .post('/api/shots/99999')
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
 
-      expect(response.status).toBe(404);
-      expect(response.body.error).toContain('Game not found');
+        expect(response.status).toBe(404);
+        expect(response.body.error).toContain('Game not found');
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST non-existent game rejection failed');
+        throw error;
+      }
     });
 
-    it('should reject shot for game not in progress', async () => {
-      // Create a scheduled game
-      const scheduledGame = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
-         VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-01T14:00:00Z')]
-      );
+    it('❌ should reject shot for game not in progress', async () => {
+      try {
+        // Create a scheduled game
+        const scheduledGame = await db.query(
+          `INSERT INTO games (home_team_id, away_team_id, date, status)
+           VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
+          [team1.id, team2.id, new Date('2025-12-01T14:00:00Z')]
+        );
 
-      const shotData = {
-        player_id: player1.id,
-        team_id: team1.id,
-        x_coord: 45.5,
-        y_coord: 30.2,
-        result: 'goal',
-        period: 1
-      };
+        const shotData = {
+          player_id: player1.id,
+          team_id: team1.id,
+          x_coord: 45.5,
+          y_coord: 30.2,
+          result: 'goal',
+          period: 1
+        };
 
-      const response = await request(app)
-        .post(`/api/shots/${scheduledGame.rows[0].id}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send(shotData);
+        const response = await request(app)
+          .post(`/api/shots/${scheduledGame.rows[0].id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('in progress');
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('in progress');
 
-      await db.query('DELETE FROM games WHERE id = $1', [scheduledGame.rows[0].id]);
+        await db.query('DELETE FROM games WHERE id = $1', [scheduledGame.rows[0].id]);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST scheduled game rejection failed');
+        throw error;
+      }
     });
 
-    it('should reject invalid coordinates', async () => {
-      const shotData = {
-        player_id: player1.id,
-        team_id: team1.id,
-        x_coord: 150, // Invalid: > 100
-        y_coord: 30.2,
-        result: 'goal',
-        period: 1
-      };
+    it('❌ should reject invalid coordinates', async () => {
+      try {
+        const shotData = {
+          player_id: player1.id,
+          team_id: team1.id,
+          x_coord: 150, // Invalid: > 100
+          y_coord: 30.2,
+          result: 'goal',
+          period: 1
+        };
 
-      const response = await request(app)
-        .post(`/api/shots/${testGame.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send(shotData);
+        const response = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
 
-      expect(response.status).toBe(400);
+        expect(response.status).toBe(400);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST invalid coordinates validation failed');
+        throw error;
+      }
     });
 
-    it('should reject invalid result value', async () => {
-      const shotData = {
-        player_id: player1.id,
-        team_id: team1.id,
-        x_coord: 45.5,
-        y_coord: 30.2,
-        result: 'invalid_result',
-        period: 1
-      };
+    it('❌ should reject invalid result value', async () => {
+      try {
+        const shotData = {
+          player_id: player1.id,
+          team_id: team1.id,
+          x_coord: 45.5,
+          y_coord: 30.2,
+          result: 'invalid_result',
+          period: 1
+        };
 
-      const response = await request(app)
-        .post(`/api/shots/${testGame.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send(shotData);
+        const response = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
 
-      expect(response.status).toBe(400);
+        expect(response.status).toBe(400);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST invalid result validation failed');
+        throw error;
+      }
     });
 
-    it('should reject player from non-participating team', async () => {
-      // Create another team and player
-      const uniqueOtherTeamName = generateUniqueTeamName('OtherTeamShots');
-      const otherTeam = await db.query('INSERT INTO teams (name) VALUES ($1) RETURNING *', [uniqueOtherTeamName]);
-      const otherPlayer = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [otherTeam.rows[0].id, 'Other', 'Player', 99]
-      );
+    it('❌ should reject player from non-participating team', async () => {
+      try {
+        // Create another team and player
+        const uniqueOtherTeamName = generateUniqueTeamName('OtherTeamShots');
+        const otherTeam = await db.query('INSERT INTO teams (name) VALUES ($1) RETURNING *', [uniqueOtherTeamName]);
+        const otherPlayer = await db.query(
+          'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+          [otherTeam.rows[0].id, 'Other', 'Player', 99]
+        );
 
-      const shotData = {
-        player_id: otherPlayer.rows[0].id,
-        team_id: otherTeam.rows[0].id,
-        x_coord: 45.5,
-        y_coord: 30.2,
-        result: 'goal',
-        period: 1
-      };
+        const shotData = {
+          player_id: otherPlayer.rows[0].id,
+          team_id: otherTeam.rows[0].id,
+          x_coord: 45.5,
+          y_coord: 30.2,
+          result: 'goal',
+          period: 1
+        };
 
-      const response = await request(app)
-        .post(`/api/shots/${testGame.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send(shotData);
+        const response = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('not participating');
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('not participating');
 
-      await db.query('DELETE FROM players WHERE id = $1', [otherPlayer.rows[0].id]);
-      await db.query('DELETE FROM teams WHERE id = $1', [otherTeam.rows[0].id]);
+        await db.query('DELETE FROM players WHERE id = $1', [otherPlayer.rows[0].id]);
+        await db.query('DELETE FROM teams WHERE id = $1', [otherTeam.rows[0].id]);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST non-participating team validation failed');
+        throw error;
+      }
     });
-  });
-
-  describe('GET /api/shots/:gameId', () => {
+  });  describe('📊 GET /api/shots/:gameId', () => {
     let shot1, shot2, shot3;
 
     beforeAll(async () => {
@@ -331,55 +380,80 @@ describe('Shot Routes', () => {
       await db.query('DELETE FROM shots WHERE id IN ($1, $2, $3)', [shot1.id, shot2.id, shot3.id]);
     });
 
-    it('should get all shots for a game', async () => {
-      const response = await request(app)
-        .get(`/api/shots/${testGame.id}`)
-        .set('Authorization', `Bearer ${authToken}`);
+    it('✅ should get all shots for a game', async () => {
+      try {
+        const response = await request(app)
+          .get(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`);
 
-      expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThanOrEqual(3);
-      expect(response.body[0]).toHaveProperty('first_name');
-      expect(response.body[0]).toHaveProperty('team_name');
+        expect(response.status).toBe(200);
+        expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body.length).toBeGreaterThanOrEqual(3);
+        expect(response.body[0]).toHaveProperty('first_name');
+        expect(response.body[0]).toHaveProperty('team_name');
+      } catch (error) {
+        global.testContext.logTestError(error, 'GET all shots failed');
+        throw error;
+      }
     });
 
-    it('should filter shots by period', async () => {
-      const response = await request(app)
-        .get(`/api/shots/${testGame.id}?period=1`)
-        .set('Authorization', `Bearer ${authToken}`);
+    it('✅ should filter shots by period', async () => {
+      try {
+        const response = await request(app)
+          .get(`/api/shots/${testGame.id}?period=1`)
+          .set('Authorization', `Bearer ${authToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.every(shot => shot.period === 1)).toBe(true);
+        expect(response.status).toBe(200);
+        expect(response.body.every(shot => shot.period === 1)).toBe(true);
+      } catch (error) {
+        global.testContext.logTestError(error, 'GET shots by period filter failed');
+        throw error;
+      }
     });
 
-    it('should filter shots by team', async () => {
-      const response = await request(app)
-        .get(`/api/shots/${testGame.id}?team_id=${team1.id}`)
-        .set('Authorization', `Bearer ${authToken}`);
+    it('✅ should filter shots by team', async () => {
+      try {
+        const response = await request(app)
+          .get(`/api/shots/${testGame.id}?team_id=${team1.id}`)
+          .set('Authorization', `Bearer ${authToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.every(shot => shot.team_id === team1.id)).toBe(true);
+        expect(response.status).toBe(200);
+        expect(response.body.every(shot => shot.team_id === team1.id)).toBe(true);
+      } catch (error) {
+        global.testContext.logTestError(error, 'GET shots by team filter failed');
+        throw error;
+      }
     });
 
-    it('should filter shots by result', async () => {
-      const response = await request(app)
-        .get(`/api/shots/${testGame.id}?result=goal`)
-        .set('Authorization', `Bearer ${authToken}`);
+    it('✅ should filter shots by result', async () => {
+      try {
+        const response = await request(app)
+          .get(`/api/shots/${testGame.id}?result=goal`)
+          .set('Authorization', `Bearer ${authToken}`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.every(shot => shot.result === 'goal')).toBe(true);
+        expect(response.status).toBe(200);
+        expect(response.body.every(shot => shot.result === 'goal')).toBe(true);
+      } catch (error) {
+        global.testContext.logTestError(error, 'GET shots by result filter failed');
+        throw error;
+      }
     });
 
-    it('should reject invalid result filter', async () => {
-      const response = await request(app)
-        .get(`/api/shots/${testGame.id}?result=invalid`)
-        .set('Authorization', `Bearer ${authToken}`);
+    it('❌ should reject invalid result filter', async () => {
+      try {
+        const response = await request(app)
+          .get(`/api/shots/${testGame.id}?result=invalid`)
+          .set('Authorization', `Bearer ${authToken}`);
 
-      expect(response.status).toBe(400);
+        expect(response.status).toBe(400);
+      } catch (error) {
+        global.testContext.logTestError(error, 'GET invalid result filter rejection failed');
+        throw error;
+      }
     });
   });
 
-  describe('PUT /api/shots/:gameId/:shotId', () => {
+  describe('✏️ PUT /api/shots/:gameId/:shotId', () => {
     let testShot;
 
     beforeEach(async () => {
@@ -399,76 +473,101 @@ describe('Shot Routes', () => {
       await db.query('DELETE FROM shots WHERE id = $1', [testShot.id]);
     });
 
-    it('should update shot coordinates', async () => {
-      const response = await request(app)
-        .put(`/api/shots/${testGame.id}/${testShot.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send({ x_coord: 50, y_coord: 40 });
+    it('✅ should update shot coordinates', async () => {
+      try {
+        const response = await request(app)
+          .put(`/api/shots/${testGame.id}/${testShot.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send({ x_coord: 50, y_coord: 40 });
 
-      expect(response.status).toBe(200);
-      expect(parseFloat(response.body.x_coord)).toBeCloseTo(50);
-      expect(parseFloat(response.body.y_coord)).toBeCloseTo(40);
+        expect(response.status).toBe(200);
+        expect(parseFloat(response.body.x_coord)).toBeCloseTo(50);
+        expect(parseFloat(response.body.y_coord)).toBeCloseTo(40);
+      } catch (error) {
+        global.testContext.logTestError(error, 'PUT update shot coordinates failed');
+        throw error;
+      }
     });
 
-    it('should update shot result and adjust score', async () => {
-      // Change miss to goal
-      const response = await request(app)
-        .put(`/api/shots/${testGame.id}/${testShot.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send({ result: 'goal' });
+    it('✅ should update shot result and adjust score', async () => {
+      try {
+        // Change miss to goal
+        const response = await request(app)
+          .put(`/api/shots/${testGame.id}/${testShot.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send({ result: 'goal' });
 
-      expect(response.status).toBe(200);
-      expect(response.body.result).toBe('goal');
+        expect(response.status).toBe(200);
+        expect(response.body.result).toBe('goal');
 
-      // Verify score was updated
-      const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
-      expect(gameCheck.rows[0].home_score).toBe(1);
+        // Verify score was updated
+        const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
+        expect(gameCheck.rows[0].home_score).toBe(1);
+      } catch (error) {
+        global.testContext.logTestError(error, 'PUT update shot result and score failed');
+        throw error;
+      }
     });
 
-    it('should update shot from goal to miss and decrease score', async () => {
-      // First make it a goal
-      await db.query('UPDATE shots SET result = $1 WHERE id = $2', ['goal', testShot.id]);
-      await db.query('UPDATE games SET home_score = 1 WHERE id = $1', [testGame.id]);
+    it('✅ should update shot from goal to miss and decrease score', async () => {
+      try {
+        // First make it a goal
+        await db.query('UPDATE shots SET result = $1 WHERE id = $2', ['goal', testShot.id]);
+        await db.query('UPDATE games SET home_score = 1 WHERE id = $1', [testGame.id]);
 
-      // Now change to miss
-      const response = await request(app)
-        .put(`/api/shots/${testGame.id}/${testShot.id}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send({ result: 'miss' });
+        // Now change to miss
+        const response = await request(app)
+          .put(`/api/shots/${testGame.id}/${testShot.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send({ result: 'miss' });
 
-      expect(response.status).toBe(200);
-      expect(response.body.result).toBe('miss');
+        expect(response.status).toBe(200);
+        expect(response.body.result).toBe('miss');
 
-      // Verify score was decreased
-      const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
-      expect(gameCheck.rows[0].home_score).toBe(0);
+        // Verify score was decreased
+        const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
+        expect(gameCheck.rows[0].home_score).toBe(0);
+      } catch (error) {
+        global.testContext.logTestError(error, 'PUT update goal to miss and decrease score failed');
+        throw error;
+      }
     });
 
-    it('should reject update for non-existent shot', async () => {
-      const response = await request(app)
-        .put(`/api/shots/${testGame.id}/99999`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .set('Content-Type', 'application/json')
-        .send({ result: 'goal' });
+    it('❌ should reject update for non-existent shot', async () => {
+      try {
+        const response = await request(app)
+          .put(`/api/shots/${testGame.id}/99999`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send({ result: 'goal' });
 
-      expect(response.status).toBe(404);
+        expect(response.status).toBe(404);
+      } catch (error) {
+        global.testContext.logTestError(error, 'PUT non-existent shot 404 failed');
+        throw error;
+      }
     });
 
-    it('should reject update by regular user', async () => {
-      const response = await request(app)
-        .put(`/api/shots/${testGame.id}/${testShot.id}`)
-        .set('Authorization', `Bearer ${userToken}`)
-        .set('Content-Type', 'application/json')
-        .send({ result: 'goal' });
+    it('❌ should reject update by regular user', async () => {
+      try {
+        const response = await request(app)
+          .put(`/api/shots/${testGame.id}/${testShot.id}`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .set('Content-Type', 'application/json')
+          .send({ result: 'goal' });
 
-      expect(response.status).toBe(403);
+        expect(response.status).toBe(403);
+      } catch (error) {
+        global.testContext.logTestError(error, 'PUT user authorization rejection failed');
+        throw error;
+      }
     });
   });
 
-  describe('DELETE /api/shots/:gameId/:shotId', () => {
+  describe('🗑️ DELETE /api/shots/:gameId/:shotId', () => {
     let testShot;
 
     beforeEach(async () => {
@@ -484,51 +583,71 @@ describe('Shot Routes', () => {
       await db.query('UPDATE games SET home_score = 1 WHERE id = $1', [testGame.id]);
     });
 
-    it('should delete a shot and decrease score', async () => {
-      const response = await request(app)
-        .delete(`/api/shots/${testGame.id}/${testShot.id}`)
-        .set('Authorization', `Bearer ${authToken}`);
+    it('✅ should delete a shot and decrease score', async () => {
+      try {
+        const response = await request(app)
+          .delete(`/api/shots/${testGame.id}/${testShot.id}`)
+          .set('Authorization', `Bearer ${authToken}`);
 
-      expect(response.status).toBe(204);
+        expect(response.status).toBe(204);
 
-      // Verify shot was deleted
-      const shotCheck = await db.query('SELECT * FROM shots WHERE id = $1', [testShot.id]);
-      expect(shotCheck.rows.length).toBe(0);
+        // Verify shot was deleted
+        const shotCheck = await db.query('SELECT * FROM shots WHERE id = $1', [testShot.id]);
+        expect(shotCheck.rows.length).toBe(0);
 
-      // Verify score was decreased
-      const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
-      expect(gameCheck.rows[0].home_score).toBe(0);
+        // Verify score was decreased
+        const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
+        expect(gameCheck.rows[0].home_score).toBe(0);
+      } catch (error) {
+        global.testContext.logTestError(error, 'DELETE shot and decrease score failed');
+        throw error;
+      }
     });
 
-    it('should delete a miss shot without affecting score', async () => {
-      // Change to miss
-      await db.query('UPDATE shots SET result = $1 WHERE id = $2', ['miss', testShot.id]);
+    it('✅ should delete a miss shot without affecting score', async () => {
+      try {
+        // Change to miss
+        await db.query('UPDATE shots SET result = $1 WHERE id = $2', ['miss', testShot.id]);
 
-      const response = await request(app)
-        .delete(`/api/shots/${testGame.id}/${testShot.id}`)
-        .set('Authorization', `Bearer ${authToken}`);
+        const response = await request(app)
+          .delete(`/api/shots/${testGame.id}/${testShot.id}`)
+          .set('Authorization', `Bearer ${authToken}`);
 
-      expect(response.status).toBe(204);
+        expect(response.status).toBe(204);
 
-      // Score should still be 1
-      const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
-      expect(gameCheck.rows[0].home_score).toBe(1);
+        // Score should still be 1
+        const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
+        expect(gameCheck.rows[0].home_score).toBe(1);
+      } catch (error) {
+        global.testContext.logTestError(error, 'DELETE miss shot without score change failed');
+        throw error;
+      }
     });
 
-    it('should reject deletion for non-existent shot', async () => {
-      const response = await request(app)
-        .delete(`/api/shots/${testGame.id}/99999`)
-        .set('Authorization', `Bearer ${authToken}`);
+    it('❌ should reject deletion for non-existent shot', async () => {
+      try {
+        const response = await request(app)
+          .delete(`/api/shots/${testGame.id}/99999`)
+          .set('Authorization', `Bearer ${authToken}`);
 
-      expect(response.status).toBe(404);
+        expect(response.status).toBe(404);
+      } catch (error) {
+        global.testContext.logTestError(error, 'DELETE non-existent shot 404 failed');
+        throw error;
+      }
     });
 
-    it('should reject deletion by regular user', async () => {
-      const response = await request(app)
-        .delete(`/api/shots/${testGame.id}/${testShot.id}`)
-        .set('Authorization', `Bearer ${userToken}`);
+    it('❌ should reject deletion by regular user', async () => {
+      try {
+        const response = await request(app)
+          .delete(`/api/shots/${testGame.id}/${testShot.id}`)
+          .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(403);
+        expect(response.status).toBe(403);
+      } catch (error) {
+        global.testContext.logTestError(error, 'DELETE user authorization rejection failed');
+        throw error;
+      }
     });
   });
 });

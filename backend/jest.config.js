@@ -7,6 +7,21 @@ export default {
   globalSetup: '<rootDir>/jest.globalSetup.cjs',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
   globalTeardown: '<rootDir>/jest.teardown.cjs',
+  
+  // Enhanced test reporting for clarity
+  reporters: ['default'],
+  
+  // Better error handling and output
+  bail: false, // Don't stop on first failure
+  collectCoverageFrom: [
+    'src/**/*.js',
+    '!src/index.js',
+    '!src/app.js',
+    '!src/config/*.js'
+  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'text-summary', 'html', 'clover'],
+  
   transform: {
     '^.+\\.js$': [
       'babel-jest',
@@ -33,14 +48,16 @@ export default {
     'node_modules/(?!(supertest|express|pg)/)'
   ],
   testMatch: ['**/__tests__/**/*.js', '**/?(*.)+(spec|test).js'],
-  collectCoverageFrom: [
-    'src/**/*.js',
-    '!src/index.js',
-    '!src/app.js',
-    '!src/config/*.js'
-  ],
-  coverageDirectory: 'coverage',
   clearMocks: true,
   resetMocks: true,
-  restoreMocks: true
+  restoreMocks: true,
+  
+  // Enhanced output formatting
+  displayName: {
+    name: 'ShotSpot Backend',
+    color: 'blue'
+  },
+  
+  // Better test organization
+  testSequencer: '<rootDir>/jest.sequencer.cjs'
 };
