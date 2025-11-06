@@ -386,6 +386,12 @@ describe('FaultManagement', () => {
     });
     
     const playerSelect = screen.getByDisplayValue('Select player');
+
+    // Wait until the option with value "1" exists in the select
+    await waitFor(() => {
+      expect(playerSelect.querySelector('option[value="1"]')).toBeInTheDocument();
+    });
+
     await user.selectOptions(playerSelect, '1');
     
     const recordButton = screen.getByRole('button', { name: 'Record Offensive Fault' });
