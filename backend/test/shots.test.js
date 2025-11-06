@@ -31,68 +31,68 @@ describe('🏀 Shot Routes', () => {
       const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
       
       // Create test users with different roles and unique names
-    const adminResult = await db.query(
-      `INSERT INTO users (username, email, password_hash, role) 
+      const adminResult = await db.query(
+        `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [`admin_shots_${uniqueId}`, `admin_shots_${uniqueId}@test.com`, 'hash', 'admin']
-    );
-    adminUser = adminResult.rows[0];
-    authToken = jwt.sign({ id: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
+        [`admin_shots_${uniqueId}`, `admin_shots_${uniqueId}@test.com`, 'hash', 'admin']
+      );
+      adminUser = adminResult.rows[0];
+      authToken = jwt.sign({ id: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
 
-    const coachResult = await db.query(
-      `INSERT INTO users (username, email, password_hash, role) 
+      const coachResult = await db.query(
+        `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [`coach_shots_${uniqueId}`, `coach_shots_${uniqueId}@test.com`, 'hash', 'coach']
-    );
-    coachUser = coachResult.rows[0];
-    coachToken = jwt.sign({ id: coachUser.id, role: 'coach' }, process.env.JWT_SECRET);
+        [`coach_shots_${uniqueId}`, `coach_shots_${uniqueId}@test.com`, 'hash', 'coach']
+      );
+      coachUser = coachResult.rows[0];
+      coachToken = jwt.sign({ id: coachUser.id, role: 'coach' }, process.env.JWT_SECRET);
 
-    const userResult = await db.query(
-      `INSERT INTO users (username, email, password_hash, role) 
+      const userResult = await db.query(
+        `INSERT INTO users (username, email, password_hash, role) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [`user_shots_${uniqueId}`, `user_shots_${uniqueId}@test.com`, 'hash', 'user']
-    );
-    regularUser = userResult.rows[0];
-    userToken = jwt.sign({ id: regularUser.id, role: 'user' }, process.env.JWT_SECRET);
+        [`user_shots_${uniqueId}`, `user_shots_${uniqueId}@test.com`, 'hash', 'user']
+      );
+      regularUser = userResult.rows[0];
+      userToken = jwt.sign({ id: regularUser.id, role: 'user' }, process.env.JWT_SECRET);
 
-    // Validate tokens were created successfully
-    if (!authToken || !coachToken || !userToken) {
-      throw new Error('Failed to create one or more JWT tokens for test users');
-    }
+      // Validate tokens were created successfully
+      if (!authToken || !coachToken || !userToken) {
+        throw new Error('Failed to create one or more JWT tokens for test users');
+      }
 
-    // Create test teams with unique names
-    const team1Result = await db.query(
-      'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      [`Shot Test Team 1 ${uniqueId}`]
-    );
-    team1 = team1Result.rows[0];
+      // Create test teams with unique names
+      const team1Result = await db.query(
+        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+        [`Shot Test Team 1 ${uniqueId}`]
+      );
+      team1 = team1Result.rows[0];
 
-    const team2Result = await db.query(
-      'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-      [`Shot Test Team 2 ${uniqueId}`]
-    );
-    team2 = team2Result.rows[0];
+      const team2Result = await db.query(
+        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+        [`Shot Test Team 2 ${uniqueId}`]
+      );
+      team2 = team2Result.rows[0];
 
-    // Create test players
-    const player1Result = await db.query(
-      'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-      [team1.id, 'John', 'Shooter', 10]
-    );
-    player1 = player1Result.rows[0];
+      // Create test players
+      const player1Result = await db.query(
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        [team1.id, 'John', 'Shooter', 10]
+      );
+      player1 = player1Result.rows[0];
 
-    const player2Result = await db.query(
-      'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-      [team2.id, 'Jane', 'Scorer', 15]
-    );
-    player2 = player2Result.rows[0];
+      const player2Result = await db.query(
+        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        [team2.id, 'Jane', 'Scorer', 15]
+      );
+      player2 = player2Result.rows[0];
 
-    // Create a test game in progress
-    const gameResult = await db.query(
-      `INSERT INTO games (home_team_id, away_team_id, date, status)
+      // Create a test game in progress
+      const gameResult = await db.query(
+        `INSERT INTO games (home_team_id, away_team_id, date, status)
        VALUES ($1, $2, $3, 'in_progress') RETURNING *`,
-      [team1.id, team2.id, new Date('2025-11-01T14:00:00Z')]
-    );
-    testGame = gameResult.rows[0];
+        [team1.id, team2.id, new Date('2025-11-01T14:00:00Z')]
+      );
+      testGame = gameResult.rows[0];
     } catch (error) {
       global.testContext.logTestError(error, 'Shot Routes setup failed');
       throw error;
