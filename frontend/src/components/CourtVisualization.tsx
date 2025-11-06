@@ -101,6 +101,7 @@ interface CourtVisualizationProps {
   timerState?: string; // 'running' | 'paused' | 'stopped'
   onResumeTimer?: () => void; // Resume timer when clicking court
   onPauseTimer?: () => void; // Pause timer when needed
+  canAddEvents?: () => boolean; // Period end check function
 }
 
 const CourtVisualization: React.FC<CourtVisualizationProps> = ({
@@ -119,7 +120,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   awayPlayers: awayPlayersProps,
   timerState,
   onResumeTimer,
-  onPauseTimer: _onPauseTimer // eslint-disable-line @typescript-eslint/no-unused-vars
+  onPauseTimer: _onPauseTimer, // eslint-disable-line @typescript-eslint/no-unused-vars
+  canAddEvents
 }) => {
   const [homePlayers, setHomePlayers] = useState<Player[]>(homePlayersProps || []);
   const [awayPlayers, setAwayPlayers] = useState<Player[]>(awayPlayersProps || []);
@@ -413,6 +415,11 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       return;
     }
 
+    // Check if period has ended and require confirmation
+    if (canAddEvents && !canAddEvents()) {
+      return; // User cancelled, don't record the shot
+    }
+
     try {
       setError(null);
       
@@ -486,7 +493,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error recording shot');
     }
-  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers]);
+  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers, canAddEvents]);
 
   // Render shot markers on court
   const renderShotMarkers = () => {

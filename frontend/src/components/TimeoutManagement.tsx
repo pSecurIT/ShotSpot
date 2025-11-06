@@ -10,6 +10,7 @@ interface TimeoutManagementProps {
   currentPeriod: number;
   timeRemaining?: string;
   onTimeoutRecorded?: () => void;
+  canAddEvents?: () => boolean; // Period end check function
 }
 
 interface Timeout {
@@ -35,7 +36,8 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
   awayTeamName,
   currentPeriod,
   timeRemaining,
-  onTimeoutRecorded
+  onTimeoutRecorded,
+  canAddEvents
 }) => {
   const [recentTimeouts, setRecentTimeouts] = useState<Timeout[]>([]);
   const [activeTimeouts, setActiveTimeouts] = useState<Timeout[]>([]);
@@ -79,6 +81,11 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
     if (timeoutType === 'team' && !selectedTeam) {
       setError('Please select a team for team timeout');
       return;
+    }
+
+    // Check if period has ended and require confirmation
+    if (canAddEvents && !canAddEvents()) {
+      return; // User cancelled, don't start the timeout
     }
 
     setLoading(true);
