@@ -401,6 +401,11 @@ describe('FaultManagement', () => {
       expect(api.get).toHaveBeenCalled();
     });
     
+    // Wait for the player option to be available before selecting
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Select player').querySelector('option[value="1"]')).toBeInTheDocument();
+    });
+    
     const playerSelect = screen.getByDisplayValue('Select player');
     await user.selectOptions(playerSelect, '1');
     

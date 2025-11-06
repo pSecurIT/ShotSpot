@@ -121,7 +121,25 @@ const LiveMatch: React.FC = () => {
   const navigate = useNavigate();
   
   // Use custom timer hook with request deduplication and optimistic updates
-  const { timerState, refetch: fetchTimerState, setTimerStateOptimistic } = useTimer(gameId);
+  // Period end handler
+  const handlePeriodEnd = useCallback(() => {
+    setError(null);
+    setSuccess('⏰ Period has ended! Timer paused automatically.');
+    setTimeout(() => setSuccess(null), 4000);
+  }, []);
+
+  const { timerState, refetch: fetchTimerState, setTimerStateOptimistic, periodHasEnded, resetPeriodEndState } = useTimer(gameId, {
+    onPeriodEnd: handlePeriodEnd
+  });
+
+  // Check if events can be added (returns false if period has ended and user hasn't confirmed)
+  const canAddEvents = useCallback(() => {
+    return !periodHasEnded || window.confirm(
+      '⏰ Period has ended!\n\nThe timer has reached 0:00 and this period has officially ended. ' +
+      'Adding new events after the period end will affect official statistics.\n\n' +
+      'Are you sure you want to continue and add this event?'
+    );
+  }, [periodHasEnded]);
   
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +178,9 @@ const LiveMatch: React.FC = () => {
 
   // Active tab for Enhanced Match Events
   const [activeTab, setActiveTab] = useState<'timeline' | 'faults' | 'timeouts' | 'freeshots' | 'commentary'>('timeline');
+
+  // Focus mode state for mobile-optimized fullscreen experience
+  const [focusMode, setFocusMode] = useState<boolean>(false);
 
   // Fetch game data
   const fetchGame = useCallback(async () => {
@@ -960,6 +981,16 @@ const LiveMatch: React.FC = () => {
   }, [game, timerState?.current_period, gameId, fetchActivePossession]);
 
   const handleShotRecorded = useCallback(async (shotInfo: { result: 'goal' | 'miss' | 'blocked'; teamId: number; opposingTeamId: number }) => {
+    // Check if period has ended and require confirmation
+    if (!canAddEvents()) {
+      return; // User cancelled, don't record the shot
+    }
+
+    // Reset period end state since user confirmed they want to continue
+    if (periodHasEnded) {
+      resetPeriodEndState();
+    }
+
     // 🔥 OPTIMISTIC UPDATE: Increment shot counter immediately
     if (activePossession) {
       setActivePossession(prev => {
@@ -1011,7 +1042,7 @@ const LiveMatch: React.FC = () => {
         console.error('Error refreshing game data:', error);
       }
     });
-  }, [activePossession, gameId, handleCenterLineCross, fetchActivePossession, fetchTimerState, fetchGame, fetchPossessionStats]);
+  }, [activePossession, gameId, handleCenterLineCross, fetchActivePossession, fetchTimerState, fetchGame, fetchPossessionStats, canAddEvents, periodHasEnded, resetPeriodEndState]);
 
   // Load possession data
   useEffect(() => {
@@ -1070,6 +1101,67 @@ const LiveMatch: React.FC = () => {
     
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
+
+  // Toggle focus mode for mobile-optimized experience
+  const toggleFocusMode = () => {
+    setFocusMode(prev => !prev);
+  };
+
+  // Keyboard shortcut for focus mode (F key)
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Only trigger on F key if no input is focused
+      if (event.key === 'f' || event.key === 'F') {
+        const activeElement = document.activeElement as HTMLElement;
+        const isInputFocused = activeElement && (
+          activeElement.tagName === 'INPUT' || 
+          activeElement.tagName === 'TEXTAREA' || 
+          activeElement.contentEditable === 'true'
+        );
+        
+        if (!isInputFocused) {
+          event.preventDefault();
+          toggleFocusMode();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
+  // Auto-hide cursor in focus mode for cleaner mobile experience
+  useEffect(() => {
+    if (focusMode) {
+      document.body.style.cursor = 'none';
+      let timeoutId: NodeJS.Timeout;
+      
+      const showCursor = () => {
+        document.body.style.cursor = 'default';
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          if (focusMode) {
+            document.body.style.cursor = 'none';
+          }
+        }, 3000);
+      };
+
+      const handleMouseMove = () => showCursor();
+      const handleTouch = () => showCursor();
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('touchstart', handleTouch);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('touchstart', handleTouch);
+        clearTimeout(timeoutId);
+        document.body.style.cursor = 'default';
+      };
+    } else {
+      document.body.style.cursor = 'default';
+    }
+  }, [focusMode]);
 
   if (loading) {
     return <div className="loading">Loading match data...</div>;
@@ -1469,19 +1561,26 @@ const LiveMatch: React.FC = () => {
   }
 
   return (
-    <div className="live-match-container">
+    <div className={`live-match-container ${focusMode ? 'focus-mode' : ''}`}>
       <div className="live-match-header">
         <button onClick={() => navigate('/games')} className="back-button">
           ← Back to Games
         </button>
         <h2>Live Match</h2>
+        <button 
+          onClick={toggleFocusMode} 
+          className="focus-mode-toggle"
+          title={`${focusMode ? 'Exit' : 'Enter'} Focus Mode (Press F) - Optimized fullscreen view for mobile devices`}
+        >
+          {focusMode ? '📱 Exit Focus' : '🎯 Focus Mode'}
+        </button>
       </div>
 
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
 
       {/* Scoreboard */}
-      <div className="scoreboard">
+      <div className={`scoreboard ${focusMode ? 'scoreboard-compact' : ''}`}>
         <div className="team-section home-team">
           <h3>{game.home_team_name}</h3>
           <div className="score">{game.home_score}</div>
@@ -1511,54 +1610,152 @@ const LiveMatch: React.FC = () => {
         </div>
       </div>
 
-      {/* Timer Controls */}
-      <div className="timer-controls">
-        <h3>Timer Controls</h3>
-        <div className="control-buttons">
-          {timerState?.timer_state === 'stopped' && (
-            <button onClick={handleStartTimer} className="primary-button start-timer-button">
-              ▶️ Start Match
+      {/* Timer Controls - Hidden in focus mode */}
+      {!focusMode && (
+        <div className="timer-controls">
+          <h3>Timer Controls</h3>
+          <div className="control-buttons">
+            {timerState?.timer_state === 'stopped' && (
+              <button onClick={handleStartTimer} className="primary-button start-timer-button">
+                ▶️ Start Match
+              </button>
+            )}
+            
+            {timerState?.timer_state === 'paused' && (
+              <button onClick={handleStartTimer} className="primary-button">
+                ▶️ Resume
+              </button>
+            )}
+            
+            {timerState?.timer_state === 'running' && (
+              <button onClick={handlePauseTimer} className="secondary-button">
+                ⏸️ Pause
+              </button>
+            )}
+            
+            {timerState?.timer_state === 'running' && (
+              <button onClick={handleStopTimer} className="danger-button">
+                ⏹️ Reset Match
+              </button>
+            )}
+            
+            {timerState?.timer_state === 'paused' && (
+              <button onClick={handleStopTimer} className="danger-button">
+                ⏹️ Reset Match
+              </button>
+            )}
+            
+            {(timerState?.current_period || 1) < (game.number_of_periods || 4) && (
+              <button onClick={handleNextPeriod} className="secondary-button">
+                ⏭️ Next Period
+              </button>
+            )}
+            
+            <button onClick={handleEndGame} className="danger-button">
+              🏁 End Game
             </button>
-          )}
-          
-          {timerState?.timer_state === 'paused' && (
-            <button onClick={handleStartTimer} className="primary-button">
-              ▶️ Resume
-            </button>
-          )}
-          
-          {timerState?.timer_state === 'running' && (
-            <button onClick={handlePauseTimer} className="secondary-button">
-              ⏸️ Pause
-            </button>
-          )}
-          
-          {timerState?.timer_state === 'running' && (
-            <button onClick={handleStopTimer} className="danger-button">
-              ⏹️ Reset Match
-            </button>
-          )}
-          
-          {timerState?.timer_state === 'paused' && (
-            <button onClick={handleStopTimer} className="danger-button">
-              ⏹️ Reset Match
-            </button>
-          )}
-          
-          {(timerState?.current_period || 1) < (game.number_of_periods || 4) && (
-            <button onClick={handleNextPeriod} className="secondary-button">
-              ⏭️ Next Period
-            </button>
-          )}
-          
-          <button onClick={handleEndGame} className="danger-button">
-            🏁 End Game
-          </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Court Visualization - Shot Tracking with Possession */}
-      <div className="court-section">
+      {/* Court Visualization with Focus Mode Support */}
+      <div className={`court-section ${focusMode ? 'court-section-focus' : ''}`}>
+        {focusMode && (
+          <>
+            {/* Visual indicators for attacking sides */}
+            <div className={`attacking-side-indicator left-side ${
+              activePossession?.team_id === (game.home_attacking_side === 'left' ? game.home_team_id : game.away_team_id) ? 'active' : ''
+            }`}>
+              <div className="indicator-content">
+                <div className="team-name">
+                  {game.home_attacking_side === 'left' ? game.home_team_name : game.away_team_name}
+                </div>
+                {activePossession?.team_id === (game.home_attacking_side === 'left' ? game.home_team_id : game.away_team_id) && (
+                  <div className="possession-indicator">
+                    <div className="possession-pulse"></div>
+                    <span>⚽ HAS BALL</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={`attacking-side-indicator right-side ${
+              activePossession?.team_id === (game.home_attacking_side === 'right' ? game.home_team_id : game.away_team_id) ? 'active' : ''
+            }`}>
+              <div className="indicator-content">
+                <div className="team-name">
+                  {game.home_attacking_side === 'right' ? game.home_team_name : game.away_team_name}
+                </div>
+                {activePossession?.team_id === (game.home_attacking_side === 'right' ? game.home_team_id : game.away_team_id) && (
+                  <div className="possession-indicator">
+                    <div className="possession-pulse"></div>
+                    <span>⚽ HAS BALL</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={`focus-controls focus-controls-${game.home_attacking_side === 'left' ? 'right' : 'left'}`}>
+              <div className="focus-controls-inner">
+                <h4>Quick Controls</h4>
+                
+                {/* Essential Timer Controls */}
+                <div className="focus-timer-controls">
+                  {timerState?.timer_state === 'stopped' && (
+                    <button onClick={handleStartTimer} className="focus-button primary">
+                      ▶️ Start
+                    </button>
+                  )}
+                  
+                  {timerState?.timer_state === 'paused' && (
+                    <button onClick={handleStartTimer} className="focus-button primary">
+                      ▶️ Resume
+                    </button>
+                  )}
+                  
+                  {timerState?.timer_state === 'running' && (
+                    <button onClick={handlePauseTimer} className="focus-button secondary">
+                      ⏸️ Pause
+                    </button>
+                  )}
+                  
+                  {(timerState?.current_period || 1) < (game.number_of_periods || 4) && (
+                    <button onClick={handleNextPeriod} className="focus-button secondary">
+                      ⏭️ Next Period
+                    </button>
+                  )}
+                </div>
+
+                {/* Possession Controls */}
+                {activePossession && (
+                  <div className="focus-possession-info">
+                    <div className="possession-team">
+                      {activePossession.team_name}
+                    </div>
+                    <div className="possession-stats">
+                      <span>⏱️ {Math.floor(possessionDuration / 60)}:{(possessionDuration % 60).toString().padStart(2, '0')}</span>
+                      <span>🎯 {activePossession.shots_taken}</span>
+                    </div>
+                    <div className="possession-instruction">
+                      📍 Tap field to switch possession
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick Actions */}
+                <div className="focus-actions">
+                  <button onClick={toggleFocusMode} className="focus-button secondary">
+                    📱 Exit Focus
+                  </button>
+                  <button onClick={handleEndGame} className="focus-button danger">
+                    🏁 End Game
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         <CourtVisualization
           key={courtResetKey}
           gameId={parseInt(gameId!)}
@@ -1577,143 +1774,151 @@ const LiveMatch: React.FC = () => {
           timerState={timerState?.timer_state}
           onResumeTimer={handleStartTimer}
           onPauseTimer={handlePauseTimer}
+          canAddEvents={canAddEvents}
         />
       </div>
 
-      {/* Substitution Panel */}
-      <div className="substitution-section">
-        <SubstitutionPanel
-          gameId={parseInt(gameId!)}
-          homeTeamId={game.home_team_id}
-          awayTeamId={game.away_team_id}
-          homeTeamName={game.home_team_name}
-          awayTeamName={game.away_team_name}
-          currentPeriod={timerState?.current_period || game.current_period}
-          timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-          onSubstitutionRecorded={() => {
-            fetchPlayers();
-            fetchGame();
-          }}
-        />
-      </div>
+      {/* Substitution Panel - Hidden in focus mode */}
+      {!focusMode && (
+        <div className="substitution-section">
+          <SubstitutionPanel
+            gameId={parseInt(gameId!)}
+            homeTeamId={game.home_team_id}
+            awayTeamId={game.away_team_id}
+            homeTeamName={game.home_team_name}
+            awayTeamName={game.away_team_name}
+            currentPeriod={timerState?.current_period || game.current_period}
+            timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+            onSubstitutionRecorded={() => {
+              fetchPlayers();
+              fetchGame();
+            }}
+            canAddEvents={canAddEvents}
+          />
+        </div>
+      )}
 
-      {/* Enhanced Match Events Dashboard */}
-      <div className="match-content">
-        <div className="content-section full-width">
-          <div className="enhanced-events-dashboard">
-            <div className="dashboard-header">
-              <h3>Match Events Dashboard</h3>
-              <div className="tab-navigation">
-                <button
-                  className={`tab-button ${activeTab === 'timeline' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('timeline')}
-                >
-                  📊 Timeline
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'faults' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('faults')}
-                >
-                  ⚠️ Faults
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'timeouts' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('timeouts')}
-                >
-                  ⏸️ Timeouts
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'freeshots' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('freeshots')}
-                >
-                  🎯 Free Shots
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'commentary' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('commentary')}
-                >
-                  📝 Commentary
-                </button>
+      {/* Enhanced Match Events Dashboard - Hidden in focus mode */}
+      {!focusMode && (
+        <div className="match-content">
+          <div className="content-section full-width">
+            <div className="enhanced-events-dashboard">
+              <div className="dashboard-header">
+                <h3>Match Events Dashboard</h3>
+                <div className="tab-navigation">
+                  <button
+                    className={`tab-button ${activeTab === 'timeline' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('timeline')}
+                  >
+                    📊 Timeline
+                  </button>
+                  <button
+                    className={`tab-button ${activeTab === 'faults' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('faults')}
+                  >
+                    ⚠️ Faults
+                  </button>
+                  <button
+                    className={`tab-button ${activeTab === 'timeouts' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('timeouts')}
+                  >
+                    ⏸️ Timeouts
+                  </button>
+                  <button
+                    className={`tab-button ${activeTab === 'freeshots' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('freeshots')}
+                  >
+                    🎯 Free Shots
+                  </button>
+                  <button
+                    className={`tab-button ${activeTab === 'commentary' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('commentary')}
+                  >
+                    📝 Commentary
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div className="tab-content">
-              {activeTab === 'timeline' && (
-                <MatchTimeline
-                  gameId={game.id}
-                  homeTeamId={game.home_team_id}
-                  awayTeamId={game.away_team_id}
-                  homeTeamName={game.home_team_name}
-                  awayTeamName={game.away_team_name}
-                  homePlayers={homePlayers}
-                  awayPlayers={awayPlayers}
-                  onRefresh={fetchGame}
-                />
-              )}
+              <div className="tab-content">
+                {activeTab === 'timeline' && (
+                  <MatchTimeline
+                    gameId={game.id}
+                    homeTeamId={game.home_team_id}
+                    awayTeamId={game.away_team_id}
+                    homeTeamName={game.home_team_name}
+                    awayTeamName={game.away_team_name}
+                    homePlayers={homePlayers}
+                    awayPlayers={awayPlayers}
+                    onRefresh={fetchGame}
+                  />
+                )}
 
-              {activeTab === 'faults' && (
-                <FaultManagement
-                  gameId={game.id}
-                  homeTeamId={game.home_team_id}
-                  awayTeamId={game.away_team_id}
-                  homeTeamName={game.home_team_name}
-                  awayTeamName={game.away_team_name}
-                  currentPeriod={timerState?.current_period || game.current_period}
-                  timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-                  onFaultRecorded={() => {
-                    // Refresh timeline to show new fault events
-                    fetchGame();
-                  }}
-                />
-              )}
+                {activeTab === 'faults' && (
+                  <FaultManagement
+                    gameId={game.id}
+                    homeTeamId={game.home_team_id}
+                    awayTeamId={game.away_team_id}
+                    homeTeamName={game.home_team_name}
+                    awayTeamName={game.away_team_name}
+                    currentPeriod={timerState?.current_period || game.current_period}
+                    timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                    onFaultRecorded={() => {
+                      // Refresh timeline to show new fault events
+                      fetchGame();
+                    }}
+                    canAddEvents={canAddEvents}
+                  />
+                )}
 
-              {activeTab === 'timeouts' && (
-                <TimeoutManagement
-                  gameId={game.id}
-                  homeTeamId={game.home_team_id}
-                  awayTeamId={game.away_team_id}
-                  homeTeamName={game.home_team_name}
-                  awayTeamName={game.away_team_name}
-                  currentPeriod={timerState?.current_period || game.current_period}
-                  timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-                  onTimeoutRecorded={() => {
-                    // Refresh timeline to show new timeout events
-                    fetchGame();
-                  }}
-                />
-              )}
+                {activeTab === 'timeouts' && (
+                  <TimeoutManagement
+                    gameId={game.id}
+                    homeTeamId={game.home_team_id}
+                    awayTeamId={game.away_team_id}
+                    homeTeamName={game.home_team_name}
+                    awayTeamName={game.away_team_name}
+                    currentPeriod={timerState?.current_period || game.current_period}
+                    timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                    onTimeoutRecorded={() => {
+                      // Refresh timeline to show new timeout events
+                      fetchGame();
+                    }}
+                    canAddEvents={canAddEvents}
+                  />
+                )}
 
-              {activeTab === 'freeshots' && (
-                <FreeShotPanel
-                  gameId={game.id}
-                  homeTeamId={game.home_team_id}
-                  awayTeamId={game.away_team_id}
-                  homeTeamName={game.home_team_name}
-                  awayTeamName={game.away_team_name}
-                  currentPeriod={timerState?.current_period || game.current_period}
-                  timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-                  onFreeShotRecorded={() => {
-                    // Refresh timeline and game data to show new free shot events
-                    fetchGame();
-                  }}
-                />
-              )}
+                {activeTab === 'freeshots' && (
+                  <FreeShotPanel
+                    gameId={game.id}
+                    homeTeamId={game.home_team_id}
+                    awayTeamId={game.away_team_id}
+                    homeTeamName={game.home_team_name}
+                    awayTeamName={game.away_team_name}
+                    currentPeriod={timerState?.current_period || game.current_period}
+                    timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                    onFreeShotRecorded={() => {
+                      // Refresh timeline and game data to show new free shot events
+                      fetchGame();
+                    }}
+                  />
+                )}
 
-              {activeTab === 'commentary' && (
-                <MatchCommentary
-                  gameId={game.id}
-                  currentPeriod={timerState?.current_period || game.current_period}
-                  timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-                  onCommentaryAdded={() => {
-                    // Refresh game data to update any match state
-                    fetchGame();
-                  }}
-                />
-              )}
+                {activeTab === 'commentary' && (
+                  <MatchCommentary
+                    gameId={game.id}
+                    currentPeriod={timerState?.current_period || game.current_period}
+                    timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                    onCommentaryAdded={() => {
+                      // Refresh game data to update any match state
+                      fetchGame();
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
