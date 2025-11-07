@@ -48,8 +48,8 @@ afterEach(async () => {
     console.warn(`⚠️  Warning: Test "${currentTestName}" in ${currentSuiteName} made no assertions`);
   }
   
-  // Give time for any pending async operations to complete
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // Give database operations time to complete and connections to close
+  await new Promise(resolve => setTimeout(resolve, 10));
 });
 
 afterAll(() => {

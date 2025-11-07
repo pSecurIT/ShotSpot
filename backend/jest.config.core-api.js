@@ -1,12 +1,26 @@
 /** @type {import('jest').Config} */
 export default {
-  verbose: false, // Reduce verbosity for faster execution
+  displayName: 'Core API Tests',
+  verbose: false,
   testEnvironment: 'node',
-  maxWorkers: 1, // Run tests serially to avoid database conflicts
-  testTimeout: 10000, // Reduced timeout for faster failure detection
+  maxWorkers: 1, // Serial execution for database safety
+  testTimeout: 20000, // Increased timeout for API tests with database operations
   globalSetup: '<rootDir>/jest.globalSetup.cjs',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
   globalTeardown: '<rootDir>/jest.teardown.cjs',
+  
+  // Test pattern for core API tests
+  testMatch: [
+    '**/test/health.test.js',
+    '**/test/auth.test.js', 
+    '**/test/users.test.js',
+    '**/test/teams.test.js',
+    '**/test/players.test.js',
+    '**/test/games.test.js'
+  ],
+  
+  // Use different database name for isolation
+  setupFiles: ['<rootDir>/jest.setup.core-api.cjs'],
   
   // Optimized test reporting
   reporters: [
@@ -17,16 +31,19 @@ export default {
     }]
   ],
   
-  // Better error handling and output
-  bail: false, // Don't stop on first failure
+  bail: false,
   collectCoverageFrom: [
-    'src/**/*.js',
-    '!src/index.js',
-    '!src/app.js',
-    '!src/config/*.js'
+    'src/routes/health.js',
+    'src/routes/auth.js',
+    'src/routes/users.js',
+    'src/routes/teams.js',
+    'src/routes/players.js',
+    'src/routes/games.js',
+    'src/middleware/auth.js',
+    '!src/index.js'
   ],
-  coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'text-summary', 'html', 'clover'],
+  coverageDirectory: 'coverage/core-api',
+  coverageReporters: ['text-summary', 'html'],
   
   transform: {
     '^.+\\.js$': [
@@ -42,6 +59,7 @@ export default {
       }
     ]
   },
+  
   moduleFileExtensions: ['js', 'mjs', 'cjs', 'jsx', 'json'],
   testEnvironmentOptions: {
     url: 'http://localhost'
@@ -53,26 +71,20 @@ export default {
   transformIgnorePatterns: [
     'node_modules/(?!(supertest|express|pg)/)'
   ],
-  testMatch: ['**/__tests__/**/*.js', '**/?(*.)+(spec|test).js'],
   clearMocks: true,
   resetMocks: true,
   restoreMocks: true,
   
-  // Enhanced output formatting
-  displayName: {
-    name: 'ShotSpot Backend',
-    color: 'blue'
-  },
-  
-  // Better test organization
-  testSequencer: '<rootDir>/jest.sequencer.cjs',
-  
   // Performance optimizations
-  cacheDirectory: '<rootDir>/.jest-cache',
-  maxConcurrency: 1, // Ensure serial execution
+  cacheDirectory: '<rootDir>/.jest-cache/core-api',
+  maxConcurrency: 1,
+  
+  // Worker management for better cleanup
+  forceExit: true,
+  detectOpenHandles: false,
   
   // Faster file watching and processing
-  watchman: false, // Disable watchman for faster startup
+  watchman: false,
   
   // Optimize module resolution
   haste: {
