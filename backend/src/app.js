@@ -169,16 +169,18 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Debug middleware
+// Debug middleware (silent in test environment)
 app.use((req, res, next) => {
-  console.log('Request:', {
-    method: req.method,
-    path: req.path,
-    headers: {
-      authorization: req.headers.authorization ? 'present' : 'missing',
-      'content-type': req.headers['content-type']
-    }
-  });
+  if (process.env.NODE_ENV !== 'test') {
+    console.log('Request:', {
+      method: req.method,
+      path: req.path,
+      headers: {
+        authorization: req.headers.authorization ? 'present' : 'missing',
+        'content-type': req.headers['content-type']
+      }
+    });
+  }
   next();
 });
 

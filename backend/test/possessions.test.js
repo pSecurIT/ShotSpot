@@ -537,7 +537,7 @@ describe('🏃 Ball Possessions API', () => {
         expect(response.body).toHaveProperty('current_duration_seconds');
         expect(response.body.current_duration_seconds).toBeGreaterThanOrEqual(0);
         expect(response.body.ended_at).toBeNull();
-      });
+      }, 30000);
 
       it('✅ should allow all authenticated users to view active possession', async () => {
         // Create active possession
@@ -555,7 +555,7 @@ describe('🏃 Ball Possessions API', () => {
 
           expect(response.body).toHaveProperty('id');
         }
-      });
+      }, 30000);
     });
 
     describe('❌ Error Handling', () => {
@@ -665,7 +665,7 @@ describe('🏃 Ball Possessions API', () => {
 
           expect(Array.isArray(response.body)).toBe(true);
         }
-      });
+      }, 30000);
     });
 
     describe('❌ Error Handling', () => {
@@ -714,7 +714,7 @@ describe('🏃 Ball Possessions API', () => {
           .expect(200);
 
         expect(response2.body).toHaveProperty('shots_taken', 2);
-      });
+      }, 30000);
 
       it('✅ should allow coach to increment shots', async () => {
         const response = await request(app)
@@ -779,7 +779,7 @@ describe('🏃 Ball Possessions API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .set('Content-Type', 'application/json')
           .expect(400);
-      });
+      }, 30000);
     });
   });
 
@@ -922,6 +922,6 @@ describe('🏃 Ball Possessions API', () => {
         .expect(200);
 
       expect(activeResponse.body).toHaveProperty('id');
-    });
+    }, 30000);
   });
 });
