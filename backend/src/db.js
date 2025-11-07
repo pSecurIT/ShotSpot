@@ -29,19 +29,19 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-// Validate required database configuration
+// Database configuration with explicit fallbacks (never default to "root")
 const requiredDbConfig = {
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost', 
+  database: process.env.DB_NAME || (process.env.NODE_ENV === 'test' ? 'shotspot_test_db' : 'shotspot_db'),
+  password: process.env.DB_PASSWORD || (process.env.NODE_ENV === 'test' ? 'postgres' : ''),
   port: parseInt(process.env.DB_PORT) || 5432
 };
 
 // Validate all required fields are present
 Object.entries(requiredDbConfig).forEach(([key, value]) => {
-  if (!value) {
-    throw new Error(`Missing required database configuration: ${key}`);
+  if (!value && key !== 'password') { // Password can be empty in some setups
+    throw new Error(`Missing required database configuration: ${key}. Current value: "${value}"`);
   }
 });
 

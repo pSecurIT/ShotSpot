@@ -28,6 +28,8 @@ jobs:
       DB_HOST: 127.0.0.1
       DB_PORT: 5432
       DB_NAME: shotspot_test_db
+      DB_NAME_CORE_API: shotspot_test_db_core_api
+      DB_NAME_GAME_LOGIC: shotspot_test_db_game_logic
       DB_MAX_CONNECTIONS: 5
       DB_IDLE_TIMEOUT_MS: 1000
       JWT_SECRET: test_jwt_secret_key_min_32_chars_long_for_testing
@@ -78,13 +80,19 @@ jobs:
       working-directory: backend
       run: npm run migrate
 
+    - name: Setup Parallel Test Databases
+      working-directory: backend
+      run: |
+        echo "Setting up parallel test databases..."
+        node scripts/setup-parallel-dbs.js
+        
     - name: Run Backend Tests
       working-directory: backend
       run: |
         echo "Waiting for Postgres to be fully ready..."
         sleep 10
-        # run tests serially to avoid DB races against a single test DB
-        npm test -- --coverage --runInBand
+        # Run parallel tests with isolated databases for better performance
+        npm run test:parallel
 
     # Coverage reporting can be added later with Codecov or similar services
 

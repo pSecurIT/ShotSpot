@@ -24,8 +24,8 @@ const superuserConfig = {
   database: 'postgres' // Connect to default postgres database
 };
 
-const testUser = process.env.DB_USER;
-const testPassword = process.env.DB_PASSWORD;
+const testUser = process.env.DB_USER || 'postgres';
+const testPassword = process.env.DB_PASSWORD || 'postgres';
 
 const databases = [
   process.env.DB_NAME || 'shotspot_test_db',
@@ -40,20 +40,24 @@ async function setupParallelDatabases() {
     await client.connect();
     console.log('🔌 Connected to PostgreSQL as superuser');
 
-    // Create test user if not exists
-    try {
-      await client.query(`
-        DO $$
-        BEGIN
-          IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${testUser}') THEN
-            CREATE ROLE ${testUser} LOGIN PASSWORD '${testPassword}';
-          END IF;
-        END
-        $$;
-      `);
-      console.log(`✅ Test user '${testUser}' ready`);
-    } catch (error) {
-      console.log(`ℹ️  User '${testUser}' already exists`);
+    // Create test user if not exists and different from superuser
+    if (testUser !== superuserConfig.user) {
+      try {
+        await client.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${testUser}') THEN
+              CREATE ROLE ${testUser} LOGIN PASSWORD '${testPassword}';
+            END IF;
+          END
+          $$;
+        `);
+        console.log(`✅ Test user '${testUser}' ready`);
+      } catch (error) {
+        console.log(`ℹ️  User '${testUser}' already exists`);
+      }
+    } else {
+      console.log(`ℹ️  Using superuser '${testUser}' as test user (CI mode)`);
     }
 
     // Create and setup each database
@@ -68,13 +72,16 @@ async function setupParallelDatabases() {
         console.log(`ℹ️  No existing database to drop: ${dbName}`);
       }
 
-      // Create database
-      await client.query(`CREATE DATABASE ${dbName} OWNER ${testUser}`);
-      console.log(`📦 Created database: ${dbName}`);
+      // Create database with appropriate owner
+      const owner = (testUser !== superuserConfig.user) ? testUser : superuserConfig.user;
+      await client.query(`CREATE DATABASE ${dbName} OWNER ${owner}`);
+      console.log(`📦 Created database: ${dbName} with owner: ${owner}`);
       
-      // Grant permissions
-      await client.query(`GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${testUser}`);
-      console.log(`🔑 Granted privileges to ${testUser} on ${dbName}`);
+      // Grant permissions (only if different user)
+      if (testUser !== superuserConfig.user) {
+        await client.query(`GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${testUser}`);
+        console.log(`🔑 Granted privileges to ${testUser} on ${dbName}`);
+      }
     }
 
     // Setup schema for each database
@@ -130,25 +137,31 @@ async function setupParallelDatabases() {
           }
         }
         
-        // Grant additional permissions on tables and sequences  
-        await dbClient.query(`GRANT ALL ON ALL TABLES IN SCHEMA public TO ${testUser}`);
-        await dbClient.query(`GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO ${testUser}`);
-        await dbClient.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${testUser}`);
-        await dbClient.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${testUser}`);
-        
-        // Change ownership of all tables and sequences to test user
-        const tablesResult = await dbClient.query(`
-          SELECT tablename FROM pg_tables WHERE schemaname = 'public'
-        `);
-        for (const row of tablesResult.rows) {
-          await dbClient.query(`ALTER TABLE ${row.tablename} OWNER TO ${testUser}`);
-        }
-        
-        const sequencesResult = await dbClient.query(`
-          SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'
-        `);
-        for (const row of sequencesResult.rows) {
-          await dbClient.query(`ALTER SEQUENCE ${row.sequence_name} OWNER TO ${testUser}`);
+        // Grant additional permissions on tables and sequences (only if different user)
+        if (testUser !== superuserConfig.user) {
+          await dbClient.query(`GRANT ALL ON ALL TABLES IN SCHEMA public TO ${testUser}`);
+          await dbClient.query(`GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO ${testUser}`);
+          await dbClient.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${testUser}`);
+          await dbClient.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${testUser}`);
+          
+          // Change ownership of all tables and sequences to test user
+          const tablesResult = await dbClient.query(`
+            SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+          `);
+          for (const row of tablesResult.rows) {
+            await dbClient.query(`ALTER TABLE ${row.tablename} OWNER TO ${testUser}`);
+          }
+          
+          const sequencesResult = await dbClient.query(`
+            SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'
+          `);
+          for (const row of sequencesResult.rows) {
+            await dbClient.query(`ALTER SEQUENCE ${row.sequence_name} OWNER TO ${testUser}`);
+          }
+          
+          console.log(`🔑 Set ownership and permissions for ${testUser}`);
+        } else {
+          console.log(`ℹ️  Skipping permission grants (using superuser)`);
         }
         
         console.log(`✅ Schema setup complete for: ${dbName}`);
