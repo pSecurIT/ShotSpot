@@ -1,0 +1,173 @@
+#!/usr/bin/env node
+
+/**
+ * Setup parallel test databases for isolated test execution
+ */
+
+import { Client } from 'pg';
+import dotenv from 'dotenv';
+import { readFileSync } from 'fs';
+import { join, dirname, basename } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables
+dotenv.config({ path: join(__dirname, '..', '.env.test') });
+
+const superuserConfig = {
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD,
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT) || 5432,
+  database: 'postgres' // Connect to default postgres database
+};
+
+const testUser = process.env.DB_USER;
+const testPassword = process.env.DB_PASSWORD;
+
+const databases = [
+  process.env.DB_NAME || 'shotspot_test_db',
+  process.env.DB_NAME_CORE_API || 'shotspot_test_db_core_api',
+  process.env.DB_NAME_GAME_LOGIC || 'shotspot_test_db_game_logic'
+];
+
+async function setupParallelDatabases() {
+  const client = new Client(superuserConfig);
+  
+  try {
+    await client.connect();
+    console.log('🔌 Connected to PostgreSQL as superuser');
+
+    // Create test user if not exists
+    try {
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${testUser}') THEN
+            CREATE ROLE ${testUser} LOGIN PASSWORD '${testPassword}';
+          END IF;
+        END
+        $$;
+      `);
+      console.log(`✅ Test user '${testUser}' ready`);
+    } catch (error) {
+      console.log(`ℹ️  User '${testUser}' already exists`);
+    }
+
+    // Create and setup each database
+    for (const dbName of databases) {
+      console.log(`\n🗄️  Setting up database: ${dbName}`);
+      
+      // Drop database if exists (for clean slate)
+      try {
+        await client.query(`DROP DATABASE IF EXISTS ${dbName}`);
+        console.log(`🗑️  Dropped existing database: ${dbName}`);
+      } catch (error) {
+        console.log(`ℹ️  No existing database to drop: ${dbName}`);
+      }
+
+      // Create database
+      await client.query(`CREATE DATABASE ${dbName} OWNER ${testUser}`);
+      console.log(`📦 Created database: ${dbName}`);
+      
+      // Grant permissions
+      await client.query(`GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${testUser}`);
+      console.log(`🔑 Granted privileges to ${testUser} on ${dbName}`);
+    }
+
+    // Setup schema for each database
+    for (const dbName of databases) {
+      console.log(`\n🏗️  Setting up schema for: ${dbName}`);
+      
+      const dbClient = new Client({
+        ...superuserConfig,
+        database: dbName
+      });
+      
+      try {
+        await dbClient.connect();
+        
+        // Read and execute schema
+        const schemaPath = join(__dirname, '..', 'src', 'schema.sql');
+        const schema = readFileSync(schemaPath, 'utf8');
+        await dbClient.query(schema);
+        
+        // Apply all migrations in order
+        const migrations = [
+          '../src/migrations/add_player_gender.sql',
+          '../src/migrations/add_timer_fields.sql', 
+          '../src/migrations/add_game_rosters.sql',
+          '../src/migrations/add_substitutions.sql',
+          '../src/migrations/add_possession_tracking.sql',
+          '../src/migrations/add_enhanced_events.sql',
+          '../src/migrations/add_match_configuration_columns.sql',
+          '../src/migrations/add_attacking_side.sql',
+          '../src/migrations/add_starting_position.sql'
+        ];
+
+        console.log('📦 Applying migrations...');
+        for (const migrationFile of migrations) {
+          try {
+            const migrationPath = join(__dirname, migrationFile);
+            
+            // Check if migration file exists
+            try {
+              const migrationContent = readFileSync(migrationPath, 'utf8');
+              await dbClient.query(migrationContent);
+              console.log(`✅ Applied migration: ${basename(migrationFile)}`);
+            } catch (err) {
+              if (err.code === 'ENOENT') {
+                console.log(`⚠️  Migration file not found: ${basename(migrationFile)}, skipping`);
+              } else {
+                console.warn(`⚠️  Migration ${basename(migrationFile)} failed:`, err.message);
+              }
+            }
+          } catch (err) {
+            console.warn(`⚠️  Migration ${basename(migrationFile)} failed:`, err.message);
+            // Continue with other migrations - some may have already been applied
+          }
+        }
+        
+        // Grant additional permissions on tables and sequences  
+        await dbClient.query(`GRANT ALL ON ALL TABLES IN SCHEMA public TO ${testUser}`);
+        await dbClient.query(`GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO ${testUser}`);
+        await dbClient.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${testUser}`);
+        await dbClient.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${testUser}`);
+        
+        // Change ownership of all tables and sequences to test user
+        const tablesResult = await dbClient.query(`
+          SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+        `);
+        for (const row of tablesResult.rows) {
+          await dbClient.query(`ALTER TABLE ${row.tablename} OWNER TO ${testUser}`);
+        }
+        
+        const sequencesResult = await dbClient.query(`
+          SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'
+        `);
+        for (const row of sequencesResult.rows) {
+          await dbClient.query(`ALTER SEQUENCE ${row.sequence_name} OWNER TO ${testUser}`);
+        }
+        
+        console.log(`✅ Schema setup complete for: ${dbName}`);
+      } finally {
+        await dbClient.end();
+      }
+    }
+
+    console.log('\n🎉 All parallel test databases setup complete!');
+    console.log('\nDatabases created:');
+    databases.forEach(db => console.log(`  📚 ${db}`));
+    
+  } catch (error) {
+    console.error('❌ Error setting up parallel databases:', error.message);
+    process.exit(1);
+  } finally {
+    await client.end();
+  }
+}
+
+// Run setup
+setupParallelDatabases();

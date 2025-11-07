@@ -103,6 +103,9 @@ frontend/src/types/generated/
 .cache/
 .parcel-cache/
 .npm/
+.jest-cache/
+backend/.jest-cache/
+frontend/.jest-cache/
 
 # Test snapshots
 **/__snapshots__/

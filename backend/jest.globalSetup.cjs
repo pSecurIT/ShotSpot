@@ -23,16 +23,31 @@ module.exports = async () => {
   try {
     console.log('🧹 GLOBAL SETUP: Connected to test database, truncating tables...');
     
-    // Truncate all tables in the correct order (child tables first due to foreign keys)
-    await pool.query('TRUNCATE TABLE substitutions RESTART IDENTITY CASCADE');
-    await pool.query('TRUNCATE TABLE game_rosters RESTART IDENTITY CASCADE'); 
-    await pool.query('TRUNCATE TABLE ball_possessions RESTART IDENTITY CASCADE');
-    await pool.query('TRUNCATE TABLE shots RESTART IDENTITY CASCADE');
-    await pool.query('TRUNCATE TABLE game_events RESTART IDENTITY CASCADE');
-    await pool.query('TRUNCATE TABLE games RESTART IDENTITY CASCADE');
-    await pool.query('TRUNCATE TABLE players RESTART IDENTITY CASCADE');
-    await pool.query('TRUNCATE TABLE teams RESTART IDENTITY CASCADE');
-    await pool.query('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
+    // Get list of tables that exist
+    const tableQuery = `
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_type = 'BASE TABLE'
+    `;
+    const tablesResult = await pool.query(tableQuery);
+    const existingTables = tablesResult.rows.map(row => row.table_name);
+    
+    // Define tables to truncate in the correct order (child tables first due to foreign keys)
+    const tablesToTruncate = [
+      'substitutions', 'game_rosters', 'ball_possessions', 
+      'shots', 'game_events', 'players', 'games', 'teams', 'users'
+    ];
+    
+    // Only truncate tables that exist
+    for (const table of tablesToTruncate) {
+      if (existingTables.includes(table)) {
+        await pool.query(`TRUNCATE TABLE ${table} RESTART IDENTITY CASCADE`);
+        console.log(`🧹 GLOBAL SETUP: Truncated ${table}`);
+      } else {
+        console.log(`⚠️  GLOBAL SETUP: Table ${table} does not exist, skipping`);
+      }
+    }
     
     console.log('✅ GLOBAL SETUP: Test database cleaned successfully');
   } catch (error) {
