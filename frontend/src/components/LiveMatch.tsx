@@ -134,11 +134,11 @@ const LiveMatch: React.FC = () => {
 
   // Check if events can be added (returns false if period has ended and user hasn't confirmed)
   const canAddEvents = useCallback(() => {
-    return !periodHasEnded || window.confirm(
+    return !periodHasEnded || (typeof window !== 'undefined' && window.confirm(
       '⏰ Period has ended!\n\nThe timer has reached 0:00 and this period has officially ended. ' +
       'Adding new events after the period end will affect official statistics.\n\n' +
       'Are you sure you want to continue and add this event?'
-    );
+    ));
   }, [periodHasEnded]);
   
   const [game, setGame] = useState<Game | null>(null);
@@ -774,7 +774,7 @@ const LiveMatch: React.FC = () => {
   };
 
   const handleStopTimer = async () => {
-    if (!window.confirm('Are you sure you want to stop and reset the entire match? This will:\n\n• Reset scores to 0-0\n• Delete all recorded shots\n• Delete all game events\n• Delete all possession records\n• Reset timer to period 1\n\nThis action cannot be undone!')) {
+    if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to stop and reset the entire match? This will:\n\n• Reset scores to 0-0\n• Delete all recorded shots\n• Delete all game events\n• Delete all possession records\n• Reset timer to period 1\n\nThis action cannot be undone!')) {
       return;
     }
     
@@ -870,7 +870,7 @@ const LiveMatch: React.FC = () => {
   };
 
   const handleEndGame = async () => {
-    if (!window.confirm('Are you sure you want to end this game?')) {
+    if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to end this game?')) {
       return;
     }
 

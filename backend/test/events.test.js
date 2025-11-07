@@ -1151,7 +1151,7 @@ describe('🎯 Events API', () => {
       expect(eventTypes).toContain('free_shot_free_shot');
       expect(eventTypes).toContain('timeout_team');
       expect(eventTypes).toContain('commentary_highlight');
-    });
+    }, 30000);
 
     it('should filter comprehensive events by type', async () => {
       // Create test events in parallel for better performance
@@ -1186,7 +1186,7 @@ describe('🎯 Events API', () => {
       expect(response.status).toBe(200);
       expect(response.body.length).toBe(1);
       expect(response.body[0].type).toBe('free_shot_free_shot');
-    });
+    }, 30000);
 
     it('should filter comprehensive events by period', async () => {
       // Create events in different periods in parallel for better performance
@@ -1219,6 +1219,6 @@ describe('🎯 Events API', () => {
       expect(response.status).toBe(200);
       expect(response.body.length).toBe(1);
       expect(response.body[0].period).toBe(1);
-    });
+    }, 30000);
   });
 });

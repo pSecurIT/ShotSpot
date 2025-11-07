@@ -48,8 +48,12 @@ afterEach(async () => {
     console.warn(`⚠️  Warning: Test "${currentTestName}" in ${currentSuiteName} made no assertions`);
   }
   
-  // Give time for any pending async operations to complete
+  // Give database operations time to complete and connections to close
+  // Increased from 10ms to 100ms for proper async operation cleanup
   await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // Clear any pending timers from rate limiting or other middleware
+  jest.clearAllTimers();
 });
 
 afterAll(() => {

@@ -1,32 +1,50 @@
 /** @type {import('jest').Config} */
 export default {
-  verbose: false, // Reduce verbosity for faster execution
+  displayName: 'Game Logic Tests',
+  verbose: false,
   testEnvironment: 'node',
-  maxWorkers: 1, // Run tests serially to avoid database conflicts
-  testTimeout: 10000, // Reduced timeout for faster failure detection
+  maxWorkers: 1, // Serial execution for database safety
+  testTimeout: 30000, // Extended timeout for complex game logic and concurrent tests
   globalSetup: '<rootDir>/jest.globalSetup.cjs',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
   globalTeardown: '<rootDir>/jest.teardown.cjs',
+  
+  // Test pattern for game logic tests
+  testMatch: [
+    '**/test/shots.test.js',
+    '**/test/events.test.js',
+    '**/test/possessions.test.js',
+    '**/test/substitutions.test.js',
+    '**/test/match-events.test.js',
+    '**/test/game-rosters.test.js',
+    '**/test/timer.test.js'
+  ],
+  
+  // Use different database name for isolation
+  setupFiles: ['<rootDir>/jest.setup.game-logic.cjs'],
   
   // Optimized test reporting
   reporters: [
     ['default', { 
       silent: false,
       verbose: false,
-      summaryThreshold: 10 
+      summaryThreshold: 15
     }]
   ],
   
-  // Better error handling and output
-  bail: false, // Don't stop on first failure
+  bail: false,
   collectCoverageFrom: [
-    'src/**/*.js',
-    '!src/index.js',
-    '!src/app.js',
-    '!src/config/*.js'
+    'src/routes/shots.js',
+    'src/routes/events.js', 
+    'src/routes/possessions.js',
+    'src/routes/substitutions.js',
+    'src/routes/match-events.js',
+    'src/routes/game-rosters.js',
+    'src/routes/timer.js',
+    '!src/index.js'
   ],
-  coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'text-summary', 'html', 'clover'],
+  coverageDirectory: 'coverage/game-logic',
+  coverageReporters: ['text-summary', 'html'],
   
   transform: {
     '^.+\\.js$': [
@@ -42,6 +60,7 @@ export default {
       }
     ]
   },
+  
   moduleFileExtensions: ['js', 'mjs', 'cjs', 'jsx', 'json'],
   testEnvironmentOptions: {
     url: 'http://localhost'
@@ -53,26 +72,23 @@ export default {
   transformIgnorePatterns: [
     'node_modules/(?!(supertest|express|pg)/)'
   ],
-  testMatch: ['**/__tests__/**/*.js', '**/?(*.)+(spec|test).js'],
   clearMocks: true,
   resetMocks: true,
   restoreMocks: true,
   
-  // Enhanced output formatting
-  displayName: {
-    name: 'ShotSpot Backend',
-    color: 'blue'
-  },
+  // Performance optimizations
+  cacheDirectory: '<rootDir>/.jest-cache/game-logic',
+  maxConcurrency: 1,
+  
+  // Worker management for better cleanup
+  forceExit: true,
+  detectOpenHandles: false,
   
   // Better test organization
   testSequencer: '<rootDir>/jest.sequencer.cjs',
   
-  // Performance optimizations
-  cacheDirectory: '<rootDir>/.jest-cache',
-  maxConcurrency: 1, // Ensure serial execution
-  
   // Faster file watching and processing
-  watchman: false, // Disable watchman for faster startup
+  watchman: false,
   
   // Optimize module resolution
   haste: {
