@@ -49,6 +49,17 @@ router.post(
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error('Error creating possession:', error);
+      
+      // Handle foreign key violations
+      if (error.code === '23503') {
+        if (error.constraint === 'ball_possessions_team_id_fkey') {
+          return res.status(400).json({ error: 'Team not found' });
+        }
+        if (error.constraint === 'ball_possessions_game_id_fkey') {
+          return res.status(400).json({ error: 'Game not found' });
+        }
+      }
+      
       res.status(500).json({ error: 'Failed to create possession' });
     }
   }
