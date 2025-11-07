@@ -161,7 +161,7 @@ async function setupParallelDatabases() {
           
           console.log(`🔑 Set ownership and permissions for ${testUser}`);
         } else {
-          console.log(`ℹ️  Skipping permission grants (using superuser)`);
+          console.log('ℹ️  Skipping permission grants (using superuser)');
         }
         
         console.log(`✅ Schema setup complete for: ${dbName}`);
