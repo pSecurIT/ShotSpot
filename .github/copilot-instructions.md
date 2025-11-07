@@ -1,4 +1,4 @@
-# Copilot Instructions for Korfball-game-statistics
+# Copilot Instructions for ShotSpot - a Korfball game statistics app
 
 ## Project Overview
 This app tracks real-time statistics for korfball matches, focusing on shot locations, outcomes (goal/miss), player management, and game events (faults, time tracking).
@@ -35,9 +35,12 @@ This app tracks real-time statistics for korfball matches, focusing on shot loca
     - Match event recording
     - Real-time updates
 - **Test Coverage Requirements**:
-  - Maintain minimum 80% coverage for business logic
-  - All API endpoints must have integration tests
+  - **NEW FUNCTIONALITY**: All newly created functionalities MUST achieve minimum 80% test coverage before being considered complete
+  - Maintain minimum 80% coverage for existing business logic
+  - All API endpoints must have comprehensive integration tests
   - Critical UI flows must have E2E tests
+  - Security-critical modules (authentication, user management, data validation) require 90%+ coverage
+  - Use comprehensive test scenarios including positive cases, negative cases, edge cases, and error handling
 
 ### Security Requirements
 - **Authentication & Authorization**:
@@ -71,6 +74,11 @@ This app tracks real-time statistics for korfball matches, focusing on shot loca
 - **Naming**: Use clear, descriptive names for events, players, and UI elements (e.g., `shotLocation`, `playerStatus`).
 - **File Organization**: Place future source code in folders by feature (e.g., `src/players/`, `src/match/`).
 - **Documentation**: Update this file and the README with any new workflows or conventions.
+- **Testing Standards**: 
+  - Write tests BEFORE or ALONGSIDE new functionality implementation
+  - All new routes, components, and business logic must include comprehensive test suites
+  - Test files should follow naming convention: `filename.test.js` or `filename.spec.js`
+  - Include test descriptions with emojis for better readability (✅ success cases, ❌ error cases, 🔧 edge cases)
 - **Security**: 
   - Prefix security-sensitive variables with `secure`
   - Document all security-relevant configuration
@@ -79,14 +87,31 @@ This app tracks real-time statistics for korfball matches, focusing on shot loca
 ## Examples
 - When adding a new event type, ensure it includes location, player, and result fields.
 - UI forms for team setup should allow quick editing and validation.
-- Example test structure:
+- Example test structure with comprehensive coverage:
   ```typescript
-  describe('TeamManagement', () => {
-    it('should validate team name format', () => {
-      // Test implementation
+  describe('👥 User Management API', () => {
+    describe('✅ Successful Operations', () => {
+      it('✅ should create user with valid data', () => {
+        // Test implementation with positive case
+      });
+      it('✅ should update user role as admin', () => {
+        // Test implementation with authorization
+      });
     });
-    it('should require authentication for team creation', () => {
-      // Test implementation
+    
+    describe('❌ Error Handling', () => {
+      it('❌ should reject invalid email format', () => {
+        // Test implementation with validation
+      });
+      it('❌ should deny access to non-admin users', () => {
+        // Test implementation with security
+      });
+    });
+    
+    describe('🔧 Edge Cases', () => {
+      it('🔧 should handle database connection errors', () => {
+        // Test implementation with error scenarios
+      });
     });
   });
   ```
@@ -106,6 +131,36 @@ This app tracks real-time statistics for korfball matches, focusing on shot loca
     const query = 'INSERT INTO teams (name, created_by) VALUES ($1, $2) RETURNING *';
     return db.query(query, [team.name, userId]);
   };
+  ```
+- Test coverage implementation example:
+  ```typescript
+  describe('🔐 Security Tests', () => {
+    it('✅ should validate input sanitization', async () => {
+      const response = await request(app)
+        .post('/api/teams')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: '<script>alert("xss")</script>' })
+        .expect(400);
+      
+      expect(response.body).toHaveProperty('errors');
+      // Verify XSS attempt was blocked
+    });
+    
+    it('❌ should require authentication for protected routes', async () => {
+      await request(app)
+        .get('/api/teams')
+        .expect(401);
+    });
+    
+    it('🔧 should handle concurrent user operations safely', async () => {
+      // Test concurrent access patterns
+      const promises = Array.from({ length: 10 }, () => 
+        request(app).post('/api/teams').set('Authorization', token).send(validTeam)
+      );
+      const results = await Promise.allSettled(promises);
+      // Verify no race conditions or data corruption
+    });
+  });
   ```
 
 ---

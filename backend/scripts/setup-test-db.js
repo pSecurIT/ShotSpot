@@ -99,10 +99,34 @@ async function setupTestDb() {
     const schema = fs.readFileSync(join(__dirname, '../src/schema.sql'), 'utf8');
     await testPool.query(schema);
 
-    // Apply Enhanced Events migration
-    const enhancedEventsMigration = fs.readFileSync(join(__dirname, '../src/migrations/add_enhanced_events.sql'), 'utf8');
-    await testPool.query(enhancedEventsMigration);
-    console.log('Applied Enhanced Events migration');
+    // Apply all migrations in order
+    const migrations = [
+      'add_player_gender.sql',
+      'add_timer_fields.sql', 
+      'add_game_rosters.sql',
+      'add_substitutions.sql',
+      'add_possession_tracking.sql',
+      'add_enhanced_events.sql',
+      'add_match_configuration_columns.sql',
+      'add_attacking_side.sql',
+      'add_starting_position.sql'
+    ];
+
+    for (const migrationFile of migrations) {
+      const migrationPath = join(__dirname, '../src/migrations', migrationFile);
+      if (fs.existsSync(migrationPath)) {
+        try {
+          const migration = fs.readFileSync(migrationPath, 'utf8');
+          await testPool.query(migration);
+          console.log(`Applied migration: ${migrationFile}`);
+        } catch (err) {
+          console.warn(`Warning: Migration ${migrationFile} failed:`, err.message);
+          // Continue with other migrations - some may have already been applied
+        }
+      } else {
+        console.warn(`Migration file not found: ${migrationFile}`);
+      }
+    }
 
     // Grant permissions to test user on all tables (if different from admin)
     if (dbUser !== adminUser) {

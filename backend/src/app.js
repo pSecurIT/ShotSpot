@@ -22,6 +22,7 @@ import substitutionsRoutes from './routes/substitutions.js';
 import freeShotsRoutes from './routes/free-shots.js';
 import timeoutsRoutes from './routes/timeouts.js';
 import matchCommentaryRoutes from './routes/match-commentary.js';
+import userRoutes from './routes/users.js';
 
 const app = express();
 
@@ -257,6 +258,7 @@ import healthRoutes from './routes/health.js';
 // Routes
 app.use('/health', healthRoutes); // Health check endpoint should be before other routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/games', gamesRoutes);

@@ -12,6 +12,11 @@ const api = axios.create({
 // Store CSRF token
 let csrfToken: string | null = null;
 
+// Function to reset CSRF token (for testing)
+export const resetCsrfToken = (): void => {
+  csrfToken = null;
+};
+
 // Function to get CSRF token
 export const getCsrfToken = async (): Promise<string> => {
   if (!csrfToken) {
