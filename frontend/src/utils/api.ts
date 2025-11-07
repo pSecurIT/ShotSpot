@@ -12,6 +12,11 @@ const api = axios.create({
 // Store CSRF token
 let csrfToken: string | null = null;
 
+// Function to reset CSRF token (for testing)
+export const resetCsrfToken = (): void => {
+  csrfToken = null;
+};
+
 // Function to get CSRF token
 export const getCsrfToken = async (): Promise<string> => {
   if (!csrfToken) {
@@ -27,7 +32,7 @@ export const getCsrfToken = async (): Promise<string> => {
 api.interceptors.request.use(
   async (config) => {
     // Add Bearer token
-    const token = localStorage.getItem('token');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -108,9 +113,11 @@ api.interceptors.response.use(
     // Handle authentication errors
     if (error.response?.status === 401) {
       // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
 
     return Promise.reject(error);

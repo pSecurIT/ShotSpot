@@ -22,6 +22,7 @@ import substitutionsRoutes from './routes/substitutions.js';
 import freeShotsRoutes from './routes/free-shots.js';
 import timeoutsRoutes from './routes/timeouts.js';
 import matchCommentaryRoutes from './routes/match-commentary.js';
+import userRoutes from './routes/users.js';
 
 const app = express();
 
@@ -80,44 +81,46 @@ app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), (r
   res.status(204).end();
 });
 
-// Rate limiting with enhanced security
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 5000, // Increased for development with timer polling
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  skipSuccessfulRequests: false, // Count all requests
-  skipFailedRequests: false,     // Count failed requests too
-  handler: (req, res) => {
-    res.status(429).json({
-      error: 'Too many requests, please try again later.',
-      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000) - Date.now() / 1000
-    });
-  },
-  skip: (req) => {
-    // Skip rate limiting for certain trusted IPs, health checks, and timer endpoints (frequent polling)
-    const trustedIPs = (process.env.TRUSTED_IPS || '').split(',');
-    const isTimerEndpoint = req.path.startsWith('/api/timer');
-    const isHealthCheck = req.path === '/health';
-    const isTrustedIP = trustedIPs.includes(req.ip);
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    
-    // In development, skip rate limiting for timer endpoints and localhost
-    return isHealthCheck || isTrustedIP || (isDevelopment && (isTimerEndpoint || req.ip === '127.0.0.1' || req.ip === '::1'));
-  }
-});
+// Rate limiting with enhanced security (disabled in test to prevent timer leaks)
+if (process.env.NODE_ENV !== 'test') {
+  const limiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX) || 5000, // Increased for development with timer polling
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    skipSuccessfulRequests: false, // Count all requests
+    skipFailedRequests: false,     // Count failed requests too
+    handler: (req, res) => {
+      res.status(429).json({
+        error: 'Too many requests, please try again later.',
+        retryAfter: Math.ceil(req.rateLimit.resetTime / 1000) - Date.now() / 1000
+      });
+    },
+    skip: (req) => {
+      // Skip rate limiting for certain trusted IPs, health checks, and timer endpoints (frequent polling)
+      const trustedIPs = (process.env.TRUSTED_IPS || '').split(',');
+      const isTimerEndpoint = req.path.startsWith('/api/timer');
+      const isHealthCheck = req.path === '/health';
+      const isTrustedIP = trustedIPs.includes(req.ip);
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      
+      // In development, skip rate limiting for timer endpoints and localhost
+      return isHealthCheck || isTrustedIP || (isDevelopment && (isTimerEndpoint || req.ip === '127.0.0.1' || req.ip === '::1'));
+    }
+  });
 
-// Speed limiter - gradually slow down responses based on number of requests
-const speedLimiter = slowDown({
-  windowMs: 900000, // 15 minutes
-  delayAfter: 50, // allow 50 requests per 15 minutes, then...
-  delayMs: (hits) => hits * 100, // add 100ms of delay per hit
-  maxDelayMs: 3000 // maximum delay of 3 seconds
-});
+  // Speed limiter - gradually slow down responses based on number of requests
+  const speedLimiter = slowDown({
+    windowMs: 900000, // 15 minutes
+    delayAfter: 50, // allow 50 requests per 15 minutes, then...
+    delayMs: (hits) => hits * 100, // add 100ms of delay per hit
+    maxDelayMs: 3000 // maximum delay of 3 seconds
+  });
 
-// Apply rate limiting and speed limiting to all routes
-app.use(limiter);
-app.use(speedLimiter);
+  // Apply rate limiting and speed limiting to all routes
+  app.use(limiter);
+  app.use(speedLimiter);
+}
 
 // CORS configuration with enhanced security
 const corsOptions = {
@@ -168,16 +171,18 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Debug middleware
+// Debug middleware (silent in test environment)
 app.use((req, res, next) => {
-  console.log('Request:', {
-    method: req.method,
-    path: req.path,
-    headers: {
-      authorization: req.headers.authorization ? 'present' : 'missing',
-      'content-type': req.headers['content-type']
-    }
-  });
+  if (process.env.NODE_ENV !== 'test') {
+    console.log('Request:', {
+      method: req.method,
+      path: req.path,
+      headers: {
+        authorization: req.headers.authorization ? 'present' : 'missing',
+        'content-type': req.headers['content-type']
+      }
+    });
+  }
   next();
 });
 
@@ -257,6 +262,7 @@ import healthRoutes from './routes/health.js';
 // Routes
 app.use('/health', healthRoutes); // Health check endpoint should be before other routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/games', gamesRoutes);

@@ -1,5 +1,6 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import bcrypt from 'bcrypt';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import rateLimit from 'express-rate-limit';

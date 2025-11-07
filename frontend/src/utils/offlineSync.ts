@@ -118,23 +118,27 @@ export const getPendingActionsCount = async (): Promise<number> => {
  * Listen for online event and sync automatically
  */
 export const startAutoSync = (): void => {
-  window.addEventListener('online', async () => {
-    console.log('[OfflineSync] Connection restored, syncing pending actions...');
-    await processQueue();
-    
-    // Notify user via custom event
-    window.dispatchEvent(new CustomEvent('offline-sync-complete'));
-  });
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', async () => {
+      console.log('[OfflineSync] Connection restored, syncing pending actions...');
+      await processQueue();
+      
+      // Notify user via custom event
+      window.dispatchEvent(new CustomEvent('offline-sync-complete'));
+    });
 
-  console.log('[OfflineSync] Auto-sync listener started');
+    console.log('[OfflineSync] Auto-sync listener started');
+  }
 };
 
 /**
  * Stop auto-sync listener
  */
 export const stopAutoSync = (): void => {
-  window.removeEventListener('online', processQueue);
-  console.log('[OfflineSync] Auto-sync listener stopped');
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('online', processQueue);
+    console.log('[OfflineSync] Auto-sync listener stopped');
+  }
 };
 
 export default {

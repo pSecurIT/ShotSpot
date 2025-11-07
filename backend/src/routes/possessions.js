@@ -1,8 +1,12 @@
 import express from 'express';
 import { body, param, validationResult } from 'express-validator';
 import pool from '../db.js';
+import { auth, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Apply authentication middleware to all routes
+router.use(auth);
 
 /**
  * POST /api/possessions/:gameId
@@ -10,11 +14,10 @@ const router = express.Router();
  */
 router.post(
   '/:gameId',
-  [
-    param('gameId').isInt(),
-    body('team_id').isInt(),
-    body('period').isInt({ min: 1, max: 10 })
-  ],
+  requireRole(['admin', 'coach']),
+  param('gameId').isInt(),
+  body('team_id').isInt(),
+  body('period').isInt({ min: 1, max: 10 }),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -25,12 +28,24 @@ router.post(
     const { team_id, period } = req.body;
 
     try {
-      // First, end any active possession for this game
+      // Validate game exists
+      const gameRes = await pool.query('SELECT 1 FROM games WHERE id = $1', [gameId]);
+      if (gameRes.rowCount === 0) {
+        return res.status(404).json({ error: 'Game not found' });
+      }
+
+      // Validate team exists
+      const teamRes = await pool.query('SELECT 1 FROM teams WHERE id = $1', [team_id]);
+      if (teamRes.rowCount === 0) {
+        return res.status(404).json({ error: 'Team not found' });
+      }
+
+      // End any active possession for this game
       await pool.query(
-        `UPDATE ball_possessions 
+        `UPDATE ball_possessions
          SET ended_at = CURRENT_TIMESTAMP,
              duration_seconds = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at))::INTEGER,
-             result = CASE WHEN result IS NULL THEN 'turnover' ELSE result END
+             result = COALESCE(result, 'turnover')
          WHERE game_id = $1 AND ended_at IS NULL`,
         [gameId]
       );
@@ -43,10 +58,22 @@ router.post(
         [gameId, team_id, period]
       );
 
-      res.status(201).json(result.rows[0]);
+      return res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error('Error creating possession:', error);
-      res.status(500).json({ error: 'Failed to create possession' });
+      
+      // Defensive mapping for FK errors if they still occur
+      if (error && error.code === '23503') {
+        if (error.constraint && error.constraint.includes('team')) {
+          return res.status(404).json({ error: 'Team not found' });
+        }
+        if (error.constraint && error.constraint.includes('game')) {
+          return res.status(404).json({ error: 'Game not found' });
+        }
+        return res.status(400).json({ error: 'Foreign key constraint failed' });
+      }
+      
+      return res.status(500).json({ error: 'Failed to create possession' });
     }
   }
 );
@@ -57,11 +84,10 @@ router.post(
  */
 router.put(
   '/:gameId/:possessionId',
-  [
-    param('gameId').isInt(),
-    param('possessionId').isInt(),
-    body('result').isIn(['goal', 'turnover', 'out_of_bounds', 'timeout', 'period_end'])
-  ],
+  requireRole(['admin', 'coach']),
+  param('gameId').isInt(),
+  param('possessionId').isInt(),
+  body('result').isIn(['goal', 'turnover', 'out_of_bounds', 'timeout', 'period_end']),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -100,9 +126,7 @@ router.put(
  */
 router.get(
   '/:gameId',
-  [
-    param('gameId').isInt()
-  ],
+  param('gameId').isInt(),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -151,9 +175,7 @@ router.get(
  */
 router.get(
   '/:gameId/active',
-  [
-    param('gameId').isInt()
-  ],
+  param('gameId').isInt(),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -191,9 +213,7 @@ router.get(
  */
 router.get(
   '/:gameId/stats',
-  [
-    param('gameId').isInt()
-  ],
+  param('gameId').isInt(),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -207,11 +227,11 @@ router.get(
         `SELECT 
           p.team_id,
           t.name as team_name,
-          COUNT(*) as total_possessions,
+          COUNT(*)::INTEGER as total_possessions,
           ROUND(AVG(p.duration_seconds), 1) as avg_duration_seconds,
           ROUND(AVG(p.shots_taken), 2) as avg_shots_per_possession,
-          SUM(CASE WHEN p.result = 'goal' THEN 1 ELSE 0 END) as possessions_with_goal,
-          SUM(CASE WHEN p.result = 'turnover' THEN 1 ELSE 0 END) as turnovers
+          SUM(CASE WHEN p.result = 'goal' THEN 1 ELSE 0 END)::INTEGER as possessions_with_goal,
+          SUM(CASE WHEN p.result = 'turnover' THEN 1 ELSE 0 END)::INTEGER as turnovers
          FROM ball_possessions p
          JOIN teams t ON p.team_id = t.id
          WHERE p.game_id = $1 AND p.ended_at IS NOT NULL
@@ -233,10 +253,9 @@ router.get(
  */
 router.patch(
   '/:gameId/:possessionId/increment-shots',
-  [
-    param('gameId').isInt(),
-    param('possessionId').isInt()
-  ],
+  requireRole(['admin', 'coach']),
+  param('gameId').isInt(),
+  param('possessionId').isInt(),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

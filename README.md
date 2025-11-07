@@ -1,7 +1,11 @@
 # ShotSpot
 
 [![Security Rating](https://img.shields.io/security-headers?url=https%3A%2F%2Fshotspot-demo.example.com)](https://securityheaders.com)
-[![Code Coverage](https://img.shields.io/codecov/c/github/pSecurIT/Korfball-game-statistics)](https://codecov.io/gh/pSecurIT/Korfball-game-statistics)
+[![Code Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot)](https://codecov.io/gh/pSecurIT/ShotSpot)
+[![Frontend Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot/main?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/pSecurIT/ShotSpot)
+[![Backend Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot/main?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/pSecurIT/ShotSpot)
+[![Build Status](https://github.com/pSecurIT/ShotSpot/workflows/Test%20Coverage/badge.svg)](https://github.com/pSecurIT/ShotSpot/actions)
+[![License](https://img.shields.io/github/license/pSecurIT/ShotSpot)](LICENSE)
 
 ## ✅ App Summary
 

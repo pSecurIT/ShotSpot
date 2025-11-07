@@ -16,7 +16,15 @@
     "test": "jest --config jest.config.js --no-cache --verbose",
     "test:watch": "jest --config jest.config.js --watch --no-cache --verbose",
     "test:coverage": "jest --config jest.config.js --coverage --no-cache --verbose",
-    "test:debug": "jest --config jest.config.js --no-cache --verbose --detectOpenHandles --forceExit"
+    "test:ci": "jest --coverage --ci --watchAll=false",
+    "test:debug": "jest --config jest.config.js --no-cache --verbose --detectOpenHandles --forceExit",
+    "setup-parallel-dbs": "node scripts/setup-parallel-dbs.js",
+    "pretest:parallel": "npm run setup-parallel-dbs",
+    "test:parallel": "jest --config jest.config.parallel.js --no-cache",
+    "test:parallel:coverage": "jest --config jest.config.parallel.js --coverage --no-cache",
+    "test:unit": "jest --config jest.config.unit.js --no-cache",
+    "test:core-api": "jest --config jest.config.core-api.js --no-cache",
+    "test:game-logic": "jest --config jest.config.game-logic.js --no-cache"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

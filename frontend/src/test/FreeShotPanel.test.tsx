@@ -233,13 +233,12 @@ describe('FreeShotPanel', () => {
     const user = userEvent.setup();
     render(<FreeShotPanel {...mockProps} />);
     
-    await waitFor(() => {
-      expect(api.get).toHaveBeenCalled();
-    });
+    // Wait for a player option to appear (ensures options are rendered)
+    const playerOption = await screen.findByRole('option', { name: '#10 John Doe' });
     
-    // Select player
+    // Now select it
     const playerSelect = screen.getByDisplayValue('Select player');
-    await user.selectOptions(playerSelect, '1');
+    await user.selectOptions(playerSelect, playerOption);
     
     // Button should now be enabled
     const recordButton = screen.getByRole('button', { name: 'Record Free Shot' });

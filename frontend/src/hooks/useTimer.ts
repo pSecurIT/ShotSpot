@@ -70,13 +70,18 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
     try {
       setLoading(true);
       const response = await api.get(`/timer/${gameId}`);
-      setServerTimerState(response.data);
       
-      // Reset period end flag when timer is started fresh
-      if (response.data.timer_state === 'running' && 
-          (!serverTimerState || serverTimerState.timer_state !== 'running')) {
-        setPeriodHasEnded(false);
-      }
+      setServerTimerState(prevState => {
+        const newState = response.data;
+        
+        // Reset period end flag when timer is started fresh
+        if (newState.timer_state === 'running' && 
+            (!prevState || prevState.timer_state !== 'running')) {
+          setPeriodHasEnded(false);
+        }
+        
+        return newState;
+      });
       
       // Initialize client-side timer with server data
       // Use time_remaining if available, otherwise fall back to period_duration
@@ -98,7 +103,7 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [gameId, serverTimerState]);
+  }, [gameId]);
 
   // Client-side countdown (runs every second, no network calls)
   useEffect(() => {

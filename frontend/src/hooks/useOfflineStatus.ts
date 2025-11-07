@@ -77,10 +77,14 @@ export const useOfflineStatus = () => {
       updatePendingCount();
     };
 
-    window.addEventListener('offline-sync-complete', handleSyncComplete);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('offline-sync-complete', handleSyncComplete);
+    }
 
     return () => {
-      window.removeEventListener('offline-sync-complete', handleSyncComplete);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('offline-sync-complete', handleSyncComplete);
+      }
     };
   }, [updatePendingCount]);
 

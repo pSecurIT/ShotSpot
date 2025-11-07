@@ -1,23 +1,29 @@
 import jwt from 'jsonwebtoken';
 
+// Helper to log errors only in non-test environments
+const isTest = process.env.NODE_ENV === 'test';
+const logError = (...args) => {
+  if (!isTest) console.error(...args);
+};
+
 const auth = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
-      console.error('auth: No authorization header');
+      logError('auth: No authorization header');
       return res.status(401).json({ error: 'No token provided' });
     }
 
     const token = authHeader.split(' ')[1]; // Bearer <token>
     if (!token) {
-      console.error('auth: Missing token in authorization header');
+      logError('auth: Missing token in authorization header');
       return res.status(401).json({ error: 'Invalid token format' });
     }
 
     // Validate JWT token structure (must have 3 parts: header.payload.signature)
     const tokenParts = token.split('.');
     if (tokenParts.length !== 3) {
-      console.error('auth: Malformed JWT token - expected 3 parts, got', tokenParts.length);
+      logError('auth: Malformed JWT token - expected 3 parts, got', tokenParts.length);
       return res.status(401).json({ error: 'Invalid token format' });
     }
 
@@ -31,46 +37,55 @@ const auth = (req, res, next) => {
         throw new Error('Empty payload');
       }
       rawPayload = Buffer.from(payloadB64, 'base64').toString();
-      console.log('Auth: Raw token payload:', rawPayload);
+      // Only log in non-test environments
+      if (process.env.NODE_ENV !== 'test') {
+        console.log('Auth: Raw token payload:', rawPayload);
+      }
     } catch (err) {
-      console.error('auth: Error decoding token payload:', err.message);
+      logError('auth: Error decoding token payload:', err.message);
       return res.status(401).json({ error: 'Invalid token format' });
     }
 
     // Verify and decode token
     const decoded = jwt.verify(token, jwtSecret);
-    console.log('Auth: Verified token payload:', decoded);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('Auth: Verified token payload:', decoded);
+    }
     
     req.user = {
       ...decoded,
       role: decoded.role.toLowerCase() // Normalize role here
     };
 
-    console.log('Auth: Final user object:', req.user);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('Auth: Final user object:', req.user);
+    }
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
+    logError('Authentication error:', error);
     res.status(401).json({ error: 'Invalid token' });
   }
 };
 
 const requireRole = (roles) => {
   return (req, res, next) => {
-    // Debug info for request
-    console.log('requireRole: Checking request', {
-      path: req.path,
-      method: req.method,
-      user: req.user,
-      requestedRoles: roles
-    });
+    // Debug info for request (only in non-test environments)
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('requireRole: Checking request', {
+        path: req.path,
+        method: req.method,
+        user: req.user,
+        requestedRoles: roles
+      });
+    }
 
     if (!req.user) {
-      console.error('requireRole: No user object found in request');
+      logError('requireRole: No user object found in request');
       return res.status(401).json({ error: 'Authentication required' });
     }
 
     if (!req.user.role) {
-      console.error('requireRole: No role found in user object:', req.user);
+      logError('requireRole: No role found in user object:', req.user);
       return res.status(403).json({ error: 'No role assigned to user' });
     }
 
@@ -80,16 +95,18 @@ const requireRole = (roles) => {
       ? roles.map(r => r.toLowerCase()) 
       : [roles.toLowerCase()];
 
-    // Debug information for role check
-    console.log('requireRole: Role validation:', {
-      userRole,
-      allowedRoles,
-      hasRequiredRole: allowedRoles.includes(userRole),
-      userObject: req.user
-    });
+    // Debug information for role check (only in non-test environments)
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('requireRole: Role validation:', {
+        userRole,
+        allowedRoles,
+        hasRequiredRole: allowedRoles.includes(userRole),
+        userObject: req.user
+      });
+    }
 
     if (!allowedRoles.includes(userRole)) {
-      console.error(`requireRole: User role ${userRole} not in allowed roles:`, allowedRoles);
+      logError(`requireRole: User role ${userRole} not in allowed roles:`, allowedRoles);
       return res.status(403).json({
         error: 'Insufficient permissions',
         details: `Required role(s): ${roles.join(', ')}. Current role: ${userRole}`
