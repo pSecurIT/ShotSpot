@@ -1,5 +1,8 @@
 name: Test Coverage
 
+permissions:
+  contents: read  # Only need to read repository contents for testing
+
 on:
   push:
     branches: [ main, develop ]

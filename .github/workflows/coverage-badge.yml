@@ -1,5 +1,8 @@
 name: Coverage Badge
 
+permissions:
+  contents: write  # Required to commit coverage badge back to repository
+
 on:
   push:
     branches: [ main ]

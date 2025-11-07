@@ -5,7 +5,7 @@ import App from './App';
 import { startAutoSync } from './utils/offlineSync';
 
 // Register Service Worker for offline support
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && typeof window !== 'undefined') {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/service-worker.js')
