@@ -791,12 +791,12 @@ describe('🏃 Ball Possessions API', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ team_id: 99999, period: 1 });
 
-      // Accept either 500 (database error) or 429 (rate limited) as valid responses
-      if (response.status === 500) {
-        expect(response.body).toHaveProperty('error', 'Failed to create possession');
+      // Should now return 400 with proper error message for FK violations
+      if (response.status === 400) {
+        expect(response.body).toHaveProperty('error', 'Team not found');
       } else if (response.status === 429) {
         // Rate limited - acceptable for this test
-        console.log('Rate limited during database error test - acceptable');
+        console.log('Rate limited during FK violation test - acceptable');
       } else {
         throw new Error(`Unexpected status code: ${response.status}`);
       }
