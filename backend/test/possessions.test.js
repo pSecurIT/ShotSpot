@@ -785,18 +785,18 @@ describe('🏃 Ball Possessions API', () => {
 
   describe('🔧 Edge Cases and Validation', () => {
     it('🔧 should handle database errors gracefully for possession creation', async () => {
-      // Mock database error by using invalid team_id
+      // Use invalid team_id - should get 404 since team doesn't exist
       const response = await request(app)
         .post(`/api/possessions/${game.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ team_id: 99999, period: 1 });
 
-      // Should now return 400 with proper error message for FK violations
-      if (response.status === 400) {
+      // Should now return 404 with proper error message (team validation before insert)
+      if (response.status === 404) {
         expect(response.body).toHaveProperty('error', 'Team not found');
       } else if (response.status === 429) {
         // Rate limited - acceptable for this test
-        console.log('Rate limited during FK violation test - acceptable');
+        console.log('Rate limited during team validation test - acceptable');
       } else {
         throw new Error(`Unexpected status code: ${response.status}`);
       }

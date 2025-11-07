@@ -92,6 +92,16 @@ jobs:
         echo "Verifying game-logic test database..."
         psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db_game_logic" -c "\dt public.*"
     
+    - name: Debug - Count tables
+      run: |
+        echo "Table counts in each database:"
+        echo "Main DB:"
+        psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db" -c "SELECT count(*) as table_count FROM pg_tables WHERE schemaname = 'public';" || true
+        echo "Core API DB:"
+        psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db_core_api" -c "SELECT count(*) as table_count FROM pg_tables WHERE schemaname = 'public';" || true
+        echo "Game Logic DB:"
+        psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db_game_logic" -c "SELECT count(*) as table_count FROM pg_tables WHERE schemaname = 'public';" || true
+    
     - name: Run backend tests with coverage
       run: |
         cd backend
@@ -139,14 +149,23 @@ jobs:
     - name: Extract coverage
       id: coverage
       run: |
-        COVERAGE=$(node -p "
-          const fs = require('fs');
-          const coverage = JSON.parse(fs.readFileSync('frontend/coverage/coverage-summary.json', 'utf8'));
-          Math.round(coverage.total.statements.pct) + '%'
-        ")
+        set -e
+        COVFILE="frontend/coverage/coverage-summary.json"
+        if [ -f "$COVFILE" ]; then
+          COVERAGE=$(node -p "
+            const fs = require('fs');
+            const coverage = JSON.parse(fs.readFileSync('$COVFILE','utf8'));
+            Math.round(coverage.total.statements.pct) + '%'
+          ")
+          echo "Coverage extracted: $COVERAGE"
+        else
+          echo "::warning::Coverage summary not found at $COVFILE. Setting coverage to 0%."
+          COVERAGE="0%"
+        fi
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
     
     - name: Create coverage badge
+      if: steps.coverage.outputs.coverage != ''
       uses: emibcn/badge-action@v2.0.3
       with:
         label: 'Coverage'
@@ -155,7 +174,7 @@ jobs:
         path: 'coverage-badge.svg'
     
     - name: Commit badge
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.coverage.outputs.coverage != ''
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
