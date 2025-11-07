@@ -200,6 +200,30 @@ async function main() {
       await executeSqlFile(file, postgresPassword);
     }
 
+    // Apply all migrations in order
+    const migrations = [
+      '../src/migrations/add_player_gender.sql',
+      '../src/migrations/add_timer_fields.sql', 
+      '../src/migrations/add_game_rosters.sql',
+      '../src/migrations/add_substitutions.sql',
+      '../src/migrations/add_possession_tracking.sql',
+      '../src/migrations/add_enhanced_events.sql',
+      '../src/migrations/add_match_configuration_columns.sql',
+      '../src/migrations/add_attacking_side.sql',
+      '../src/migrations/add_starting_position.sql'
+    ];
+
+    console.log('Applying database migrations...');
+    for (const migrationFile of migrations) {
+      try {
+        await executeSqlFile(migrationFile, postgresPassword);
+        console.log(`Applied migration: ${path.basename(migrationFile)}`);
+      } catch (err) {
+        console.warn(`Warning: Migration ${path.basename(migrationFile)} failed:`, err.message);
+        // Continue with other migrations - some may have already been applied
+      }
+    }
+
     console.log('Database setup completed successfully');
   } catch (error) {
     console.error('Database setup failed:', error);

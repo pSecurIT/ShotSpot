@@ -125,7 +125,7 @@ const GameManagement: React.FC = () => {
   };
 
   const handleCancelGame = async (gameId: number) => {
-    if (!window.confirm('Are you sure you want to cancel this game?')) {
+    if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to cancel this game?')) {
       return;
     }
 
@@ -183,7 +183,7 @@ const GameManagement: React.FC = () => {
   };
 
   const handleDeleteGame = async (gameId: number) => {
-    if (!window.confirm('Are you sure you want to delete this game? This action cannot be undone.')) {
+    if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to delete this game? This action cannot be undone.')) {
       return;
     }
 
