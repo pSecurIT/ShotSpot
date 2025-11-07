@@ -96,12 +96,38 @@ async function setupParallelDatabases() {
       try {
         await dbClient.connect();
         
-        // Read and execute schema
+        // Read and execute schema with fail-fast error handling
         const schemaPath = join(__dirname, '..', 'src', 'schema.sql');
-        const schema = readFileSync(schemaPath, 'utf8');
-        await dbClient.query(schema);
+        if (!schemaPath) {
+          console.error(`❌ Schema path resolved to empty value: ${schemaPath}`);
+          process.exit(1);
+        }
         
-        // Apply all migrations in order
+        let schema;
+        try {
+          schema = readFileSync(schemaPath, 'utf8');
+          if (!schema || schema.trim().length === 0) {
+            console.error(`❌ Schema file is empty: ${schemaPath}`);
+            process.exit(1);
+          }
+          console.log(`📄 Read schema.sql (${schema.length} bytes)`);
+        } catch (err) {
+          console.error(`❌ Failed to read schema file at ${schemaPath}:`, err.message);
+          console.error(err);
+          process.exit(1);
+        }
+
+        try {
+          // Execute schema; if this fails, stop immediately so tests aren't run against an empty DB
+          await dbClient.query(schema);
+          console.log(`✅ Executed schema.sql for ${dbName}`);
+        } catch (err) {
+          console.error(`❌ Failed to apply schema.sql for ${dbName}:`, err.message);
+          console.error('Full error:', err);
+          process.exit(1);
+        }
+        
+        // Apply all migrations in order with fail-fast error handling
         const migrations = [
           '../src/migrations/add_player_gender.sql',
           '../src/migrations/add_timer_fields.sql', 
@@ -116,24 +142,23 @@ async function setupParallelDatabases() {
 
         console.log('📦 Applying migrations...');
         for (const migrationFile of migrations) {
+          const migrationPath = join(__dirname, migrationFile);
           try {
-            const migrationPath = join(__dirname, migrationFile);
-            
-            // Check if migration file exists
-            try {
-              const migrationContent = readFileSync(migrationPath, 'utf8');
-              await dbClient.query(migrationContent);
-              console.log(`✅ Applied migration: ${basename(migrationFile)}`);
-            } catch (err) {
-              if (err.code === 'ENOENT') {
-                console.log(`⚠️  Migration file not found: ${basename(migrationFile)}, skipping`);
-              } else {
-                console.warn(`⚠️  Migration ${basename(migrationFile)} failed:`, err.message);
-              }
+            const migrationContent = readFileSync(migrationPath, 'utf8');
+            if (!migrationContent || migrationContent.trim().length === 0) {
+              console.warn(`⚠️  Migration file empty, skipping: ${basename(migrationFile)}`);
+              continue;
             }
+            await dbClient.query(migrationContent);
+            console.log(`✅ Applied migration: ${basename(migrationFile)}`);
           } catch (err) {
-            console.warn(`⚠️  Migration ${basename(migrationFile)} failed:`, err.message);
-            // Continue with other migrations - some may have already been applied
+            if (err.code === 'ENOENT') {
+              console.warn(`⚠️  Migration file not found: ${basename(migrationFile)}, skipping`);
+              continue;
+            }
+            console.error(`❌ Migration failed (${basename(migrationFile)}) for ${dbName}:`, err.message);
+            console.error('Full error:', err);
+            process.exit(1);
           }
         }
         
@@ -162,6 +187,26 @@ async function setupParallelDatabases() {
           console.log(`🔑 Set ownership and permissions for ${testUser}`);
         } else {
           console.log('ℹ️  Skipping permission grants (using superuser)');
+        }
+        
+        // Verify schema was created successfully by listing tables
+        try {
+          const tablesResult = await dbClient.query(`
+            SELECT tablename FROM pg_tables 
+            WHERE schemaname = 'public' 
+            ORDER BY tablename
+          `);
+          
+          if (tablesResult.rows.length === 0) {
+            console.error(`❌ No tables found in ${dbName} after schema setup!`);
+            process.exit(1);
+          }
+          
+          console.log(`📊 Verified ${tablesResult.rows.length} tables in ${dbName}:`);
+          tablesResult.rows.forEach(row => console.log(`   - ${row.tablename}`));
+        } catch (err) {
+          console.error(`❌ Failed to verify tables in ${dbName}:`, err.message);
+          process.exit(1);
         }
         
         console.log(`✅ Schema setup complete for: ${dbName}`);
