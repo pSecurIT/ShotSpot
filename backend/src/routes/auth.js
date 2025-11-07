@@ -113,14 +113,27 @@ router.post('/login', [
     }
 
     // Generate JWT
+    const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+    
+    // Normalize expiresIn: allow numeric string (seconds) or timeframe string like '1h'
+    const rawExpires = process.env.JWT_EXPIRES_IN;
+    let expiresIn;
+    if (!rawExpires) {
+      expiresIn = '1h'; // safe default for tests and CI
+    } else if (/^\d+$/.test(rawExpires)) {
+      expiresIn = Number(rawExpires); // numeric seconds
+    } else {
+      expiresIn = rawExpires; // string timespan like '1h', '30m'
+    }
+    
     const token = jwt.sign(
       {
         userId: user.id,
         username: user.username,
         role: user.role
       },
-      process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing',
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      jwtSecret,
+      { expiresIn }
     );
 
     res.json({
