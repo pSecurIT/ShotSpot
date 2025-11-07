@@ -21,9 +21,9 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: shotspot_test_db
+          POSTGRES_DB: postgres
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -66,6 +66,32 @@ jobs:
         done
         echo "PostgreSQL is ready!"
     
+    - name: Setup test databases
+      run: |
+        cd backend
+        node scripts/setup-parallel-dbs.js
+      env:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_HOST: 127.0.0.1
+        DB_PORT: 5432
+        DB_NAME: shotspot_test_db
+        DB_NAME_CORE_API: shotspot_test_db_core_api
+        DB_NAME_GAME_LOGIC: shotspot_test_db_game_logic
+    
+    - name: Verify database schema
+      run: |
+        echo "Verifying main test database..."
+        psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db" -c "\dt public.*"
+        echo ""
+        echo "Verifying core-api test database..."
+        psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db_core_api" -c "\dt public.*"
+        echo ""
+        echo "Verifying game-logic test database..."
+        psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db_game_logic" -c "\dt public.*"
+    
     - name: Run backend tests with coverage
       run: |
         cd backend
@@ -86,6 +112,8 @@ jobs:
         DB_HOST: 127.0.0.1
         DB_PORT: 5432
         DB_NAME: shotspot_test_db
+        DB_NAME_CORE_API: shotspot_test_db_core_api
+        DB_NAME_GAME_LOGIC: shotspot_test_db_game_logic
         DB_MAX_CONNECTIONS: 5
         DB_IDLE_TIMEOUT_MS: 1000
         # Test Security Configuration
