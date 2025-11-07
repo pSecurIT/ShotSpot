@@ -83,6 +83,16 @@ jobs:
         echo "Verifying game-logic test database..."
         psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db_game_logic" -c "\dt public.*"
     
+    - name: Debug - Count tables
+      run: |
+        echo "Table counts in each database:"
+        echo "Main DB:"
+        psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db" -c "SELECT count(*) as table_count FROM pg_tables WHERE schemaname = 'public';" || true
+        echo "Core API DB:"
+        psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db_core_api" -c "SELECT count(*) as table_count FROM pg_tables WHERE schemaname = 'public';" || true
+        echo "Game Logic DB:"
+        psql "postgresql://postgres:postgres@127.0.0.1:5432/shotspot_test_db_game_logic" -c "SELECT count(*) as table_count FROM pg_tables WHERE schemaname = 'public';" || true
+    
     - name: Run frontend tests with coverage
       run: |
         cd frontend && npm run coverage

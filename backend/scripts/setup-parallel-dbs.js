@@ -53,7 +53,7 @@ async function setupParallelDatabases() {
           $$;
         `);
         console.log(`✅ Test user '${testUser}' ready`);
-      } catch (error) {
+      } catch (_error) {
         console.log(`ℹ️  User '${testUser}' already exists`);
       }
     } else {
@@ -68,7 +68,7 @@ async function setupParallelDatabases() {
       try {
         await client.query(`DROP DATABASE IF EXISTS ${dbName}`);
         console.log(`🗑️  Dropped existing database: ${dbName}`);
-      } catch (error) {
+      } catch (_error) {
         console.log(`ℹ️  No existing database to drop: ${dbName}`);
       }
 
@@ -160,6 +160,19 @@ async function setupParallelDatabases() {
             console.error('Full error:', err);
             process.exit(1);
           }
+        }
+        
+        // Sanity check: ensure core tables exist after schema/migrations
+        try {
+          const sanityCheck = await dbClient.query('SELECT to_regclass(\'public.users\') AS users_exists');
+          if (!sanityCheck.rows[0].users_exists) {
+            console.error(`❌ Sanity check failed: table public.users not found after schema/migrations for ${dbName}`);
+            process.exit(1);
+          }
+          console.log(`✅ Sanity check passed: core tables exist in ${dbName}`);
+        } catch (err) {
+          console.error(`❌ Sanity check failed for ${dbName}:`, err.message);
+          process.exit(1);
         }
         
         // Grant additional permissions on tables and sequences (only if different user)
