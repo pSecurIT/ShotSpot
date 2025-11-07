@@ -175,7 +175,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
   };
 
   const handleUndoSubstitution = async (subId: number) => {
-    if (!window.confirm('Are you sure you want to undo this substitution?')) {
+    if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to undo this substitution?')) {
       return;
     }
 
