@@ -96,11 +96,20 @@ jobs:
           # Start services with test environment
           docker-compose --env-file .env.test up -d
 
-          # Wait for services to be healthy
+          # Wait for services to be healthy (increased timeout for DB init + migrations)
           echo "Waiting for services to be healthy..."
-          timeout 60 bash -c 'until docker-compose ps | grep -q "healthy"; do sleep 2; done' || {
-            echo "Services failed to become healthy"
-            docker-compose logs
+          timeout 300 bash -c '
+            until docker-compose ps | grep -q "healthy"; do
+              echo "$(date) - Waiting for healthy containers..."
+              docker-compose ps
+              sleep 5
+            done
+          ' || {
+            echo "❌ Services failed to become healthy after 5 minutes"
+            echo "==== docker-compose ps ===="
+            docker-compose ps
+            echo "==== docker-compose logs (app + db) ===="
+            docker-compose logs app db || true
             exit 1
           }
 
@@ -126,12 +135,15 @@ jobs:
         if: always()
         run: |
           # Guard docker-compose calls for robust cleanup
-          if command -v docker-compose >/dev/null 2>&1; then
-            docker-compose down -v
-          elif docker compose version >/dev/null 2>&1; then
-            docker compose down -v
+          # Only cleanup if .env.test exists (meaning we got past setup)
+          if [ -f .env.test ]; then
+            if command -v docker-compose >/dev/null 2>&1; then
+              docker-compose down -v 2>/dev/null || true
+            elif docker compose version >/dev/null 2>&1; then
+              docker compose down -v 2>/dev/null || true
+            fi
+            rm -f .env.test || true
           fi
-          rm -f .env.test || true
 
       - name: Push Docker image
         if: github.event_name != 'pull_request'
@@ -199,9 +211,18 @@ jobs:
       - name: Wait for services
         run: |
           echo "Waiting for services to be ready..."
-          timeout 90 bash -c 'until [ "$(docker inspect -f {{.State.Health.Status}} shotspot-app 2>/dev/null)" == "healthy" ]; do sleep 3; done' || {
-            echo "Application failed to become healthy"
-            docker-compose logs
+          timeout 300 bash -c '
+            until [ "$(docker inspect -f {{.State.Health.Status}} shotspot-app 2>/dev/null)" == "healthy" ]; do
+              echo "$(date) - Waiting for healthy app container..."
+              docker-compose ps
+              sleep 5
+            done
+          ' || {
+            echo "❌ Application failed to become healthy after 5 minutes"
+            echo "==== docker-compose ps ===="
+            docker-compose ps
+            echo "==== docker-compose logs (app + db) ===="
+            docker-compose logs app db || true
             exit 1
           }
 
@@ -224,12 +245,15 @@ jobs:
         if: always()
         run: |
           # Guard docker-compose calls for robust cleanup
-          if command -v docker-compose >/dev/null 2>&1; then
-            docker-compose down -v
-          elif docker compose version >/dev/null 2>&1; then
-            docker compose down -v
+          # Only cleanup if .env exists (meaning we got past setup)
+          if [ -f .env ]; then
+            if command -v docker-compose >/dev/null 2>&1; then
+              docker-compose down -v 2>/dev/null || true
+            elif docker compose version >/dev/null 2>&1; then
+              docker compose down -v 2>/dev/null || true
+            fi
+            rm -f .env || true
           fi
-          rm -f .env || true
 
   scan-vulnerabilities:
     name: Scan for Vulnerabilities
