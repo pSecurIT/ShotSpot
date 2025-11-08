@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import api from '../utils/api';
-import { waitForSelectOptions } from './helpers/testHelpers';
 
 // Import all Enhanced Match Events components
 import FaultManagement from '../components/FaultManagement';
@@ -114,8 +113,7 @@ describe('Enhanced Match Events Integration', () => {
       
       // Select team from dropdown
       const teamDropdowns = screen.getAllByRole('combobox');
-      const faultTeamDropdown = teamDropdowns[0] as HTMLSelectElement; // First dropdown should be fault team
-      await waitForSelectOptions(() => teamDropdowns[0] as HTMLSelectElement);
+      const faultTeamDropdown = teamDropdowns[0]; // First dropdown should be fault team
       await user.selectOptions(faultTeamDropdown, '1');
       
       // Don't wait for specific player data since mocks may not provide it
@@ -174,7 +172,6 @@ describe('Enhanced Match Events Integration', () => {
       });
       
       if (timeoutTeamDropdown) {
-        await waitForSelectOptions(timeoutTeamDropdown as HTMLSelectElement);
         await user.selectOptions(timeoutTeamDropdown, '1');
       }
       
@@ -309,8 +306,7 @@ describe('Enhanced Match Events Integration', () => {
       
       // Select team from dropdown
       const teamSelects = screen.getAllByRole('combobox');
-      const faultTeamSelect = teamSelects[0] as HTMLSelectElement; // First dropdown in fault component
-      await waitForSelectOptions(() => teamSelects[0] as HTMLSelectElement);
+      const faultTeamSelect = teamSelects[0]; // First dropdown in fault component
       await user.selectOptions(faultTeamSelect, '1');
 
       // Don't wait for specific player data since mocks may not provide it
@@ -375,14 +371,12 @@ describe('Enhanced Match Events Integration', () => {
       const teamSelects = allSelects.slice(0, Math.min(3, allSelects.length));
 
       if (teamSelects.length >= 2) {
-        const faultTeamSelect = teamSelects[0] as HTMLSelectElement; // Fault team dropdown
-        const freeShotTeamSelect = teamSelects[1] as HTMLSelectElement; // Free shot team dropdown
+        const faultTeamSelect = teamSelects[0]; // Fault team dropdown
+        const freeShotTeamSelect = teamSelects[1]; // Free shot team dropdown
 
         // Rapid team changes should not break the components
         try {
-          await waitForSelectOptions(() => teamSelects[0] as HTMLSelectElement);
           await user.selectOptions(faultTeamSelect, '1');
-          await waitForSelectOptions(() => teamSelects[1] as HTMLSelectElement);
           await user.selectOptions(freeShotTeamSelect, '1');
           await user.selectOptions(faultTeamSelect, '2');
           await user.selectOptions(freeShotTeamSelect, '2');

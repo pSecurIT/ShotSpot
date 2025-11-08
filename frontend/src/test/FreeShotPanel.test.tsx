@@ -3,7 +3,6 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FreeShotPanel from '../components/FreeShotPanel';
 import api from '../utils/api';
-import { waitForSelectOptions } from './helpers/testHelpers';
 
 // Mock the api module
 vi.mock('../utils/api', () => ({
@@ -108,8 +107,7 @@ describe('FreeShotPanel', () => {
     // Free shot is selected by default
     expect(screen.getByText('🎯 Free Shot')).toHaveClass('active');
     
-    // Wait for player options to load, then select player
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select player'));
+    // Select player
     const playerSelect = screen.getByDisplayValue('Select player');
     await user.selectOptions(playerSelect, '1');
     
@@ -153,8 +151,7 @@ describe('FreeShotPanel', () => {
     const teamSelect = screen.getByDisplayValue('Team Alpha (Home)');
     await user.selectOptions(teamSelect, '2');
     
-    // Wait for away team player options to load, then select player
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select player'));
+    // Select away team player
     const playerSelect = screen.getByDisplayValue('Select player');
     await user.selectOptions(playerSelect, '3');
     
@@ -187,8 +184,7 @@ describe('FreeShotPanel', () => {
     // Select penalty type
     await user.click(screen.getByText('🚨 Penalty'));
     
-    // Wait for player options to load, then select player
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select player'));
+    // Select player
     const playerSelect = screen.getByDisplayValue('Select player');
     await user.selectOptions(playerSelect, '2');
     
@@ -263,8 +259,7 @@ describe('FreeShotPanel', () => {
       expect(api.get).toHaveBeenCalled();
     });
     
-    // Wait for player options to load, then select player and submit
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select player'));
+    // Select player and submit
     const playerSelect = screen.getByDisplayValue('Select player');
     await user.selectOptions(playerSelect, '1');
     
@@ -284,8 +279,9 @@ describe('FreeShotPanel', () => {
     const user = userEvent.setup();
     render(<FreeShotPanel {...mockProps} />);
     
-    // Wait for player options to load
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select player'));
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalled();
+    });
     
     // Fill and submit form
     const playerSelect = screen.getByDisplayValue('Select player');
@@ -379,8 +375,6 @@ describe('FreeShotPanel', () => {
       expect(api.get).toHaveBeenCalled();
     });
     
-    // Wait for player options to load, then select player
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select player'));
     const playerSelect = screen.getByDisplayValue('Select player');
     await user.selectOptions(playerSelect, '1');
     

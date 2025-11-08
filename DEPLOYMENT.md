@@ -6,8 +6,6 @@ This guide covers deployment strategies for ShotSpot, from local field testing t
 
 ## Table of Contents
 
-> **🐳 For Docker deployments, see [DOCKER.md](DOCKER.md)**
-
 1. [Deployment Scenarios](#deployment-scenarios)
 2. [Field Testing Deployment](#field-testing-deployment)
 3. [Production Deployment](#production-deployment)
@@ -69,7 +67,7 @@ npm run dev
 **On your laptop**:
 
 1. **Install prerequisites**:
-   - Node.js 22.12+: https://nodejs.org/
+   - Node.js 18+: https://nodejs.org/
    - PostgreSQL 14+: https://www.postgresql.org/
    - Git: https://git-scm.com/
 
@@ -800,7 +798,7 @@ pm2 startup  # Generate startup script
 
 **Dockerfile** (backend):
 ```dockerfile
-FROM node:22.12-alpine
+FROM node:18-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production

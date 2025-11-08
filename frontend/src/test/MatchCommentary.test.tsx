@@ -3,7 +3,6 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MatchCommentary from '../components/MatchCommentary';
 import api from '../utils/api';
-import { waitForSelectOptions } from './helpers/testHelpers';
 
 // Mock the api module
 vi.mock('../utils/api', () => ({
@@ -399,7 +398,6 @@ describe('MatchCommentary', () => {
     
     // Test filtering by type
     const typeFilter = screen.getByDisplayValue('All Types');
-    await waitForSelectOptions(() => screen.getByDisplayValue('All Types'));
     await user.selectOptions(typeFilter, 'highlight');
     
     // Should trigger API call with filter
@@ -418,7 +416,6 @@ describe('MatchCommentary', () => {
     
     // Test filtering by period
     const periodFilter = screen.getByDisplayValue('All Periods');
-    await waitForSelectOptions(() => screen.getByDisplayValue('All Periods'));
     await user.selectOptions(periodFilter, '2');
     
     // Should trigger API call with filter
