@@ -529,8 +529,10 @@ describe('SubstitutionPanel', () => {
       />
     );
 
+    // Wait for player options to load (not just the select element)
     await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /player out/i })).toBeInTheDocument();
+      const playerOutSelect = screen.getByRole('combobox', { name: /player out/i });
+      expect(playerOutSelect.querySelectorAll('option').length).toBeGreaterThan(1);
     });
 
     const playerOutSelect = screen.getByRole('combobox', { name: /player out/i });
