@@ -3,24 +3,22 @@
 # Stage 1: Build frontend
 FROM node:22.12-alpine AS frontend-builder
 
-# Security: Run as non-root user during build
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
 WORKDIR /app/frontend
 
 # Security: Copy only package files first for better layer caching
-COPY --chown=nodejs:nodejs frontend/package*.json ./
+COPY frontend/package*.json ./
 
 # Security: Use npm ci for reproducible builds and verify checksums
 RUN npm ci --ignore-scripts && \
     npm cache clean --force
 
 # Copy frontend source
-COPY --chown=nodejs:nodejs frontend/ ./
+COPY frontend/ ./
 
-# Security: Ensure nodejs user owns entire /app directory for write access
-RUN chown -R nodejs:nodejs /app
+# Security: Create non-root user and ensure ownership of entire /app directory
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 
 # Security: Build as non-root user
 USER nodejs
@@ -31,23 +29,24 @@ RUN npm run build
 # Stage 2: Build backend
 FROM node:22.12-alpine AS backend-builder
 
-# Security: Create non-root user for build
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
 WORKDIR /app/backend
 
-# Security: Copy package files with proper ownership
-COPY --chown=nodejs:nodejs backend/package*.json ./
+# Security: Copy package files for dependency installation
+COPY backend/package*.json ./
 
 # Security: Use npm ci with --ignore-scripts to prevent malicious postinstall scripts
 RUN npm ci --ignore-scripts && \
     npm cache clean --force
 
 # Copy backend source
-COPY --chown=nodejs:nodejs backend/ ./
+COPY backend/ ./
 
-# Security: Build as non-root user
+# Security: Create non-root user and ensure ownership of entire /app directory
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
+
+# Security: Switch to non-root user for any build operations
 USER nodejs
 
 # Stage 3: Production image

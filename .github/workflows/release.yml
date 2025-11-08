@@ -186,20 +186,23 @@ jobs:
           # Start services
           docker-compose up -d
           
-          # Wait for health check
+          # Wait for health check (increased timeout for DB init + migrations)
           echo "Waiting for services to be healthy..."
-          for i in {1..30}; do
-            if docker-compose ps | grep -q "healthy"; then
-              echo "✅ Services are healthy"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "❌ Services did not become healthy in time"
-              docker-compose logs
-              exit 1
-            fi
-            sleep 2
-          done
+          timeout 300 bash -c '
+            until docker-compose ps | grep -q "healthy"; do
+              echo "$(date) - Waiting for healthy containers..."
+              docker-compose ps
+              sleep 5
+            done
+          ' || {
+            echo "❌ Services did not become healthy after 5 minutes"
+            echo "==== docker-compose ps ===="
+            docker-compose ps
+            echo "==== docker-compose logs (app + db) ===="
+            docker-compose logs app db || true
+            exit 1
+          }
+          echo "✅ Services are healthy"
           
           # Test health endpoint
           sleep 5
@@ -210,12 +213,18 @@ jobs:
           }
           
           echo "✅ Image tests passed"
-          
-          # Cleanup (guarded for robustness)
-          if command -v docker-compose >/dev/null 2>&1; then
-            docker-compose down -v
-          elif docker compose version >/dev/null 2>&1; then
-            docker compose down -v
+
+      - name: Cleanup test environment
+        if: always()
+        run: |
+          cd release
+          # Only cleanup if .env exists (meaning we got past setup)
+          if [ -f .env ]; then
+            if command -v docker-compose >/dev/null 2>&1; then
+              docker-compose down -v 2>/dev/null || true
+            elif docker compose version >/dev/null 2>&1; then
+              docker compose down -v 2>/dev/null || true
+            fi
           fi
 
       - name: Generate test summary
