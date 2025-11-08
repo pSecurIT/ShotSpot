@@ -78,42 +78,51 @@ jobs:
       - name: Test Docker image
         run: |
           # Create test environment file
-          cat > .env.test << EOF
-          PORT=3001
-          NODE_ENV=production
-          DB_HOST=db
-          DB_PORT=5432
-          DB_NAME=shotspot_test
-          DB_USER=shotspot_test
-          DB_PASSWORD=test_password_123
-          JWT_SECRET=test_jwt_secret_for_ci_only
-          CORS_ORIGIN=http://localhost:3000
-          RATE_LIMIT_WINDOW_MS=900000
-          RATE_LIMIT_MAX=100
-          LOG_LEVEL=info
-          EOF
+          cat > .env.test <<'EOF'
+PORT=3001
+NODE_ENV=production
+DB_HOST=db
+DB_PORT=5432
+DB_NAME=shotspot_test
+DB_USER=shotspot_test
+DB_PASSWORD=test_password_123
+JWT_SECRET=test_jwt_secret_for_ci_only
+CORS_ORIGIN=http://localhost:3000
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=100
+LOG_LEVEL=info
+EOF
+          
+          # Verify .env.test content (diagnostic)
+          echo "=== .env.test content ==="
+          cat .env.test
 
           # Start services with test environment
           docker-compose --env-file .env.test up -d
 
           # Check for immediate restarts (diagnostic)
           sleep 10
-          if docker-compose ps | grep -q "Restarting"; then
+          if docker-compose --env-file .env.test ps | grep -q "Restarting"; then
             echo "⚠️ Container is restarting - dumping logs for diagnosis..."
-            docker-compose logs app --tail=200
+            docker-compose --env-file .env.test logs app --tail=200
           fi
 
           # Wait for services to be healthy (increased timeout for DB init + migrations)
           echo "Waiting for services to be healthy..."
           timeout 300 bash -c '
-            until docker-compose ps | grep -q "healthy"; do
+            # Re-export variables in the subshell
+            set -o allexport
+            source .env.test
+            set +o allexport
+            
+            until docker-compose --env-file .env.test ps | grep -q "healthy"; do
               echo "$(date) - Waiting for healthy containers..."
-              docker-compose ps
+              docker-compose --env-file .env.test ps
               
               # Check for restart loop during wait
-              if docker-compose ps | grep -q "Restarting"; then
+              if docker-compose --env-file .env.test ps | grep -q "Restarting"; then
                 echo "⚠️ Container restarting detected - showing recent logs..."
-                docker-compose logs app --tail=50
+                docker-compose --env-file .env.test logs app --tail=50
               fi
               
               sleep 5
@@ -121,11 +130,11 @@ jobs:
           ' || {
             echo "❌ Services failed to become healthy after 5 minutes"
             echo "==== docker-compose ps ===="
-            docker-compose ps
+            docker-compose --env-file .env.test ps
             echo "==== docker-compose logs (app) - last 200 lines ===="
-            docker-compose logs app --tail=200 || true
+            docker-compose --env-file .env.test logs app --tail=200 || true
             echo "==== docker-compose logs (db) - last 100 lines ===="
-            docker-compose logs db --tail=100 || true
+            docker-compose --env-file .env.test logs db --tail=100 || true
             exit 1
           }
 
@@ -133,15 +142,15 @@ jobs:
           echo "Testing health endpoint..."
           curl -f http://localhost:3001/api/health || {
             echo "Health check failed"
-            docker-compose logs app
+            docker-compose --env-file .env.test logs app
             exit 1
           }
 
           # Test database connection
           echo "Testing database connection..."
-          docker-compose exec -T db psql -U shotspot_test -d shotspot_test -c "SELECT 1;" || {
+          docker-compose --env-file .env.test exec -T db psql -U shotspot_test -d shotspot_test -c "SELECT 1;" || {
             echo "Database connection failed"
-            docker-compose logs db
+            docker-compose --env-file .env.test logs db
             exit 1
           }
 
@@ -154,9 +163,9 @@ jobs:
           # Only cleanup if .env.test exists (meaning we got past setup)
           if [ -f .env.test ]; then
             if command -v docker-compose >/dev/null 2>&1; then
-              docker-compose down -v 2>/dev/null || true
+              docker-compose --env-file .env.test down -v 2>/dev/null || true
             elif docker compose version >/dev/null 2>&1; then
-              docker compose down -v 2>/dev/null || true
+              docker compose --env-file .env.test down -v 2>/dev/null || true
             fi
             rm -f .env.test || true
           fi
@@ -203,20 +212,24 @@ jobs:
 
       - name: Create test environment file
         run: |
-          cat > .env << 'EOF'
-          PORT=3001
-          NODE_ENV=production
-          DB_HOST=db
-          DB_PORT=5432
-          DB_NAME=shotspot_test
-          DB_USER=shotspot_test
-          DB_PASSWORD=test_password_123
-          JWT_SECRET=test_jwt_secret_for_ci_only
-          CORS_ORIGIN=http://localhost:3000
-          RATE_LIMIT_WINDOW_MS=900000
-          RATE_LIMIT_MAX=100
-          LOG_LEVEL=info
-          EOF
+          cat > .env <<'EOF'
+PORT=3001
+NODE_ENV=production
+DB_HOST=db
+DB_PORT=5432
+DB_NAME=shotspot_test
+DB_USER=shotspot_test
+DB_PASSWORD=test_password_123
+JWT_SECRET=test_jwt_secret_for_ci_only
+CORS_ORIGIN=http://localhost:3000
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=100
+LOG_LEVEL=info
+EOF
+          
+          # Verify .env content (diagnostic)
+          echo "=== .env content ==="
+          cat .env
 
           # Export variables so docker-compose sees them during interpolation
           set -o allexport
@@ -239,8 +252,18 @@ jobs:
 
       - name: Wait for services
         run: |
+          # Source env file for this step
+          set -o allexport
+          source .env
+          set +o allexport
+          
           echo "Waiting for services to be ready..."
           timeout 300 bash -c '
+            # Re-export variables in the subshell
+            set -o allexport
+            source .env
+            set +o allexport
+            
             until [ "$(docker inspect -f {{.State.Health.Status}} shotspot-app 2>/dev/null)" == "healthy" ]; do
               echo "$(date) - Waiting for healthy app container..."
               docker-compose --env-file .env ps
