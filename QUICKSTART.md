@@ -74,7 +74,7 @@ Open http://localhost:3000 in your browser 🎉
 
 **Node.js**:
 - Download: https://nodejs.org/
-- Install LTS version (18.x or higher)
+- Install LTS version (22.12 or higher)
 - Verify: `node --version`
 
 **PostgreSQL**:
