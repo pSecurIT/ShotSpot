@@ -20,8 +20,8 @@ describe('PlayerManagement', () => {
   ];
 
   const mockPlayers = [
-    { id: 1, team_id: 1, first_name: 'John', last_name: 'Doe', jersey_number: 10, role: 'player', is_active: true, gender: 'male', games_played: 5, goals: 12, total_shots: 20, team_name: 'Team Alpha' },
-    { id: 2, team_id: 2, first_name: 'Jane', last_name: 'Smith', jersey_number: 20, role: 'captain', is_active: true, gender: 'female', games_played: 4, goals: 8, total_shots: 15, team_name: 'Team Beta' }
+    { id: 1, team_id: 1, first_name: 'John', last_name: 'Doe', jersey_number: 10, is_active: true, gender: 'male', games_played: 5, goals: 12, total_shots: 20, team_name: 'Team Alpha' },
+    { id: 2, team_id: 2, first_name: 'Jane', last_name: 'Smith', jersey_number: 20, is_active: true, gender: 'female', games_played: 4, goals: 8, total_shots: 15, team_name: 'Team Beta' }
   ];
 
   beforeEach(() => {
@@ -43,8 +43,7 @@ describe('PlayerManagement', () => {
         team_id: 1,
         first_name: 'New',
         last_name: 'Player',
-        jersey_number: 30,
-        role: 'Player'
+        jersey_number: 30
       }
     });
 
@@ -55,7 +54,6 @@ describe('PlayerManagement', () => {
         first_name: 'Updated',
         last_name: 'Player',
         jersey_number: 10,
-        role: 'Player',
         is_active: true
       }
     });
@@ -92,13 +90,11 @@ describe('PlayerManagement', () => {
     const firstNameInput = screen.getByRole('textbox', { name: /first name/i });
     const lastNameInput = screen.getByRole('textbox', { name: /last name/i });
     const jerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });
-    const roleSelect = document.getElementById('role') as HTMLSelectElement;
 
     await userEvent.selectOptions(teamSelect, '1');
     await userEvent.type(firstNameInput, 'New');
     await userEvent.type(lastNameInput, 'Player');
     await userEvent.type(jerseyInput, '30');
-    await userEvent.selectOptions(roleSelect, 'player');
 
     const submitButton = screen.getByText('Add Player');
     await userEvent.click(submitButton);
@@ -109,8 +105,7 @@ describe('PlayerManagement', () => {
         first_name: 'New',
         last_name: 'Player',
         jersey_number: 30,
-        gender: null,
-        role: 'player'
+        gender: null
       });
     });
   });
@@ -227,22 +222,6 @@ describe('PlayerManagement', () => {
     expect(genderSelect).toHaveValue('female');
   });
 
-  it('allows selecting different player roles', async () => {
-    render(<PlayerManagement />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Select a team')).toBeInTheDocument();
-    });
-
-    // Select role using getElementById to avoid ambiguity with filter
-    const roleSelect = document.getElementById('role') as HTMLSelectElement;
-    
-    expect(roleSelect).toHaveValue('player'); // default value
-    
-    await userEvent.selectOptions(roleSelect, 'captain');
-    expect(roleSelect).toHaveValue('captain');
-  });
-
   it('filters players by team', async () => {
     render(<PlayerManagement />);
 
@@ -332,7 +311,6 @@ describe('PlayerManagement', () => {
       first_name: 'John Updated',
       last_name: 'Doe Updated',
       jersey_number: 11,
-      role: 'captain',
       is_active: true,
       gender: 'male'
     };
@@ -503,7 +481,6 @@ describe('PlayerManagement', () => {
       first_name: 'Inactive',
       last_name: 'Player',
       jersey_number: 99,
-      role: 'Player',
       is_active: false
     };
 
@@ -611,7 +588,7 @@ describe('PlayerManagement', () => {
         first_name: 'Inactive',
         last_name: 'Player',
         jersey_number: 99,
-        role: 'Player',
+
         is_active: false
       };
 
@@ -708,7 +685,7 @@ describe('PlayerManagement', () => {
         first_name: 'Inactive',
         last_name: 'Player',
         jersey_number: 99,
-        role: 'Player',
+
         is_active: false
       };
 
@@ -790,7 +767,7 @@ describe('PlayerManagement', () => {
       first_name: 'Inactive',
       last_name: 'Player',
       jersey_number: 99,
-      role: 'Player',
+
       is_active: false
     };
 
@@ -870,7 +847,7 @@ describe('PlayerManagement', () => {
         first_name: 'Another',
         last_name: 'Inactive',
         jersey_number: 88,
-        role: 'Player',
+
         is_active: false
       };
 
@@ -993,28 +970,10 @@ describe('PlayerManagement', () => {
       });
     });
 
-    it('✅ filters players by role', async () => {
-      render(<PlayerManagement />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/John Doe/)).toBeInTheDocument();
-        expect(screen.getByText(/Jane Smith/)).toBeInTheDocument();
-      });
-
-      const roleFilter = document.getElementById('role_filter')!;
-      await userEvent.selectOptions(roleFilter, 'captain');
-
-      // Only captains should be visible
-      await waitFor(() => {
-        expect(screen.queryByText(/John Doe/)).not.toBeInTheDocument();
-        expect(screen.getByText(/Jane Smith/)).toBeInTheDocument();
-      });
-    });
-
     it('🔧 combines multiple filters correctly', async () => {
       const extendedPlayers = [
         ...mockPlayers,
-        { id: 3, team_id: 1, first_name: 'Alice', last_name: 'Johnson', jersey_number: 15, role: 'captain', is_active: true, gender: 'female', games_played: 3, goals: 5, total_shots: 10, team_name: 'Team Alpha' }
+        { id: 3, team_id: 1, first_name: 'Alice', last_name: 'Johnson', jersey_number: 15, is_active: true, gender: 'female', games_played: 3, goals: 5, total_shots: 10, team_name: 'Team Alpha' }
       ];
 
       (api.get as jest.Mock).mockImplementation((url: string) => {
@@ -1032,14 +991,14 @@ describe('PlayerManagement', () => {
         expect(screen.getByText(/Alice Johnson/)).toBeInTheDocument();
       });
 
-      // Filter by team 1 and captain role
+      // Filter by team 1 and female gender
       const teamFilter = document.getElementById('team_filter')!;
-      const roleFilter = document.getElementById('role_filter')!;
+      const genderFilter = document.getElementById('gender_filter')!;
 
       await userEvent.selectOptions(teamFilter, '1');
-      await userEvent.selectOptions(roleFilter, 'captain');
+      await userEvent.selectOptions(genderFilter, 'female');
 
-      // Wait for filtering - should only show Alice (Team 1, Captain)
+      // Wait for filtering - should only show Alice (Team 1, Female)
       await waitFor(() => {
         expect(screen.queryByText(/John Doe/)).not.toBeInTheDocument();
         expect(screen.queryByText(/Jane Smith/)).not.toBeInTheDocument();
@@ -1074,19 +1033,6 @@ describe('PlayerManagement', () => {
       // John: 12 goals / 20 shots = 60%
       const johnCard = screen.getByText(/John Doe/).closest('.player-card');
       expect(johnCard).toHaveTextContent('60%');
-    });
-
-    it('✅ displays captain badge for captains', async () => {
-      render(<PlayerManagement />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Jane Smith/)).toBeInTheDocument();
-      });
-
-      // Jane is a captain, should have star badge
-      const janeCard = screen.getByText(/Jane Smith/).closest('.player-card');
-      expect(janeCard?.querySelector('.captain-badge')).toBeInTheDocument();
-      expect(janeCard?.querySelector('.captain-badge')).toHaveTextContent('⭐');
     });
 
     it('✅ sorts players by name', async () => {

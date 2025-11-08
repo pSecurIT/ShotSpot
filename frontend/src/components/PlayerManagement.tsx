@@ -7,7 +7,6 @@ interface Player {
   first_name: string;
   last_name: string;
   jersey_number: number;
-  role: string;
   is_active: boolean;
   gender?: 'male' | 'female';
   games_played?: number;
@@ -31,7 +30,6 @@ const PlayerManagement: React.FC = () => {
   const [showInactive, setShowInactive] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('');
-  const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('');
   const [sortBy, setSortBy] = useState<'name' | 'jersey' | 'team' | 'goals'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -39,7 +37,6 @@ const PlayerManagement: React.FC = () => {
     first_name: '',
     last_name: '',
     jersey_number: '',
-    role: 'player',
     team_id: '',
     gender: ''
   });
@@ -126,7 +123,6 @@ const PlayerManagement: React.FC = () => {
         first_name: '',
         last_name: '',
         jersey_number: '',
-        role: 'player',
         team_id: '',
         gender: ''
       });
@@ -200,7 +196,6 @@ const PlayerManagement: React.FC = () => {
         first_name: editingPlayer.first_name,
         last_name: editingPlayer.last_name,
         jersey_number: editingPlayer.jersey_number,
-        role: editingPlayer.role,
         is_active: editingPlayer.is_active,
         gender: editingPlayer.gender || null
       });
@@ -296,9 +291,6 @@ const PlayerManagement: React.FC = () => {
       
       // Gender filter
       if (selectedGenderFilter && p.gender !== selectedGenderFilter) return false;
-      
-      // Role filter
-      if (selectedRoleFilter && p.role !== selectedRoleFilter) return false;
       
       // Search query (name or jersey number)
       if (searchQuery) {
@@ -432,20 +424,6 @@ const PlayerManagement: React.FC = () => {
                 <span className="field-error">{validationErrors.gender}</span>
               )}
             </div>
-
-            <div className="form-group">
-              <label htmlFor="role">Role:</label>
-              <select
-                id="role"
-                name="role"
-                value={newPlayer.role}
-                onChange={handleInputChange}
-                required
-              >
-                <option value="player">Player</option>
-                <option value="captain">Captain</option>
-              </select>
-            </div>
           </div>
 
           <button type="submit" className="primary-button">
@@ -542,20 +520,6 @@ const PlayerManagement: React.FC = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="edit_role">Role:</label>
-                <select
-                  id="edit_role"
-                  name="role"
-                  value={editingPlayer.role}
-                  onChange={handleEditInputChange}
-                  required
-                >
-                  <option value="player">Player</option>
-                  <option value="captain">Captain</option>
-                </select>
-              </div>
-
-              <div className="form-group">
                 <label htmlFor="edit_is_active">Status:</label>
                 <select
                   id="edit_is_active"
@@ -646,20 +610,6 @@ const PlayerManagement: React.FC = () => {
               </div>
               
               <div className="filter-group">
-                <label htmlFor="role_filter">Role:</label>
-                <select
-                  id="role_filter"
-                  value={selectedRoleFilter}
-                  onChange={(e) => setSelectedRoleFilter(e.target.value)}
-                  className="filter-select"
-                >
-                  <option value="">All</option>
-                  <option value="player">Player</option>
-                  <option value="captain">Captain</option>
-                </select>
-              </div>
-              
-              <div className="filter-group">
                 <label htmlFor="sort_by">Sort by:</label>
                 <select
                   id="sort_by"
@@ -718,7 +668,6 @@ const PlayerManagement: React.FC = () => {
                   <div className="player-header">
                     <span className="player-name">
                       {player.first_name} {player.last_name}
-                      {player.role === 'captain' && <span className="captain-badge" title="Team Captain">⭐</span>}
                     </span>
                     <span className="player-number">#{player.jersey_number}</span>
                   </div>

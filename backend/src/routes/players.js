@@ -164,7 +164,6 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
     });
   }
 
-  // Get data from request body, convert player role to lowercase
   // Handle both camelCase and snake_case property names
   const {
     team_id = req.body.teamId,
@@ -230,7 +229,6 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
     is_active = req.body.isActive,
     gender
   } = req.body;
-  const _role = (req.body.role || '').toLowerCase(); // Normalize the player's team role (reserved for future use)
   
   try {
     // Check for duplicate jersey number in the same team, excluding current player
