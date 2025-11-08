@@ -78,20 +78,20 @@ jobs:
       - name: Test Docker image
         run: |
           # Create test environment file
-          cat > .env.test <<'EOF'
-PORT=3001
-NODE_ENV=production
-DB_HOST=db
-DB_PORT=5432
-DB_NAME=shotspot_test
-DB_USER=shotspot_test
-DB_PASSWORD=test_password_123
-JWT_SECRET=test_jwt_secret_for_ci_only
-CORS_ORIGIN=http://localhost:3000
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX=100
-LOG_LEVEL=info
-EOF
+          printf '%s\n' \
+            'PORT=3001' \
+            'NODE_ENV=production' \
+            'DB_HOST=db' \
+            'DB_PORT=5432' \
+            'DB_NAME=shotspot_test' \
+            'DB_USER=shotspot_test' \
+            'DB_PASSWORD=test_password_123' \
+            'JWT_SECRET=test_jwt_secret_for_ci_only' \
+            'CORS_ORIGIN=http://localhost:3000' \
+            'RATE_LIMIT_WINDOW_MS=900000' \
+            'RATE_LIMIT_MAX=100' \
+            'LOG_LEVEL=info' \
+            > .env.test
           
           # Verify .env.test content (diagnostic)
           echo "=== .env.test content ==="
@@ -212,20 +212,20 @@ EOF
 
       - name: Create test environment file
         run: |
-          cat > .env <<'EOF'
-PORT=3001
-NODE_ENV=production
-DB_HOST=db
-DB_PORT=5432
-DB_NAME=shotspot_test
-DB_USER=shotspot_test
-DB_PASSWORD=test_password_123
-JWT_SECRET=test_jwt_secret_for_ci_only
-CORS_ORIGIN=http://localhost:3000
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX=100
-LOG_LEVEL=info
-EOF
+          printf '%s\n' \
+            'PORT=3001' \
+            'NODE_ENV=production' \
+            'DB_HOST=db' \
+            'DB_PORT=5432' \
+            'DB_NAME=shotspot_test' \
+            'DB_USER=shotspot_test' \
+            'DB_PASSWORD=test_password_123' \
+            'JWT_SECRET=test_jwt_secret_for_ci_only' \
+            'CORS_ORIGIN=http://localhost:3000' \
+            'RATE_LIMIT_WINDOW_MS=900000' \
+            'RATE_LIMIT_MAX=100' \
+            'LOG_LEVEL=info' \
+            > .env
           
           # Verify .env content (diagnostic)
           echo "=== .env content ==="
