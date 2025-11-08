@@ -19,8 +19,8 @@ RUN npm ci --ignore-scripts && \
 # Copy frontend source
 COPY --chown=nodejs:nodejs frontend/ ./
 
-# Security: Ensure full read/write permissions for build artifacts
-RUN chmod -R u+rw /app/frontend
+# Security: Ensure nodejs user owns entire /app directory for write access
+RUN chown -R nodejs:nodejs /app
 
 # Security: Build as non-root user
 USER nodejs
