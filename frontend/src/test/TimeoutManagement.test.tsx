@@ -3,6 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TimeoutManagement from '../components/TimeoutManagement';
 import api from '../utils/api';
+import { waitForSelectOptions } from './helpers/testHelpers';
 
 // Mock the api module
 vi.mock('../utils/api', () => ({
@@ -113,6 +114,7 @@ describe('TimeoutManagement', () => {
     
     // Select duration
     const durationSelect = screen.getByDisplayValue('1 minute');
+    await waitForSelectOptions(() => screen.getByDisplayValue('1 minute'));
     await user.selectOptions(durationSelect, '2 minutes');
     
     // Add called by
@@ -287,6 +289,7 @@ describe('TimeoutManagement', () => {
     const durationSelect = screen.getByDisplayValue('1 minute');
     
     // Test different durations
+    await waitForSelectOptions(() => screen.getByDisplayValue('1 minute'));
     await user.selectOptions(durationSelect, '30 seconds');
     expect(durationSelect).toHaveValue('30 seconds');
     

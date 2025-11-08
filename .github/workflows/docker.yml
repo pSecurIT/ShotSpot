@@ -37,6 +37,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Install docker-compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose version
+
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -68,11 +74,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Install docker-compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
 
       - name: Test Docker image
         run: |
@@ -124,8 +125,13 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker-compose down -v
-          rm -f .env.test
+          # Guard docker-compose calls for robust cleanup
+          if command -v docker-compose >/dev/null 2>&1; then
+            docker-compose down -v
+          elif docker compose version >/dev/null 2>&1; then
+            docker compose down -v
+          fi
+          rm -f .env.test || true
 
       - name: Push Docker image
         if: github.event_name != 'pull_request'
@@ -163,8 +169,9 @@ jobs:
 
       - name: Install docker-compose
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose version
 
       - name: Create test environment file
         run: |
@@ -216,8 +223,13 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker-compose down -v
-          rm -f .env
+          # Guard docker-compose calls for robust cleanup
+          if command -v docker-compose >/dev/null 2>&1; then
+            docker-compose down -v
+          elif docker compose version >/dev/null 2>&1; then
+            docker compose down -v
+          fi
+          rm -f .env || true
 
   scan-vulnerabilities:
     name: Scan for Vulnerabilities

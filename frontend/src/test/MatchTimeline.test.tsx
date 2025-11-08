@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import MatchTimeline from '../components/MatchTimeline';
 import api from '../utils/api';
+import { waitForSelectOptions } from './helpers/testHelpers';
 
 // Mock the API module
 vi.mock('../utils/api');
@@ -269,6 +270,7 @@ describe('MatchTimeline', () => {
     // Try to find and interact with filter
     const typeFilters = screen.queryAllByDisplayValue('All');
     if (typeFilters.length > 0) {
+      await waitForSelectOptions(typeFilters[0] as HTMLSelectElement);
       await user.selectOptions(typeFilters[0], 'shots');
       
       // Check that filtering works (but be lenient about what shows)
