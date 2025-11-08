@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import GameManagement from '../components/GameManagement';
 import api from '../utils/api';
+import { waitForSelectOptions } from './helpers/testHelpers';
 
 // Mock the api module
 vi.mock('../utils/api', () => ({
@@ -181,7 +182,9 @@ describe('GameManagement', () => {
     const awayTeamSelect = screen.getByDisplayValue('Select away team');
     const dateInput = screen.getByLabelText('Date & Time:');
     
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select home team'));
     await user.selectOptions(homeTeamSelect, '1');
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select away team'));
     await user.selectOptions(awayTeamSelect, '3');
     await user.type(dateInput, '2025-11-15T16:00');
     
@@ -214,7 +217,9 @@ describe('GameManagement', () => {
     const awayTeamSelect = screen.getByDisplayValue('Select away team');
     const dateInput = screen.getByLabelText('Date & Time:');
     
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select home team'));
     await user.selectOptions(homeTeamSelect, '1');
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select away team'));
     await user.selectOptions(awayTeamSelect, '1');
     await user.type(dateInput, '2025-11-15T16:00');
     
@@ -285,7 +290,9 @@ describe('GameManagement', () => {
     const awayTeamSelect = screen.getByDisplayValue('Select away team');
     const dateInput = screen.getByLabelText('Date & Time:');
     
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select home team'));
     await user.selectOptions(homeTeamSelect, '1');
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select away team'));
     await user.selectOptions(awayTeamSelect, '2');
     await user.type(dateInput, '2025-11-15T16:00');
     
@@ -307,6 +314,7 @@ describe('GameManagement', () => {
     
     // Change filter to scheduled
     const filterSelect = screen.getByDisplayValue('All Games');
+    await waitForSelectOptions(() => screen.getByDisplayValue('All Games'));
     await user.selectOptions(filterSelect, 'scheduled');
     
     await waitFor(() => {
@@ -658,7 +666,9 @@ describe('GameManagement', () => {
     const awayTeamSelect = screen.getByDisplayValue('Select away team');
     const dateInput = screen.getByLabelText('Date & Time:');
     
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select home team'));
     await user.selectOptions(homeTeamSelect, '1');
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select away team'));
     await user.selectOptions(awayTeamSelect, '3');
     await user.type(dateInput, '2025-11-15T16:00');
     
