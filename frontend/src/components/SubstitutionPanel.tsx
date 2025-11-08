@@ -255,7 +255,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
             >
               <option value="">Select player to sub out</option>
               {teamPlayers.active.map((player) => (
-                <option key={player.id} value={String(player.id)}>
+                <option key={player.id} value={player.id}>
                   #{player.jersey_number} {player.first_name} {player.last_name}
                   {player.gender && ` (${player.gender === 'male' ? 'M' : 'F'})`}
                 </option>
@@ -280,7 +280,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
             >
               <option value="">Select player to sub in</option>
               {teamPlayers.bench.map((player) => (
-                <option key={player.id} value={String(player.id)}>
+                <option key={player.id} value={player.id}>
                   #{player.jersey_number} {player.first_name} {player.last_name}
                   {player.gender && ` (${player.gender === 'male' ? 'M' : 'F'})`}
                 </option>

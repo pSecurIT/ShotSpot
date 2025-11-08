@@ -1,35 +1,10 @@
 # ShotSpot Quick Start Guide
 
-**Get up and running in 2-5 minutes!**
+**Get up and running in 5 minutes!**
 
 ---
 
-## 🐳 Docker Quick Start (Recommended - 2 minutes)
-
-**Easiest way!** Just Docker and go:
-
-```bash
-# 1. Clone
-git clone https://github.com/pSecurIT/ShotSpot.git
-cd ShotSpot
-
-# 2. Configure
-cp .env.docker.example .env
-# Edit .env: Set DB_PASSWORD and JWT_SECRET
-
-# 3. Start!
-docker-compose up -d
-```
-
-Open http://localhost:3001 in your browser 🎉
-
-**Full Docker guide**: [DOCKER.md](DOCKER.md)
-
----
-
-## ⚡ Manual Installation (5 minutes)
-
-Without Docker? No problem:
+## ⚡ Super Quick Start
 
 ```bash
 # 1. Clone
@@ -55,13 +30,9 @@ Open http://localhost:3000 in your browser 🎉
 
 ## 📋 Checklist
 
-**For Docker installation:**
-- [ ] Docker 20.10+ installed (`docker --version`)
-- [ ] Docker Compose 2.0+ installed (`docker-compose --version`)
-- [ ] Port 3001 and 5432 available
+Before running, make sure you have:
 
-**For manual installation:**
-- [ ] Node.js 22.12+ installed (`node --version`)
+- [ ] Node.js 18+ installed (`node --version`)
 - [ ] PostgreSQL 14+ installed and running
 - [ ] PostgreSQL password ready
 - [ ] Port 3000 and 3001 available
@@ -74,7 +45,7 @@ Open http://localhost:3000 in your browser 🎉
 
 **Node.js**:
 - Download: https://nodejs.org/
-- Install LTS version (22.12 or higher)
+- Install LTS version (18.x or higher)
 - Verify: `node --version`
 
 **PostgreSQL**:

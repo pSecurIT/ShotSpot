@@ -5,8 +5,6 @@
 [![Frontend Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot/main?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/pSecurIT/ShotSpot)
 [![Backend Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot/main?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/pSecurIT/ShotSpot)
 [![Build Status](https://github.com/pSecurIT/ShotSpot/workflows/Test%20Coverage/badge.svg)](https://github.com/pSecurIT/ShotSpot/actions)
-[![Docker Image](https://img.shields.io/badge/docker-ghcr.io-blue?logo=docker)](https://ghcr.io/psecurit/shotspot)
-[![Docker Pulls](https://img.shields.io/badge/docker-multi--platform-success?logo=docker)](https://github.com/pSecurIT/ShotSpot/pkgs/container/shotspot)
 [![License](https://img.shields.io/github/license/pSecurIT/ShotSpot)](LICENSE)
 
 ## ✅ App Summary
@@ -80,44 +78,13 @@
 
 ## 🚀 Quick Start
 
-> **🐳 Docker Users**: See [DOCKER.md](DOCKER.md) for containerized deployment
-
 ### Prerequisites
 
 - **Node.js** 18+ and npm ([Download here](https://nodejs.org/))
 - **PostgreSQL** 14+ ([Download here](https://www.postgresql.org/download/))
 - **Git** ([Download here](https://git-scm.com/downloads))
 
-**OR** use **Docker** for zero-config setup:
-- **Docker** 20.10+ ([Download here](https://docs.docker.com/get-docker/))
-- **Docker Compose** 2.0+ (included with Docker Desktop)
-
-### Docker Installation (Recommended - 2 minutes)
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/pSecurIT/Korfball-game-statistics.git
-   cd Korfball-game-statistics
-   ```
-
-2. **Configure environment**:
-   ```bash
-   cp .env.docker.example .env
-   # Edit .env and set DB_PASSWORD and JWT_SECRET
-   ```
-
-3. **Start with Docker**:
-   ```bash
-   docker-compose up -d
-   ```
-
-**That's it!** Access at http://localhost:3001
-
-For full Docker documentation, see [DOCKER.md](DOCKER.md)
-
----
-
-### Manual Installation (5 minutes)
+### Installation (5 minutes)
 
 1. **Clone and install**:
    ```bash
