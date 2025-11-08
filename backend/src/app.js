@@ -6,6 +6,8 @@ import slowDown from 'express-slow-down';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import csrf from './middleware/csrf.js';
 import { errorNotificationService } from './utils/errorNotification.js';
 import authRoutes from './routes/auth.js';
@@ -389,9 +391,37 @@ app.use((err, req, res, _next) => {
   }
 });
 
-// 404 handler - must be after all other routes
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
+// Serve static frontend files in production
+if (process.env.NODE_ENV === 'production') {
+  // Get __dirname equivalent for ES modules only when needed
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const frontendDistPath = path.join(__dirname, '../../frontend/dist');
+  
+  // Serve static files
+  app.use(express.static(frontendDistPath, {
+    maxAge: '1y',
+    setHeaders: (res, filepath) => {
+      // Don't cache index.html and service-worker.js
+      if (filepath.endsWith('index.html') || filepath.endsWith('service-worker.js')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      }
+    }
+  }));
+  
+  // SPA fallback - serve index.html for all non-API routes
+  app.get('/*', (req, res) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api/') || req.path.startsWith('/health')) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+} else {
+  // 404 handler for development - API routes only
+  app.use((req, res) => {
+    res.status(404).json({ error: 'Route not found' });
+  });
+}
 
 export default app;
