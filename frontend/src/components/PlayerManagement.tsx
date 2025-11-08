@@ -7,9 +7,12 @@ interface Player {
   first_name: string;
   last_name: string;
   jersey_number: number;
-  role: string;
   is_active: boolean;
   gender?: 'male' | 'female';
+  games_played?: number;
+  goals?: number;
+  total_shots?: number;
+  team_name?: string;
 }
 
 interface Team {
@@ -24,12 +27,16 @@ const PlayerManagement: React.FC = () => {
   const [success, setSuccess] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>('');
+  const [showInactive, setShowInactive] = useState<boolean>(true);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'name' | 'jersey' | 'team' | 'goals'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [newPlayer, setNewPlayer] = useState({
     first_name: '',
     last_name: '',
     jersey_number: '',
-    role: 'player',
     team_id: '',
     gender: ''
   });
@@ -116,7 +123,6 @@ const PlayerManagement: React.FC = () => {
         first_name: '',
         last_name: '',
         jersey_number: '',
-        role: 'player',
         team_id: '',
         gender: ''
       });
@@ -190,7 +196,6 @@ const PlayerManagement: React.FC = () => {
         first_name: editingPlayer.first_name,
         last_name: editingPlayer.last_name,
         jersey_number: editingPlayer.jersey_number,
-        role: editingPlayer.role,
         is_active: editingPlayer.is_active,
         gender: editingPlayer.gender || null
       });
@@ -222,6 +227,35 @@ const PlayerManagement: React.FC = () => {
     setValidationErrors({});
   };
 
+  const handleTogglePlayerStatus = async (player: Player, e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent form submission
+    
+    const action = player.is_active ? 'deactivate' : 'reactivate';
+    const confirmMessage = player.is_active 
+      ? `Are you sure you want to archive ${player.first_name} ${player.last_name}? They will be hidden from active rosters but their statistics will be preserved.`
+      : `Reactivate ${player.first_name} ${player.last_name}?`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      await api.put(`/players/${player.id}`, {
+        ...player,
+        is_active: !player.is_active
+      });
+      
+      await fetchPlayers();
+      setEditingPlayer(null); // Close edit form after archiving/reactivating
+      setSuccess(`Player ${action}d successfully!`);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string; details?: string } }; message?: string };
+      const errorMessage = err.response?.data?.details || err.response?.data?.error || err.message || `Failed to ${action} player`;
+      setError(errorMessage);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setNewPlayer(prev => ({
@@ -246,10 +280,48 @@ const PlayerManagement: React.FC = () => {
     });
   };
 
-  // Filter players by selected team
-  const filteredPlayers = selectedTeamFilter
-    ? players.filter(p => p.team_id.toString() === selectedTeamFilter)
-    : players;
+  // Filter and sort players
+  const filteredPlayers = players
+    .filter(p => {
+      // Team filter
+      if (selectedTeamFilter && p.team_id.toString() !== selectedTeamFilter) return false;
+      
+      // Active status filter
+      if (!showInactive && !p.is_active) return false;
+      
+      // Gender filter
+      if (selectedGenderFilter && p.gender !== selectedGenderFilter) return false;
+      
+      // Search query (name or jersey number)
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+        const jerseyMatch = p.jersey_number.toString().includes(query);
+        if (!fullName.includes(query) && !jerseyMatch) return false;
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case 'name':
+          comparison = `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`);
+          break;
+        case 'jersey':
+          comparison = a.jersey_number - b.jersey_number;
+          break;
+        case 'team':
+          comparison = (a.team_name || '').localeCompare(b.team_name || '');
+          break;
+        case 'goals':
+          comparison = (a.goals || 0) - (b.goals || 0);
+          break;
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
 
   return (
     <div className="player-management">
@@ -352,20 +424,6 @@ const PlayerManagement: React.FC = () => {
                 <span className="field-error">{validationErrors.gender}</span>
               )}
             </div>
-
-            <div className="form-group">
-              <label htmlFor="role">Role:</label>
-              <select
-                id="role"
-                name="role"
-                value={newPlayer.role}
-                onChange={handleInputChange}
-                required
-              >
-                <option value="player">Player</option>
-                <option value="captain">Captain</option>
-              </select>
-            </div>
           </div>
 
           <button type="submit" className="primary-button">
@@ -462,20 +520,6 @@ const PlayerManagement: React.FC = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="edit_role">Role:</label>
-                <select
-                  id="edit_role"
-                  name="role"
-                  value={editingPlayer.role}
-                  onChange={handleEditInputChange}
-                  required
-                >
-                  <option value="player">Player</option>
-                  <option value="captain">Captain</option>
-                </select>
-              </div>
-
-              <div className="form-group">
                 <label htmlFor="edit_is_active">Status:</label>
                 <select
                   id="edit_is_active"
@@ -497,6 +541,13 @@ const PlayerManagement: React.FC = () => {
               <button type="button" onClick={handleCancelEdit} className="secondary-button">
                 Cancel
               </button>
+              <button
+                type="button"
+                className={`${editingPlayer.is_active ? 'archive-button' : 'reactivate-button'}`}
+                onClick={(e) => handleTogglePlayerStatus(editingPlayer, e)}
+              >
+                {editingPlayer.is_active ? '🗄️ Archive Player' : '↩️ Reactivate Player'}
+              </button>
             </div>
           </form>
         </div>
@@ -506,18 +557,96 @@ const PlayerManagement: React.FC = () => {
       <div className="players-list-section">
         <div className="list-header">
           <h3>Players List</h3>
-          <div className="team-filter">
-            <label htmlFor="team_filter">Filter by Team:</label>
-            <select
-              id="team_filter"
-              value={selectedTeamFilter}
-              onChange={(e) => setSelectedTeamFilter(e.target.value)}
-            >
-              <option value="">All Teams</option>
-              {teams.map(team => (
-                <option key={team.id} value={team.id}>{team.name}</option>
-              ))}
-            </select>
+          
+          {/* Search and Filters */}
+          <div className="search-filters-container">
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="🔍 Search by name or jersey number..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="search-input"
+              />
+              {searchQuery && (
+                <button
+                  className="clear-search"
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            
+            <div className="filters-row">
+              <div className="filter-group">
+                <label htmlFor="team_filter">Team:</label>
+                <select
+                  id="team_filter"
+                  value={selectedTeamFilter}
+                  onChange={(e) => setSelectedTeamFilter(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="">All Teams</option>
+                  {teams.map(team => (
+                    <option key={team.id} value={team.id}>{team.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="filter-group">
+                <label htmlFor="gender_filter">Gender:</label>
+                <select
+                  id="gender_filter"
+                  value={selectedGenderFilter}
+                  onChange={(e) => setSelectedGenderFilter(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="">All</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
+              
+              <div className="filter-group">
+                <label htmlFor="sort_by">Sort by:</label>
+                <select
+                  id="sort_by"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'name' | 'jersey' | 'team' | 'goals')}
+                  className="filter-select"
+                >
+                  <option value="name">Name</option>
+                  <option value="jersey">Jersey #</option>
+                  <option value="team">Team</option>
+                  <option value="goals">Goals</option>
+                </select>
+                <button
+                  className="sort-order-btn"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+                >
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </button>
+              </div>
+              
+              <div className="status-filter">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={showInactive}
+                    onChange={(e) => setShowInactive(e.target.checked)}
+                  />
+                  Show inactive
+                </label>
+              </div>
+            </div>
+            
+            {/* Results count */}
+            <div className="results-count">
+              Showing {filteredPlayers.length} of {players.length} players
+            </div>
           </div>
         </div>
 
@@ -525,34 +654,61 @@ const PlayerManagement: React.FC = () => {
           {filteredPlayers.length === 0 ? (
             <p className="no-players">No players found.</p>
           ) : (
-            filteredPlayers.map(player => (
-              <div 
-                key={player.id} 
-                className={`player-card ${!player.is_active ? 'inactive' : ''} ${editingPlayer?.id === player.id ? 'editing' : ''}`}
-                onClick={() => handleEditPlayer(player)}
-              >
-                <div className="player-header">
-                  <span className="player-name">
-                    {player.first_name} {player.last_name}
-                  </span>
-                  <span className="player-number">#{player.jersey_number}</span>
-                </div>
-                <div className="player-details">
-                  <span className="player-team">
-                    {teams.find(team => team.id === player.team_id)?.name || 'Unknown Team'}
-                  </span>
-                  {player.gender && (
-                    <span className="player-gender">
-                      {player.gender === 'male' ? '♂️ Male' : '♀️ Female'}
+            filteredPlayers.map(player => {
+              const shootingPercentage = player.total_shots && player.total_shots > 0
+                ? Math.round((player.goals || 0) / player.total_shots * 100)
+                : 0;
+              
+              return (
+                <div 
+                  key={player.id} 
+                  className={`player-card ${!player.is_active ? 'inactive' : ''} ${editingPlayer?.id === player.id ? 'editing' : ''}`}
+                  onClick={() => handleEditPlayer(player)}
+                >
+                  <div className="player-header">
+                    <span className="player-name">
+                      {player.first_name} {player.last_name}
                     </span>
-                  )}
-                  <span className="player-role">{player.role}</span>
-                  {!player.is_active && (
-                    <span className="player-status">Inactive</span>
+                    <span className="player-number">#{player.jersey_number}</span>
+                  </div>
+                  <div className="player-details">
+                    <span className="player-team">
+                      {teams.find(team => team.id === player.team_id)?.name || 'Unknown Team'}
+                    </span>
+                    {player.gender && (
+                      <span className="player-gender">
+                        {player.gender === 'male' ? '♂️ Male' : '♀️ Female'}
+                      </span>
+                    )}
+                    {!player.is_active && (
+                      <span className="player-status-badge archived">Archived</span>
+                    )}
+                  </div>
+                  
+                  {/* Player Statistics */}
+                  {(player.games_played || 0) > 0 && (
+                    <div className="player-stats">
+                      <div className="stat-item">
+                        <span className="stat-label">Games</span>
+                        <span className="stat-value">{player.games_played || 0}</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">Goals</span>
+                        <span className="stat-value">{player.goals || 0}</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">Shots</span>
+                        <span className="stat-value">{player.total_shots || 0}</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">Accuracy</span>
+                        <span className="stat-value">{shootingPercentage}%</span>
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

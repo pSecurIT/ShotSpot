@@ -55,24 +55,38 @@ router.use((req, res, next) => {
   next();
 });
 
-// Get all players
+// Get all players with basic stats
 router.get('/', async (req, res) => {
   try {
     // Add optional team_id filter
     const { team_id } = req.query;
     const query = team_id
       ? `
-        SELECT players.*, teams.name as team_name 
-        FROM players 
-        LEFT JOIN teams ON players.team_id = teams.id 
-        WHERE team_id = $1
-        ORDER BY team_id, last_name, first_name
+        SELECT 
+          p.*,
+          t.name as team_name,
+          COALESCE(COUNT(DISTINCT s.game_id), 0) as games_played,
+          COALESCE(COUNT(CASE WHEN s.result = 'goal' THEN 1 END), 0) as goals,
+          COALESCE(COUNT(s.id), 0) as total_shots
+        FROM players p
+        LEFT JOIN teams t ON p.team_id = t.id
+        LEFT JOIN shots s ON p.id = s.player_id
+        WHERE p.team_id = $1
+        GROUP BY p.id, t.name
+        ORDER BY p.team_id, p.last_name, p.first_name
       `
       : `
-        SELECT players.*, teams.name as team_name 
-        FROM players 
-        LEFT JOIN teams ON players.team_id = teams.id 
-        ORDER BY team_id, last_name, first_name
+        SELECT 
+          p.*,
+          t.name as team_name,
+          COALESCE(COUNT(DISTINCT s.game_id), 0) as games_played,
+          COALESCE(COUNT(CASE WHEN s.result = 'goal' THEN 1 END), 0) as goals,
+          COALESCE(COUNT(s.id), 0) as total_shots
+        FROM players p
+        LEFT JOIN teams t ON p.team_id = t.id
+        LEFT JOIN shots s ON p.id = s.player_id
+        GROUP BY p.id, t.name
+        ORDER BY p.team_id, p.last_name, p.first_name
       `;
     
     const result = await db.query(query, team_id ? [team_id] : []);
@@ -150,7 +164,6 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
     });
   }
 
-  // Get data from request body, convert player role to lowercase
   // Handle both camelCase and snake_case property names
   const {
     team_id = req.body.teamId,
@@ -216,7 +229,6 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
     is_active = req.body.isActive,
     gender
   } = req.body;
-  const _role = (req.body.role || '').toLowerCase(); // Normalize the player's team role (reserved for future use)
   
   try {
     // Check for duplicate jersey number in the same team, excluding current player
