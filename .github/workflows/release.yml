@@ -117,6 +117,9 @@ jobs:
     name: Test Docker Image
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     
     steps:
       - name: Checkout repository
@@ -153,6 +156,11 @@ jobs:
           fi
           
           echo "✅ Image structure tests passed"
+
+      - name: Install docker-compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
 
       - name: Test image with docker-compose
         run: |
