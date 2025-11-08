@@ -96,20 +96,36 @@ jobs:
           # Start services with test environment
           docker-compose --env-file .env.test up -d
 
+          # Check for immediate restarts (diagnostic)
+          sleep 10
+          if docker-compose ps | grep -q "Restarting"; then
+            echo "⚠️ Container is restarting - dumping logs for diagnosis..."
+            docker-compose logs app --tail=200
+          fi
+
           # Wait for services to be healthy (increased timeout for DB init + migrations)
           echo "Waiting for services to be healthy..."
           timeout 300 bash -c '
             until docker-compose ps | grep -q "healthy"; do
               echo "$(date) - Waiting for healthy containers..."
               docker-compose ps
+              
+              # Check for restart loop during wait
+              if docker-compose ps | grep -q "Restarting"; then
+                echo "⚠️ Container restarting detected - showing recent logs..."
+                docker-compose logs app --tail=50
+              fi
+              
               sleep 5
             done
           ' || {
             echo "❌ Services failed to become healthy after 5 minutes"
             echo "==== docker-compose ps ===="
             docker-compose ps
-            echo "==== docker-compose logs (app + db) ===="
-            docker-compose logs app db || true
+            echo "==== docker-compose logs (app) - last 200 lines ===="
+            docker-compose logs app --tail=200 || true
+            echo "==== docker-compose logs (db) - last 100 lines ===="
+            docker-compose logs db --tail=100 || true
             exit 1
           }
 
@@ -187,7 +203,7 @@ jobs:
 
       - name: Create test environment file
         run: |
-          cat > .env << EOF
+          cat > .env << 'EOF'
           PORT=3001
           NODE_ENV=production
           DB_HOST=db
@@ -202,11 +218,24 @@ jobs:
           LOG_LEVEL=info
           EOF
 
+          # Export variables so docker-compose sees them during interpolation
+          set -o allexport
+          source .env
+          set +o allexport
+
       - name: Validate docker-compose.yml
-        run: docker-compose config
+        run: docker-compose --env-file .env config
 
       - name: Start Docker Compose services
-        run: docker-compose up -d
+        run: docker-compose --env-file .env up -d
+
+      - name: Check for immediate container issues
+        run: |
+          sleep 10
+          if docker-compose --env-file .env ps | grep -q "Restarting"; then
+            echo "⚠️ Container is restarting - dumping logs for diagnosis..."
+            docker-compose --env-file .env logs app --tail=200
+          fi
 
       - name: Wait for services
         run: |
@@ -214,15 +243,24 @@ jobs:
           timeout 300 bash -c '
             until [ "$(docker inspect -f {{.State.Health.Status}} shotspot-app 2>/dev/null)" == "healthy" ]; do
               echo "$(date) - Waiting for healthy app container..."
-              docker-compose ps
+              docker-compose --env-file .env ps
+              
+              # Check for restart loop during wait
+              if docker-compose --env-file .env ps | grep -q "Restarting"; then
+                echo "⚠️ Container restarting detected - showing recent logs..."
+                docker-compose --env-file .env logs app --tail=50
+              fi
+              
               sleep 5
             done
           ' || {
             echo "❌ Application failed to become healthy after 5 minutes"
             echo "==== docker-compose ps ===="
-            docker-compose ps
-            echo "==== docker-compose logs (app + db) ===="
-            docker-compose logs app db || true
+            docker-compose --env-file .env ps
+            echo "==== docker-compose logs (app) - last 200 lines ===="
+            docker-compose --env-file .env logs app --tail=200 || true
+            echo "==== docker-compose logs (db) - last 100 lines ===="
+            docker-compose --env-file .env logs db --tail=100 || true
             exit 1
           }
 
@@ -236,7 +274,7 @@ jobs:
 
       - name: Check logs for errors
         run: |
-          docker-compose logs | grep -i error && {
+          docker-compose --env-file .env logs | grep -i error && {
             echo "Errors found in logs"
             exit 1
           } || echo "No errors in logs"
@@ -248,9 +286,9 @@ jobs:
           # Only cleanup if .env exists (meaning we got past setup)
           if [ -f .env ]; then
             if command -v docker-compose >/dev/null 2>&1; then
-              docker-compose down -v 2>/dev/null || true
+              docker-compose --env-file .env down -v 2>/dev/null || true
             elif docker compose version >/dev/null 2>&1; then
-              docker compose down -v 2>/dev/null || true
+              docker compose --env-file .env down -v 2>/dev/null || true
             fi
             rm -f .env || true
           fi
