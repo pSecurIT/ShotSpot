@@ -1,7 +1,7 @@
 # Multi-stage build for ShotSpot application
-# Security: Use Node 18 with Alpine for minimal attack surface
+# Security: Use Node 22.12 with Alpine for minimal attack surface
 # Stage 1: Build frontend
-FROM node:18-alpine AS frontend-builder
+FROM node:22.12-alpine AS frontend-builder
 
 # Security: Run as non-root user during build
 RUN addgroup -g 1001 -S nodejs && \
@@ -19,6 +19,9 @@ RUN npm ci --ignore-scripts && \
 # Copy frontend source
 COPY --chown=nodejs:nodejs frontend/ ./
 
+# Security: Ensure full read/write permissions for build artifacts
+RUN chmod -R u+rw /app/frontend
+
 # Security: Build as non-root user
 USER nodejs
 
@@ -26,7 +29,7 @@ USER nodejs
 RUN npm run build
 
 # Stage 2: Build backend
-FROM node:18-alpine AS backend-builder
+FROM node:22.12-alpine AS backend-builder
 
 # Security: Create non-root user for build
 RUN addgroup -g 1001 -S nodejs && \
@@ -48,7 +51,7 @@ COPY --chown=nodejs:nodejs backend/ ./
 USER nodejs
 
 # Stage 3: Production image
-FROM node:18-alpine
+FROM node:22.12-alpine
 
 # Security: Update packages and install only necessary tools
 RUN apk update && \
