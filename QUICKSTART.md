@@ -61,7 +61,7 @@ Open http://localhost:3000 in your browser 🎉
 - [ ] Port 3001 and 5432 available
 
 **For manual installation:**
-- [ ] Node.js 18+ installed (`node --version`)
+- [ ] Node.js 22.12+ installed (`node --version`)
 - [ ] PostgreSQL 14+ installed and running
 - [ ] PostgreSQL password ready
 - [ ] Port 3000 and 3001 available

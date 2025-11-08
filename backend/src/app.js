@@ -26,9 +26,6 @@ import timeoutsRoutes from './routes/timeouts.js';
 import matchCommentaryRoutes from './routes/match-commentary.js';
 import userRoutes from './routes/users.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 
 // Security middleware with enhanced configuration
@@ -396,6 +393,9 @@ app.use((err, req, res, _next) => {
 
 // Serve static frontend files in production
 if (process.env.NODE_ENV === 'production') {
+  // Get __dirname equivalent for ES modules only when needed
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
   const frontendDistPath = path.join(__dirname, '../../frontend/dist');
   
   // Serve static files

@@ -69,6 +69,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Install docker-compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
       - name: Test Docker image
         run: |
           # Create test environment file
@@ -149,10 +154,17 @@ jobs:
   test-docker-compose:
     name: Test Docker Compose
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install docker-compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
 
       - name: Create test environment file
         run: |
@@ -211,6 +223,9 @@ jobs:
     name: Scan for Vulnerabilities
     runs-on: ubuntu-latest
     needs: test-docker-build
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout repository
