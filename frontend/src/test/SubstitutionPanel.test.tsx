@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SubstitutionPanel from '../components/SubstitutionPanel';
 import api from '../utils/api';
+import { waitForSelectOptions } from './helpers/testHelpers';
 
 // Mock the api module
 vi.mock('../utils/api', () => ({
@@ -242,9 +243,8 @@ describe('SubstitutionPanel', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /player out/i })).toBeInTheDocument();
-    });
+    // Wait for player options to load
+    await waitForSelectOptions(() => screen.getByRole('combobox', { name: /player out/i }));
 
     // Select player out
     const playerOutSelect = screen.getByRole('combobox', { name: /player out/i });
@@ -325,9 +325,8 @@ describe('SubstitutionPanel', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /player out/i })).toBeInTheDocument();
-    });
+    // Wait for player options to load
+    await waitForSelectOptions(() => screen.getByRole('combobox', { name: /player out/i }));
 
     // Select players
     const playerOutSelect = screen.getByRole('combobox', { name: /player out/i });
@@ -473,9 +472,8 @@ describe('SubstitutionPanel', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /player out/i })).toBeInTheDocument();
-    });
+    // Wait for player options to load
+    await waitForSelectOptions(() => screen.getByRole('combobox', { name: /player out/i }));
 
     // Select players and submit
     const playerOutSelect = screen.getByRole('combobox', { name: /player out/i }) as HTMLSelectElement;
@@ -529,9 +527,8 @@ describe('SubstitutionPanel', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /player out/i })).toBeInTheDocument();
-    });
+    // Wait for player options to load using helper function
+    await waitForSelectOptions(() => screen.getByRole('combobox', { name: /player out/i }));
 
     const playerOutSelect = screen.getByRole('combobox', { name: /player out/i });
     await user.selectOptions(playerOutSelect, '1');
@@ -556,9 +553,8 @@ describe('SubstitutionPanel', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /player out/i })).toBeInTheDocument();
-    });
+    // Wait for player options to load
+    await waitForSelectOptions(() => screen.getByRole('combobox', { name: /player out/i }));
 
     // Select players for home team
     const playerOutSelect = screen.getByRole('combobox', { name: /player out/i }) as HTMLSelectElement;
