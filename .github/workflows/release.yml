@@ -186,20 +186,36 @@ jobs:
           # Start services
           docker-compose up -d
           
+          # Check for immediate container issues
+          sleep 10
+          if docker-compose ps | grep -q "Restarting"; then
+            echo "⚠️ Container is restarting - dumping logs for diagnosis..."
+            docker-compose logs app --tail=200
+          fi
+          
           # Wait for health check (increased timeout for DB init + migrations)
           echo "Waiting for services to be healthy..."
           timeout 300 bash -c '
             until docker-compose ps | grep -q "healthy"; do
               echo "$(date) - Waiting for healthy containers..."
               docker-compose ps
+              
+              # Check for restart loop during wait
+              if docker-compose ps | grep -q "Restarting"; then
+                echo "⚠️ Container restarting detected - showing recent logs..."
+                docker-compose logs app --tail=50
+              fi
+              
               sleep 5
             done
           ' || {
             echo "❌ Services did not become healthy after 5 minutes"
             echo "==== docker-compose ps ===="
             docker-compose ps
-            echo "==== docker-compose logs (app + db) ===="
-            docker-compose logs app db || true
+            echo "==== docker-compose logs (app) - last 200 lines ===="
+            docker-compose logs app --tail=200 || true
+            echo "==== docker-compose logs (db) - last 100 lines ===="
+            docker-compose logs db --tail=100 || true
             exit 1
           }
           echo "✅ Services are healthy"
