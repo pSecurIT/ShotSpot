@@ -6,6 +6,8 @@ This guide covers deployment strategies for ShotSpot, from local field testing t
 
 ## Table of Contents
 
+> **🐳 For Docker deployments, see [DOCKER.md](DOCKER.md)**
+
 1. [Deployment Scenarios](#deployment-scenarios)
 2. [Field Testing Deployment](#field-testing-deployment)
 3. [Production Deployment](#production-deployment)
