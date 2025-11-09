@@ -410,10 +410,15 @@ if (process.env.NODE_ENV === 'production') {
   }));
   
   // SPA fallback - serve index.html for all non-API routes
-  app.get('/*', (req, res) => {
+  // Use middleware instead of route pattern for path-to-regexp v8 compatibility
+  app.use((req, res, next) => {
     // Don't serve index.html for API routes
     if (req.path.startsWith('/api/') || req.path.startsWith('/health')) {
-      return res.status(404).json({ error: 'Route not found' });
+      return next();
+    }
+    // Only handle GET requests
+    if (req.method !== 'GET') {
+      return next();
     }
     res.sendFile(path.join(frontendDistPath, 'index.html'));
   });

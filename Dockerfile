@@ -8,15 +8,16 @@ WORKDIR /app/frontend
 # Security: Copy only package files first for better layer caching
 COPY frontend/package*.json ./
 
-# Multi-arch: Configure npm for better compatibility with ARM64/QEMU
-RUN npm config set unsafe-perm true && \
-    npm config set fetch-retry-maxtimeout 120000 && \
-    npm config set fetch-retry-mintimeout 15000
+# Multi-arch: Configure npm via environment variables (compatible across npm versions)
+# Note: unsafe-perm removed in npm 9+ (now default behavior when running as root)
+ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=15000 \
+    NPM_CONFIG_FETCH_RETRIES=10
 
 # Security: Use npm ci for reproducible builds and verify checksums
 # Install as root for speed (no chown needed on node_modules)
-# Multi-arch: Use --no-optional to avoid problematic native dependencies
-RUN npm ci --ignore-scripts --no-optional && \
+# Note: Keep optional deps for build tools like Rollup that need platform-specific binaries
+RUN npm ci --ignore-scripts && \
     npm cache clean --force
 
 # Copy frontend source (already owned by root, no chown needed yet)
@@ -33,15 +34,16 @@ WORKDIR /app/backend
 # Security: Copy package files for dependency installation
 COPY backend/package*.json ./
 
-# Multi-arch: Configure npm for better compatibility with ARM64/QEMU
-RUN npm config set unsafe-perm true && \
-    npm config set fetch-retry-maxtimeout 120000 && \
-    npm config set fetch-retry-mintimeout 15000
+# Multi-arch: Configure npm via environment variables (compatible across npm versions)
+# Note: unsafe-perm removed in npm 9+ (now default behavior when running as root)
+ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=15000 \
+    NPM_CONFIG_FETCH_RETRIES=10
 
 # Security: Use npm ci with --ignore-scripts to prevent malicious postinstall scripts
 # Install as root for speed (no chown needed on node_modules)
-# Multi-arch: Use --no-optional to avoid problematic native dependencies
-RUN npm ci --ignore-scripts --no-optional && \
+# Note: Keep optional deps - backend may need platform-specific modules
+RUN npm ci --ignore-scripts && \
     npm cache clean --force
 
 # Copy backend source (already owned by root)
@@ -78,9 +80,10 @@ RUN chmod +x /usr/local/bin/healthcheck
 # Install only production dependencies for backend
 WORKDIR /app/backend
 
-# Multi-arch: Configure npm for production install
-RUN npm config set unsafe-perm true && \
-    npm config set fetch-retry-maxtimeout 120000
+# Multi-arch: Configure npm via environment variables (compatible across npm versions)
+# Note: unsafe-perm removed in npm 9+ (now default behavior when running as root)
+ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_RETRIES=10
 
 # Multi-arch: Use --no-optional to avoid problematic native dependencies
 RUN npm ci --only=production --ignore-scripts --no-optional && \
