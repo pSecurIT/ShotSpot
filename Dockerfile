@@ -1,16 +1,22 @@
 # Multi-stage build for ShotSpot application
-# Security: Use Node 22.12 with Alpine for minimal attack surface
+# Security: Use Node LTS with Alpine for minimal attack surface and multi-arch support
 # Stage 1: Build frontend
-FROM node:22.12-alpine AS frontend-builder
+FROM node:lts-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
 # Security: Copy only package files first for better layer caching
 COPY frontend/package*.json ./
 
+# Multi-arch: Configure npm for better compatibility with ARM64/QEMU
+RUN npm config set unsafe-perm true && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retry-mintimeout 15000
+
 # Security: Use npm ci for reproducible builds and verify checksums
 # Install as root for speed (no chown needed on node_modules)
-RUN npm ci --ignore-scripts && \
+# Multi-arch: Use --no-optional to avoid problematic native dependencies
+RUN npm ci --ignore-scripts --no-optional && \
     npm cache clean --force
 
 # Copy frontend source (already owned by root, no chown needed yet)
@@ -20,23 +26,29 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build backend
-FROM node:22.12-alpine AS backend-builder
+FROM node:lts-alpine AS backend-builder
 
 WORKDIR /app/backend
 
 # Security: Copy package files for dependency installation
 COPY backend/package*.json ./
 
+# Multi-arch: Configure npm for better compatibility with ARM64/QEMU
+RUN npm config set unsafe-perm true && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retry-mintimeout 15000
+
 # Security: Use npm ci with --ignore-scripts to prevent malicious postinstall scripts
 # Install as root for speed (no chown needed on node_modules)
-RUN npm ci --ignore-scripts && \
+# Multi-arch: Use --no-optional to avoid problematic native dependencies
+RUN npm ci --ignore-scripts --no-optional && \
     npm cache clean --force
 
 # Copy backend source (already owned by root)
 COPY backend/ ./
 
 # Stage 3: Production image
-FROM node:22.12-alpine
+FROM node:lts-alpine
 
 # Security: Update packages and install only necessary tools
 RUN apk update && \
@@ -65,7 +77,13 @@ RUN chmod +x /usr/local/bin/healthcheck
 
 # Install only production dependencies for backend
 WORKDIR /app/backend
-RUN npm ci --only=production --ignore-scripts && \
+
+# Multi-arch: Configure npm for production install
+RUN npm config set unsafe-perm true && \
+    npm config set fetch-retry-maxtimeout 120000
+
+# Multi-arch: Use --no-optional to avoid problematic native dependencies
+RUN npm ci --only=production --ignore-scripts --no-optional && \
     npm cache clean --force && \
     # Security: Remove unnecessary files
     find . -name "*.md" -type f -delete && \
