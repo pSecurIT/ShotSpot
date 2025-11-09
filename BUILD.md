@@ -22,8 +22,8 @@ This is a quick reference for building and running ShotSpot. For complete guides
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/pSecurIT/Korfball-game-statistics.git
-cd Korfball-game-statistics
+git clone https://github.com/pSecurIT/ShotSpot.git
+cd ShotSpot
 
 # 2. Install all dependencies
 npm run install:all
@@ -395,7 +395,7 @@ Cache-Control: public, max-age=31536000
 
 ```bash
 # 1. Open terminal/command prompt
-cd Korfball-game-statistics
+cd ShotSpot
 
 # 2. Start application
 npm run dev
@@ -559,7 +559,7 @@ npm outdated                          # Check for updates
 
 **Issues?** Check:
 1. [Troubleshooting section](INSTALLATION.md#troubleshooting)
-2. [GitHub Issues](https://github.com/pSecurIT/Korfball-game-statistics/issues)
+2. [GitHub Issues](https://github.com/pSecurIT/ShotSpot/issues)
 3. Email: support@shotspot.example.com
 
 **Emergency Support**:

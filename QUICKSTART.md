@@ -33,8 +33,8 @@ Without Docker? No problem:
 
 ```bash
 # 1. Clone
-git clone https://github.com/pSecurIT/Korfball-game-statistics.git
-cd Korfball-game-statistics
+git clone https://github.com/pSecurIT/ShotSpot.git
+cd ShotSpot
 
 # 2. Install
 npm run install:all

@@ -75,8 +75,8 @@ npm run dev
 
 2. **Clone and install**:
    ```bash
-   git clone https://github.com/pSecurIT/Korfball-game-statistics.git
-   cd Korfball-game-statistics
+   git clone https://github.com/pSecurIT/ShotSpot.git
+   cd ShotSpot
    npm run install:all
    ```
 
@@ -115,7 +115,7 @@ Before heading to the field:
 
 2. **Start application**:
    ```bash
-   cd Korfball-game-statistics
+   cd ShotSpot
    npm run dev
    ```
 
@@ -287,8 +287,8 @@ LOG_FILE=/var/log/shotspot/app.log
 3. **Deploy application**:
    ```bash
    # Clone repository
-   git clone https://github.com/pSecurIT/Korfball-game-statistics.git
-   cd Korfball-game-statistics
+   git clone https://github.com/pSecurIT/ShotSpot.git
+   cd ShotSpot
    
    # Install dependencies
    npm run install:all
@@ -923,7 +923,7 @@ SELECT pg_terminate_backend(pid) WHERE pid = <blocking_pid>;
 
 **Contact**:
 - Email: support@shotspot.example.com
-- GitHub Issues: https://github.com/pSecurIT/Korfball-game-statistics/issues
+- GitHub Issues: https://github.com/pSecurIT/ShotSpot/issues
 
 **Emergency Contacts**:
 - Database Issues: DBA team

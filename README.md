@@ -96,8 +96,8 @@
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/pSecurIT/Korfball-game-statistics.git
-   cd Korfball-game-statistics
+   git clone https://github.com/pSecurIT/ShotSpot.git
+   cd ShotSpot
    ```
 
 2. **Configure environment**:
@@ -121,8 +121,8 @@ For full Docker documentation, see [DOCKER.md](DOCKER.md)
 
 1. **Clone and install**:
    ```bash
-   git clone https://github.com/pSecurIT/Korfball-game-statistics.git
-   cd Korfball-game-statistics
+   git clone https://github.com/pSecurIT/ShotSpot.git
+   cd ShotSpot
    npm run install:all
    ```
 

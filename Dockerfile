@@ -9,21 +9,14 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Security: Use npm ci for reproducible builds and verify checksums
+# Install as root for speed (no chown needed on node_modules)
 RUN npm ci --ignore-scripts && \
     npm cache clean --force
 
-# Copy frontend source
+# Copy frontend source (already owned by root, no chown needed yet)
 COPY frontend/ ./
 
-# Security: Create non-root user and ensure ownership of entire /app directory
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app
-
-# Security: Build as non-root user
-USER nodejs
-
-# Build frontend for production
+# Build frontend for production (can run as root, it's just a build)
 RUN npm run build
 
 # Stage 2: Build backend
@@ -35,19 +28,12 @@ WORKDIR /app/backend
 COPY backend/package*.json ./
 
 # Security: Use npm ci with --ignore-scripts to prevent malicious postinstall scripts
+# Install as root for speed (no chown needed on node_modules)
 RUN npm ci --ignore-scripts && \
     npm cache clean --force
 
-# Copy backend source
+# Copy backend source (already owned by root)
 COPY backend/ ./
-
-# Security: Create non-root user and ensure ownership of entire /app directory
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app
-
-# Security: Switch to non-root user for any build operations
-USER nodejs
 
 # Stage 3: Production image
 FROM node:22.12-alpine
@@ -60,21 +46,17 @@ RUN apk update && \
     tini && \
     rm -rf /var/cache/apk/*
 
-# Security: Create non-root user with minimal privileges
+# Security: Create non-root user (no chown on /app yet - faster)
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 -G nodejs && \
-    mkdir -p /app && \
-    chown -R nodejs:nodejs /app
+    mkdir -p /app
 
 WORKDIR /app
 
-# Security: Set file permissions before copying
-USER root
-
-# Copy backend from builder with restricted permissions
+# Copy backend from builder with ownership set during copy (much faster than chown -R after)
 COPY --from=backend-builder --chown=nodejs:nodejs /app/backend ./backend
 
-# Copy built frontend from builder with restricted permissions
+# Copy built frontend from builder with ownership set during copy
 COPY --from=frontend-builder --chown=nodejs:nodejs /app/frontend/dist ./frontend/dist
 
 # Copy health check script
@@ -90,11 +72,9 @@ RUN npm ci --only=production --ignore-scripts && \
     find . -name "*.ts" -type f -delete && \
     find . -name "*.map" -type f -delete
 
-# Security: Set read-only filesystem for application files
+# Security: Set read-only permissions (only on source files, skip node_modules for speed)
 RUN chmod -R 555 /app/backend/src && \
-    chmod -R 555 /app/frontend/dist && \
-    # Keep node_modules executable for binary scripts
-    chmod -R 555 /app/backend/node_modules/.bin || true
+    chmod -R 555 /app/frontend/dist
 
 # Security: Create temp directory with write permissions for app user
 RUN mkdir -p /tmp/app && \

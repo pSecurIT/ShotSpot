@@ -1,6 +1,6 @@
 # Frontend Development Guide
 
-This document provides essential information for developing the frontend of the Korfball Game Statistics application.
+This document provides essential information for developing the frontend of the ShotSpot application.
 
 ## Quick Start
 
