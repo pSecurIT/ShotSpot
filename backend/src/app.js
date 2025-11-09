@@ -379,16 +379,26 @@ app.use((err, req, res, _next) => {
   }
 });
 
-// Serve static frontend files in production
-if (process.env.NODE_ENV === 'production') {
-  // Get __dirname equivalent for ES modules only when needed
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const frontendDistPath = path.join(__dirname, '../../frontend/dist');
-  
+// Serve static frontend files in both production and development
+// Get __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDistPath = path.join(__dirname, '../../frontend/dist');
+
+// Check if frontend dist folder exists
+let serveFrontend = false;
+try {
+  fs.accessSync(frontendDistPath);
+  serveFrontend = true;
+  console.log('Frontend dist folder found, serving static files from:', frontendDistPath);
+} catch {
+  console.log('Frontend dist folder not found. Run "npm run build" in frontend directory to build.');
+}
+
+if (serveFrontend) {
   // Serve static files
   app.use(express.static(frontendDistPath, {
-    maxAge: '1y',
+    maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0',
     setHeaders: (res, filepath) => {
       // Don't cache index.html and service-worker.js
       if (filepath.endsWith('index.html') || filepath.endsWith('service-worker.js')) {
@@ -412,9 +422,15 @@ if (process.env.NODE_ENV === 'production') {
     res.status(404).json({ error: 'Route not found' });
   });
 } else {
-  // 404 handler for development - API routes only
+  // 404 handler when frontend is not built
   app.use((req, res) => {
-    res.status(404).json({ error: 'Route not found' });
+    if (req.path.startsWith('/api/') || req.path.startsWith('/health')) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+    res.status(503).json({ 
+      error: 'Frontend not available', 
+      message: 'Run "npm run build" in the frontend directory to build the application' 
+    });
   });
 }
 
