@@ -1,6 +1,6 @@
 # Secrets Management Guide
 
-This guide outlines the procedures for managing secrets across different environments in the Korfball Game Statistics application.
+This guide outlines the procedures for managing secrets across different environments in the ShotSpot application.
 
 ## Development Environment
 

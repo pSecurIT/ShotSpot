@@ -1,7 +1,7 @@
 {
   "name": "shotspot-backend",
   "version": "1.0.0",
-  "description": "Backend for ShotSpot - Korfball Game Statistics app",
+  "description": "Backend for ShotSpot - Korfball Match Statistics app",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

@@ -51,8 +51,8 @@ For experienced users who want to get started immediately:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/pSecurIT/Korfball-game-statistics.git
-cd Korfball-game-statistics
+git clone https://github.com/pSecurIT/ShotSpot.git
+cd ShotSpot
 
 # 2. Install all dependencies
 npm run install:all
@@ -83,10 +83,10 @@ The application will open automatically in your browser at http://localhost:3000
 cd ~/Documents  # or any directory you prefer
 
 # Clone the repository
-git clone https://github.com/pSecurIT/Korfball-game-statistics.git
+git clone https://github.com/pSecurIT/ShotSpot.git
 
 # Navigate into the project
-cd Korfball-game-statistics
+cd ShotSpot
 ```
 
 ### Step 2: Install Dependencies
@@ -672,7 +672,7 @@ Run daily via cron (Linux/macOS) or Task Scheduler (Windows).
 ### Check for Updates
 
 ```bash
-cd Korfball-game-statistics
+cd ShotSpot
 git fetch origin
 git status
 ```
@@ -704,7 +704,7 @@ npm run dev
 cd ..
 
 # Remove project folder
-rm -rf Korfball-game-statistics
+rm -rf ShotSpot
 ```
 
 ### Remove Database
@@ -738,7 +738,7 @@ DROP USER shotspot_user;
 
 ### Support
 
-- **GitHub Issues**: https://github.com/pSecurIT/Korfball-game-statistics/issues
+- **GitHub Issues**: https://github.com/pSecurIT/ShotSpot/issues
 - **Email**: support@shotspot.example.com
 
 ### Reporting Bugs
