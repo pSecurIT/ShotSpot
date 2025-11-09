@@ -45,6 +45,19 @@ Object.entries(requiredDbConfig).forEach(([key, value]) => {
   }
 });
 
+// Determine SSL configuration
+let sslConfig;
+if (process.env.DB_SSL === 'false' || process.env.DB_SSL === '0') {
+  // Explicitly disabled
+  sslConfig = false;
+} else if (process.env.NODE_ENV === 'production') {
+  // Production default: require SSL with cert validation
+  sslConfig = { rejectUnauthorized: true };
+} else {
+  // Development/test: no SSL
+  sslConfig = false;
+}
+
 const pool = new Pool({
   ...requiredDbConfig,
   // Optimize connection pool for test environment
@@ -52,7 +65,7 @@ const pool = new Pool({
   idleTimeoutMillis: process.env.NODE_ENV === 'test' ? 1000 : (parseInt(process.env.DB_IDLE_TIMEOUT_MS) || 30000),
   connectionTimeoutMillis: process.env.NODE_ENV === 'test' ? 1000 : 2000,
   acquireTimeoutMillis: process.env.NODE_ENV === 'test' ? 1000 : 30000,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false
+  ssl: sslConfig
 });
 
 // Error handling

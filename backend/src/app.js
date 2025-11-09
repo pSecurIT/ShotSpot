@@ -7,6 +7,7 @@ import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import csrf from './middleware/csrf.js';
 import { errorNotificationService } from './utils/errorNotification.js';
@@ -34,34 +35,27 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       defaultSrc: ['\'self\''],
-      scriptSrc: ['\'self\''],
-      styleSrc: ['\'self\''],
-      imgSrc: ['\'self\''],
-      connectSrc: ['\'self\''],
-      fontSrc: ['\'self\''],
+      scriptSrc: ['\'self\'', '\'unsafe-inline\''], // Allow inline scripts for SPA
+      styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://fonts.googleapis.com'], // Allow inline styles and Google Fonts
+      imgSrc: ['\'self\'', 'data:', 'blob:'], // Allow data URIs and blobs for images
+      connectSrc: ['\'self\''], // API calls to same origin
+      fontSrc: ['\'self\'', 'data:', 'https://fonts.gstatic.com'], // Allow Google Fonts
       objectSrc: ['\'none\''],
       mediaSrc: ['\'self\''],
       frameSrc: ['\'none\''],
-      baseUri: ['\'none\''],
+      baseUri: ['\'self\''],
       formAction: ['\'self\''],
       frameAncestors: ['\'none\''],
-      manifestSrc: ['\'none\''],
-      workerSrc: ['\'none\''],
-      sandbox: [
-        'allow-forms',
-        'allow-scripts',
-        'allow-same-origin',
-        'allow-downloads'
-      ],
-      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [''] : null,
-      reportUri: process.env.CSP_REPORT_URI || '/api/csp-report',
-      reportTo: 'csp-endpoint'
+      manifestSrc: ['\'self\''], // Allow manifest.json
+      workerSrc: ['\'self\'', 'blob:'], // Allow service workers
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+      reportUri: process.env.CSP_REPORT_URI || '/api/csp-report'
     },
     reportOnly: false
   },
-  crossOriginEmbedderPolicy: { policy: 'require-corp' },
+  crossOriginEmbedderPolicy: false, // Disable for SPA compatibility
   crossOriginOpenerPolicy: { policy: 'same-origin' },
-  crossOriginResourcePolicy: { policy: 'same-site' },
+  crossOriginResourcePolicy: { policy: 'same-origin' }, // Allow resources from same origin
   dnsPrefetchControl: { allow: false },
   frameguard: { action: 'deny' },
   hsts: process.env.ENABLE_HSTS === 'true' ? {
@@ -137,14 +131,8 @@ const corsOptions = {
       return;
     }
     
-    // In production, require origin and match against allowed origins
-    if (!isDevelopment && !isTest && !origin) {
-      callback(new Error('Origin header is required'), false);
-      return;
-    }
-    
-    // Allow requests with no origin in development only
-    if (isDevelopment && !origin) {
+    // Allow requests with no origin (same-origin requests, curl, health checks)
+    if (!origin) {
       callback(null, true);
       return;
     }
@@ -297,6 +285,9 @@ app.use((err, req, res, _next) => {
     }
   };
   
+  // Always log errors to console for debugging
+  console.error('Error caught by global handler:', logError);
+  
   // Log based on environment configuration
   if (process.env.ENABLE_ERROR_LOGGING === 'true') {
     if (process.env.NODE_ENV === 'production') {
@@ -305,17 +296,17 @@ app.use((err, req, res, _next) => {
       const logLevel = process.env.LOG_LEVEL || 'error';
       
       // Ensure log directory exists
-      const logDir = require('path').dirname(logPath);
-      require('fs').mkdirSync(logDir, { recursive: true });
+      const logDir = path.dirname(logPath);
+      fs.mkdirSync(logDir, { recursive: true });
       
       // Write to log file
-      require('fs').appendFileSync(
+      fs.appendFileSync(
         logPath,
         JSON.stringify({ ...logError, level: logLevel }) + '\n'
       );
       
       // Send notification for critical errors if webhook is configured
-      if (error.status === 500 && process.env.ERROR_NOTIFICATION_WEBHOOK) {
+      if (err.status === 500 && process.env.ERROR_NOTIFICATION_WEBHOOK) {
         fetch(process.env.ERROR_NOTIFICATION_WEBHOOK, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -325,9 +316,6 @@ app.use((err, req, res, _next) => {
           console.error('Failed to send error notification to webhook:', webhookErr.message);
         });
       }
-    } else {
-      // Development logging
-      console.error(logError);
     }
   }
   
@@ -411,16 +399,17 @@ if (process.env.NODE_ENV === 'production') {
   
   // SPA fallback - serve index.html for all non-API routes
   // Use middleware instead of route pattern for path-to-regexp v8 compatibility
-  app.use((req, res, next) => {
-    // Don't serve index.html for API routes
+  app.use((req, res) => {
+    // Don't serve index.html for API routes or health checks
     if (req.path.startsWith('/api/') || req.path.startsWith('/health')) {
-      return next();
+      return res.status(404).json({ error: 'Route not found' });
     }
-    // Only handle GET requests
-    if (req.method !== 'GET') {
-      return next();
+    // Serve index.html for all other GET requests (SPA routing)
+    if (req.method === 'GET') {
+      return res.sendFile(path.join(frontendDistPath, 'index.html'));
     }
-    res.sendFile(path.join(frontendDistPath, 'index.html'));
+    // Non-GET requests that aren't API calls
+    res.status(404).json({ error: 'Route not found' });
   });
 } else {
   // 404 handler for development - API routes only
