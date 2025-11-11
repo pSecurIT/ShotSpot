@@ -179,7 +179,7 @@ app.use((req, res, next) => {
 app.use(cookieParser());
 // Session configuration with security settings from environment
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || process.env.JWT_SECRET,
   resave: false,
   saveUninitialized: true, // Changed to true to create session for CSRF token
   name: 'sessionId', // Change from default 'connect.sid'
