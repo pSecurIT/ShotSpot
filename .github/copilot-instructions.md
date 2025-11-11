@@ -1,167 +1,100 @@
-# Copilot Instructions for ShotSpot - a Korfball game statistics app
+﻿# Copilot Instructions for ShotSpot
 
 ## Project Overview
-This app tracks real-time statistics for korfball matches, focusing on shot locations, outcomes (goal/miss), player management, and game events (faults, time tracking).
+**Korfball match statistics tracking app** - React 19 (TypeScript) + Node.js/Express + PostgreSQL monorepo with offline-first PWA capabilities.
 
-## Architecture & Key Components
-- **Player & Team Management**: Users input team rosters and bench players before the match.
-- **Match Event Tracking**: During the game, the app records:
-  - Shot locations and results (goal, miss, hit but no score)
-  - Faults (out of bounds, defensive/offensive)
-  - Game time
-- **User Roles**: Primarily designed for coaches and assistants.
+**Core Purpose**: Real-time event tracking during korfball matches with shot location mapping, player statistics, and timer management. Built for coaches to use on tablets/phones during live games.
+
+## Architecture Essentials
+
+### Stack & Structure
+- **Frontend**: React 19 + TypeScript (Vite), Service Worker + IndexedDB for offline support
+- **Backend**: Express 5 API with ES modules (import/export), JWT auth, role-based access
+- **Database**: PostgreSQL with direct pg Pool queries (no ORM)
+- **Monorepo**: Root package.json runs both via concurrently
+
+### Critical Data Flows
+1. **Authentication**: JWT in Authorization: Bearer token  auth middleware  requireRole(['admin', 'coach'])
+2. **Database Access**: Always parameterized queries via db.query(text, params) - see backend/src/db.js
+3. **Offline Sync**: Service worker caches API responses  IndexedDB queues writes  background sync on reconnect
+4. **Migrations**: SQL files in backend/src/migrations/*.sql run alphabetically on DB init
+
+### Key Architectural Decisions
+- **No ORM**: Direct SQL for transparency and performance (see backend/src/routes/teams.js for patterns)
+- **Serial Testing**: Jest maxWorkers: 1 prevents DB race conditions
+- **Environment Logging**: All logs wrapped in if (process.env.NODE_ENV !== 'test') to reduce noise
+- **CSP Security**: Strict Content Security Policy with inline styles allowed for React (see backend/src/app.js)
 
 ## Developer Workflows
-### Build & Development
-- **Frontend Development**:
-  - Start dev server: `npm run dev`
-  - Build for production: `npm run build`
-  - Preview production build: `npm run preview`
-- **Project Structure**:
-  - `src/` - Application source code
-  - `public/` - Static assets
-  - `vite.config.ts` - Vite configuration
-  - `tsconfig.json` - TypeScript configuration
 
-### Testing Guidelines
-- **Unit Tests**: Use Vitest for frontend and Jest for backend
-  - Frontend: Test React components with `@testing-library/react`
-  - Run tests: `npm test` (watch mode) or `npm run coverage` (with coverage report)
-  - Backend: Test API endpoints with `supertest`
-- **Integration Tests**:
-  - Use Cypress for end-to-end testing of critical flows
-  - Key test scenarios:
-    - Team/player management workflow
-    - Match event recording
-    - Real-time updates
-- **Test Coverage Requirements**:
-  - **NEW FUNCTIONALITY**: All newly created functionalities MUST achieve minimum 80% test coverage before being considered complete
-  - Maintain minimum 80% coverage for existing business logic
-  - All API endpoints must have comprehensive integration tests
-  - Critical UI flows must have E2E tests
-  - Security-critical modules (authentication, user management, data validation) require 90%+ coverage
-  - Use comprehensive test scenarios including positive cases, negative cases, edge cases, and error handling
+### First-Time Setup
+npm run install:all
+cp backend/.env.example backend/.env
+npm run setup-db
+npm run dev
 
-### Security Requirements
-- **Authentication & Authorization**:
-  - Implement JWT-based authentication
-  - Role-based access control (Coach, Assistant, Viewer)
-  - Secure password hashing with bcrypt
-- **Data Protection**:
-  - Input validation on all API endpoints
-  - Sanitize SQL queries using parameterized statements
-  - HTTPS required for all API communications
-- **API Security**:
-  - Rate limiting on all endpoints
-  - CORS configuration for frontend origin only
-  - Request size limits to prevent DoS
-- **Auditing**:
-  - Log all data modifications with user context
-  - Track failed authentication attempts
-  - Regular security audit of dependencies
+### Daily Development
+npm run dev              # Concurrent backend (3001) + frontend (3000) with hot reload
+npm run setup-db         # Reset database (clears all data!)
 
-## Project-Specific Patterns
-- **Real-time Data Entry**: UI/logic should prioritize speed and accuracy for live match input.
-- **Event Granularity**: Each shot and fault is tracked with location/context, not just summary stats.
-- **Player State**: Track which players are active vs. on the bench throughout the match.
+**Important**: Backend serves built frontend in production. Must run: cd frontend && npm run build before deploying.
 
-## Integration Points
-- **Database**: PostgreSQL with secure connection strings in environment variables
-- **API Authentication**: JWT tokens with refresh mechanism
-- **Real-time Updates**: WebSocket connections with secure handshake
+### Testing Workflow
+# Backend (Jest + Babel for ES modules)
+cd backend
+npm test                 # Serial execution, auto-creates shotspot_test_db
+npm run test:coverage    # Requires 80%+ (90%+ for auth/validation)
 
-## Conventions
-- **Naming**: Use clear, descriptive names for events, players, and UI elements (e.g., `shotLocation`, `playerStatus`).
-- **File Organization**: Place future source code in folders by feature (e.g., `src/players/`, `src/match/`).
-- **Documentation**: Update this file and the README with any new workflows or conventions.
-- **Testing Standards**: 
-  - Write tests BEFORE or ALONGSIDE new functionality implementation
-  - All new routes, components, and business logic must include comprehensive test suites
-  - Test files should follow naming convention: `filename.test.js` or `filename.spec.js`
-  - Include test descriptions with emojis for better readability (✅ success cases, ❌ error cases, 🔧 edge cases)
-- **Security**: 
-  - Prefix security-sensitive variables with `secure`
-  - Document all security-relevant configuration
-  - Include security considerations in code reviews
+# Frontend (Vitest + jsdom)
+cd frontend
+npm test                 # Watch mode
+npm run coverage         # Generate report
 
-## Examples
-- When adding a new event type, ensure it includes location, player, and result fields.
-- UI forms for team setup should allow quick editing and validation.
-- Example test structure with comprehensive coverage:
-  ```typescript
-  describe('👥 User Management API', () => {
-    describe('✅ Successful Operations', () => {
-      it('✅ should create user with valid data', () => {
-        // Test implementation with positive case
-      });
-      it('✅ should update user role as admin', () => {
-        // Test implementation with authorization
-      });
-    });
-    
-    describe('❌ Error Handling', () => {
-      it('❌ should reject invalid email format', () => {
-        // Test implementation with validation
-      });
-      it('❌ should deny access to non-admin users', () => {
-        // Test implementation with security
-      });
-    });
-    
-    describe('🔧 Edge Cases', () => {
-      it('🔧 should handle database connection errors', () => {
-        // Test implementation with error scenarios
-      });
-    });
-  });
-  ```
-- Security implementation example:
-  ```typescript
-  // Input validation
-  const validateTeamInput = (team: TeamInput): boolean => {
-    if (!team.name || team.name.length < 3) {
-      throw new ValidationError('Team name must be at least 3 characters');
-    }
-    return true;
-  };
+# Linting
+npm run lint             # Both frontend + backend
+npm run lint:fix         # Auto-fix issues
 
-  // Secure database query
-  const createTeam = async (team: TeamInput, userId: string): Promise<Team> => {
-    validateTeamInput(team);
-    const query = 'INSERT INTO teams (name, created_by) VALUES ($1, $2) RETURNING *';
-    return db.query(query, [team.name, userId]);
-  };
-  ```
-- Test coverage implementation example:
-  ```typescript
-  describe('🔐 Security Tests', () => {
-    it('✅ should validate input sanitization', async () => {
-      const response = await request(app)
-        .post('/api/teams')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ name: '<script>alert("xss")</script>' })
-        .expect(400);
-      
-      expect(response.body).toHaveProperty('errors');
-      // Verify XSS attempt was blocked
-    });
-    
-    it('❌ should require authentication for protected routes', async () => {
-      await request(app)
-        .get('/api/teams')
-        .expect(401);
-    });
-    
-    it('🔧 should handle concurrent user operations safely', async () => {
-      // Test concurrent access patterns
-      const promises = Array.from({ length: 10 }, () => 
-        request(app).post('/api/teams').set('Authorization', token).send(validTeam)
-      );
-      const results = await Promise.allSettled(promises);
-      // Verify no race conditions or data corruption
-    });
-  });
-  ```
+### Test Structure Convention
+Use emoji prefixes for test discoverability:
+describe('Team Routes', () => {
+  it('should create team with valid data', ...);      // Success path
+  it('should reject duplicate team names', ...);      // Error handling
+  it('should handle concurrent team creation', ...);  // Edge cases
+});
 
----
-If any section is unclear or missing, please provide feedback so this guide can be improved for future AI agents.
+**Coverage Mandate**: ALL new functionality requires 80%+ coverage before merge. Security-critical code (auth, validation) requires 90%+.
+
+## Security Patterns
+
+### Middleware Stack (order critical!)
+In backend/src/app.js - applied in this exact order:
+1. helmet()                    // CSP, HSTS, X-Frame-Options
+2. rateLimit()                 // 100 req/15min (skipped in tests)
+3. cors()                      // CORS_ORIGIN validation
+4. express.json()              // Body parser (10kb limit)
+5. csrf.middleware             // CSRF protection
+6. Custom headers              // Cache-Control for auth endpoints
+
+### Authentication Implementation
+Pattern from backend/src/routes/teams.js
+import { auth, requireRole } from '../middleware/auth.js';
+
+router.use(auth);  // All routes require authentication
+router.post('/', requireRole(['admin', 'coach']), handler);  // Role-based access
+
+**Role Hierarchy**: admin > coach > user (normalized to lowercase in middleware)
+
+### Security Checklist for New Endpoints
+- Use parameterized queries: db.query('SELECT * FROM x WHERE id = ', [id])
+- Apply auth middleware to all routes
+- Use requireRole() for write operations (POST/PUT/DELETE)
+- Validate input with express-validator
+- Never log tokens/passwords (use process.env.NODE_ENV !== 'test' guards)
+- Return generic error messages in production (detailed in dev only)
+
+## Documentation Quick Reference
+- **Quick Start**: QUICKSTART.md - 5-minute setup guide
+- **Installation**: INSTALLATION.md - Complete setup + 15+ troubleshooting solutions
+- **Build Commands**: BUILD.md - Full command reference
+- **Security Details**: SECURITY.md - Rate limits, CSRF, CSP headers, error handling
+- **Offline Mode**: OFFLINE.md - Service worker, IndexedDB, sync queue architecture
