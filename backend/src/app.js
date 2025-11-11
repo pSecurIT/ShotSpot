@@ -122,7 +122,6 @@ if (process.env.NODE_ENV !== 'test') {
 const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
-    const isDevelopment = process.env.NODE_ENV === 'development';
     const isTest = process.env.NODE_ENV === 'test';
     
     // Allow all requests in test environment
@@ -381,9 +380,9 @@ app.use((err, req, res, _next) => {
 
 // Serve static frontend files in both production and development
 // Get __dirname equivalent for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const frontendDistPath = path.join(__dirname, '../../frontend/dist');
+const currentFileUrl = fileURLToPath(import.meta.url);
+const currentDir = path.dirname(currentFileUrl);
+const frontendDistPath = path.join(currentDir, '../../frontend/dist');
 
 // Check if frontend dist folder exists
 let serveFrontend = false;
