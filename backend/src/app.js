@@ -96,7 +96,7 @@ if (process.env.NODE_ENV !== 'test') {
       // Skip rate limiting for certain trusted IPs, health checks, and timer endpoints (frequent polling)
       const trustedIPs = (process.env.TRUSTED_IPS || '').split(',');
       const isTimerEndpoint = req.path.startsWith('/api/timer');
-      const isHealthCheck = req.path === '/health';
+      const isHealthCheck = req.path === '/api/health';
       const isTrustedIP = trustedIPs.includes(req.ip);
       const isDevelopment = process.env.NODE_ENV === 'development';
       
@@ -249,7 +249,7 @@ app.use((req, res, next) => {
 import healthRoutes from './routes/health.js';
 
 // Routes
-app.use('/health', healthRoutes); // Health check endpoint should be before other routes
+app.use('/api/health', healthRoutes); // Health check endpoint should be before other routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/teams', teamRoutes);
@@ -409,8 +409,8 @@ if (serveFrontend) {
   // SPA fallback - serve index.html for all non-API routes
   // Use middleware instead of route pattern for path-to-regexp v8 compatibility
   app.use((req, res) => {
-    // Don't serve index.html for API routes or health checks
-    if (req.path.startsWith('/api/') || req.path.startsWith('/health')) {
+    // Don't serve index.html for API routes (includes /api/health)
+    if (req.path.startsWith('/api/')) {
       return res.status(404).json({ error: 'Route not found' });
     }
     // Serve index.html for all other GET requests (SPA routing)
@@ -423,7 +423,7 @@ if (serveFrontend) {
 } else {
   // 404 handler when frontend is not built
   app.use((req, res) => {
-    if (req.path.startsWith('/api/') || req.path.startsWith('/health')) {
+    if (req.path.startsWith('/api/')) {
       return res.status(404).json({ error: 'Route not found' });
     }
     res.status(503).json({ 
