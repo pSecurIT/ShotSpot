@@ -165,14 +165,38 @@ router.get('/shots/:gameId/players', [
   const { team_id } = req.query;
 
   try {
-    let queryText = `
-      SELECT 
+    // First get all players who participated in the game (from game_rosters or shots)
+    let playersQuery = `
+      SELECT DISTINCT
         p.id as player_id,
         p.first_name,
         p.last_name,
         p.jersey_number,
         t.name as team_name,
-        s.team_id,
+        t.id as team_id,
+        gr.is_starting
+      FROM players p
+      JOIN teams t ON p.team_id = t.id
+      LEFT JOIN game_rosters gr ON gr.player_id = p.id AND gr.game_id = $1
+      WHERE (
+        EXISTS (
+          SELECT 1 FROM shots WHERE player_id = p.id AND game_id = $1
+        ) OR gr.game_id = $1
+      )
+    `;
+    const playersParams = [gameId];
+    
+    if (team_id) {
+      playersQuery += ' AND t.id = $2';
+      playersParams.push(team_id);
+    }
+    
+    const playersResult = await db.query(playersQuery, playersParams);
+
+    // Get shot statistics
+    let shotsQuery = `
+      SELECT 
+        p.id as player_id,
         COUNT(*) as total_shots,
         COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as goals,
         COUNT(CASE WHEN s.result = 'miss' THEN 1 END) as misses,
@@ -185,7 +209,6 @@ router.get('/shots/:gameId/players', [
         ROUND(AVG(s.distance), 2) as avg_distance,
         ROUND(AVG(s.x_coord), 2) as avg_x_coord,
         ROUND(AVG(s.y_coord), 2) as avg_y_coord,
-        -- Zone performance (left, center, right based on x_coord)
         COUNT(CASE WHEN s.x_coord < 33.33 THEN 1 END) as left_zone_shots,
         COUNT(CASE WHEN s.x_coord >= 33.33 AND s.x_coord < 66.67 THEN 1 END) as center_zone_shots,
         COUNT(CASE WHEN s.x_coord >= 66.67 THEN 1 END) as right_zone_shots,
@@ -194,21 +217,154 @@ router.get('/shots/:gameId/players', [
         COUNT(CASE WHEN s.x_coord >= 66.67 AND s.result = 'goal' THEN 1 END) as right_zone_goals
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      JOIN teams t ON s.team_id = t.id
       WHERE s.game_id = $1
+      GROUP BY p.id
     `;
-    const queryParams = [gameId];
-    let paramIndex = 2;
+    const shotsParams = [gameId];
+    const shotsResult = await db.query(shotsQuery, shotsParams);
 
-    if (team_id) {
-      queryText += ` AND s.team_id = $${paramIndex}`;
-      queryParams.push(team_id);
-      paramIndex++;
+    // Get substitutions for play time calculation
+    const subsQuery = `
+      SELECT 
+        player_in_id as player_id,
+        period,
+        EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
+        'in' as type
+      FROM substitutions
+      WHERE game_id = $1
+      UNION ALL
+      SELECT 
+        player_out_id as player_id,
+        period,
+        EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
+        'out' as type
+      FROM substitutions
+      WHERE game_id = $1
+      ORDER BY period, time_remaining_seconds DESC, type DESC
+    `;
+    const subsResult = await db.query(subsQuery, [gameId]);
+
+    // Get game period configuration
+    const gameConfigQuery = `
+      SELECT EXTRACT(EPOCH FROM period_duration)/60 as period_duration_minutes, number_of_periods
+      FROM games
+      WHERE id = $1
+    `;
+    const gameConfigResult = await db.query(gameConfigQuery, [gameId]);
+    const periodDuration = gameConfigResult.rows[0]?.period_duration_minutes || 10; // Default 10 minutes
+    const numberOfPeriods = gameConfigResult.rows[0]?.number_of_periods || 4; // Default 4 periods
+
+    // Calculate play time for each player
+    const playTimeMap = new Map();
+    
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('Play time calculation debug:');
+      console.log('- Period duration:', periodDuration, 'minutes');
+      console.log('- Number of periods:', numberOfPeriods);
+      console.log('- Total players:', playersResult.rows.length);
+      console.log('- Players with is_starting true:', playersResult.rows.filter(p => p.is_starting).length);
+      console.log('- Total substitutions:', subsResult.rows.length);
     }
+    
+    playersResult.rows.forEach(player => {
+      const playerId = player.player_id;
+      const isStarter = player.is_starting === true; // Explicitly check for true
+      
+      // Track player's on-court time
+      let totalSeconds = 0;
+      let isOnCourt = isStarter; // Starters begin on court
+      let lastTime = 0; // Start of game (in seconds from game start)
+      let currentPeriod = 1;
 
-    queryText += ' GROUP BY p.id, p.first_name, p.last_name, p.jersey_number, t.name, s.team_id ORDER BY goals DESC, total_shots DESC';
+      if (process.env.NODE_ENV !== 'test') {
+        console.log(`\nPlayer: ${player.first_name} ${player.last_name} (#${player.jersey_number})`);
+        console.log(`  - is_starting: ${player.is_starting}`);
+        console.log(`  - isStarter: ${isStarter}`);
+        console.log(`  - Initial isOnCourt: ${isOnCourt}`);
+        console.log(`  - Initial lastTime: ${lastTime} seconds`);
+      }
 
-    const result = await db.query(queryText, queryParams);
+      // Process substitutions for this player
+      const playerSubs = subsResult.rows.filter(sub => sub.player_id === playerId);
+      
+      if (process.env.NODE_ENV !== 'test') {
+        console.log(`  - Substitutions for this player: ${playerSubs.length}`);
+      }
+      
+      playerSubs.forEach(sub => {
+        const subTime = (sub.period - 1) * periodDuration * 60 + (periodDuration * 60 - sub.time_remaining_seconds);
+        
+        // Handle period changes
+        if (sub.period > currentPeriod) {
+          if (isOnCourt) {
+            // Add time from last event to end of previous period(s)
+            totalSeconds += (currentPeriod * periodDuration * 60) - lastTime;
+            // Add full periods between
+            totalSeconds += (sub.period - currentPeriod - 1) * periodDuration * 60;
+            // Set last time to start of current period
+            lastTime = (sub.period - 1) * periodDuration * 60;
+          } else {
+            lastTime = (sub.period - 1) * periodDuration * 60;
+          }
+          currentPeriod = sub.period;
+        }
+        
+        if (sub.type === 'in') {
+          isOnCourt = true;
+          lastTime = subTime;
+        } else if (sub.type === 'out') {
+          if (isOnCourt) {
+            totalSeconds += subTime - lastTime;
+          }
+          isOnCourt = false;
+          lastTime = subTime;
+        }
+      });
+
+      // Add remaining time if player is still on court at end of game
+      if (isOnCourt) {
+        const remainingTime = (numberOfPeriods * periodDuration * 60) - lastTime;
+        totalSeconds += remainingTime;
+        if (process.env.NODE_ENV !== 'test') {
+          console.log(`  - Still on court at game end, adding remaining: ${remainingTime} seconds`);
+        }
+      }
+
+      if (process.env.NODE_ENV !== 'test') {
+        console.log(`  - TOTAL PLAY TIME: ${totalSeconds} seconds (${Math.floor(totalSeconds/60)}:${(totalSeconds%60).toString().padStart(2,'0')})`);
+      }
+
+      playTimeMap.set(playerId, Math.round(totalSeconds));
+    });
+
+    // Merge all data
+    const result = {
+      rows: playersResult.rows.map(player => {
+        const shots = shotsResult.rows.find(s => s.player_id === player.player_id) || {
+          total_shots: 0,
+          goals: 0,
+          misses: 0,
+          blocked: 0,
+          field_goal_percentage: 0,
+          avg_distance: 0,
+          avg_x_coord: 0,
+          avg_y_coord: 0,
+          left_zone_shots: 0,
+          center_zone_shots: 0,
+          right_zone_shots: 0,
+          left_zone_goals: 0,
+          center_zone_goals: 0,
+          right_zone_goals: 0
+        };
+
+        return {
+          ...player,
+          ...shots,
+          play_time_seconds: playTimeMap.get(player.player_id) || 0
+        };
+      }).filter(p => p.total_shots > 0 || p.play_time_seconds > 0) // Only include players who played or shot
+        .sort((a, b) => b.goals - a.goals || b.total_shots - a.total_shots)
+    };
 
     // Calculate zone success rates
     const players = result.rows.map(row => ({
@@ -218,7 +374,8 @@ router.get('/shots/:gameId/players', [
       misses: parseInt(row.misses),
       blocked: parseInt(row.blocked),
       field_goal_percentage: parseFloat(row.field_goal_percentage) || 0,
-      avg_distance: parseFloat(row.avg_distance) || 0,
+      average_distance: parseFloat(row.avg_distance) || 0,
+      play_time_seconds: row.play_time_seconds || 0,
       avg_x_coord: parseFloat(row.avg_x_coord) || 0,
       avg_y_coord: parseFloat(row.avg_y_coord) || 0,
       zone_performance: {
@@ -246,7 +403,7 @@ router.get('/shots/:gameId/players', [
       }
     }));
 
-    // Remove raw zone counts from response
+    // Remove raw zone counts and internal fields from response
     players.forEach(player => {
       delete player.left_zone_shots;
       delete player.center_zone_shots;
@@ -254,6 +411,9 @@ router.get('/shots/:gameId/players', [
       delete player.left_zone_goals;
       delete player.center_zone_goals;
       delete player.right_zone_goals;
+      delete player.avg_distance; // Remove since we renamed to average_distance
+      delete player.avg_x_coord;
+      delete player.avg_y_coord;
     });
 
     res.json(players);
@@ -368,7 +528,7 @@ router.get('/shots/:gameId/streaks', [
     const queryParams = [gameId];
 
     if (team_id) {
-      queryText += ` AND s.team_id = $2`;
+      queryText += ' AND s.team_id = $2';
       queryParams.push(team_id);
     }
 
@@ -481,7 +641,7 @@ router.get('/shots/:gameId/zones', [
     const overallParams = [gameId];
 
     if (team_id) {
-      overallQuery += ` AND team_id = $2`;
+      overallQuery += ' AND team_id = $2';
       overallParams.push(team_id);
     }
 
@@ -522,7 +682,7 @@ router.get('/shots/:gameId/zones', [
       const zoneParams = [gameId, zone.min_x, zone.max_x, zone.min_y, zone.max_y];
 
       if (team_id) {
-        zoneQuery += ` AND team_id = $6`;
+        zoneQuery += ' AND team_id = $6';
         zoneParams.push(team_id);
       }
 
@@ -595,7 +755,7 @@ router.get('/shots/:gameId/trends', [
     const queryParams = [gameId];
 
     if (team_id) {
-      queryText += ` AND team_id = $2`;
+      queryText += ' AND team_id = $2';
       queryParams.push(team_id);
     }
 
@@ -638,6 +798,311 @@ router.get('/shots/:gameId/trends', [
   } catch (err) {
     console.error('Error fetching trends:', err);
     res.status(500).json({ error: 'Failed to fetch trend data' });
+  }
+});
+
+/**
+ * Phase 4: Get player development across season
+ * Returns performance metrics across multiple games
+ */
+router.get('/players/:playerId/development', [
+  param('playerId').isInt().withMessage('Player ID must be an integer'),
+  query('team_id').optional().isInt().withMessage('Team ID must be an integer'),
+  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { playerId } = req.params;
+  const { team_id, limit = 10 } = req.query;
+
+  try {
+    let queryText = `
+      SELECT 
+        g.id as game_id,
+        g.date as game_date,
+        t.name as team_name,
+        COUNT(*) as shots,
+        COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as goals,
+        ROUND(
+          COUNT(CASE WHEN s.result = 'goal' THEN 1 END)::numeric / 
+          NULLIF(COUNT(*)::numeric, 0) * 100, 
+          2
+        ) as fg_percentage,
+        ROUND(AVG(s.distance), 2) as avg_distance
+      FROM shots s
+      JOIN games g ON s.game_id = g.id
+      JOIN teams t ON s.team_id = t.id
+      WHERE s.player_id = $1
+    `;
+    const queryParams = [playerId];
+    let paramIndex = 2;
+
+    if (team_id) {
+      queryText += ` AND s.team_id = $${paramIndex}`;
+      queryParams.push(team_id);
+      paramIndex++;
+    }
+
+    queryText += ` GROUP BY g.id, g.date, t.name ORDER BY g.date DESC LIMIT $${paramIndex}`;
+    queryParams.push(limit);
+
+    const result = await db.query(queryText, queryParams);
+
+    const development = result.rows.map((row, index, arr) => {
+      const game = {
+        game_id: row.game_id,
+        game_date: row.game_date,
+        team_name: row.team_name,
+        shots: parseInt(row.shots),
+        goals: parseInt(row.goals),
+        fg_percentage: parseFloat(row.fg_percentage) || 0,
+        avg_distance: parseFloat(row.avg_distance) || 0,
+        improvement: null
+      };
+
+      // Calculate improvement from previous game
+      if (index < arr.length - 1) {
+        const prevFG = parseFloat(arr[index + 1].fg_percentage) || 0;
+        game.improvement = parseFloat((game.fg_percentage - prevFG).toFixed(2));
+      }
+
+      return game;
+    });
+
+    res.json(development);
+  } catch (err) {
+    console.error('Error fetching player development:', err);
+    res.status(500).json({ error: 'Failed to fetch player development data' });
+  }
+});
+
+/**
+ * Phase 4: Get opponent shooting tendencies
+ * Returns aggregated shooting patterns for a team across multiple games
+ */
+router.get('/teams/:teamId/tendencies', [
+  param('teamId').isInt().withMessage('Team ID must be an integer'),
+  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { teamId } = req.params;
+  const { limit = 10 } = req.query;
+
+  try {
+    // Get overall team statistics across recent games
+    const overallStats = await db.query(`
+      SELECT 
+        COUNT(DISTINCT s.game_id) as games_played,
+        COUNT(*) as total_shots,
+        COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as total_goals,
+        ROUND(
+          COUNT(CASE WHEN s.result = 'goal' THEN 1 END)::numeric / 
+          NULLIF(COUNT(*)::numeric, 0) * 100, 
+          2
+        ) as avg_fg_percentage,
+        ROUND(AVG(s.distance), 2) as avg_distance,
+        ROUND(AVG(s.x_coord), 2) as avg_x_coord,
+        ROUND(AVG(s.y_coord), 2) as avg_y_coord
+      FROM shots s
+      WHERE s.team_id = $1
+        AND s.game_id IN (
+          SELECT g.id FROM games g
+          JOIN shots s2 ON g.id = s2.game_id
+          WHERE s2.team_id = $1
+          GROUP BY g.id
+          ORDER BY g.date DESC
+          LIMIT $2
+        )
+    `, [teamId, limit]);
+
+    // Get favorite zones (hot zones across all games)
+    const zoneStats = await db.query(`
+      SELECT 
+        CASE 
+          WHEN s.x_coord < 33.33 THEN 'left'
+          WHEN s.x_coord >= 33.33 AND s.x_coord < 66.67 THEN 'center'
+          ELSE 'right'
+        END as zone,
+        COUNT(*) as shots,
+        COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as goals,
+        ROUND(
+          COUNT(CASE WHEN s.result = 'goal' THEN 1 END)::numeric / 
+          NULLIF(COUNT(*)::numeric, 0) * 100, 
+          2
+        ) as fg_percentage
+      FROM shots s
+      WHERE s.team_id = $1
+        AND s.game_id IN (
+          SELECT g.id FROM games g
+          JOIN shots s2 ON g.id = s2.game_id
+          WHERE s2.team_id = $1
+          GROUP BY g.id
+          ORDER BY g.date DESC
+          LIMIT $2
+        )
+      GROUP BY zone
+      ORDER BY shots DESC
+    `, [teamId, limit]);
+
+    // Get top shooters
+    const topShooters = await db.query(`
+      SELECT 
+        p.id as player_id,
+        p.first_name,
+        p.last_name,
+        p.jersey_number,
+        COUNT(*) as shots,
+        COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as goals,
+        ROUND(
+          COUNT(CASE WHEN s.result = 'goal' THEN 1 END)::numeric / 
+          NULLIF(COUNT(*)::numeric, 0) * 100, 
+          2
+        ) as fg_percentage
+      FROM shots s
+      JOIN players p ON s.player_id = p.id
+      WHERE s.team_id = $1
+        AND s.game_id IN (
+          SELECT g.id FROM games g
+          JOIN shots s2 ON g.id = s2.game_id
+          WHERE s2.team_id = $1
+          GROUP BY g.id
+          ORDER BY g.date DESC
+          LIMIT $2
+        )
+      GROUP BY p.id, p.first_name, p.last_name, p.jersey_number
+      ORDER BY shots DESC
+      LIMIT 5
+    `, [teamId, limit]);
+
+    res.json({
+      overall: {
+        games_played: parseInt(overallStats.rows[0].games_played),
+        total_shots: parseInt(overallStats.rows[0].total_shots),
+        total_goals: parseInt(overallStats.rows[0].total_goals),
+        avg_fg_percentage: parseFloat(overallStats.rows[0].avg_fg_percentage) || 0,
+        avg_distance: parseFloat(overallStats.rows[0].avg_distance) || 0,
+        avg_shot_location: {
+          x: parseFloat(overallStats.rows[0].avg_x_coord) || 0,
+          y: parseFloat(overallStats.rows[0].avg_y_coord) || 0
+        }
+      },
+      zone_preferences: zoneStats.rows.map(row => ({
+        zone: row.zone,
+        shots: parseInt(row.shots),
+        goals: parseInt(row.goals),
+        fg_percentage: parseFloat(row.fg_percentage) || 0
+      })),
+      top_shooters: topShooters.rows.map(row => ({
+        player_id: row.player_id,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        jersey_number: row.jersey_number,
+        shots: parseInt(row.shots),
+        goals: parseInt(row.goals),
+        fg_percentage: parseFloat(row.fg_percentage) || 0
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching team tendencies:', err);
+    res.status(500).json({ error: 'Failed to fetch team tendencies' });
+  }
+});
+
+/**
+ * Phase 4: Get matchup analysis
+ * Compare team performance against specific opponents
+ */
+router.get('/teams/:teamId/matchup/:opponentId', [
+  param('teamId').isInt().withMessage('Team ID must be an integer'),
+  param('opponentId').isInt().withMessage('Opponent ID must be an integer'),
+  query('limit').optional().isInt({ min: 1, max: 20 }).withMessage('Limit must be between 1 and 20')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { teamId, opponentId } = req.params;
+  const { limit = 5 } = req.query;
+
+  try {
+    // Find games between these two teams
+    const games = await db.query(`
+      SELECT DISTINCT g.id, g.date
+      FROM games g
+      WHERE (g.home_team_id = $1 AND g.away_team_id = $2)
+         OR (g.home_team_id = $2 AND g.away_team_id = $1)
+      ORDER BY g.date DESC
+      LIMIT $3
+    `, [teamId, opponentId, limit]);
+
+    const gameIds = games.rows.map(g => g.id);
+
+    if (gameIds.length === 0) {
+      return res.json({
+        games_played: 0,
+        message: 'No games found between these teams',
+        team_stats: null,
+        opponent_stats: null
+      });
+    }
+
+    // Get team stats in these matchups
+    const teamStats = await db.query(`
+      SELECT 
+        COUNT(*) as total_shots,
+        COUNT(CASE WHEN result = 'goal' THEN 1 END) as total_goals,
+        ROUND(
+          COUNT(CASE WHEN result = 'goal' THEN 1 END)::numeric / 
+          NULLIF(COUNT(*)::numeric, 0) * 100, 
+          2
+        ) as avg_fg_percentage,
+        ROUND(AVG(distance), 2) as avg_distance
+      FROM shots
+      WHERE team_id = $1 AND game_id = ANY($2)
+    `, [teamId, gameIds]);
+
+    // Get opponent stats in these matchups
+    const opponentStats = await db.query(`
+      SELECT 
+        COUNT(*) as total_shots,
+        COUNT(CASE WHEN result = 'goal' THEN 1 END) as total_goals,
+        ROUND(
+          COUNT(CASE WHEN result = 'goal' THEN 1 END)::numeric / 
+          NULLIF(COUNT(*)::numeric, 0) * 100, 
+          2
+        ) as avg_fg_percentage,
+        ROUND(AVG(distance), 2) as avg_distance
+      FROM shots
+      WHERE team_id = $1 AND game_id = ANY($2)
+    `, [opponentId, gameIds]);
+
+    res.json({
+      games_played: games.rows.length,
+      game_dates: games.rows.map(g => g.date),
+      team_stats: {
+        total_shots: parseInt(teamStats.rows[0].total_shots),
+        total_goals: parseInt(teamStats.rows[0].total_goals),
+        avg_fg_percentage: parseFloat(teamStats.rows[0].avg_fg_percentage) || 0,
+        avg_distance: parseFloat(teamStats.rows[0].avg_distance) || 0
+      },
+      opponent_stats: {
+        total_shots: parseInt(opponentStats.rows[0].total_shots),
+        total_goals: parseInt(opponentStats.rows[0].total_goals),
+        avg_fg_percentage: parseFloat(opponentStats.rows[0].avg_fg_percentage) || 0,
+        avg_distance: parseFloat(opponentStats.rows[0].avg_distance) || 0
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching matchup analysis:', err);
+    res.status(500).json({ error: 'Failed to fetch matchup analysis' });
   }
 });
 

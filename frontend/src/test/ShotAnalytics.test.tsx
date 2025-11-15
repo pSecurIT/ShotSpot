@@ -259,22 +259,35 @@ describe('ShotAnalytics Component', () => {
     });
 
     it('should display player statistics table', async () => {
-      mockGet.mockResolvedValue({ data: mockPlayerStats });
+      mockGet.mockImplementation((url) => {
+        if (url.includes('/summary')) {
+          return Promise.resolve({ data: mockGameSummary });
+        }
+        return Promise.resolve({ data: mockPlayerStats });
+      });
       renderShotAnalytics();
 
       const playerStatsTab = screen.getByText('👤 Player Stats');
       fireEvent.click(playerStatsTab);
 
       await waitFor(() => {
-        expect(screen.getByText('Player')).toBeInTheDocument();
-        expect(screen.getByText('Shots')).toBeInTheDocument();
-        expect(screen.getByText('Goals')).toBeInTheDocument();
-        expect(screen.getByText('FG%')).toBeInTheDocument();
+        const table = screen.getByRole('table');
+        expect(table).toBeInTheDocument();
+        // Check for table headers by role
+        expect(screen.getAllByRole('columnheader').some(th => th.textContent?.includes('Player'))).toBe(true);
+        expect(screen.getAllByRole('columnheader').some(th => th.textContent?.includes('Shots'))).toBe(true);
+        expect(screen.getAllByRole('columnheader').some(th => th.textContent?.includes('Goals'))).toBe(true);
+        expect(screen.getAllByRole('columnheader').some(th => th.textContent?.includes('FG%'))).toBe(true);
       });
     });
 
     it('should display zone performance columns', async () => {
-      mockGet.mockResolvedValue({ data: mockPlayerStats });
+      mockGet.mockImplementation((url) => {
+        if (url.includes('/summary')) {
+          return Promise.resolve({ data: mockGameSummary });
+        }
+        return Promise.resolve({ data: mockPlayerStats });
+      });
       renderShotAnalytics();
 
       const playerStatsTab = screen.getByText('👤 Player Stats');
@@ -288,7 +301,12 @@ describe('ShotAnalytics Component', () => {
     });
 
     it('should display player data in table rows', async () => {
-      mockGet.mockResolvedValue({ data: mockPlayerStats });
+      mockGet.mockImplementation((url) => {
+        if (url.includes('/summary')) {
+          return Promise.resolve({ data: mockGameSummary });
+        }
+        return Promise.resolve({ data: mockPlayerStats });
+      });
       renderShotAnalytics();
 
       const playerStatsTab = screen.getByText('👤 Player Stats');
@@ -468,6 +486,261 @@ describe('ShotAnalytics Component', () => {
 
       await waitFor(() => {
         expect(playerStatsTab).toHaveClass('active');
+      });
+    });
+  });
+
+  describe('🏆 Achievements Tab', () => {
+    const mockAchievements = [
+      {
+        id: 1,
+        name: 'Sharpshooter',
+        description: 'Score 10 goals in a single game',
+        badge_icon: '🎯',
+        category: 'shooting',
+        criteria: { goals_in_game: 10 },
+        points: 50,
+        earned_at: '2024-11-15T10:30:00.000Z',
+        game_id: 1
+      },
+      {
+        id: 2,
+        name: 'Perfect Game',
+        description: 'Achieve 100% field goal percentage (minimum 5 shots)',
+        badge_icon: '💯',
+        category: 'shooting',
+        criteria: { fg_percentage: 100, min_shots: 5 },
+        points: 100
+      }
+    ];
+
+    const mockLeaderboard = {
+      season: '2024-2025',
+      leaderboard: [
+        {
+          rank: 1,
+          id: 1,
+          first_name: 'John',
+          last_name: 'Doe',
+          team_name: 'Team A',
+          jersey_number: 10,
+          total_shots: 50,
+          total_goals: 35,
+          fg_percentage: 70.0,
+          achievement_points: 250,
+          games_played: 10
+        },
+        {
+          rank: 2,
+          id: 2,
+          first_name: 'Jane',
+          last_name: 'Smith',
+          team_name: 'Team B',
+          jersey_number: 11,
+          total_shots: 45,
+          total_goals: 30,
+          fg_percentage: 66.7,
+          achievement_points: 200,
+          games_played: 9
+        }
+      ]
+    };
+
+
+
+    it('should render achievements tab button', async () => {
+      mockGet.mockResolvedValue({ data: mockHeatmapData });
+      renderShotAnalytics();
+
+      await waitFor(() => {
+        expect(screen.getByText('🏆 Achievements')).toBeInTheDocument();
+      });
+    });
+
+    it('should switch to achievements view when tab clicked', async () => {
+      mockGet.mockResolvedValue({ data: mockAchievements });
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(achievementsTab).toHaveClass('active');
+      });
+    });
+
+    it('should fetch achievements list when tab opened', async () => {
+      mockGet.mockResolvedValue({ data: mockAchievements });
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(mockGet).toHaveBeenCalledWith('/achievements/list');
+      });
+    });
+
+    it('should display all achievements in grid', async () => {
+      mockGet.mockResolvedValue({ data: mockAchievements });
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('Sharpshooter')).toBeInTheDocument();
+        expect(screen.getByText('Perfect Game')).toBeInTheDocument();
+      });
+    });
+
+    it('should fetch global leaderboard on achievements tab open', async () => {
+      mockGet
+        .mockResolvedValueOnce({ data: mockHeatmapData })
+        .mockResolvedValueOnce({ data: mockAchievements })
+        .mockResolvedValueOnce({ data: mockLeaderboard });
+
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(mockGet).toHaveBeenCalledWith('/achievements/leaderboard');
+      });
+    });
+
+    it('should display leaderboard players', async () => {
+      mockGet
+        .mockResolvedValueOnce({ data: mockHeatmapData })
+        .mockResolvedValueOnce({ data: mockAchievements })
+        .mockResolvedValueOnce({ data: mockLeaderboard });
+
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle achievements fetch error gracefully', async () => {
+      mockGet.mockRejectedValue(new Error('Failed to fetch achievements'));
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(mockGet).toHaveBeenCalledWith('/achievements/list');
+      });
+      
+      // Should not crash, error is logged but component continues
+    });
+
+    it('should handle leaderboard fetch error gracefully', async () => {
+      mockGet
+        .mockResolvedValueOnce({ data: mockHeatmapData })
+        .mockResolvedValueOnce({ data: mockAchievements })
+        .mockRejectedValueOnce(new Error('Failed to fetch leaderboard'));
+
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(mockGet).toHaveBeenCalledWith('/achievements/leaderboard');
+      });
+
+      // Should not crash, error is logged but component continues
+    });
+
+    it('should render player select dropdown', async () => {
+      mockGet
+        .mockResolvedValueOnce({ data: mockHeatmapData })
+        .mockResolvedValueOnce({ data: mockAchievements })
+        .mockResolvedValueOnce({ data: mockLeaderboard });
+
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('Select Player')).toBeInTheDocument();
+      });
+    });
+
+    it('should render leaderboard type dropdown', async () => {
+      mockGet
+        .mockResolvedValueOnce({ data: mockHeatmapData })
+        .mockResolvedValueOnce({ data: mockAchievements })
+        .mockResolvedValueOnce({ data: mockLeaderboard });
+
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('Leaderboard Type')).toBeInTheDocument();
+      });
+    });
+
+    it('should display all achievements section when no player selected', async () => {
+      mockGet
+        .mockResolvedValueOnce({ data: mockHeatmapData })
+        .mockResolvedValueOnce({ data: mockAchievements })
+        .mockResolvedValueOnce({ data: mockLeaderboard });
+
+      renderShotAnalytics();
+
+      const achievementsTab = screen.getByText('🏆 Achievements');
+      fireEvent.click(achievementsTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('🎯 All Available Achievements')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('⌨️ Keyboard Shortcut - Achievements', () => {
+    const mockAchievements = [
+      {
+        id: 1,
+        name: 'Sharpshooter',
+        description: 'Score 10 goals in a single game',
+        badge_icon: '🎯',
+        category: 'shooting',
+        criteria: { goals_in_game: 10 },
+        points: 50
+      }
+    ];
+
+    it('should switch to achievements tab when "8" key pressed', async () => {
+      mockGet.mockResolvedValue({ data: mockAchievements });
+      renderShotAnalytics();
+
+      fireEvent.keyDown(document, { key: '8' });
+
+      await waitFor(() => {
+        const achievementsTab = screen.getByText('🏆 Achievements');
+        expect(achievementsTab).toHaveClass('active');
+      });
+    });
+
+    it('should fetch achievements when keyboard shortcut used', async () => {
+      mockGet.mockResolvedValue({ data: mockAchievements });
+      renderShotAnalytics();
+
+      fireEvent.keyDown(document, { key: '8' });
+
+      await waitFor(() => {
+        expect(mockGet).toHaveBeenCalledWith('/achievements/list');
       });
     });
   });

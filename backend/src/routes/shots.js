@@ -163,7 +163,26 @@ router.post('/:gameId', [
       WHERE s.id = $1
     `, [shot.id]);
 
-    res.status(201).json(completeShotResult.rows[0]);
+    const completeShot = completeShotResult.rows[0];
+
+    // Emit WebSocket event for real-time analytics update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`game-${gameId}`).emit('shot-recorded', {
+        gameId: parseInt(gameId),
+        shot: completeShot,
+        timestamp: new Date().toISOString()
+      });
+
+      // Emit analytics refresh event
+      io.to(`game-${gameId}`).emit('analytics-update', {
+        gameId: parseInt(gameId),
+        type: 'shot',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.status(201).json(completeShot);
   } catch (err) {
     console.error('Error creating shot:', err);
     res.status(500).json({ error: 'Failed to create shot' });
