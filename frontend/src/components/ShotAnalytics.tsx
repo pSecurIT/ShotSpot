@@ -108,6 +108,12 @@ const ShotAnalytics: React.FC = () => {
   const [teams, setTeams] = useState<{ id: number; name: string }[]>([]);
   const [periods, setPeriods] = useState<number[]>([]);
 
+  // Phase 1: Enhanced visualization states
+  const [selectedShot, setSelectedShot] = useState<ShotChartShot | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [animatedPeriod, setAnimatedPeriod] = useState<number | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+
   // Court ref for positioning
   const courtRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -295,6 +301,35 @@ const ShotAnalytics: React.FC = () => {
           </div>
         </div>
 
+        {periods.length > 1 && (
+          <div className="animation-controls">
+            <button 
+              onClick={async () => {
+                if (!isAnimating) {
+                  setIsAnimating(true);
+                  const originalPeriod = selectedPeriod;
+                  
+                  for (let i = 0; i < periods.length; i++) {
+                    setAnimatedPeriod(periods[i]);
+                    setSelectedPeriod(periods[i]);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                  }
+                  
+                  setIsAnimating(false);
+                  setAnimatedPeriod(null);
+                  setSelectedPeriod(originalPeriod);
+                }
+              }}
+              disabled={isAnimating}
+            >
+              {isAnimating ? 'Animating...' : 'Animate by Period'}
+            </button>
+            {isAnimating && animatedPeriod && (
+              <span className="animation-status">Showing Period {animatedPeriod}</span>
+            )}
+          </div>
+        )}
+
         <div className="court-container" ref={courtRef}>
           <img 
             ref={imageRef}
@@ -389,7 +424,20 @@ const ShotAnalytics: React.FC = () => {
           </div>
         </div>
 
-        <div className="court-container" ref={courtRef}>
+        <div className="zoom-controls">
+          <button onClick={() => setZoomLevel(prev => Math.min(prev + 0.25, 3))} disabled={zoomLevel >= 3}>
+            Zoom In (+)
+          </button>
+          <span className="zoom-level">{Math.round(zoomLevel * 100)}%</span>
+          <button onClick={() => setZoomLevel(prev => Math.max(prev - 0.25, 1))} disabled={zoomLevel <= 1}>
+            Zoom Out (-)
+          </button>
+          <button onClick={() => setZoomLevel(1)} disabled={zoomLevel === 1}>
+            Reset
+          </button>
+        </div>
+
+        <div className="court-container" ref={courtRef} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.3s ease' }}>
           <img 
             ref={imageRef}
             src={courtImageUrl} 
@@ -406,13 +454,40 @@ const ShotAnalytics: React.FC = () => {
                   top: `${shot.y_coord}%`,
                   backgroundColor: getShotColor(shot.result),
                 }}
-                title={`${shot.first_name} ${shot.last_name} (#${shot.jersey_number})\n${shot.team_name}\n${shot.result.toUpperCase()}${shot.distance ? `\n${shot.distance}m` : ''}`}
+                onClick={() => setSelectedShot(shot)}
               >
                 {getShotMarker(shot.result)}
               </div>
             ))}
           </div>
         </div>
+
+        {selectedShot && (
+          <div className="shot-modal-overlay" onClick={() => setSelectedShot(null)}>
+            <div className="shot-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="modal-close" onClick={() => setSelectedShot(null)}>×</button>
+              <h3>Shot Details</h3>
+              <div className="modal-content">
+                <div className="modal-section">
+                  <h4>Player</h4>
+                  <p>#{selectedShot.jersey_number} {selectedShot.first_name} {selectedShot.last_name}</p>
+                  <p className="team-name">{selectedShot.team_name}</p>
+                </div>
+                <div className="modal-section">
+                  <h4>Shot Information</h4>
+                  <p><strong>Result:</strong> <span className={`result-badge ${selectedShot.result}`}>{selectedShot.result.toUpperCase()}</span></p>
+                  <p><strong>Period:</strong> {selectedShot.period}</p>
+                  <p><strong>Distance:</strong> {selectedShot.distance ? `${selectedShot.distance}m` : 'N/A'}</p>
+                </div>
+                <div className="modal-section">
+                  <h4>Location</h4>
+                  <p><strong>X:</strong> {selectedShot.x_coord.toFixed(1)}%</p>
+                  <p><strong>Y:</strong> {selectedShot.y_coord.toFixed(1)}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="shot-chart-legend">
           <h4>Shot Chart</h4>
