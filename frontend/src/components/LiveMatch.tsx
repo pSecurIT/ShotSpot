@@ -1862,6 +1862,12 @@ const LiveMatch: React.FC = () => {
                   >
                     📝 Commentary
                   </button>
+                  <button
+                    className="tab-button analytics-button"
+                    onClick={() => navigate(`/analytics/${gameId}`)}
+                  >
+                    📈 Analytics
+                  </button>
                 </div>
               </div>
 

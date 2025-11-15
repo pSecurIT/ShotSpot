@@ -5423,6 +5423,16 @@ select.error:focus {
   transform: translateY(-1px);
 }
 
+.tab-button.analytics-button {
+  background: rgba(102, 126, 234, 0.2);
+  border-color: rgba(102, 126, 234, 0.5);
+}
+
+.tab-button.analytics-button:hover {
+  background: rgba(102, 126, 234, 0.3);
+  border-color: rgba(102, 126, 234, 0.7);
+}
+
 .tab-content {
   padding: 0;
   min-height: 400px;

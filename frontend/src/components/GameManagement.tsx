@@ -397,10 +397,33 @@ const GameManagement: React.FC = () => {
                         View Live Match
                       </button>
                       <button 
+                        onClick={() => navigate(`/analytics/${game.id}`)}
+                        className="secondary-button"
+                      >
+                        📈 Analytics
+                      </button>
+                      <button 
                         onClick={() => handleEndGame(game.id)}
                         className="secondary-button"
                       >
                         End Game
+                      </button>
+                    </>
+                  )}
+
+                  {game.status === 'completed' && (
+                    <>
+                      <button 
+                        onClick={() => navigate(`/match/${game.id}`)}
+                        className="secondary-button"
+                      >
+                        View Match Details
+                      </button>
+                      <button 
+                        onClick={() => navigate(`/analytics/${game.id}`)}
+                        className="primary-button"
+                      >
+                        📈 View Analytics
                       </button>
                     </>
                   )}
