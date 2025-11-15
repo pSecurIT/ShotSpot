@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import CourtVisualization from './CourtVisualization';
@@ -127,6 +127,10 @@ const LiveMatch: React.FC = () => {
     setError(null);
     setSuccess('⏰ Period has ended! Timer paused automatically.');
     setTimeout(() => setSuccess(null), 4000);
+    
+    // Clear active possession when period ends
+    setActivePossession(null);
+    setPossessionDuration(0);
   }, []);
 
   const { timerState, refetch: fetchTimerState, setTimerStateOptimistic, periodHasEnded, resetPeriodEndState } = useTimer(gameId, {
@@ -848,6 +852,10 @@ const LiveMatch: React.FC = () => {
     try {
       setError(null);
       
+      // Clear active possession when starting new period
+      setActivePossession(null);
+      setPossessionDuration(0);
+      
       // 🔥 OPTIMISTIC UPDATE: Increment period immediately
       if (timerState && game) {
         const nextPeriod = timerState.current_period + 1;
@@ -1050,14 +1058,13 @@ const LiveMatch: React.FC = () => {
     Promise.all([
       fetchGame(),
       fetchPossessionStats(),
-      fetchActivePossession(),
-      fetchTimerState()
+      fetchActivePossession()
     ]).catch(error => {
       if (process.env.NODE_ENV === 'development') {
         console.error('Error refreshing game data:', error);
       }
     });
-  }, [activePossession, gameId, handleCenterLineCross, fetchActivePossession, fetchTimerState, fetchGame, fetchPossessionStats, canAddEvents, periodHasEnded, resetPeriodEndState]);
+  }, [activePossession, gameId, handleCenterLineCross, fetchActivePossession, fetchGame, fetchPossessionStats, canAddEvents, periodHasEnded, resetPeriodEndState]);
 
   // Load possession data
   useEffect(() => {
@@ -1068,16 +1075,69 @@ const LiveMatch: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id, game?.status, fetchActivePossession, fetchPossessionStats]);
 
+  // Use ref to track possession start time - prevents resets when optimistic ID updates to real ID
+  const possessionStartTimeRef = useRef<number | null>(null);
+  const possessionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const totalPausedDurationRef = useRef<number>(0); // Track total time spent paused (in ms)
+  const lastPauseTimeRef = useRef<number | null>(null); // Track when timer was paused
+  const wasRunningRef = useRef<boolean>(false); // Track if timer was running
+  
+  // Update possession start time ref when possession changes (but not when ID just updates)
+  // Track when possession starts (using state to trigger timer effect)
+  const [possessionStarted, setPossessionStarted] = useState<number | null>(null);
+  
+  useEffect(() => {
+    if (activePossession) {
+      const newStartTime = new Date(activePossession.started_at).getTime();
+      
+      // Only update ref if this is actually a NEW possession (different start time by more than 1 second)
+      // This prevents reset when optimistic possession gets replaced with server response
+      if (!possessionStartTimeRef.current || 
+          Math.abs(newStartTime - possessionStartTimeRef.current) > 1000) {
+        possessionStartTimeRef.current = newStartTime;
+        totalPausedDurationRef.current = 0; // Reset paused time for new possession
+        lastPauseTimeRef.current = null;
+        wasRunningRef.current = false;
+        setPossessionStarted(newStartTime); // Trigger timer effect
+      }
+    } else {
+      possessionStartTimeRef.current = null;
+      totalPausedDurationRef.current = 0;
+      lastPauseTimeRef.current = null;
+      wasRunningRef.current = false;
+      setPossessionStarted(null);
+    }
+    // Intentionally NOT depending on activePossession to prevent reset when optimistic ID updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePossession?.started_at]);
+
   // Client-side possession duration timer (pauses when game timer is paused)
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    // Clear existing interval
+    if (possessionIntervalRef.current) {
+      clearInterval(possessionIntervalRef.current);
+      possessionIntervalRef.current = null;
+    }
     
-    if (activePossession && timerState?.timer_state === 'running') {
-      // Calculate initial duration based on started_at
+    const isRunning = timerState?.timer_state === 'running';
+    
+    if (activePossession && isRunning && possessionStartTimeRef.current) {
+      // Timer is running - count up from current position
+      
+      // If we're resuming from pause, add the paused duration to our total
+      if (wasRunningRef.current === false && lastPauseTimeRef.current !== null) {
+        const pauseDuration = Date.now() - lastPauseTimeRef.current;
+        totalPausedDurationRef.current += pauseDuration;
+        lastPauseTimeRef.current = null;
+      }
+      wasRunningRef.current = true;
+      
       const calculateDuration = () => {
-        const startTime = new Date(activePossession.started_at).getTime();
+        if (!possessionStartTimeRef.current) return;
         const now = Date.now();
-        const durationSeconds = Math.floor((now - startTime) / 1000);
+        // Calculate elapsed time minus total paused duration
+        const elapsed = now - possessionStartTimeRef.current - totalPausedDurationRef.current;
+        const durationSeconds = Math.floor(elapsed / 1000);
         setPossessionDuration(durationSeconds);
       };
       
@@ -1085,27 +1145,39 @@ const LiveMatch: React.FC = () => {
       calculateDuration();
       
       // Update duration every second only when timer is running
-      interval = setInterval(() => {
+      possessionIntervalRef.current = setInterval(() => {
         calculateDuration();
       }, 1000);
-    } else if (activePossession && timerState?.timer_state !== 'running') {
+    } else if (activePossession && !isRunning && possessionStartTimeRef.current) {
       // Timer paused/stopped - freeze duration at current value
-      const startTime = new Date(activePossession.started_at).getTime();
-      const now = Date.now();
-      const durationSeconds = Math.floor((now - startTime) / 1000);
-      setPossessionDuration(durationSeconds);
+      if (wasRunningRef.current === true) {
+        // Just paused - record the pause time
+        lastPauseTimeRef.current = Date.now();
+        wasRunningRef.current = false;
+      }
+      
+      // Keep displaying the frozen duration (calculate without adding more paused time)
+      if (lastPauseTimeRef.current !== null) {
+        const elapsed = lastPauseTimeRef.current - possessionStartTimeRef.current - totalPausedDurationRef.current;
+        const durationSeconds = Math.floor(elapsed / 1000);
+        setPossessionDuration(durationSeconds);
+      }
     } else {
       // No active possession, reset duration
       setPossessionDuration(0);
+      lastPauseTimeRef.current = null;
+      wasRunningRef.current = false;
     }
 
     return () => {
-      if (interval) {
-        clearInterval(interval);
+      if (possessionIntervalRef.current) {
+        clearInterval(possessionIntervalRef.current);
+        possessionIntervalRef.current = null;
       }
     };
+    // Timer state and possession start time changes should trigger interval update
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePossession?.id, activePossession?.started_at, timerState?.timer_state]);
+  }, [timerState?.timer_state, possessionStarted]);
 
   // Format time remaining
   const formatTime = (timeObj: { minutes?: number; seconds?: number; hours?: number } | null): string => {

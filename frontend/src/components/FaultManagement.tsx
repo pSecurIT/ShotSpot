@@ -63,10 +63,22 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
   const [faultType, setFaultType] = useState<'fault_offensive' | 'fault_defensive' | 'fault_out_of_bounds'>('fault_offensive');
   const [faultReason, setFaultReason] = useState('');
 
+  // Ref to track mounted state for cleanup
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     fetchPlayers();
     fetchRecentFaults();
   }, [gameId, homeTeamId, awayTeamId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchPlayers = async () => {
     try {
@@ -144,7 +156,14 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
       }
 
       // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
+      // Clear any existing timeout first
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        timeoutRef.current = null;
+      }, 3000);
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to record fault');

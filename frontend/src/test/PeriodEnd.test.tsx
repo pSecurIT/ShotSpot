@@ -139,9 +139,9 @@ describe('Period End Functionality', () => {
         />
       );
 
-      // Select a player first
-      const playerSelect = screen.getByDisplayValue('Select player');
-      fireEvent.change(playerSelect, { target: { value: '1' } });
+      // Select a player first (using new player grid button)
+      const playerButton = screen.getByTitle('Select John Doe');
+      fireEvent.click(playerButton);
 
       // Click on court to select position
       const court = screen.getByRole('img');
@@ -214,9 +214,9 @@ describe('Period End Functionality', () => {
         />
       );
 
-      // Select a player first
-      const playerSelect = screen.getByDisplayValue('Select player');
-      fireEvent.change(playerSelect, { target: { value: '1' } });
+      // Select a player first (using new player grid button)
+      const playerButton = screen.getByTitle('Select John Doe');
+      fireEvent.click(playerButton);
 
       // Click on court to select position
       const court = screen.getByRole('img');

@@ -50,7 +50,7 @@ router.post(
         [gameId]
       );
 
-      // Create new possession
+      // Create new possession and include team name
       const result = await pool.query(
         `INSERT INTO ball_possessions (game_id, team_id, period)
          VALUES ($1, $2, $3)
@@ -58,7 +58,16 @@ router.post(
         [gameId, team_id, period]
       );
 
-      return res.status(201).json(result.rows[0]);
+      // Fetch the possession with team name to match GET /active response format
+      const possessionWithTeam = await pool.query(
+        `SELECT p.*, t.name as team_name
+         FROM ball_possessions p
+         JOIN teams t ON p.team_id = t.id
+         WHERE p.id = $1`,
+        [result.rows[0].id]
+      );
+
+      return res.status(201).json(possessionWithTeam.rows[0]);
     } catch (error) {
       console.error('Error creating possession:', error);
       
