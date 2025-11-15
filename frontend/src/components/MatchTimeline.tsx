@@ -270,7 +270,7 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
 
   const renderEventDetails = (event: TimelineEvent) => {
     const details = event.details;
-    if (!details) return null;
+    if (!details || !event.event_type) return null;
 
     // Type guard to safely access properties
     const getStringProp = (obj: Record<string, unknown>, key: string): string | undefined => {
@@ -549,11 +549,11 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
 
               return (
                 <div key={`event-${event.id}`} className={`timeline-item event ${isHome ? 'home' : 'away'}`}>
-                  <div className="timeline-icon">{getEventIcon(event.event_type)}</div>
+                  <div className="timeline-icon">{getEventIcon(event.event_type || 'unknown')}</div>
                   <div className="timeline-content">
                     <div className="timeline-header-row">
                       <div className="timeline-info">
-                        <span className="event-type">{event.event_type.replace('_', ' ').toUpperCase()}</span>
+                        <span className="event-type">{event.event_type?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}</span>
                         <span className="team-badge">{event.team_name}</span>
                       </div>
                       <div className="timeline-meta">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 
 interface Player {
@@ -65,10 +65,22 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
   const [reason, setReason] = useState('');
   const [distance, setDistance] = useState<string>('');
 
+  // Ref to track timeout for cleanup
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     fetchPlayers();
     fetchRecentFreeShots();
   }, [gameId, homeTeamId, awayTeamId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchPlayers = async () => {
     try {
@@ -139,7 +151,13 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
       }
 
       // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to record free shot');
@@ -156,7 +174,13 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
       if (onFreeShotRecorded) {
         onFreeShotRecorded();
       }
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to remove free shot');

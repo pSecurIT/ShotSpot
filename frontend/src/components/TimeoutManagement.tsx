@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
 
 interface TimeoutManagementProps {
@@ -49,6 +49,18 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
   const [selectedTeam, setSelectedTeam] = useState<number | null>(homeTeamId);
   const [timeoutType, setTimeoutType] = useState<'team' | 'injury' | 'official' | 'tv'>('team');
   const [duration, setDuration] = useState('1 minute');
+
+  // Ref to track timeout for cleanup
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
   const [reason, setReason] = useState('');
   const [calledBy, setCalledBy] = useState('');
 
@@ -120,7 +132,13 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
       }
 
       // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to start timeout');
@@ -137,7 +155,13 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
       if (onTimeoutRecorded) {
         onTimeoutRecorded();
       }
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to end timeout');
@@ -152,7 +176,13 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
       if (onTimeoutRecorded) {
         onTimeoutRecorded();
       }
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to remove timeout');
