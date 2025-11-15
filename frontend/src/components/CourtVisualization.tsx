@@ -695,25 +695,26 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
             </select>
           </div>
 
-          {/* Player Selection - Only show OFFENSIVE players */}
-          <div className="form-group">
+          {/* Solution 3: Mobile Player Grid - Touch-friendly player selection */}
+          <div className="form-group player-selection-group">
             <label>Offensive Player:</label>
-            <select
-              value={selectedPlayerId || ''}
-              onChange={(e) => {
-                const playerId = parseInt(e.target.value);
-                setSelectedPlayerId(playerId);
-                setLastSelectedPlayerId(playerId);
-              }}
-            >
-              <option value="">Select player</option>
+            <div className="player-grid">
               {/* eslint-disable-next-line react-hooks/refs */}
               {getCurrentOffensivePlayers(selectedTeam === 'home' ? homeTeamId : awayTeamId).map((player) => (
-                <option key={player.id} value={player.id}>
-                  #{player.jersey_number} {player.first_name} {player.last_name}
-                </option>
+                <button
+                  key={player.id}
+                  className={`player-card ${selectedPlayerId === player.id ? 'selected' : ''}`}
+                  onClick={() => {
+                    setSelectedPlayerId(player.id);
+                    setLastSelectedPlayerId(player.id);
+                  }}
+                  title={`Select ${player.first_name} ${player.last_name}`}
+                >
+                  <span className="jersey-large">#{player.jersey_number}</span>
+                  <span className="name-compact">{player.first_name[0]}. {player.last_name}</span>
+                </button>
               ))}
-            </select>
+            </div>
             <small className="helper-text">
               {(() => {
                 const teamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
