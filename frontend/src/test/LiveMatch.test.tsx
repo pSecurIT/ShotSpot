@@ -309,7 +309,7 @@ describe('LiveMatch', () => {
       await user.click(screen.getByText('🎯 Focus Mode'));
 
       await waitFor(() => {
-        expect(screen.getAllByText('📱 Exit Focus').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Exit Focus').length).toBeGreaterThan(0);
       });
     });
 
@@ -325,7 +325,7 @@ describe('LiveMatch', () => {
       document.dispatchEvent(event);
 
       await waitFor(() => {
-        expect(screen.getAllByText('📱 Exit Focus').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Exit Focus').length).toBeGreaterThan(0);
       });
     });
 

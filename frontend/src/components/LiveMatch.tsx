@@ -8,6 +8,7 @@ import FaultManagement from './FaultManagement';
 import TimeoutManagement from './TimeoutManagement';
 import FreeShotPanel from './FreeShotPanel';
 import MatchCommentary from './MatchCommentary';
+import FocusMode from './FocusMode';
 import { useTimer } from '../hooks/useTimer';
 
 /**
@@ -179,7 +180,21 @@ const LiveMatch: React.FC = () => {
   // Active tab for Enhanced Match Events
   const [activeTab, setActiveTab] = useState<'timeline' | 'faults' | 'timeouts' | 'freeshots' | 'commentary'>('timeline');
 
-  // Focus mode state for mobile-optimized fullscreen experience
+  /**
+   * Focus mode state for mobile-optimized fullscreen experience
+   * 
+   * DATA PERSISTENCE GUARANTEE:
+   * Toggling between normal view and focus mode does NOT lose any data because:
+   * 1. All game state (game, players, timer, possession, scores) remains in LiveMatch parent component
+   * 2. FocusMode component is stateless and receives ALL data via props
+   * 3. Both views share the same event handlers (onShotRecorded, onSubstitutionRecorded, etc.)
+   * 4. When focusMode boolean changes, only the rendered component changes - state persists
+   * 
+   * Example flow:
+   * - User records shot in focus mode → handleShotRecorded updates game state in LiveMatch
+   * - User exits focus mode → focusMode set to false, normal view renders
+   * - Shot data remains in game.home_score/away_score and is visible in both views
+   */
   const [focusMode, setFocusMode] = useState<boolean>(false);
 
   // Fetch game data
@@ -1560,8 +1575,46 @@ const LiveMatch: React.FC = () => {
     );
   }
 
+  // Render Focus Mode if enabled
+  if (focusMode) {
+    return (
+      <FocusMode
+        gameId={parseInt(gameId!)}
+        homeTeamId={game.home_team_id}
+        awayTeamId={game.away_team_id}
+        homeTeamName={game.home_team_name}
+        awayTeamName={game.away_team_name}
+        homeScore={game.home_score}
+        awayScore={game.away_score}
+        currentPeriod={timerState?.current_period || game.current_period}
+        numberOfPeriods={game.number_of_periods || 4}
+        homeAttackingSide={game.home_attacking_side}
+        timerState={timerState?.timer_state}
+        timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining || game.period_duration)}
+        homePlayers={homePlayers}
+        awayPlayers={awayPlayers}
+        activePossession={activePossession}
+        possessionDuration={possessionDuration}
+        onShotRecorded={handleShotRecorded}
+        onCenterLineCross={handleCenterLineCross}
+        onStartTimer={handleStartTimer}
+        onPauseTimer={handlePauseTimer}
+        onNextPeriod={handleNextPeriod}
+        onEndGame={handleEndGame}
+        onExitFocus={toggleFocusMode}
+        onSubstitutionRecorded={() => {
+          fetchPlayers();
+          fetchGame();
+        }}
+        canAddEvents={canAddEvents}
+        onResumeTimer={handleStartTimer}
+        courtResetKey={courtResetKey}
+      />
+    );
+  }
+
   return (
-    <div className={`live-match-container ${focusMode ? 'focus-mode' : ''}`}>
+    <div className="live-match-container">
       <div className="live-match-header">
         <button onClick={() => navigate('/games')} className="back-button">
           ← Back to Games
@@ -1570,9 +1623,9 @@ const LiveMatch: React.FC = () => {
         <button 
           onClick={toggleFocusMode} 
           className="focus-mode-toggle"
-          title={`${focusMode ? 'Exit' : 'Enter'} Focus Mode (Press F) - Optimized fullscreen view for mobile devices`}
+          title="Enter Focus Mode (Press F) - Optimized fullscreen view for mobile devices"
         >
-          {focusMode ? '📱 Exit Focus' : '🎯 Focus Mode'}
+          🎯 Focus Mode
         </button>
       </div>
 
@@ -1580,7 +1633,7 @@ const LiveMatch: React.FC = () => {
       {success && <div className="success-message">{success}</div>}
 
       {/* Scoreboard */}
-      <div className={`scoreboard ${focusMode ? 'scoreboard-compact' : ''}`}>
+      <div className="scoreboard">
         <div className="team-section home-team">
           <h3>{game.home_team_name}</h3>
           <div className="score">{game.home_score}</div>
@@ -1658,104 +1711,8 @@ const LiveMatch: React.FC = () => {
         </div>
       )}
 
-      {/* Court Visualization with Focus Mode Support */}
-      <div className={`court-section ${focusMode ? 'court-section-focus' : ''}`}>
-        {focusMode && (
-          <>
-            {/* Visual indicators for attacking sides */}
-            <div className={`attacking-side-indicator left-side ${
-              activePossession?.team_id === (game.home_attacking_side === 'left' ? game.home_team_id : game.away_team_id) ? 'active' : ''
-            }`}>
-              <div className="indicator-content">
-                <div className="team-name">
-                  {game.home_attacking_side === 'left' ? game.home_team_name : game.away_team_name}
-                </div>
-                {activePossession?.team_id === (game.home_attacking_side === 'left' ? game.home_team_id : game.away_team_id) && (
-                  <div className="possession-indicator">
-                    <div className="possession-pulse"></div>
-                    <span>⚽ HAS BALL</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className={`attacking-side-indicator right-side ${
-              activePossession?.team_id === (game.home_attacking_side === 'right' ? game.home_team_id : game.away_team_id) ? 'active' : ''
-            }`}>
-              <div className="indicator-content">
-                <div className="team-name">
-                  {game.home_attacking_side === 'right' ? game.home_team_name : game.away_team_name}
-                </div>
-                {activePossession?.team_id === (game.home_attacking_side === 'right' ? game.home_team_id : game.away_team_id) && (
-                  <div className="possession-indicator">
-                    <div className="possession-pulse"></div>
-                    <span>⚽ HAS BALL</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className={`focus-controls focus-controls-${game.home_attacking_side === 'left' ? 'right' : 'left'}`}>
-              <div className="focus-controls-inner">
-                <h4>Quick Controls</h4>
-                
-                {/* Essential Timer Controls */}
-                <div className="focus-timer-controls">
-                  {timerState?.timer_state === 'stopped' && (
-                    <button onClick={handleStartTimer} className="focus-button primary">
-                      ▶️ Start
-                    </button>
-                  )}
-                  
-                  {timerState?.timer_state === 'paused' && (
-                    <button onClick={handleStartTimer} className="focus-button primary">
-                      ▶️ Resume
-                    </button>
-                  )}
-                  
-                  {timerState?.timer_state === 'running' && (
-                    <button onClick={handlePauseTimer} className="focus-button secondary">
-                      ⏸️ Pause
-                    </button>
-                  )}
-                  
-                  {(timerState?.current_period || 1) < (game.number_of_periods || 4) && (
-                    <button onClick={handleNextPeriod} className="focus-button secondary">
-                      ⏭️ Next Period
-                    </button>
-                  )}
-                </div>
-
-                {/* Possession Controls */}
-                {activePossession && (
-                  <div className="focus-possession-info">
-                    <div className="possession-team">
-                      {activePossession.team_name}
-                    </div>
-                    <div className="possession-stats">
-                      <span>⏱️ {Math.floor(possessionDuration / 60)}:{(possessionDuration % 60).toString().padStart(2, '0')}</span>
-                      <span>🎯 {activePossession.shots_taken}</span>
-                    </div>
-                    <div className="possession-instruction">
-                      📍 Tap field to switch possession
-                    </div>
-                  </div>
-                )}
-
-                {/* Quick Actions */}
-                <div className="focus-actions">
-                  <button onClick={toggleFocusMode} className="focus-button secondary">
-                    📱 Exit Focus
-                  </button>
-                  <button onClick={handleEndGame} className="focus-button danger">
-                    🏁 End Game
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
+      {/* Court Visualization */}
+      <div className="court-section">
         <CourtVisualization
           key={courtResetKey}
           gameId={parseInt(gameId!)}
@@ -1778,10 +1735,9 @@ const LiveMatch: React.FC = () => {
         />
       </div>
 
-      {/* Substitution Panel - Hidden in focus mode */}
-      {!focusMode && (
-        <div className="substitution-section">
-          <SubstitutionPanel
+      {/* Substitution Panel */}
+      <div className="substitution-section">
+        <SubstitutionPanel
             gameId={parseInt(gameId!)}
             homeTeamId={game.home_team_id}
             awayTeamId={game.away_team_id}
@@ -1795,12 +1751,10 @@ const LiveMatch: React.FC = () => {
             }}
             canAddEvents={canAddEvents}
           />
-        </div>
-      )}
+      </div>
 
-      {/* Enhanced Match Events Dashboard - Hidden in focus mode */}
-      {!focusMode && (
-        <div className="match-content">
+      {/* Enhanced Match Events Dashboard */}
+      <div className="match-content">
           <div className="content-section full-width">
             <div className="enhanced-events-dashboard">
               <div className="dashboard-header">
@@ -1917,8 +1871,7 @@ const LiveMatch: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };

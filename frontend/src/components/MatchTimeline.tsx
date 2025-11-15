@@ -96,7 +96,7 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
   const fetchEvents = useCallback(async () => {
     try {
       // Fetch from comprehensive events view that includes enhanced match events
-      const response = await api.get(`/events/${gameId}/comprehensive`);
+      const response = await api.get(`/events/comprehensive/${gameId}`);
       setEvents(response.data);
     } catch (err) {
       // Fallback to regular events if comprehensive endpoint doesn't exist yet
