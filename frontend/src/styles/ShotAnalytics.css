@@ -755,6 +755,65 @@
   color: white;
 }
 
+/* Phase 2: Advanced Charts View */
+.charts-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.charts-view h3 {
+  margin: 0 0 2rem 0;
+  color: #333;
+  font-size: 2rem;
+  text-align: center;
+  padding-bottom: 1rem;
+  border-bottom: 3px solid #2196F3;
+}
+
+.chart-section {
+  background: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: all 0.3s;
+}
+
+.chart-section:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-color: #2196F3;
+}
+
+.chart-section h4 {
+  margin: 0 0 1.5rem 0;
+  color: #2196F3;
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-align: center;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #E3F2FD;
+}
+
+.custom-tooltip {
+  background: white;
+  padding: 1rem;
+  border: 2px solid #4CAF50;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.custom-tooltip p {
+  margin: 0.25rem 0;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.custom-tooltip p strong {
+  color: #4CAF50;
+  font-size: 1rem;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .shot-analytics-container {

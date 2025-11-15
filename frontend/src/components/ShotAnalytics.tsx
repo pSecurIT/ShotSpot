@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import {
+  LineChart, Line, BarChart, Bar, ScatterChart, Scatter, RadarChart, Radar,
+  PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
+} from 'recharts';
 import api from '../utils/api';
 import courtImageUrl from '../img/Korfbalveld-breed.PNG';
 import '../styles/ShotAnalytics.css';
@@ -83,7 +88,7 @@ interface GameSummary {
   by_team: TeamSummary[];
 }
 
-type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary';
+type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts';
 
 const ShotAnalytics: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -229,6 +234,11 @@ const ShotAnalytics: React.FC = () => {
         break;
       case 'summary':
         fetchGameSummary();
+        break;
+      case 'charts':
+        // Charts view needs both shot chart and player stats data
+        fetchShotChart();
+        fetchPlayerStats();
         break;
     }
   }, [activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary]);
@@ -651,6 +661,172 @@ const ShotAnalytics: React.FC = () => {
     );
   };
 
+  // Render advanced charts view (Phase 2)
+  const renderAdvancedCharts = () => {
+    // Prepare data for line chart (Shot % by period)
+    const periodData = periods.map(period => {
+      const periodShots = shotChartData.filter(s => s.period === period);
+      const goals = periodShots.filter(s => s.result === 'goal').length;
+      const total = periodShots.length;
+      return {
+        period: `P${period}`,
+        percentage: total > 0 ? Math.round((goals / total) * 100) : 0,
+        shots: total,
+        goals
+      };
+    });
+
+    // Prepare data for bar chart (Player rankings by FG%)
+    const playerRankings = [...playerStats]
+      .sort((a, b) => b.field_goal_percentage - a.field_goal_percentage)
+      .slice(0, 10)
+      .map(p => ({
+        name: `#${p.jersey_number} ${p.last_name}`,
+        fg_percentage: p.field_goal_percentage,
+        shots: p.total_shots
+      }));
+
+    // Prepare data for scatter plot (Distance vs Success Rate)
+    const distanceData = playerStats
+      .filter(p => p.average_distance && p.total_shots >= 3)
+      .map(p => ({
+        name: `${p.first_name} ${p.last_name}`,
+        distance: p.average_distance,
+        success_rate: p.field_goal_percentage,
+        shots: p.total_shots
+      }));
+
+    // Prepare data for radar chart (Top player multi-dimensional profile)
+    const topPlayer = playerStats.length > 0 ? playerStats.reduce((prev, current) =>
+      (prev.field_goal_percentage > current.field_goal_percentage) ? prev : current
+    ) : null;
+
+    const radarData = topPlayer ? [
+      { stat: 'Volume', value: Math.min(100, (topPlayer.total_shots / 20) * 100), fullMark: 100 },
+      { stat: 'Accuracy', value: topPlayer.field_goal_percentage, fullMark: 100 },
+      { stat: 'Left Zone', value: topPlayer.zone_performance.left.success_rate, fullMark: 100 },
+      { stat: 'Center Zone', value: topPlayer.zone_performance.center.success_rate, fullMark: 100 },
+      { stat: 'Right Zone', value: topPlayer.zone_performance.right.success_rate, fullMark: 100 },
+      { stat: 'Distance', value: topPlayer.average_distance ? Math.min(100, topPlayer.average_distance * 10) : 0, fullMark: 100 }
+    ] : [];
+
+    const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#f44336', '#9C27B0', '#00BCD4'];
+
+    return (
+      <div className="analytics-view charts-view">
+        <h3>📈 Advanced Analytics Charts</h3>
+        
+        {/* Line Chart: Shot % by Period */}
+        {periodData.length > 0 && (
+          <div className="chart-section">
+            <h4>Shot Success Rate by Period</h4>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={periodData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="period" />
+                <YAxis label={{ value: 'Success %', angle: -90, position: 'insideLeft' }} />
+                <Tooltip content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="custom-tooltip">
+                        <p><strong>{data.period}</strong></p>
+                        <p>Success Rate: {data.percentage}%</p>
+                        <p>Shots: {data.shots}</p>
+                        <p>Goals: {data.goals}</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }} />
+                <Legend />
+                <Line type="monotone" dataKey="percentage" stroke="#4CAF50" strokeWidth={3} name="Success %" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Bar Chart: Player Rankings */}
+        {playerRankings.length > 0 && (
+          <div className="chart-section">
+            <h4>Top 10 Players by Field Goal Percentage</h4>
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={playerRankings} layout="horizontal">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" domain={[0, 100]} label={{ value: 'FG %', position: 'insideBottom', offset: -5 }} />
+                <YAxis type="category" dataKey="name" width={100} />
+                <Tooltip content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="custom-tooltip">
+                        <p><strong>{data.name}</strong></p>
+                        <p>FG%: {data.fg_percentage}%</p>
+                        <p>Total Shots: {data.shots}</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }} />
+                <Bar dataKey="fg_percentage" name="FG %">
+                  {playerRankings.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Scatter Plot: Distance vs Success */}
+        {distanceData.length > 0 && (
+          <div className="chart-section">
+            <h4>Shot Distance vs Success Rate</h4>
+            <ResponsiveContainer width="100%" height={400}>
+              <ScatterChart>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" dataKey="distance" name="Distance" unit="m" label={{ value: 'Distance (m)', position: 'insideBottom', offset: -5 }} />
+                <YAxis type="number" dataKey="success_rate" name="Success Rate" unit="%" label={{ value: 'Success Rate %', angle: -90, position: 'insideLeft' }} />
+                <Tooltip content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="custom-tooltip">
+                        <p><strong>{data.name}</strong></p>
+                        <p>Distance: {data.distance}m</p>
+                        <p>Success: {data.success_rate}%</p>
+                        <p>Shots: {data.shots}</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }} />
+                <Scatter name="Players" data={distanceData} fill="#2196F3" />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Radar Chart: Player Profile */}
+        {topPlayer && radarData.length > 0 && (
+          <div className="chart-section">
+            <h4>Player Profile: {topPlayer.first_name} {topPlayer.last_name} (#{topPlayer.jersey_number})</h4>
+            <ResponsiveContainer width="100%" height={400}>
+              <RadarChart data={radarData}>
+                <PolarGrid />
+                <PolarAngleAxis dataKey="stat" />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} />
+                <Radar name={`${topPlayer.first_name} ${topPlayer.last_name}`} dataKey="value" stroke="#4CAF50" fill="#4CAF50" fillOpacity={0.6} />
+                <Tooltip />
+                <Legend />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="shot-analytics-container">
       <div className="analytics-header">
@@ -685,6 +861,12 @@ const ShotAnalytics: React.FC = () => {
           >
             📋 Summary
           </button>
+          <button
+            className={`view-tab ${activeView === 'charts' ? 'active' : ''}`}
+            onClick={() => setActiveView('charts')}
+          >
+            📈 Advanced Charts
+          </button>
         </div>
       </div>
 
@@ -697,6 +879,7 @@ const ShotAnalytics: React.FC = () => {
           {activeView === 'shot-chart' && renderShotChart()}
           {activeView === 'players' && renderPlayerStats()}
           {activeView === 'summary' && renderGameSummary()}
+          {activeView === 'charts' && renderAdvancedCharts()}
         </>
       )}
     </div>
