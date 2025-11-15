@@ -2060,6 +2060,132 @@ select.error:focus {
   color: #1565C0;
 }
 
+/* Solution 3: Mobile Player Grid Styles */
+.player-selection-group {
+  width: 100%;
+}
+
+.player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.player-card {
+  background-color: #f5f5f5;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  padding: 0.5rem 0.35rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 65px;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.player-card:hover {
+  background-color: #e8f5e9;
+  border-color: #4CAF50;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.player-card:active {
+  transform: translateY(0);
+}
+
+.player-card.selected {
+  background-color: #4CAF50;
+  border-color: #2e7d32;
+  border-width: 3px;
+  color: white;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+.player-card.selected:hover {
+  background-color: #45a049;
+  border-color: #1b5e20;
+}
+
+.player-card .jersey-large {
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.player-card.selected .jersey-large {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.player-card:not(.selected) .jersey-large {
+  color: #2e7d32;
+}
+
+.player-card .name-compact {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+  line-height: 1.1;
+}
+
+.player-card.selected .name-compact {
+  color: white;
+}
+
+.player-card:not(.selected) .name-compact {
+  color: #333;
+}
+
+/* Mobile Responsiveness for New Components */
+@media (max-width: 768px) {
+  .quick-shot-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.6rem;
+  }
+  
+  .quick-shot-button {
+    padding: 0.85rem 0.6rem;
+    min-height: 90px;
+  }
+  
+  .quick-shot-button .jersey-number {
+    font-size: 1.3rem;
+  }
+  
+  .quick-shot-button .player-name {
+    font-size: 0.8rem;
+  }
+  
+  .player-grid {
+    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+    gap: 0.5rem;
+  }
+  
+  .player-card {
+    padding: 0.6rem 0.4rem;
+    min-height: 75px;
+  }
+  
+  .player-card .jersey-large {
+    font-size: 1.2rem;
+  }
+  
+  .player-card .name-compact {
+    font-size: 0.75rem;
+  }
+  
+  .player-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .shot-legend {
   background-color: white;
   padding: 1rem;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../utils/api';
 
 interface Player {
@@ -73,6 +73,18 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Ref to track timeout for cleanup
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Fetch active players and bench players
   const fetchActivePlayers = useCallback(async () => {
@@ -158,7 +170,13 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
       }
 
       // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
       const errorMessage = axiosError.response?.data?.error || 'Failed to record substitution';
@@ -191,7 +209,13 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
         onSubstitutionRecorded();
       }
 
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
       const errorMessage = axiosError.response?.data?.error || 'Failed to undo substitution';

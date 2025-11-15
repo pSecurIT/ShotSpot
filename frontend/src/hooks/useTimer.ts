@@ -74,24 +74,39 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
       setServerTimerState(prevState => {
         const newState = response.data;
         
+        // Ensure time_remaining is populated (fallback to period_duration if not set)
+        if (!newState.time_remaining && newState.period_duration) {
+          newState.time_remaining = newState.period_duration;
+        }
+        
         // Reset period end flag when timer is started fresh
         if (newState.timer_state === 'running' && 
             (!prevState || prevState.timer_state !== 'running')) {
           setPeriodHasEnded(false);
+          
+          // Only reset client time when transitioning TO running state (new period/resume)
+          const timeToDisplay = newState.time_remaining || newState.period_duration;
+          if (timeToDisplay) {
+            setClientTimeRemaining({
+              minutes: timeToDisplay.minutes || 0,
+              seconds: timeToDisplay.seconds || 0
+            });
+          }
+        } else if (newState.timer_state !== 'running' && prevState?.timer_state === 'running') {
+          // Timer was paused or stopped - update client time to match server
+          const timeToDisplay = newState.time_remaining || newState.period_duration;
+          if (timeToDisplay) {
+            setClientTimeRemaining({
+              minutes: timeToDisplay.minutes || 0,
+              seconds: timeToDisplay.seconds || 0
+            });
+          }
         }
+        // If timer is already running, DON'T update clientTimeRemaining
+        // Let it continue counting down smoothly
         
         return newState;
       });
-      
-      // Initialize client-side timer with server data
-      // Use time_remaining if available, otherwise fall back to period_duration
-      const timeToDisplay = response.data.time_remaining || response.data.period_duration;
-      if (timeToDisplay) {
-        setClientTimeRemaining({
-          minutes: timeToDisplay.minutes || 0,
-          seconds: timeToDisplay.seconds || 0
-        });
-      }
       
       setError(null);
     } catch (err) {
@@ -105,6 +120,16 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
     }
   }, [gameId]);
 
+  // Store timer state for countdown to prevent re-renders on server sync
+  const timerStateRef = useRef<'stopped' | 'running' | 'paused'>('stopped');
+  
+  // Update ref when server state changes
+  useEffect(() => {
+    if (serverTimerState?.timer_state) {
+      timerStateRef.current = serverTimerState.timer_state;
+    }
+  }, [serverTimerState?.timer_state]);
+
   // Client-side countdown (runs every second, no network calls)
   useEffect(() => {
     if (clientIntervalRef.current) {
@@ -114,6 +139,11 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
 
     if (serverTimerState?.timer_state === 'running' && clientTimeRemaining) {
       clientIntervalRef.current = setInterval(() => {
+        // Check current timer state from ref to avoid recreating interval
+        if (timerStateRef.current !== 'running') {
+          return;
+        }
+        
         setClientTimeRemaining(prev => {
           if (!prev) return null;
           
@@ -158,7 +188,10 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
         clientIntervalRef.current = null;
       }
     };
-  }, [serverTimerState?.timer_state, clientTimeRemaining, gameId, options]);
+    // Only recreate interval when transitioning to/from running state or gameId changes
+    // clientTimeRemaining and serverTimerState changes don't recreate interval
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverTimerState?.timer_state, gameId]);
 
   // Periodic server sync when timer is running (every 5 seconds)
   useEffect(() => {
@@ -166,7 +199,8 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
     
     if (serverTimerState?.timer_state === 'running' && gameId) {
       syncInterval = setInterval(() => {
-        fetchTimerState();
+        // Use force=false to respect deduplication
+        fetchTimerState(false);
       }, SERVER_SYNC_INTERVAL);
     }
 
@@ -175,7 +209,9 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
         clearInterval(syncInterval);
       }
     };
-  }, [serverTimerState?.timer_state, gameId, fetchTimerState]);
+    // fetchTimerState excluded - it's stable via useCallback with gameId dependency
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverTimerState?.timer_state, gameId]);
 
   // Initial fetch
   useEffect(() => {
