@@ -210,7 +210,9 @@ async function main() {
       '../src/migrations/add_enhanced_events.sql',
       '../src/migrations/add_match_configuration_columns.sql',
       '../src/migrations/add_attacking_side.sql',
-      '../src/migrations/add_starting_position.sql'
+      '../src/migrations/add_starting_position.sql',
+      '../src/migrations/add_achievements_system.sql',
+      '../src/migrations/seed_achievements.sql'
     ];
 
     console.log('Applying database migrations...');

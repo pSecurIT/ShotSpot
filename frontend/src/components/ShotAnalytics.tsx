@@ -5,6 +5,11 @@ import {
   PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
+import { useWebSocket } from '../hooks/useWebSocket';
+import AchievementBadge from './AchievementBadge';
+import Leaderboard from './Leaderboard';
+import AchievementNotification from './AchievementNotification';
+import { Achievement, LeaderboardPlayer } from '../types/achievements';
 import api from '../utils/api';
 import courtImageUrl from '../img/Korfbalveld-breed.PNG';
 import '../styles/ShotAnalytics.css';
@@ -60,6 +65,7 @@ interface PlayerStats {
   blocked: number;
   field_goal_percentage: number;
   average_distance: number;
+  play_time_seconds?: number;
   zone_performance: {
     left: ZonePerformance;
     center: ZonePerformance;
@@ -135,14 +141,74 @@ interface PeriodTrend {
   fg_change: number | null;
 }
 
-type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts' | 'performance';
+// Phase 4: Historical & Comparative Analytics interfaces
+interface PlayerDevelopment {
+  game_id: number;
+  game_date: string;
+  team_name: string;
+  shots: number;
+  goals: number;
+  fg_percentage: number;
+  avg_distance: number;
+  improvement: number | null;
+}
+
+interface TeamTendencies {
+  overall: {
+    games_played: number;
+    total_shots: number;
+    total_goals: number;
+    avg_fg_percentage: number;
+    avg_distance: number;
+    avg_shot_location: {
+      x: number;
+      y: number;
+    };
+  };
+  zone_preferences: Array<{
+    zone: string;
+    shots: number;
+    goals: number;
+    fg_percentage: number;
+  }>;
+  top_shooters: Array<{
+    player_id: number;
+    first_name: string;
+    last_name: string;
+    jersey_number: number;
+    shots: number;
+    goals: number;
+    fg_percentage: number;
+  }>;
+}
+
+interface MatchupAnalysis {
+  games_played: number;
+  game_dates: string[];
+  team_stats: {
+    total_shots: number;
+    total_goals: number;
+    avg_fg_percentage: number;
+    avg_distance: number;
+  };
+  opponent_stats: {
+    total_shots: number;
+    total_goals: number;
+    avg_fg_percentage: number;
+    avg_distance: number;
+  };
+}
+
+type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts' | 'performance' | 'historical' | 'achievements';
 
 const ShotAnalytics: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
+  const { socket, joinGame, leaveGame } = useWebSocket();
   const [activeView, setActiveView] = useState<AnalyticsView>('heatmap');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Data states
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
@@ -155,11 +221,30 @@ const ShotAnalytics: React.FC = () => {
   const [zoneAnalysis, setZoneAnalysis] = useState<ZoneAnalysis | null>(null);
   const [trends, setTrends] = useState<PeriodTrend[]>([]);
 
+  // Phase 4 data states
+  const [playerDevelopment, setPlayerDevelopment] = useState<PlayerDevelopment[]>([]);
+  const [teamTendencies, setTeamTendencies] = useState<TeamTendencies | null>(null);
+  const [matchupAnalysis, setMatchupAnalysis] = useState<MatchupAnalysis | null>(null);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [selectedOpponentId, setSelectedOpponentId] = useState<number | null>(null);
+
+  // Phase 6 achievements data states
+  const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
+  const [playerAchievements, setPlayerAchievements] = useState<Achievement[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
+  const [selectedAchievementPlayer, setSelectedAchievementPlayer] = useState<number | null>(null);
+  const [leaderboardType, setLeaderboardType] = useState<'global' | 'team'>('global');
+  const [unlockedAchievement, setUnlockedAchievement] = useState<Achievement | null>(null);
+
   // Filter states
   const [gridSize, setGridSize] = useState(10);
   const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<number | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null);
+
+  // Sorting states for player stats
+  const [sortColumn, setSortColumn] = useState<keyof PlayerStats | 'play_time'>('goals');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Available teams and periods (extracted from data)
   const [teams, setTeams] = useState<{ id: number; name: string }[]>([]);
@@ -335,6 +420,211 @@ const ShotAnalytics: React.FC = () => {
     }
   }, [gameId, selectedTeam]);
 
+  // Phase 4: Fetch player development
+  const fetchPlayerDevelopment = useCallback(async () => {
+    if (!selectedPlayerId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const params = new URLSearchParams();
+      if (selectedTeam) params.append('team_id', selectedTeam.toString());
+      params.append('limit', '10');
+
+      const response = await api.get<PlayerDevelopment[]>(`/analytics/players/${selectedPlayerId}/development?${params}`);
+      setPlayerDevelopment(response.data);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load player development data');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedPlayerId, selectedTeam]);
+
+  // Phase 4: Fetch team tendencies
+  const fetchTeamTendencies = useCallback(async () => {
+    if (!selectedTeam) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const params = new URLSearchParams();
+      params.append('limit', '10');
+
+      const response = await api.get<TeamTendencies>(`/analytics/teams/${selectedTeam}/tendencies?${params}`);
+      setTeamTendencies(response.data);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load team tendencies');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedTeam]);
+
+  // Phase 4: Fetch matchup analysis
+  const fetchMatchupAnalysis = useCallback(async () => {
+    if (!selectedTeam || !selectedOpponentId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const params = new URLSearchParams();
+      params.append('limit', '5');
+
+      const response = await api.get<MatchupAnalysis>(`/analytics/teams/${selectedTeam}/matchup/${selectedOpponentId}?${params}`);
+      setMatchupAnalysis(response.data);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load matchup analysis');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedTeam, selectedOpponentId]);
+
+  // Phase 6: Fetch all achievements
+  const fetchAchievements = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await api.get<Achievement[]>('/achievements/list');
+      setAllAchievements(response.data);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load achievements');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Phase 6: Fetch player achievements
+  const fetchPlayerAchievements = useCallback(async () => {
+    if (!selectedAchievementPlayer) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await api.get<{ achievements: Achievement[]; total_points: number }>(`/achievements/player/${selectedAchievementPlayer}`);
+      setPlayerAchievements(response.data.achievements || []);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load player achievements');
+      setPlayerAchievements([]); // Reset to empty array on error
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedAchievementPlayer]);
+
+  // Phase 6: Fetch leaderboard
+  const fetchLeaderboard = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (leaderboardType === 'global') {
+        const response = await api.get<{ season: string; leaderboard: LeaderboardPlayer[] }>('/achievements/leaderboard');
+        setLeaderboard(response.data.leaderboard || []);
+      } else if (selectedTeam) {
+        const response = await api.get<{ team_id: number; leaderboard: LeaderboardPlayer[] }>(`/achievements/team/${selectedTeam}/leaderboard`);
+        setLeaderboard(response.data.leaderboard || []);
+      } else {
+        setError('Please select a team for team leaderboard');
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load leaderboard');
+      setLeaderboard([]); // Reset to empty array on error
+    } finally {
+      setLoading(false);
+    }
+  }, [leaderboardType, selectedTeam]);
+
+  // Phase 5: WebSocket connection - join/leave game room
+  useEffect(() => {
+    if (!gameId || !socket) return;
+
+    const gameIdNum = parseInt(gameId);
+    joinGame(gameIdNum);
+
+    return () => {
+      leaveGame(gameIdNum);
+    };
+  }, [gameId, socket, joinGame, leaveGame]);
+
+  // Phase 5: WebSocket event listeners for real-time updates
+  useEffect(() => {
+    if (!socket || !autoRefresh) return;
+
+    const handleAnalyticsUpdate = () => {
+      console.log('🔄 Analytics update received, refreshing current view...');
+      
+      // Refresh current view data
+      switch (activeView) {
+        case 'heatmap':
+          fetchHeatmap();
+          break;
+        case 'shot-chart':
+          fetchShotChart();
+          break;
+        case 'players':
+          fetchPlayerStats();
+          break;
+        case 'summary':
+          fetchGameSummary();
+          break;
+        case 'charts':
+          fetchShotChart();
+          fetchPlayerStats();
+          break;
+        case 'performance':
+          fetchStreaks();
+          fetchZoneAnalysis();
+          fetchTrends();
+          break;
+        case 'historical':
+          if (selectedPlayerId) fetchPlayerDevelopment();
+          if (selectedTeam) fetchTeamTendencies();
+          if (selectedTeam && selectedOpponentId) fetchMatchupAnalysis();
+          break;
+        case 'achievements':
+          fetchAchievements();
+          if (selectedAchievementPlayer) fetchPlayerAchievements();
+          fetchLeaderboard();
+          break;
+      }
+    };
+
+    socket.on('analytics-update', handleAnalyticsUpdate);
+
+    // Phase 6: Listen for achievement unlocked events
+    const handleAchievementUnlocked = (data: { achievement: Achievement; player_id: number }) => {
+      console.log('🏆 Achievement unlocked:', data);
+      setUnlockedAchievement(data.achievement);
+      
+      // Refresh achievements if viewing achievements tab
+      if (activeView === 'achievements') {
+        fetchAchievements();
+        if (selectedAchievementPlayer === data.player_id) {
+          fetchPlayerAchievements();
+        }
+        fetchLeaderboard();
+      }
+    };
+
+    socket.on('achievement-unlocked', handleAchievementUnlocked);
+
+    return () => {
+      socket.off('analytics-update', handleAnalyticsUpdate);
+      socket.off('achievement-unlocked', handleAchievementUnlocked);
+    };
+  }, [socket, autoRefresh, activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends, fetchPlayerDevelopment, fetchTeamTendencies, fetchMatchupAnalysis, fetchAchievements, fetchPlayerAchievements, fetchLeaderboard, selectedPlayerId, selectedTeam, selectedOpponentId, selectedAchievementPlayer]);
+
   // Load data when view changes
   useEffect(() => {
     switch (activeView) {
@@ -346,6 +636,8 @@ const ShotAnalytics: React.FC = () => {
         break;
       case 'players':
         fetchPlayerStats();
+        // Fetch game summary to populate teams dropdown
+        if (teams.length === 0) fetchGameSummary();
         break;
       case 'summary':
         fetchGameSummary();
@@ -361,8 +653,26 @@ const ShotAnalytics: React.FC = () => {
         fetchZoneAnalysis();
         fetchTrends();
         break;
+      case 'historical':
+        // Historical view needs player development, team tendencies, and matchup analysis
+        if (selectedPlayerId) fetchPlayerDevelopment();
+        if (selectedTeam) fetchTeamTendencies();
+        if (selectedTeam && selectedOpponentId) fetchMatchupAnalysis();
+        break;
+      case 'achievements':
+        // Achievements view needs all achievements and leaderboard
+        fetchAchievements();
+        fetchLeaderboard();
+        break;
     }
-  }, [activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends]);
+  }, [activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends, fetchPlayerDevelopment, fetchTeamTendencies, fetchMatchupAnalysis, fetchAchievements, fetchLeaderboard, selectedPlayerId, selectedTeam, selectedOpponentId, teams.length]);
+
+  // Fetch player achievements when player selection changes
+  useEffect(() => {
+    if (activeView === 'achievements' && selectedAchievementPlayer) {
+      fetchPlayerAchievements();
+    }
+  }, [activeView, selectedAchievementPlayer, fetchPlayerAchievements]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -378,10 +688,10 @@ const ShotAnalytics: React.FC = () => {
         return;
       }
 
-      // Tab switching with numbers 1-6
-      const views: AnalyticsView[] = ['heatmap', 'shot-chart', 'players', 'summary', 'charts', 'performance'];
+      // Tab switching with numbers 1-8
+      const views: AnalyticsView[] = ['heatmap', 'shot-chart', 'players', 'summary', 'charts', 'performance', 'historical', 'achievements'];
       const keyNum = parseInt(e.key);
-      if (keyNum >= 1 && keyNum <= 6) {
+      if (keyNum >= 1 && keyNum <= 8) {
         setActiveView(views[keyNum - 1]);
         return;
       }
@@ -407,11 +717,24 @@ const ShotAnalytics: React.FC = () => {
     if (count === 0) return 'rgba(76, 175, 80, 0)';
     
     const intensity = count / maxCount;
-    const red = Math.round(255 * intensity);
-    const green = Math.round(100 * (1 - intensity));
-    const alpha = 0.3 + (intensity * 0.5); // 0.3 to 0.8 opacity
     
-    return `rgba(${red}, ${green}, 50, ${alpha})`;
+    // Create a green -> yellow -> red gradient
+    let red: number;
+    let green: number;
+    
+    if (intensity < 0.5) {
+      // Green to yellow (0-50% intensity)
+      red = Math.round(255 * (intensity * 2));
+      green = 220;
+    } else {
+      // Yellow to red (50-100% intensity)
+      red = 255;
+      green = Math.round(220 * (1 - ((intensity - 0.5) * 2)));
+    }
+    
+    const alpha = 0.4 + (intensity * 0.5); // 0.4 to 0.9 opacity
+    
+    return `rgba(${red}, ${green}, 0, ${alpha})`;
   };
 
   // Get color for shot marker
@@ -434,7 +757,25 @@ const ShotAnalytics: React.FC = () => {
 
   // Render heatmap view
   const renderHeatmap = () => {
-    if (!heatmapData || !courtRef.current || !imageRef.current) return null;
+    if (!heatmapData) {
+      return (
+        <div className="analytics-view">
+          <div className="empty-state">
+            <p>No heatmap data available. Shots will appear here once they are recorded.</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (heatmapData.data.length === 0) {
+      return (
+        <div className="analytics-view">
+          <div className="empty-state">
+            <p>No shot data for the selected filters. Try changing team or period filters.</p>
+          </div>
+        </div>
+      );
+    }
 
     const maxCount = Math.max(...heatmapData.data.map(b => b.count), 1);
 
@@ -510,17 +851,22 @@ const ShotAnalytics: React.FC = () => {
             {heatmapData.data.map((bucket, index) => {
               const bucketWidth = 100 / heatmapData.grid_size;
               const bucketHeight = 100 / heatmapData.grid_size;
+              // bucket.x and bucket.y are coordinate values (0-100), not indices
+              // So we just use them directly as percentages
+              const leftPos = bucket.x;
+              const topPos = bucket.y;
+              const bgColor = getHeatmapColor(bucket.count, maxCount);
               
               return (
                 <div
                   key={index}
                   className="heatmap-bucket"
                   style={{
-                    left: `${bucket.x * bucketWidth}%`,
-                    top: `${bucket.y * bucketHeight}%`,
+                    left: `${leftPos}%`,
+                    top: `${topPos}%`,
                     width: `${bucketWidth}%`,
                     height: `${bucketHeight}%`,
-                    backgroundColor: getHeatmapColor(bucket.count, maxCount),
+                    backgroundColor: bgColor,
                     border: bucket.count > 0 ? '1px solid rgba(0,0,0,0.1)' : 'none'
                   }}
                   title={`Shots: ${bucket.count}\nGoals: ${bucket.goals}\nSuccess: ${bucket.success_rate}%`}
@@ -552,7 +898,15 @@ const ShotAnalytics: React.FC = () => {
 
   // Render shot chart view
   const renderShotChart = () => {
-    if (!courtRef.current || !imageRef.current) return null;
+    if (shotChartData.length === 0) {
+      return (
+        <div className="analytics-view">
+          <div className="empty-state">
+            <p>No shots recorded yet. Shot markers will appear on the court once shots are recorded.</p>
+          </div>
+        </div>
+      );
+    }
 
     const availablePlayers = Array.from(new Set(shotChartData.map(s => ({
       id: s.player_id,
@@ -720,7 +1074,52 @@ const ShotAnalytics: React.FC = () => {
   };
 
   // Render player statistics view
+  const handleSort = (column: keyof PlayerStats | 'play_time') => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  const getSortedPlayerStats = () => {
+    return [...playerStats].sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
+
+      if (sortColumn === 'play_time') {
+        aValue = a.play_time_seconds || 0;
+        bValue = b.play_time_seconds || 0;
+      } else if (sortColumn === 'first_name' || sortColumn === 'last_name') {
+        aValue = a[sortColumn].toLowerCase();
+        bValue = b[sortColumn].toLowerCase();
+      } else if (sortColumn === 'team_name') {
+        aValue = a.team_name.toLowerCase();
+        bValue = b.team_name.toLowerCase();
+      } else if (sortColumn === 'average_distance') {
+        aValue = a.average_distance || 0;
+        bValue = b.average_distance || 0;
+      } else {
+        // For numeric columns (total_shots, goals, misses, blocked, field_goal_percentage)
+        aValue = a[sortColumn] as number;
+        bValue = b[sortColumn] as number;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const renderSortIcon = (column: keyof PlayerStats | 'play_time') => {
+    if (sortColumn !== column) return ' ⇅';
+    return sortDirection === 'asc' ? ' ▲' : ' ▼';
+  };
+
   const renderPlayerStats = () => {
+    const sortedStats = getSortedPlayerStats();
+
     return (
       <div className="analytics-view">
         <div className="analytics-controls">
@@ -746,52 +1145,84 @@ const ShotAnalytics: React.FC = () => {
           <table>
             <thead>
               <tr>
-                <th>Player</th>
-                <th>Team</th>
-                <th>Shots</th>
-                <th>Goals</th>
-                <th>Misses</th>
-                <th>Blocked</th>
-                <th>FG%</th>
-                <th>Avg Dist</th>
+                <th onClick={() => handleSort('last_name')} style={{ cursor: 'pointer' }}>
+                  Player{renderSortIcon('last_name')}
+                </th>
+                <th onClick={() => handleSort('team_name')} style={{ cursor: 'pointer' }}>
+                  Team{renderSortIcon('team_name')}
+                </th>
+                <th onClick={() => handleSort('total_shots')} style={{ cursor: 'pointer' }}>
+                  Shots{renderSortIcon('total_shots')}
+                </th>
+                <th onClick={() => handleSort('goals')} style={{ cursor: 'pointer' }}>
+                  Goals{renderSortIcon('goals')}
+                </th>
+                <th onClick={() => handleSort('misses')} style={{ cursor: 'pointer' }}>
+                  Misses{renderSortIcon('misses')}
+                </th>
+                <th onClick={() => handleSort('blocked')} style={{ cursor: 'pointer' }}>
+                  Blocked{renderSortIcon('blocked')}
+                </th>
+                <th onClick={() => handleSort('field_goal_percentage')} style={{ cursor: 'pointer' }}>
+                  FG%{renderSortIcon('field_goal_percentage')}
+                </th>
+                <th onClick={() => handleSort('average_distance')} style={{ cursor: 'pointer' }}>
+                  Avg Dist{renderSortIcon('average_distance')}
+                </th>
+                <th onClick={() => handleSort('play_time')} style={{ cursor: 'pointer' }}>
+                  Play Time{renderSortIcon('play_time')}
+                </th>
                 <th>Left Zone</th>
                 <th>Center Zone</th>
                 <th>Right Zone</th>
               </tr>
             </thead>
             <tbody>
-              {playerStats.map((player) => (
-                <tr key={player.player_id}>
-                  <td className="player-name">
-                    #{player.jersey_number} {player.first_name} {player.last_name}
-                  </td>
-                  <td>{player.team_name}</td>
-                  <td className="stat-number">{player.total_shots}</td>
-                  <td className="stat-number success">{player.goals}</td>
-                  <td className="stat-number miss">{player.misses}</td>
-                  <td className="stat-number blocked">{player.blocked}</td>
-                  <td className="stat-number fg-percentage">{player.field_goal_percentage}%</td>
-                  <td className="stat-number">{player.average_distance ? `${player.average_distance}m` : '-'}</td>
-                  <td className="zone-stat">
-                    <div className="zone-detail">
-                      <span className="zone-shots">{player.zone_performance.left.shots} shots</span>
-                      <span className="zone-rate">{player.zone_performance.left.success_rate}%</span>
-                    </div>
-                  </td>
-                  <td className="zone-stat">
-                    <div className="zone-detail">
-                      <span className="zone-shots">{player.zone_performance.center.shots} shots</span>
-                      <span className="zone-rate">{player.zone_performance.center.success_rate}%</span>
-                    </div>
-                  </td>
-                  <td className="zone-stat">
-                    <div className="zone-detail">
-                      <span className="zone-shots">{player.zone_performance.right.shots} shots</span>
-                      <span className="zone-rate">{player.zone_performance.right.success_rate}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {sortedStats.map((player) => {
+                const playTimeMinutes = player.play_time_seconds 
+                  ? Math.floor(player.play_time_seconds / 60)
+                  : 0;
+                const playTimeSeconds = player.play_time_seconds 
+                  ? player.play_time_seconds % 60
+                  : 0;
+                const playTimeDisplay = player.play_time_seconds 
+                  ? `${playTimeMinutes}:${playTimeSeconds.toString().padStart(2, '0')}`
+                  : '-';
+
+                return (
+                  <tr key={player.player_id}>
+                    <td className="player-name">
+                      #{player.jersey_number} {player.first_name} {player.last_name}
+                    </td>
+                    <td>{player.team_name}</td>
+                    <td className="stat-number">{player.total_shots}</td>
+                    <td className="stat-number success">{player.goals}</td>
+                    <td className="stat-number miss">{player.misses}</td>
+                    <td className="stat-number blocked">{player.blocked}</td>
+                    <td className="stat-number fg-percentage">{player.field_goal_percentage}%</td>
+                    <td className="stat-number">{player.average_distance ? `${player.average_distance}m` : '-'}</td>
+                    <td className="stat-number">{playTimeDisplay}</td>
+                    <td className="zone-stat">
+                      <div className="zone-detail">
+                        <span className="zone-shots">{player.zone_performance.left.shots} shots</span>
+                        <span className="zone-rate">{player.zone_performance.left.success_rate}%</span>
+                      </div>
+                    </td>
+                    <td className="zone-stat">
+                      <div className="zone-detail">
+                        <span className="zone-shots">{player.zone_performance.center.shots} shots</span>
+                        <span className="zone-rate">{player.zone_performance.center.success_rate}%</span>
+                      </div>
+                    </td>
+                    <td className="zone-stat">
+                      <div className="zone-detail">
+                        <span className="zone-shots">{player.zone_performance.right.shots} shots</span>
+                        <span className="zone-rate">{player.zone_performance.right.success_rate}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1179,6 +1610,367 @@ const ShotAnalytics: React.FC = () => {
     );
   };
 
+  // Phase 4: Render historical analytics
+  const renderHistoricalAnalytics = () => {
+    return (
+      <div className="historical-view">
+        <div className="filters">
+          <div className="filter-group">
+            <label htmlFor="player-select">Player Development</label>
+            <select 
+              id="player-select"
+              value={selectedPlayerId || ''} 
+              onChange={(e) => setSelectedPlayerId(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">Select a player...</option>
+              {playerStats.map(p => (
+                <option key={p.player_id} value={p.player_id}>
+                  {p.first_name} {p.last_name} (#{p.jersey_number})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="opponent-select">Matchup Analysis</label>
+            <select 
+              id="opponent-select"
+              value={selectedOpponentId || ''} 
+              onChange={(e) => setSelectedOpponentId(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">Select opponent...</option>
+              {teams.filter(t => t.id !== selectedTeam).map(team => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Player Development Section */}
+        {selectedPlayerId && (
+          <div className="historical-section">
+            <h3>📈 Player Development Over Last 10 Games</h3>
+            {playerDevelopment.length > 0 ? (
+              <>
+                <div className="development-chart">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={[...playerDevelopment].reverse()}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="game_date" 
+                        tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      />
+                      <YAxis domain={[0, 100]} />
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="custom-tooltip">
+                                <p><strong>{new Date(data.game_date).toLocaleDateString()}</strong></p>
+                                <p>Shots: {data.shots} | Goals: {data.goals}</p>
+                                <p>FG%: {data.fg_percentage}%</p>
+                                {data.improvement !== null && (
+                                  <p style={{ color: data.improvement > 0 ? '#4CAF50' : '#F44336' }}>
+                                    {data.improvement > 0 ? '↑' : '↓'} {Math.abs(data.improvement)}% from previous
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="fg_percentage" stroke="#2196F3" name="FG%" strokeWidth={2} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="development-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Team</th>
+                        <th>Shots</th>
+                        <th>Goals</th>
+                        <th>FG%</th>
+                        <th>Avg Distance</th>
+                        <th>Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {playerDevelopment.map(game => (
+                        <tr key={game.game_id}>
+                          <td>{new Date(game.game_date).toLocaleDateString()}</td>
+                          <td>{game.team_name}</td>
+                          <td>{game.shots}</td>
+                          <td className="success">{game.goals}</td>
+                          <td className="fg-cell">{game.fg_percentage}%</td>
+                          <td>{game.avg_distance}m</td>
+                          <td className={game.improvement && game.improvement > 0 ? 'success' : game.improvement && game.improvement < 0 ? 'miss' : ''}>
+                            {game.improvement !== null ? `${game.improvement > 0 ? '+' : ''}${game.improvement}%` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <p className="no-data">No development data available for this player</p>
+            )}
+          </div>
+        )}
+
+        {/* Team Tendencies Section */}
+        {selectedTeam && teamTendencies && (
+          <div className="historical-section">
+            <h3>🎯 Team Shooting Tendencies (Last 10 Games)</h3>
+            <div className="tendencies-grid">
+              <div className="tendency-card">
+                <h4>Overall Stats</h4>
+                <div className="stat-row">
+                  <span className="stat-label">Games:</span>
+                  <span className="stat-value">{teamTendencies.overall.games_played}</span>
+                </div>
+                <div className="stat-row">
+                  <span className="stat-label">Total Shots:</span>
+                  <span className="stat-value">{teamTendencies.overall.total_shots}</span>
+                </div>
+                <div className="stat-row">
+                  <span className="stat-label">Goals:</span>
+                  <span className="stat-value success">{teamTendencies.overall.total_goals}</span>
+                </div>
+                <div className="stat-row">
+                  <span className="stat-label">FG%:</span>
+                  <span className="stat-value">{teamTendencies.overall.avg_fg_percentage}%</span>
+                </div>
+                <div className="stat-row">
+                  <span className="stat-label">Avg Distance:</span>
+                  <span className="stat-value">{teamTendencies.overall.avg_distance}m</span>
+                </div>
+              </div>
+
+              <div className="tendency-card">
+                <h4>Zone Preferences</h4>
+                {teamTendencies.zone_preferences.map(zone => (
+                  <div key={zone.zone} className="zone-preference">
+                    <span className="zone-name">{zone.zone.toUpperCase()}</span>
+                    <div className="zone-bar">
+                      <div 
+                        className="zone-bar-fill" 
+                        style={{ width: `${zone.fg_percentage}%`, backgroundColor: zone.fg_percentage > 50 ? '#4CAF50' : '#FF9800' }}
+                      ></div>
+                    </div>
+                    <span className="zone-stats">{zone.shots} shots • {zone.fg_percentage}%</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="tendency-card">
+                <h4>Top Shooters</h4>
+                <div className="top-shooters-list">
+                  {teamTendencies.top_shooters.map((shooter, index) => (
+                    <div key={shooter.player_id} className="shooter-item">
+                      <span className="shooter-rank">#{index + 1}</span>
+                      <div className="shooter-info">
+                        <span className="shooter-name">{shooter.first_name} {shooter.last_name}</span>
+                        <span className="shooter-jersey">#{shooter.jersey_number}</span>
+                      </div>
+                      <div className="shooter-stats">
+                        <span>{shooter.shots} shots</span>
+                        <span className="success">{shooter.fg_percentage}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Matchup Analysis Section */}
+        {selectedTeam && selectedOpponentId && matchupAnalysis && matchupAnalysis.games_played > 0 && (
+          <div className="historical-section">
+            <h3>⚔️ Head-to-Head Matchup Analysis</h3>
+            <p className="matchup-info">
+              {matchupAnalysis.games_played} game{matchupAnalysis.games_played > 1 ? 's' : ''} analyzed
+              {matchupAnalysis.game_dates.length > 0 && ` (Latest: ${new Date(matchupAnalysis.game_dates[0]).toLocaleDateString()})`}
+            </p>
+            <div className="matchup-comparison">
+              <div className="matchup-team">
+                <h4>Your Team</h4>
+                <div className="matchup-stats">
+                  <div className="matchup-stat">
+                    <span className="stat-label">Shots</span>
+                    <span className="stat-value">{matchupAnalysis.team_stats.total_shots}</span>
+                  </div>
+                  <div className="matchup-stat">
+                    <span className="stat-label">Goals</span>
+                    <span className="stat-value success">{matchupAnalysis.team_stats.total_goals}</span>
+                  </div>
+                  <div className="matchup-stat">
+                    <span className="stat-label">FG%</span>
+                    <span className="stat-value">{matchupAnalysis.team_stats.avg_fg_percentage}%</span>
+                  </div>
+                  <div className="matchup-stat">
+                    <span className="stat-label">Avg Distance</span>
+                    <span className="stat-value">{matchupAnalysis.team_stats.avg_distance}m</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="matchup-divider">VS</div>
+
+              <div className="matchup-team">
+                <h4>Opponent</h4>
+                <div className="matchup-stats">
+                  <div className="matchup-stat">
+                    <span className="stat-label">Shots</span>
+                    <span className="stat-value">{matchupAnalysis.opponent_stats.total_shots}</span>
+                  </div>
+                  <div className="matchup-stat">
+                    <span className="stat-label">Goals</span>
+                    <span className="stat-value success">{matchupAnalysis.opponent_stats.total_goals}</span>
+                  </div>
+                  <div className="matchup-stat">
+                    <span className="stat-label">FG%</span>
+                    <span className="stat-value">{matchupAnalysis.opponent_stats.avg_fg_percentage}%</span>
+                  </div>
+                  <div className="matchup-stat">
+                    <span className="stat-label">Avg Distance</span>
+                    <span className="stat-value">{matchupAnalysis.opponent_stats.avg_distance}m</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="matchup-advantage">
+              {matchupAnalysis.team_stats.avg_fg_percentage > matchupAnalysis.opponent_stats.avg_fg_percentage ? (
+                <p className="advantage-text success">
+                  ✓ Your team has a <strong>{(matchupAnalysis.team_stats.avg_fg_percentage - matchupAnalysis.opponent_stats.avg_fg_percentage).toFixed(1)}%</strong> shooting advantage in this matchup
+                </p>
+              ) : matchupAnalysis.team_stats.avg_fg_percentage < matchupAnalysis.opponent_stats.avg_fg_percentage ? (
+                <p className="advantage-text miss">
+                  ⚠ Opponent has a <strong>{(matchupAnalysis.opponent_stats.avg_fg_percentage - matchupAnalysis.team_stats.avg_fg_percentage).toFixed(1)}%</strong> shooting advantage
+                </p>
+              ) : (
+                <p className="advantage-text">Teams are evenly matched in shooting efficiency</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!selectedPlayerId && !teamTendencies && !matchupAnalysis && (
+          <div className="empty-state">
+            <p>📊 Select a player, team, or opponent to view historical analytics</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Phase 6: Render achievements view
+  const renderAchievements = () => {
+    return (
+      <div className="achievements-view">
+        <div className="filters">
+          <div className="filter-group">
+            <label htmlFor="achievement-player-select">Select Player</label>
+            <select 
+              id="achievement-player-select"
+              value={selectedAchievementPlayer || ''} 
+              onChange={(e) => setSelectedAchievementPlayer(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">Select a player...</option>
+              {playerStats.map(p => (
+                <option key={p.player_id} value={p.player_id}>
+                  {p.first_name} {p.last_name} (#{p.jersey_number})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="leaderboard-type-select">Leaderboard Type</label>
+            <select 
+              id="leaderboard-type-select"
+              value={leaderboardType} 
+              onChange={(e) => setLeaderboardType(e.target.value as 'global' | 'team')}
+            >
+              <option value="global">🌍 Global Leaderboard</option>
+              <option value="team">👥 Team Leaderboard</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Player Achievements Section */}
+        {selectedAchievementPlayer && (
+          <div className="achievements-section">
+            <h3>🏆 Player Achievements</h3>
+            {playerAchievements.length > 0 ? (
+              <div className="achievements-grid">
+                {allAchievements.map(achievement => {
+                  const earned = playerAchievements.find(a => a.id === achievement.id);
+                  return (
+                    <AchievementBadge
+                      key={achievement.id}
+                      achievement={earned || achievement}
+                      isLocked={!earned}
+                      size="medium"
+                      showDetails={true}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="no-data">No achievements earned yet. Keep playing to unlock them!</p>
+            )}
+          </div>
+        )}
+
+        {/* All Achievements Section (when no player selected) */}
+        {!selectedAchievementPlayer && allAchievements.length > 0 && (
+          <div className="achievements-section">
+            <h3>🎯 All Available Achievements</h3>
+            <div className="achievements-grid">
+              {allAchievements.map(achievement => (
+                <AchievementBadge
+                  key={achievement.id}
+                  achievement={achievement}
+                  isLocked={true}
+                  size="medium"
+                  showDetails={true}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Leaderboard Section */}
+        <div className="achievements-section">
+          <h3>📊 {leaderboardType === 'global' ? 'Global Leaderboard' : 'Team Leaderboard'}</h3>
+          <Leaderboard
+            players={leaderboard}
+            type={leaderboardType}
+            loading={loading}
+            season="Current Season"
+            teamName={leaderboardType === 'team' && selectedTeam ? teams.find(t => t.id === selectedTeam)?.name : undefined}
+          />
+        </div>
+
+        {allAchievements.length === 0 && (
+          <div className="empty-state">
+            <p>🏆 No achievements available yet</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="shot-analytics-container">
       <div className="analytics-header">
@@ -1231,9 +2023,38 @@ const ShotAnalytics: React.FC = () => {
           >
             ⚡ Performance
           </button>
+          <button
+            className={`view-tab ${activeView === 'historical' ? 'active' : ''}`}
+            onClick={() => setActiveView('historical')}
+            title="Keyboard: 7"
+          >
+            📚 Historical
+          </button>
+          <button
+            className={`view-tab ${activeView === 'achievements' ? 'active' : ''}`}
+            onClick={() => setActiveView('achievements')}
+            title="Keyboard: 8"
+          >
+            🏆 Achievements
+          </button>
         </div>
-        <div className="keyboard-hints">
-          <span className="hint">💡 Tip: Use number keys 1-6 to switch views | ESC to close modals</span>
+        <div className="analytics-controls-bar">
+          <div className="keyboard-hints">
+            <span className="hint">💡 Tip: Use number keys 1-8 to switch views | ESC to close modals</span>
+          </div>
+          <div className="auto-refresh-toggle">
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+              />
+              <span className="toggle-slider"></span>
+            </label>
+            <span className="toggle-label">
+              {autoRefresh ? '🔄 Live Updates' : '⏸ Manual Refresh'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -1263,6 +2084,16 @@ const ShotAnalytics: React.FC = () => {
               case 'summary': fetchGameSummary(); break;
               case 'charts': fetchShotChart(); fetchPlayerStats(); break;
               case 'performance': fetchStreaks(); fetchZoneAnalysis(); fetchTrends(); break;
+              case 'historical':
+                if (selectedPlayerId) fetchPlayerDevelopment();
+                if (selectedTeam) fetchTeamTendencies();
+                if (selectedTeam && selectedOpponentId) fetchMatchupAnalysis();
+                break;
+              case 'achievements':
+                fetchAchievements();
+                if (selectedAchievementPlayer) fetchPlayerAchievements();
+                fetchLeaderboard();
+                break;
             }
           }}>
             🔄 Retry
@@ -1278,7 +2109,17 @@ const ShotAnalytics: React.FC = () => {
           {activeView === 'summary' && renderGameSummary()}
           {activeView === 'charts' && renderAdvancedCharts()}
           {activeView === 'performance' && renderPerformanceTracking()}
+          {activeView === 'historical' && renderHistoricalAnalytics()}
+          {activeView === 'achievements' && renderAchievements()}
         </>
+      )}
+
+      {/* Achievement notification toast */}
+      {unlockedAchievement && (
+        <AchievementNotification
+          achievement={unlockedAchievement}
+          onClose={() => setUnlockedAchievement(null)}
+        />
       )}
     </div>
   );
