@@ -352,23 +352,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify Docker is running
+      - name: Ensure Docker service is running
         run: |
+          echo "Checking Docker daemon status..."
           docker --version
           docker info || {
-            echo "❌ Docker daemon is not running"
-            exit 1
+            echo "⚠️ Docker daemon not accessible, attempting to start..."
+            sudo systemctl start docker || {
+              echo "❌ Failed to start Docker daemon"
+              exit 1
+            }
+            sleep 5
+            docker info || {
+              echo "❌ Docker daemon still not running after start attempt"
+              exit 1
+            }
           }
+          echo "✅ Docker daemon is running"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build image for scanning
-        run: |
-          echo "Building Docker image for vulnerability scanning..."
-          docker build -t shotspot:scan -f ./Dockerfile .
-          echo "✅ Image built successfully"
-          docker images | grep shotspot
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: shotspot:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Verify image exists
         run: |
@@ -377,7 +391,8 @@ jobs:
             docker images
             exit 1
           fi
-          echo "✅ Image shotspot:scan is available"
+          echo "✅ Image shotspot:scan is available for scanning"
+          docker images | grep shotspot
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -388,7 +403,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
