@@ -52,12 +52,12 @@ describe('⏱️ Timeouts API', () => {
 
     // Create test teams
     const homeTeam = await db.query(
-      `INSERT INTO teams (name) VALUES ('Timeout Home Team') RETURNING id`
+      'INSERT INTO teams (name) VALUES (\'Timeout Home Team\') RETURNING id'
     );
     homeTeamId = homeTeam.rows[0].id;
 
     const awayTeam = await db.query(
-      `INSERT INTO teams (name) VALUES ('Timeout Away Team') RETURNING id`
+      'INSERT INTO teams (name) VALUES (\'Timeout Away Team\') RETURNING id'
     );
     awayTeamId = awayTeam.rows[0].id;
 
@@ -343,7 +343,7 @@ describe('⏱️ Timeouts API', () => {
 
       it('❌ should reject team timeout for non-participating team', async () => {
         const otherTeam = await db.query(
-          `INSERT INTO teams (name) VALUES ('Other Team') RETURNING id`
+          'INSERT INTO teams (name) VALUES (\'Other Team\') RETURNING id'
         );
         const otherTeamId = otherTeam.rows[0].id;
 
@@ -482,7 +482,7 @@ describe('⏱️ Timeouts API', () => {
       it('❌ should reject ending already ended timeout', async () => {
         // End the timeout first
         await db.query(
-          `UPDATE timeouts SET ended_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          'UPDATE timeouts SET ended_at = CURRENT_TIMESTAMP WHERE id = $1',
           [timeoutId]
         );
 
