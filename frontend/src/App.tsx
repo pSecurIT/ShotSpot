@@ -5,6 +5,7 @@ import PlayerManagement from './components/PlayerManagement';
 import UserManagement from './components/UserManagement';
 import GameManagement from './components/GameManagement';
 import LiveMatch from './components/LiveMatch';
+import ShotAnalytics from './components/ShotAnalytics';
 import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -46,6 +47,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <LiveMatch />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/analytics/:gameId" 
+                element={
+                  <ProtectedRoute>
+                    <ShotAnalytics />
                   </ProtectedRoute>
                 } 
               />
