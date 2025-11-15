@@ -397,7 +397,8 @@ describe('ShotAnalytics Component', () => {
       renderShotAnalytics();
 
       await waitFor(() => {
-        expect(screen.getByText('Loading analytics data...')).toBeInTheDocument();
+        const loadingContainer = document.querySelector('.loading-skeleton');
+        expect(loadingContainer).toBeInTheDocument();
       });
     });
   });
