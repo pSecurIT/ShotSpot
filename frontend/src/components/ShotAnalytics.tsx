@@ -88,7 +88,54 @@ interface GameSummary {
   by_team: TeamSummary[];
 }
 
-type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts';
+// Phase 3 interfaces
+interface PlayerStreak {
+  player_id: number;
+  first_name: string;
+  last_name: string;
+  jersey_number: number;
+  team_name: string;
+  current_streak: number;
+  current_streak_type: 'makes' | 'misses';
+  longest_make_streak: number;
+  longest_miss_streak: number;
+}
+
+interface Zone {
+  zone_x: number;
+  zone_y: number;
+  min_x: number;
+  max_x: number;
+  min_y: number;
+  max_y: number;
+  shots: number;
+  goals: number;
+  fg_percentage: number;
+  overall_fg: number;
+  difference: number;
+  is_significant: boolean;
+  zone_type: 'hot' | 'cold' | 'neutral';
+}
+
+interface ZoneAnalysis {
+  overall_fg_percentage: number;
+  zones: Zone[];
+}
+
+interface PeriodTrend {
+  period: number;
+  total_shots: number;
+  goals: number;
+  misses: number;
+  blocked: number;
+  fg_percentage: number;
+  avg_distance: number;
+  players_with_shots: number;
+  trend: 'improving' | 'declining' | 'stable' | null;
+  fg_change: number | null;
+}
+
+type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts' | 'performance';
 
 const ShotAnalytics: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -102,6 +149,11 @@ const ShotAnalytics: React.FC = () => {
   const [shotChartData, setShotChartData] = useState<ShotChartShot[]>([]);
   const [playerStats, setPlayerStats] = useState<PlayerStats[]>([]);
   const [gameSummary, setGameSummary] = useState<GameSummary | null>(null);
+  
+  // Phase 3 data states
+  const [streaks, setStreaks] = useState<PlayerStreak[]>([]);
+  const [zoneAnalysis, setZoneAnalysis] = useState<ZoneAnalysis | null>(null);
+  const [trends, setTrends] = useState<PeriodTrend[]>([]);
 
   // Filter states
   const [gridSize, setGridSize] = useState(10);
@@ -220,6 +272,69 @@ const ShotAnalytics: React.FC = () => {
     }
   }, [gameId]);
 
+  // Phase 3: Fetch streak data
+  const fetchStreaks = useCallback(async () => {
+    if (!gameId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const params = new URLSearchParams();
+      if (selectedTeam) params.append('team_id', selectedTeam.toString());
+
+      const response = await api.get<PlayerStreak[]>(`/analytics/shots/${gameId}/streaks?${params}`);
+      setStreaks(response.data);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load streak data');
+    } finally {
+      setLoading(false);
+    }
+  }, [gameId, selectedTeam]);
+
+  // Phase 3: Fetch zone analysis
+  const fetchZoneAnalysis = useCallback(async () => {
+    if (!gameId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const params = new URLSearchParams();
+      if (selectedTeam) params.append('team_id', selectedTeam.toString());
+
+      const response = await api.get<ZoneAnalysis>(`/analytics/shots/${gameId}/zones?${params}`);
+      setZoneAnalysis(response.data);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load zone analysis');
+    } finally {
+      setLoading(false);
+    }
+  }, [gameId, selectedTeam]);
+
+  // Phase 3: Fetch period trends
+  const fetchTrends = useCallback(async () => {
+    if (!gameId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const params = new URLSearchParams();
+      if (selectedTeam) params.append('team_id', selectedTeam.toString());
+
+      const response = await api.get<PeriodTrend[]>(`/analytics/shots/${gameId}/trends?${params}`);
+      setTrends(response.data);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load trend data');
+    } finally {
+      setLoading(false);
+    }
+  }, [gameId, selectedTeam]);
+
   // Load data when view changes
   useEffect(() => {
     switch (activeView) {
@@ -240,8 +355,52 @@ const ShotAnalytics: React.FC = () => {
         fetchShotChart();
         fetchPlayerStats();
         break;
+      case 'performance':
+        // Performance view needs streaks, zones, and trends
+        fetchStreaks();
+        fetchZoneAnalysis();
+        fetchTrends();
+        break;
     }
-  }, [activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary]);
+  }, [activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle if not in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        return;
+      }
+
+      // Close modal with Escape
+      if (e.key === 'Escape' && selectedShot) {
+        setSelectedShot(null);
+        return;
+      }
+
+      // Tab switching with numbers 1-6
+      const views: AnalyticsView[] = ['heatmap', 'shot-chart', 'players', 'summary', 'charts', 'performance'];
+      const keyNum = parseInt(e.key);
+      if (keyNum >= 1 && keyNum <= 6) {
+        setActiveView(views[keyNum - 1]);
+        return;
+      }
+
+      // Arrow left/right for zoom in shot-chart view
+      if (activeView === 'shot-chart') {
+        if (e.key === 'ArrowRight' && zoomLevel < 3) {
+          setZoomLevel(prev => Math.min(prev + 0.25, 3));
+        } else if (e.key === 'ArrowLeft' && zoomLevel > 1) {
+          setZoomLevel(prev => Math.max(prev - 0.25, 1));
+        } else if (e.key === '0') {
+          setZoomLevel(1);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [activeView, selectedShot, zoomLevel]);
 
   // Get color for heatmap bucket based on intensity
   const getHeatmapColor = (count: number, maxCount: number): string => {
@@ -447,15 +606,23 @@ const ShotAnalytics: React.FC = () => {
           </button>
         </div>
 
-        <div className="court-container" ref={courtRef} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.3s ease' }}>
-          <img 
-            ref={imageRef}
-            src={courtImageUrl} 
-            alt="Korfball Court" 
-            className="court-image"
-          />
-          <div className="shot-markers-overlay">
-            {shotChartData.map((shot) => (
+        {shotChartData.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">🎯</div>
+            <h3>No Shots Recorded</h3>
+            <p>No shots have been recorded for this game yet. Start tracking shots to see them visualized here.</p>
+          </div>
+        ) : (
+          <>
+            <div className="court-container" ref={courtRef} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.3s ease' }}>
+              <img 
+                ref={imageRef}
+                src={courtImageUrl} 
+                alt="Korfball Court" 
+                className="court-image"
+              />
+              <div className="shot-markers-overlay">
+                {shotChartData.map((shot) => (
               <div
                 key={shot.id}
                 className={`shot-marker ${shot.result}`}
@@ -499,25 +666,57 @@ const ShotAnalytics: React.FC = () => {
           </div>
         )}
 
-        <div className="shot-chart-legend">
-          <h4>Shot Chart</h4>
-          <div className="legend-items">
-            <div className="legend-item">
-              <span className="marker goal">●</span>
-              <span>Goal ({shotChartData.filter(s => s.result === 'goal').length})</span>
+            <div className="shot-chart-legend">
+              <h4>Shot Chart</h4>
+              <div className="legend-items">
+                <div className="legend-item">
+                  <span className="marker goal">●</span>
+                  <span>Goal ({shotChartData.filter(s => s.result === 'goal').length})</span>
+                </div>
+                <div className="legend-item">
+                  <span className="marker miss">✕</span>
+                  <span>Miss ({shotChartData.filter(s => s.result === 'miss').length})</span>
+                </div>
+                <div className="legend-item">
+                  <span className="marker blocked">◼</span>
+                  <span>Blocked ({shotChartData.filter(s => s.result === 'blocked').length})</span>
+                </div>
+              </div>
             </div>
-            <div className="legend-item">
-              <span className="marker miss">✕</span>
-              <span>Miss ({shotChartData.filter(s => s.result === 'miss').length})</span>
-            </div>
-            <div className="legend-item">
-              <span className="marker blocked">◼</span>
-              <span>Blocked ({shotChartData.filter(s => s.result === 'blocked').length})</span>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     );
+  };
+
+  // Export data to CSV
+  const exportToCSV = (data: unknown[], filename: string) => {
+    if (!data || data.length === 0) return;
+    
+    // Convert data to CSV
+    const headers = Object.keys(data[0] as Record<string, unknown>);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => 
+        headers.map(header => {
+          const value = (row as Record<string, unknown>)[header];
+          // Handle nested objects and escape commas
+          const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+          return `"${strValue.replace(/"/g, '""')}"`;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Render player statistics view
@@ -534,6 +733,13 @@ const ShotAnalytics: React.FC = () => {
               ))}
             </select>
           </div>
+          <button 
+            className="export-button"
+            onClick={() => exportToCSV(playerStats, `player_stats_game_${gameId}`)}
+            disabled={playerStats.length === 0}
+          >
+            📥 Export CSV
+          </button>
         </div>
 
         <div className="player-stats-table">
@@ -827,6 +1033,152 @@ const ShotAnalytics: React.FC = () => {
     );
   };
 
+  // Phase 3: Render performance tracking view
+  const renderPerformanceTracking = () => {
+    const getTrendIcon = (trend: string | null) => {
+      if (!trend) return '—';
+      if (trend === 'improving') return '📈';
+      if (trend === 'declining') return '📉';
+      return '→';
+    };
+
+    const getTrendColor = (trend: string | null) => {
+      if (!trend) return '';
+      if (trend === 'improving') return '#4CAF50';
+      if (trend === 'declining') return '#f44336';
+      return '#666';
+    };
+
+    return (
+      <div className="analytics-view performance-view">
+        <h3>⚡ Performance Tracking</h3>
+
+        {/* Streak Tracking */}
+        <div className="performance-section">
+          <h4>🔥 Current Streaks</h4>
+          {streaks.length > 0 ? (
+            <div className="streaks-grid">
+              {streaks.map(player => (
+                <div key={player.player_id} className="streak-card">
+                  <div className="streak-header">
+                    <h5>#{player.jersey_number} {player.first_name} {player.last_name}</h5>
+                    <span className="team-badge">{player.team_name}</span>
+                  </div>
+                  <div className="streak-stats">
+                    <div className={`current-streak ${player.current_streak_type}`}>
+                      <span className="streak-label">Current:</span>
+                      <span className="streak-value">{player.current_streak} {player.current_streak_type}</span>
+                    </div>
+                    <div className="streak-records">
+                      <div className="record">
+                        <span className="record-label">Best Make Streak:</span>
+                        <span className="record-value success">{player.longest_make_streak}</span>
+                      </div>
+                      <div className="record">
+                        <span className="record-label">Longest Miss Streak:</span>
+                        <span className="record-value miss">{player.longest_miss_streak}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="no-data">No streak data available</p>
+          )}
+        </div>
+
+        {/* Hot/Cold Zones */}
+        <div className="performance-section">
+          <h4>🎯 Hot & Cold Zones</h4>
+          {zoneAnalysis && zoneAnalysis.zones.length > 0 ? (
+            <>
+              <p className="zone-info">
+                Overall FG%: <strong>{zoneAnalysis.overall_fg_percentage}%</strong>
+                <span className="zone-legend">
+                  🔥 Hot Zone (+15%) | ❄️ Cold Zone (-15%)
+                </span>
+              </p>
+              <div className="zones-court">
+                <img src={courtImageUrl} alt="Court" className="zones-court-image" />
+                <div className="zones-overlay">
+                  {zoneAnalysis.zones.map((zone, index) => (
+                    <div
+                      key={index}
+                      className={`zone-box ${zone.zone_type}`}
+                      style={{
+                        left: `${zone.min_x}%`,
+                        top: `${zone.min_y}%`,
+                        width: '25%',
+                        height: '25%'
+                      }}
+                      title={`Zone (${zone.zone_x}, ${zone.zone_y})\nShots: ${zone.shots}\nFG%: ${zone.fg_percentage}%\nDiff: ${zone.difference > 0 ? '+' : ''}${zone.difference}%`}
+                    >
+                      {zone.is_significant && (
+                        <>
+                          <span className="zone-icon">{zone.zone_type === 'hot' ? '🔥' : '❄️'}</span>
+                          <span className="zone-fg">{zone.fg_percentage}%</span>
+                          <span className="zone-diff">{zone.difference > 0 ? '+' : ''}{zone.difference}%</span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="no-data">No zone analysis available (need 10+ shots per zone)</p>
+          )}
+        </div>
+
+        {/* Period Trends */}
+        <div className="performance-section">
+          <h4>📊 Period-by-Period Trends</h4>
+          {trends.length > 0 ? (
+            <div className="trends-table-container">
+              <table className="trends-table">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>Shots</th>
+                    <th>Goals</th>
+                    <th>FG%</th>
+                    <th>Trend</th>
+                    <th>Change</th>
+                    <th>Avg Distance</th>
+                    <th>Players</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trends.map(trend => (
+                    <tr key={trend.period}>
+                      <td className="period-cell">Period {trend.period}</td>
+                      <td>{trend.total_shots}</td>
+                      <td className="success">{trend.goals}</td>
+                      <td className="fg-cell">{trend.fg_percentage}%</td>
+                      <td className="trend-cell">
+                        <span style={{ color: getTrendColor(trend.trend) }}>
+                          {getTrendIcon(trend.trend)} {trend.trend || 'N/A'}
+                        </span>
+                      </td>
+                      <td className={trend.fg_change && trend.fg_change > 0 ? 'success' : trend.fg_change && trend.fg_change < 0 ? 'miss' : ''}>
+                        {trend.fg_change !== null ? `${trend.fg_change > 0 ? '+' : ''}${trend.fg_change}%` : '—'}
+                      </td>
+                      <td>{trend.avg_distance ? `${trend.avg_distance}m` : 'N/A'}</td>
+                      <td>{trend.players_with_shots}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="no-data">No trend data available</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="shot-analytics-container">
       <div className="analytics-header">
@@ -840,38 +1192,83 @@ const ShotAnalytics: React.FC = () => {
           <button
             className={`view-tab ${activeView === 'heatmap' ? 'active' : ''}`}
             onClick={() => setActiveView('heatmap')}
+            title="Keyboard: 1"
           >
             🔥 Heatmap
           </button>
           <button
             className={`view-tab ${activeView === 'shot-chart' ? 'active' : ''}`}
             onClick={() => setActiveView('shot-chart')}
+            title="Keyboard: 2 | Zoom: ← → | Reset: 0"
           >
             🎯 Shot Chart
           </button>
           <button
             className={`view-tab ${activeView === 'players' ? 'active' : ''}`}
             onClick={() => setActiveView('players')}
+            title="Keyboard: 3"
           >
             👤 Player Stats
           </button>
           <button
             className={`view-tab ${activeView === 'summary' ? 'active' : ''}`}
             onClick={() => setActiveView('summary')}
+            title="Keyboard: 4"
           >
             📋 Summary
           </button>
           <button
             className={`view-tab ${activeView === 'charts' ? 'active' : ''}`}
             onClick={() => setActiveView('charts')}
+            title="Keyboard: 5"
           >
             📈 Advanced Charts
           </button>
+          <button
+            className={`view-tab ${activeView === 'performance' ? 'active' : ''}`}
+            onClick={() => setActiveView('performance')}
+            title="Keyboard: 6"
+          >
+            ⚡ Performance
+          </button>
+        </div>
+        <div className="keyboard-hints">
+          <span className="hint">💡 Tip: Use number keys 1-6 to switch views | ESC to close modals</span>
         </div>
       </div>
 
-      {loading && <div className="loading-spinner">Loading analytics data...</div>}
-      {error && <div className="error-message">❌ {error}</div>}
+      {loading && (
+        <div className="loading-container">
+          <div className="loading-skeleton">
+            <div className="skeleton-header"></div>
+            <div className="skeleton-content">
+              <div className="skeleton-box"></div>
+              <div className="skeleton-box"></div>
+              <div className="skeleton-box"></div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {error && (
+        <div className="error-message">
+          <span className="error-icon">❌</span>
+          <span className="error-text">{error}</span>
+          <button className="retry-button" onClick={() => {
+            setError(null);
+            switch (activeView) {
+              case 'heatmap': fetchHeatmap(); break;
+              case 'shot-chart': fetchShotChart(); break;
+              case 'players': fetchPlayerStats(); break;
+              case 'summary': fetchGameSummary(); break;
+              case 'charts': fetchShotChart(); fetchPlayerStats(); break;
+              case 'performance': fetchStreaks(); fetchZoneAnalysis(); fetchTrends(); break;
+            }
+          }}>
+            🔄 Retry
+          </button>
+        </div>
+      )}
 
       {!loading && !error && (
         <>
@@ -880,6 +1277,7 @@ const ShotAnalytics: React.FC = () => {
           {activeView === 'players' && renderPlayerStats()}
           {activeView === 'summary' && renderGameSummary()}
           {activeView === 'charts' && renderAdvancedCharts()}
+          {activeView === 'performance' && renderPerformanceTracking()}
         </>
       )}
     </div>
