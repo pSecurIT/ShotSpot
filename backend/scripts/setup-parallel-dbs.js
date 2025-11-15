@@ -137,7 +137,8 @@ async function setupParallelDatabases() {
           '../src/migrations/add_enhanced_events.sql',
           '../src/migrations/add_match_configuration_columns.sql',
           '../src/migrations/add_attacking_side.sql',
-          '../src/migrations/add_starting_position.sql'
+          '../src/migrations/add_starting_position.sql',
+          '../src/migrations/add_achievements_system.sql'
         ];
 
         console.log('📦 Applying migrations...');
