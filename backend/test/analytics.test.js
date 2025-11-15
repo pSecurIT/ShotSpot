@@ -433,4 +433,198 @@ describe('📊 Analytics Routes', () => {
       }
     });
   });
+
+  describe('⏱️ Play Time Calculations', () => {
+    let playTimeGame;
+    let starterPlayer;
+    let benchPlayer;
+    let subPlayer;
+
+    beforeAll(async () => {
+      const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+      // Create a new game for play time tests
+      const gameResult = await db.query(
+        `INSERT INTO games (home_team_id, away_team_id, date, status, period_duration, number_of_periods) 
+         VALUES ($1, $2, $3, $4, $5::interval, $6) RETURNING *`,
+        [team1.id, team2.id, new Date(), 'in_progress', '10 minutes', 4]
+      );
+      playTimeGame = gameResult.rows[0];
+
+      // Create players for play time tests
+      const starterResult = await db.query(
+        'INSERT INTO players (first_name, last_name, jersey_number, team_id, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        ['Starter', 'Player', 99, team1.id, 'male']
+      );
+      starterPlayer = starterResult.rows[0];
+
+      const benchResult = await db.query(
+        'INSERT INTO players (first_name, last_name, jersey_number, team_id, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        ['Bench', 'Player', 98, team1.id, 'female']
+      );
+      benchPlayer = benchResult.rows[0];
+
+      const subResult = await db.query(
+        'INSERT INTO players (first_name, last_name, jersey_number, team_id, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        ['Sub', 'Player', 97, team2.id, 'male']
+      );
+      subPlayer = subResult.rows[0];
+
+      // Add players to roster
+      await db.query(
+        'INSERT INTO game_rosters (game_id, player_id, team_id, is_starting) VALUES ($1, $2, $3, $4)',
+        [playTimeGame.id, starterPlayer.id, team1.id, true]
+      );
+      await db.query(
+        'INSERT INTO game_rosters (game_id, player_id, team_id, is_starting) VALUES ($1, $2, $3, $4)',
+        [playTimeGame.id, benchPlayer.id, team1.id, false]
+      );
+      await db.query(
+        'INSERT INTO game_rosters (game_id, player_id, team_id, is_starting) VALUES ($1, $2, $3, $4)',
+        [playTimeGame.id, subPlayer.id, team2.id, false]
+      );
+
+      // Add shots so players appear in results
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, distance) 
+         VALUES ($1, $2, $3, 50, 50, 'goal', 1, 5.0)`,
+        [playTimeGame.id, starterPlayer.id, team1.id]
+      );
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, distance) 
+         VALUES ($1, $2, $3, 50, 50, 'miss', 1, 5.0)`,
+        [playTimeGame.id, benchPlayer.id, team1.id]
+      );
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, distance) 
+         VALUES ($1, $2, $3, 50, 50, 'goal', 1, 5.0)`,
+        [playTimeGame.id, subPlayer.id, team2.id]
+      );
+    });
+
+    afterAll(async () => {
+      // Clean up play time test data
+      await db.query('DELETE FROM substitutions WHERE game_id = $1', [playTimeGame.id]);
+      await db.query('DELETE FROM game_rosters WHERE game_id = $1', [playTimeGame.id]);
+      await db.query('DELETE FROM shots WHERE game_id = $1', [playTimeGame.id]);
+      await db.query('DELETE FROM games WHERE id = $1', [playTimeGame.id]);
+      await db.query('DELETE FROM players WHERE id IN ($1, $2, $3)', [starterPlayer.id, benchPlayer.id, subPlayer.id]);
+    });
+
+    it('✅ should calculate full game time for starters with no substitutions', async () => {
+      try {
+        const response = await request(app)
+          .get(`/api/analytics/shots/${playTimeGame.id}/players`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(response.status).toBe(200);
+        
+        const starterStats = response.body.find(p => p.player_id === starterPlayer.id);
+        
+        // Starter should have full game time: 4 periods * 10 minutes * 60 seconds = 2400 seconds
+        expect(starterStats).toBeDefined();
+        expect(starterStats.play_time_seconds).toBe(2400);
+      } catch (error) {
+        global.testContext.logTestError(error, 'Starter play time calculation failed');
+        throw error;
+      }
+    });
+
+    it('✅ should calculate zero play time for bench players with no substitutions', async () => {
+      try {
+        const response = await request(app)
+          .get(`/api/analytics/shots/${playTimeGame.id}/players`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(response.status).toBe(200);
+        
+        const benchStats = response.body.find(p => p.player_id === benchPlayer.id);
+        
+        // Bench player with no substitutions should have 0 play time
+        expect(benchStats).toBeDefined();
+        expect(benchStats.play_time_seconds).toBe(0);
+      } catch (error) {
+        global.testContext.logTestError(error, 'Bench player play time calculation failed');
+        throw error;
+      }
+    });
+
+    it('✅ should calculate play time correctly with substitution', async () => {
+      try {
+        // Sub player enters at 8:00 remaining in period 1 (120 seconds elapsed)
+        await db.query(
+          `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, time_remaining) 
+           VALUES ($1, $2, $3, $4, $5, $6::interval)`,
+          [playTimeGame.id, team2.id, subPlayer.id, starterPlayer.id, 1, '480 seconds']
+        );
+        
+        // Sub player exits at 2:00 remaining in period 1 (480 seconds elapsed)
+        await db.query(
+          `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, time_remaining) 
+           VALUES ($1, $2, $3, $4, $5, $6::interval)`,
+          [playTimeGame.id, team2.id, starterPlayer.id, subPlayer.id, 1, '120 seconds']
+        );
+
+        const response = await request(app)
+          .get(`/api/analytics/shots/${playTimeGame.id}/players`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(response.status).toBe(200);
+        
+        const subStats = response.body.find(p => p.player_id === subPlayer.id);
+        
+        // Sub player played from 2:00 (120s) to 8:00 (480s) = 6 minutes = 360 seconds
+        expect(subStats).toBeDefined();
+        expect(subStats.play_time_seconds).toBe(360);
+      } catch (error) {
+        global.testContext.logTestError(error, 'Substitution play time calculation failed');
+        throw error;
+      }
+    });
+
+    it('✅ should return average_distance field (not avg_distance)', async () => {
+      try {
+        const response = await request(app)
+          .get(`/api/analytics/shots/${playTimeGame.id}/players`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.length).toBeGreaterThan(0);
+        
+        const player = response.body[0];
+        
+        // Should have average_distance
+        expect(player).toHaveProperty('average_distance');
+        expect(typeof player.average_distance).toBe('number');
+        
+        // Should NOT have avg_distance
+        expect(player).not.toHaveProperty('avg_distance');
+        expect(player).not.toHaveProperty('avg_x_coord');
+        expect(player).not.toHaveProperty('avg_y_coord');
+      } catch (error) {
+        global.testContext.logTestError(error, 'Field name validation failed');
+        throw error;
+      }
+    });
+
+    it('✅ should include play_time_seconds in response', async () => {
+      try {
+        const response = await request(app)
+          .get(`/api/analytics/shots/${playTimeGame.id}/players`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.length).toBeGreaterThan(0);
+        
+        response.body.forEach(player => {
+          expect(player).toHaveProperty('play_time_seconds');
+          expect(typeof player.play_time_seconds).toBe('number');
+          expect(player.play_time_seconds).toBeGreaterThanOrEqual(0);
+        });
+      } catch (error) {
+        global.testContext.logTestError(error, 'Play time field validation failed');
+        throw error;
+      }
+    });
+  });
 });

@@ -27,6 +27,7 @@ import timeoutsRoutes from './routes/timeouts.js';
 import matchCommentaryRoutes from './routes/match-commentary.js';
 import userRoutes from './routes/users.js';
 import analyticsRoutes from './routes/analytics.js';
+import achievementsRoutes from './routes/achievements.js';
 
 const app = express();
 
@@ -259,6 +260,7 @@ app.use('/api/games', gamesRoutes);
 app.use('/api/match-events', matchEventsRoutes);
 app.use('/api/shots', shotsRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/achievements', achievementsRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/timer', timerRoutes);
 app.use('/api/possessions', possessionsRoutes);
