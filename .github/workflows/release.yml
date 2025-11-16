@@ -65,6 +65,14 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Debug metadata tags
+        run: |
+          echo "Generated tags:"
+          echo "${{ steps.meta.outputs.tags }}"
+          echo ""
+          echo "Expected SHA tag: sha-${{ github.sha }}"
+          echo "Full image reference: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v6
@@ -81,6 +89,20 @@ jobs:
           sbom: true
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+
+      - name: Verify image was pushed
+        run: |
+          echo "Verifying image was pushed successfully..."
+          echo "Image digest: ${{ steps.build.outputs.digest }}"
+          echo ""
+          echo "Attempting to pull SHA-tagged image..."
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} || {
+            echo "Failed to pull SHA-tagged image"
+            echo "Available tags:"
+            echo "${{ steps.meta.outputs.tags }}"
+            exit 1
+          }
+          echo "Successfully verified SHA-tagged image exists"
 
       - name: Generate build summary
         run: |
@@ -139,7 +161,16 @@ jobs:
 
       - name: Pull built image
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          echo "Pulling image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} || {
+            echo "Failed to pull image"
+            echo "Registry: ${{ env.REGISTRY }}"
+            echo "Image: ${{ env.IMAGE_NAME }}"
+            echo "Tag: sha-${{ github.sha }}"
+            echo "Full reference: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+            exit 1
+          }
+          echo "Successfully pulled image"
 
       - name: Test image structure
         run: |
@@ -281,7 +312,15 @@ jobs:
 
       - name: Pull built image
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          echo "Pulling image for vulnerability scan: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} || {
+            echo "Failed to pull image for scanning"
+            echo "Registry: ${{ env.REGISTRY }}"
+            echo "Image: ${{ env.IMAGE_NAME }}"
+            echo "Tag: sha-${{ github.sha }}"
+            exit 1
+          }
+          echo "Image pulled successfully for scanning"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
