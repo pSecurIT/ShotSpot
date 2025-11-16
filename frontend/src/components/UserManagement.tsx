@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import ChangePasswordDialog from './ChangePasswordDialog';
 
 interface User {
   id: number;
@@ -15,7 +16,9 @@ const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const { user: currentUser } = useAuth();
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const { user: currentUser, updateUser } = useAuth();
 
   const fetchUsers = async () => {
     try {
@@ -53,6 +56,20 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleResetPassword = (user: User) => {
+    setSelectedUser(user);
+    setPasswordDialogOpen(true);
+  };
+
+  const handlePasswordChangeSuccess = (token?: string, updatedUser?: { id: number; username: string; email: string; role: string; passwordMustChange: boolean }) => {
+    if (token && updatedUser && currentUser && selectedUser?.id === currentUser.id) {
+      // Admin changed their own password - update token and user
+      updateUser(token, updatedUser);
+    }
+    setSuccess(`Password reset successfully for ${selectedUser?.username}`);
+    setSelectedUser(null);
+  };
+
   if (!currentUser || currentUser.role !== 'admin') {
     return <div>You don&apos;t have permission to access this page.</div>;
   }
@@ -79,7 +96,8 @@ const UserManagement: React.FC = () => {
             <th style={styles.th}>Username</th>
             <th style={styles.th}>Email</th>
             <th style={styles.th}>Current Role</th>
-            <th style={styles.th}>Actions</th>
+            <th style={styles.th}>Change Role</th>
+            <th style={styles.th}>Password</th>
           </tr>
         </thead>
         <tbody>
@@ -100,10 +118,32 @@ const UserManagement: React.FC = () => {
                   <option value="admin">Admin</option>
                 </select>
               </td>
+              <td style={styles.td}>
+                <button
+                  onClick={() => handleResetPassword(user)}
+                  style={styles.button}
+                >
+                  Reset Password
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {selectedUser && (
+        <ChangePasswordDialog
+          userId={selectedUser.id}
+          username={selectedUser.username}
+          isOwnPassword={selectedUser.id === currentUser?.id}
+          isOpen={passwordDialogOpen}
+          onClose={() => {
+            setPasswordDialogOpen(false);
+            setSelectedUser(null);
+          }}
+          onSuccess={handlePasswordChangeSuccess}
+        />
+      )}
     </div>
   );
 };
@@ -123,6 +163,16 @@ const styles = {
     padding: '6px',
     borderRadius: '4px',
     border: '1px solid #ddd'
+  },
+  button: {
+    padding: '8px 16px',
+    fontSize: '0.9rem',
+    border: 'none',
+    borderRadius: '4px',
+    backgroundColor: '#007bff',
+    color: 'white',
+    cursor: 'pointer',
+    fontWeight: 500
   }
 };
 
