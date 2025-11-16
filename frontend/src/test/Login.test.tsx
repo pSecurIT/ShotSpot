@@ -18,6 +18,7 @@ vi.mock('react-router-dom', async () => {
 const mockLogin = vi.fn();
 const mockLogout = vi.fn();
 const mockRegister = vi.fn();
+const mockUpdateUser = vi.fn();
 
 // Mock the useAuth hook
 vi.mock('../contexts/AuthContext', async () => {
@@ -29,6 +30,7 @@ vi.mock('../contexts/AuthContext', async () => {
       login: mockLogin,
       logout: mockLogout,
       register: mockRegister,
+      updateUser: mockUpdateUser,
     }),
   };
 });
