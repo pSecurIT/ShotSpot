@@ -8,9 +8,12 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'user',
+    password_must_change BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+COMMENT ON COLUMN users.password_must_change IS 'Forces user to change password on next login (used for default admin and password resets)';
 
 -- Teams table
 CREATE TABLE IF NOT EXISTS teams (

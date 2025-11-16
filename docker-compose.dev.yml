@@ -12,8 +12,7 @@ services:
       POSTGRES_DB: ${DB_NAME:-shotspot_db}
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
-      - ./backend/scripts/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./backend/src/migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ./backend/src/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     ports:
       - "${DB_PORT:-5432}:5432"
     healthcheck:

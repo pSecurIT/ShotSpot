@@ -31,8 +31,7 @@ services:
       POSTGRES_INITDB_ARGS: "-E UTF8 --lc-collate=C --lc-ctype=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/scripts/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./backend/src/migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ./backend/src/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     # Security: Only expose port to internal network, not host (remove port mapping for production)
     # Uncomment for external database access (development only):
     # ports:
