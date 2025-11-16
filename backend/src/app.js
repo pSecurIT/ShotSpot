@@ -95,15 +95,18 @@ if (process.env.NODE_ENV !== 'test') {
       });
     },
     skip: (req) => {
-      // Skip rate limiting for certain trusted IPs, health checks, and timer endpoints (frequent polling)
+      // Skip rate limiting in development mode entirely to avoid issues during rapid dev cycles
+      const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production';
+      if (isDevelopment) {
+        return true; // Skip all rate limiting in development
+      }
+      
+      // In production, skip only for trusted IPs and health checks
       const trustedIPs = (process.env.TRUSTED_IPS || '').split(',');
-      const isTimerEndpoint = req.path.startsWith('/api/timer');
       const isHealthCheck = req.path === '/api/health';
       const isTrustedIP = trustedIPs.includes(req.ip);
-      const isDevelopment = process.env.NODE_ENV === 'development';
       
-      // In development, skip rate limiting for timer endpoints and localhost
-      return isHealthCheck || isTrustedIP || (isDevelopment && (isTimerEndpoint || req.ip === '127.0.0.1' || req.ip === '::1'));
+      return isHealthCheck || isTrustedIP;
     }
   });
 
@@ -121,28 +124,27 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // CORS configuration with enhanced security
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map(origin => origin.trim());
+
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
-    const isTest = process.env.NODE_ENV === 'test';
-    
-    // Allow all requests in test environment
-    if (isTest) {
-      callback(null, true);
-      return;
-    }
-    
-    // Allow requests with no origin (same-origin requests, curl, health checks)
+    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
     if (!origin) {
-      callback(null, true);
-      return;
+      return callback(null, true);
     }
-
-    // Check if origin is allowed
+    
+    // Check if origin is in allowed list
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Origin not allowed by CORS'), false);
+      // Log but don't crash - just deny the request
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn(`⚠️  CORS: Blocked request from origin: ${origin}`);
+      }
+      // Return false to deny, but DON'T throw error (causes crash)
+      callback(null, false);
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -152,15 +154,21 @@ const corsOptions = {
     'X-Requested-With',
     'Accept',
     'Origin',
-    'X-CSRF-Token'  // Added CSRF token header
+    'X-CSRF-Token'
   ],
   exposedHeaders: ['Authorization'],
   credentials: true,
-  maxAge: 3600, // 1 hour
+  maxAge: 3600,
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
-app.use(cors(corsOptions));
+
+try {
+  app.use(cors(corsOptions));
+} catch (corsError) {
+  console.error('❌ CORS middleware error:', corsError);
+  throw corsError;
+}
 
 // Debug middleware (silent in test environment)
 app.use((req, res, next) => {
