@@ -54,16 +54,40 @@ const auth = (req, res, next) => {
     
     req.user = {
       ...decoded,
-      role: decoded.role.toLowerCase() // Normalize role here
+      role: decoded.role.toLowerCase(), // Normalize role here
+      passwordMustChange: decoded.passwordMustChange || false
     };
 
     if (process.env.NODE_ENV !== 'test') {
       console.log('Auth: Final user object:', req.user);
     }
+
+    // Check if password must be changed (allow only change-password and logout endpoints)
+    if (req.user.passwordMustChange) {
+      const allowedPaths = ['/api/auth/change-password', '/api/auth/logout', '/api/health'];
+      const isAllowedPath = allowedPaths.some(path => req.path === path || req.path.startsWith(path));
+      
+      if (!isAllowedPath) {
+        return res.status(403).json({
+          error: 'Password change required',
+          message: 'You must change your password before accessing other resources',
+          passwordMustChange: true
+        });
+      }
+    }
+
     next();
   } catch (error) {
-    logError('Authentication error:', error);
-    res.status(401).json({ error: 'Invalid token' });
+    // Don't expose JWT error details to client (security best practice)
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired', expired: true });
+    } else if (error.name === 'JsonWebTokenError') {
+      logError('JWT verification failed:', error.message);
+      return res.status(401).json({ error: 'Invalid token' });
+    } else {
+      logError('Authentication error:', error);
+      return res.status(401).json({ error: 'Authentication failed' });
+    }
   }
 };
 
