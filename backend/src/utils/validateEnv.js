@@ -64,6 +64,35 @@ function validateEnvVars() {
     insecure.push('CORS_ORIGIN (must be a valid URL starting with http:// or https://)');
   }
 
+  // Validate default admin credentials (if provided)
+  if (process.env.DEFAULT_ADMIN_USERNAME) {
+    const username = process.env.DEFAULT_ADMIN_USERNAME.trim();
+    if (username.length < 3 || username.length > 50) {
+      insecure.push('DEFAULT_ADMIN_USERNAME (must be between 3 and 50 characters)');
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      insecure.push('DEFAULT_ADMIN_USERNAME (only alphanumeric, underscore, and hyphen allowed)');
+    }
+  }
+
+  if (process.env.DEFAULT_ADMIN_EMAIL) {
+    const email = process.env.DEFAULT_ADMIN_EMAIL.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      insecure.push('DEFAULT_ADMIN_EMAIL (invalid email format)');
+    }
+  }
+
+  if (process.env.DEFAULT_ADMIN_PASSWORD && process.env.DEFAULT_ADMIN_PASSWORD.trim() !== '') {
+    const password = process.env.DEFAULT_ADMIN_PASSWORD;
+    if (password.length < 8) {
+      insecure.push('DEFAULT_ADMIN_PASSWORD (minimum 8 characters required)');
+    }
+    if (!/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9])/.test(password)) {
+      insecure.push('DEFAULT_ADMIN_PASSWORD (must include uppercase, lowercase, number, and special character)');
+    }
+    console.warn('⚠️  DEFAULT_ADMIN_PASSWORD is set. Consider leaving it empty for auto-generation.');
+  }
+
   // Report findings
   if (missing.length > 0) {
     console.error('Missing required environment variables:');
