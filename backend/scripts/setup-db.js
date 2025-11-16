@@ -140,14 +140,14 @@ async function main() {
   try {
     // Get environment variables
     const postgresPassword = process.env.POSTGRES_PASSWORD;
-    const appDbUser = process.env.APP_DB_USER;
-    const appDbPassword = process.env.APP_DB_PASSWORD;
+    const appDbUser = dbConfig.user; // Use DB_USER from dbConfig
+    const appDbPassword = dbConfig.password; // Use DB_PASSWORD from dbConfig
 
     // Validate environment variables
     const missingVars = [];
     if (!postgresPassword) missingVars.push('POSTGRES_PASSWORD');
-    if (!appDbUser) missingVars.push('APP_DB_USER');
-    if (!appDbPassword) missingVars.push('APP_DB_PASSWORD');
+    if (!appDbUser) missingVars.push('DB_USER');
+    if (!appDbPassword) missingVars.push('DB_PASSWORD');
 
     if (missingVars.length > 0) {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
@@ -158,10 +158,10 @@ async function main() {
       throw new Error('POSTGRES_PASSWORD must be a non-empty string');
     }
     if (typeof appDbPassword !== 'string' || appDbPassword.length === 0) {
-      throw new Error('APP_DB_PASSWORD must be a non-empty string');
+      throw new Error('DB_PASSWORD must be a non-empty string');
     }
     if (typeof appDbUser !== 'string' || appDbUser.length === 0) {
-      throw new Error('APP_DB_USER must be a non-empty string');
+      throw new Error('DB_USER must be a non-empty string');
     }
     const tempFile = path.join(__dirname, 'temp-setup.sql');
     

@@ -100,7 +100,7 @@ self.addEventListener('fetch', (event) => {
 
 /**
  * Handle API requests with network-first strategy
- * Falls back to cache if offline
+ * Falls back to cache if offline or backend unavailable
  */
 async function handleApiRequest(request) {
   const url = new URL(request.url);
@@ -113,6 +113,18 @@ async function handleApiRequest(request) {
     if (networkResponse.ok && shouldCacheApiEndpoint(url.pathname)) {
       const cache = await caches.open(API_CACHE_NAME);
       cache.put(request, networkResponse.clone());
+      return networkResponse;
+    }
+    
+    // If backend returns 503, CORS error, or 500+ error, try cache
+    if (networkResponse.status >= 500 || networkResponse.status === 0) {
+      console.log('[Service Worker] Backend unavailable (status: ' + networkResponse.status + '), trying cache:', url.pathname);
+      const cachedResponse = await caches.match(request);
+      
+      if (cachedResponse) {
+        console.log('[Service Worker] Serving from cache due to backend error:', url.pathname);
+        return cachedResponse;
+      }
     }
     
     return networkResponse;

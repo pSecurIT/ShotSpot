@@ -5,6 +5,24 @@ import validateEnv from './utils/validateEnv.js';
 import app from './app.js';
 import { verifyToken } from './middleware/auth.js';
 
+// Critical: Handle unhandled promise rejections and exceptions to prevent silent crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ UNHANDLED REJECTION:', reason);
+  console.error('Promise:', promise);
+  // Don't exit in development to keep debugging
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ UNCAUGHT EXCEPTION:', error);
+  // Don't exit in development to keep debugging
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+});
+
 // Load and validate environment variables
 dotenv.config();
 validateEnv();
