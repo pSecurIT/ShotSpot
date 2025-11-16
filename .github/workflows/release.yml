@@ -98,14 +98,16 @@ jobs:
           echo "Verifying image was pushed successfully..."
           echo "Image digest: ${{ steps.build.outputs.digest }}"
           echo ""
-          echo "Attempting to pull SHA-tagged image..."
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} || {
-            echo "Failed to pull SHA-tagged image"
-            echo "Available tags:"
-            echo "${{ steps.meta.outputs.tags }}"
+          echo "All generated tags:"
+          echo "${{ steps.meta.outputs.tags }}"
+          echo ""
+          echo "Attempting to pull image by digest (immutable reference)..."
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} || {
+            echo "Failed to pull image by digest"
+            echo "This indicates the image was not pushed successfully"
             exit 1
           }
-          echo "Successfully verified SHA-tagged image exists"
+          echo "Successfully verified image exists and is accessible"
 
       - name: Generate build summary
         run: |
