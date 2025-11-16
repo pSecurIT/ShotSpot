@@ -24,6 +24,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_digest: ${{ steps.build.outputs.digest }}
+      image_tags: ${{ steps.meta.outputs.tags }}
       
     steps:
       - name: Checkout repository
@@ -161,13 +164,13 @@ jobs:
 
       - name: Pull built image
         run: |
-          echo "Pulling image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} || {
-            echo "Failed to pull image"
-            echo "Registry: ${{ env.REGISTRY }}"
-            echo "Image: ${{ env.IMAGE_NAME }}"
-            echo "Tag: sha-${{ github.sha }}"
-            echo "Full reference: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+          echo "Pulling image by digest (immutable reference)"
+          echo "Registry: ${{ env.REGISTRY }}"
+          echo "Image: ${{ env.IMAGE_NAME }}"
+          echo "Digest: ${{ needs.build-and-push.outputs.image_digest }}"
+          echo "Full reference: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }}"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }} || {
+            echo "Failed to pull image by digest"
             exit 1
           }
           echo "Successfully pulled image"
@@ -175,17 +178,17 @@ jobs:
       - name: Test image structure
         run: |
           # Check if image was built correctly
-          docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }}
           
           # Check if exposed port is correct
-          EXPOSED_PORT=$(docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} | jq -r '.[0].Config.ExposedPorts | keys[0]')
+          EXPOSED_PORT=$(docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }} | jq -r '.[0].Config.ExposedPorts | keys[0]')
           if [ "$EXPOSED_PORT" != "3001/tcp" ]; then
             echo "Error: Expected port 3001/tcp, got $EXPOSED_PORT"
             exit 1
           fi
           
           # Check if running as non-root user
-          USER=$(docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} | jq -r '.[0].Config.User')
+          USER=$(docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }} | jq -r '.[0].Config.User')
           if [ "$USER" != "nodejs" ]; then
             echo "Error: Expected user 'nodejs', got '$USER'"
             exit 1
@@ -216,8 +219,8 @@ jobs:
           CORS_ORIGIN=http://localhost:3001
           EOF
           
-          # Update compose to use the built image
-          sed -i "s|ghcr.io/psecurit/shotspot:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}|g" docker-compose.yml
+          # Update compose to use the built image (by digest for immutability)
+          sed -i "s|ghcr.io/psecurit/shotspot:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }}|g" docker-compose.yml
           
           # Start services
           docker-compose up -d
@@ -312,12 +315,13 @@ jobs:
 
       - name: Pull built image
         run: |
-          echo "Pulling image for vulnerability scan: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} || {
+          echo "Pulling image by digest for vulnerability scan"
+          echo "Registry: ${{ env.REGISTRY }}"
+          echo "Image: ${{ env.IMAGE_NAME }}"
+          echo "Digest: ${{ needs.build-and-push.outputs.image_digest }}"
+          echo "Full reference: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }}"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }} || {
             echo "Failed to pull image for scanning"
-            echo "Registry: ${{ env.REGISTRY }}"
-            echo "Image: ${{ env.IMAGE_NAME }}"
-            echo "Tag: sha-${{ github.sha }}"
             exit 1
           }
           echo "Image pulled successfully for scanning"
@@ -325,7 +329,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }}
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -341,7 +345,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:latest image \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }} \
             --severity CRITICAL,HIGH \
             --format json > vuln-report.json || true
           
