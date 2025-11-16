@@ -73,8 +73,9 @@ jobs:
           echo "Generated tags:"
           echo "${{ steps.meta.outputs.tags }}"
           echo ""
-          echo "Expected SHA tag: sha-${{ github.sha }}"
-          echo "Full image reference: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
+          echo "Short SHA (7 chars): ${GITHUB_SHA:0:7}"
+          echo "Expected SHA tag format: sha-${GITHUB_SHA:0:7}"
+          echo "Image will be pulled by digest: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@<digest>"
 
       - name: Build and push Docker image
         id: build
@@ -96,16 +97,31 @@ jobs:
       - name: Verify image was pushed
         run: |
           echo "Verifying image was pushed successfully..."
-          echo "Image digest: ${{ steps.build.outputs.digest }}"
+          DIGEST="${{ steps.build.outputs.digest }}"
+          echo "Image digest: $DIGEST"
           echo ""
           echo "All generated tags:"
           echo "${{ steps.meta.outputs.tags }}"
           echo ""
-          echo "Attempting to pull image by digest (immutable reference)..."
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} || {
-            echo "Failed to pull image by digest"
-            echo "This indicates the image was not pushed successfully"
-            exit 1
+          echo "Attempting to pull by digest (recommended)..."
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@$DIGEST || {
+            echo "Failed to pull by digest. Attempting to pull SHA tag from generated tags..."
+            # Try to extract the sha- tag created by docker/metadata-action
+            # Tags are newline-separated, extract just the tag part after the last colon
+            SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep -o 'sha-[0-9a-f]\+' | head -n1)
+            if [ -n "$SHA_TAG" ]; then
+              echo "Trying tag: $SHA_TAG"
+              docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$SHA_TAG || {
+                echo "Failed to pull by SHA tag: $SHA_TAG"
+                echo "Available tags:"
+                echo "${{ steps.meta.outputs.tags }}"
+                exit 1
+              }
+            else
+              echo "No sha- tag found in generated tags:"
+              echo "${{ steps.meta.outputs.tags }}"
+              exit 1
+            fi
           }
           echo "Successfully verified image exists and is accessible"
 
