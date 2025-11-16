@@ -274,8 +274,11 @@ jobs:
           ENABLE_ERROR_NOTIFICATIONS=false
           EOF
           
-          # Update docker-compose.yml to use env_file and remove hardcoded environment
-          # This ensures our .env values are actually used
+          # Copy schema file for database initialization
+          cp ../backend/src/schema.sql ./init-schema.sql
+          
+          # Update docker-compose.yml to use env_file and initialize schema
+          # This ensures our .env values are actually used and database is initialized
           cat > docker-compose.yml << 'COMPOSE_EOF'
           version: '3.8'
           services:
@@ -285,6 +288,8 @@ jobs:
                 POSTGRES_USER: ${DB_USER}
                 POSTGRES_PASSWORD: ${DB_PASSWORD}
                 POSTGRES_DB: ${DB_NAME}
+              volumes:
+                - ./init-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
               healthcheck:
                 test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
                 interval: 10s
