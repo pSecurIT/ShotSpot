@@ -59,9 +59,18 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    
+    // Check if request failed due to network/backend issues
+    const isNetworkError = !error.response; // No response means network failure
+    const isServerError = error.response?.status >= 500; // 5xx errors
+    const isCorsError = error.message?.toLowerCase().includes('cors');
+    const isOffline = !navigator.onLine;
+    
+    // Queue write operations when offline or backend unavailable
+    const shouldQueue = (isOffline || isNetworkError || isServerError || isCorsError) &&
+                       ['POST', 'PUT', 'DELETE'].includes(originalRequest.method?.toUpperCase() || '');
 
-    // If offline, queue the request for later
-    if (!navigator.onLine && ['POST', 'PUT', 'DELETE'].includes(originalRequest.method?.toUpperCase() || '')) {
+    if (shouldQueue) {
       const endpoint = originalRequest.url || '';
       const fullUrl = endpoint.startsWith('http') ? endpoint : `${api.defaults.baseURL}${endpoint}`;
       
@@ -71,6 +80,8 @@ api.interceptors.response.use(
           fullUrl,
           originalRequest.data
         );
+        
+        console.log('[API] Action queued for later sync:', originalRequest.method, fullUrl);
         
         // Return a special response indicating the action was queued
         return Promise.resolve({
@@ -88,7 +99,7 @@ api.interceptors.response.use(
         return Promise.reject({
           ...error,
           offline: true,
-          message: 'Offline and failed to queue action'
+          message: 'Backend unavailable and failed to queue action'
         });
       }
     }
