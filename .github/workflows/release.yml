@@ -260,8 +260,17 @@ jobs:
           DB_NAME=shotspot_test
           DB_USER=shotspot_test
           DB_PASSWORD=test_password_123
+          DB_MAX_CONNECTIONS=20
+          DB_IDLE_TIMEOUT_MS=30000
           JWT_SECRET=test_jwt_secret_for_ci_only
+          JWT_EXPIRES_IN=1h
+          JWT_REFRESH_EXPIRES_IN=7d
           CORS_ORIGIN=http://localhost:3001
+          RATE_LIMIT_WINDOW_MS=900000
+          RATE_LIMIT_MAX=100
+          LOG_LEVEL=info
+          LOG_FORMAT=combined
+          ENABLE_ERROR_NOTIFICATIONS=false
           EOF
           
           # Update compose to use the built image (by digest for immutability)
