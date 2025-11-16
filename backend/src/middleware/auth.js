@@ -117,4 +117,14 @@ const requireRole = (roles) => {
   };
 };
 
-export { auth, requireRole };
+// Export token verification function for WebSocket auth
+const verifyToken = (token) => {
+  const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+  const decoded = jwt.verify(token, jwtSecret);
+  return {
+    userId: decoded.userId,
+    role: decoded.role.toLowerCase()
+  };
+};
+
+export { auth, requireRole, verifyToken };
