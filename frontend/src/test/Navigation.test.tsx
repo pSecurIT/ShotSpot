@@ -25,7 +25,7 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-const renderNavigation = (user: any = null) => {
+const renderNavigation = (user: { username: string; role: string } | null = null) => {
   mockUseAuth.mockReturnValue({
     user,
     logout: mockLogout,

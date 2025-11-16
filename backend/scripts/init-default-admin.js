@@ -76,7 +76,7 @@ async function initDefaultAdmin() {
   try {
     // Check if any admin user exists
     const adminCheck = await pool.query(
-      "SELECT COUNT(*) as count FROM users WHERE role = 'admin'"
+      'SELECT COUNT(*) as count FROM users WHERE role = \'admin\''
     );
     
     const adminCount = parseInt(adminCheck.rows[0].count);
