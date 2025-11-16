@@ -359,7 +359,7 @@ describe('API Utility', () => {
       } catch (error: unknown) {
         const err = error as { offline: boolean; message: string };
         expect(err.offline).toBe(true);
-        expect(err.message).toBe('Offline and failed to queue action');
+        expect(err.message).toBe('Backend unavailable and failed to queue action');
       }
 
       expect(consoleSpy).toHaveBeenCalledWith('Failed to queue offline action:', expect.any(Error));
