@@ -193,7 +193,7 @@ async function main() {
 
     // Execute schema files in sequence
     const schemaFiles = [
-      'schema.sql'  // This is our main schema file
+      '../src/schema.sql'  // Use the complete schema file from src/
     ];
 
     for (const file of schemaFiles) {
@@ -212,7 +212,8 @@ async function main() {
       '../src/migrations/add_attacking_side.sql',
       '../src/migrations/add_starting_position.sql',
       '../src/migrations/add_achievements_system.sql',
-      '../src/migrations/seed_achievements.sql'
+      '../src/migrations/seed_achievements.sql',
+      '../src/migrations/add_password_must_change.sql'
     ];
 
     console.log('Applying database migrations...');

@@ -351,7 +351,7 @@ async function hasEarnedAchievement(playerId, achievementId, gameId) {
   return parseInt(result.rows[0].count) > 0;
 }
 
-async function checkAchievementCriteria(achievement, stats, playerId, gameId) {
+async function checkAchievementCriteria(achievement, stats, _playerId, _gameId) {
   const criteria = achievement.criteria;
 
   switch (achievement.name) {
