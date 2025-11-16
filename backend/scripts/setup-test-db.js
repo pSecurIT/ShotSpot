@@ -110,7 +110,8 @@ async function setupTestDb() {
       'add_match_configuration_columns.sql',
       'add_attacking_side.sql',
       'add_starting_position.sql',
-      'add_achievements_system.sql'
+      'add_achievements_system.sql',
+      'add_password_must_change.sql'
     ];
 
     for (const migrationFile of migrations) {

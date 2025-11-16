@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import UserManagement from '../components/UserManagement';
 import api from '../utils/api';
+import { act } from 'react';
 
 // Mock the api module
 vi.mock('../utils/api');
@@ -118,7 +119,8 @@ describe('UserManagement Component', () => {
       expect(screen.getByText('Username')).toBeInTheDocument();
       expect(screen.getByText('Email')).toBeInTheDocument();
       expect(screen.getByText('Current Role')).toBeInTheDocument();
-      expect(screen.getByText('Actions')).toBeInTheDocument();
+      expect(screen.getByText('Change Role')).toBeInTheDocument();
+      expect(screen.getByText('Password')).toBeInTheDocument();
     });
 
     it('displays all users in the table', async () => {
@@ -470,6 +472,327 @@ describe('UserManagement Component', () => {
       
       await waitFor(() => {
         expect(screen.getByText('Failed to update user role')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Password Reset Functionality', () => {
+    it('displays password column with reset buttons', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Password')).toBeInTheDocument();
+      });
+      
+      const resetButtons = screen.getAllByText('Reset Password');
+      expect(resetButtons).toHaveLength(3); // One for each user
+    });
+
+    it('opens password dialog when reset button is clicked', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        const resetButtons = screen.getAllByText('Reset Password');
+        expect(resetButtons.length).toBeGreaterThan(0);
+      });
+      
+      const resetButtons = screen.getAllByText('Reset Password');
+      const user1ResetButton = resetButtons[2]; // user1's reset button
+      
+      fireEvent.click(user1ResetButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for user1')).toBeInTheDocument();
+      });
+    });
+
+    it('shows correct dialog title for different users', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('coach1')).toBeInTheDocument();
+      });
+      
+      const resetButtons = screen.getAllByText('Reset Password');
+      const coach1ResetButton = resetButtons[1]; // coach1's reset button
+      
+      fireEvent.click(coach1ResetButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for coach1')).toBeInTheDocument();
+      });
+    });
+
+    it('shows current password field when admin resets own password', async () => {
+      renderUserManagement({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
+      
+      await waitFor(() => {
+        const usernameCells = screen.getAllByText('admin');
+        expect(usernameCells.length).toBeGreaterThan(0);
+      });
+      
+      const resetButtons = screen.getAllByText('Reset Password');
+      const adminResetButton = resetButtons[0]; // admin's reset button
+      
+      fireEvent.click(adminResetButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Change Your Password')).toBeInTheDocument();
+        expect(screen.getByLabelText('Current Password *')).toBeInTheDocument();
+      });
+    });
+
+    it('does not show current password field when admin resets other user password', async () => {
+      renderUserManagement({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      const resetButtons = screen.getAllByText('Reset Password');
+      const user1ResetButton = resetButtons[2]; // user1's reset button
+      
+      fireEvent.click(user1ResetButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for user1')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Current Password *')).not.toBeInTheDocument();
+      });
+    });
+
+    it('successfully resets password for other user', async () => {
+      mockApi.put.mockResolvedValue({ data: { message: 'Password reset successfully' } });
+      
+      renderUserManagement({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      // Open password dialog for user1
+      const resetButtons = screen.getAllByText('Reset Password');
+      fireEvent.click(resetButtons[2]);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for user1')).toBeInTheDocument();
+      });
+      
+      // Fill in new password
+      const newPasswordInput = screen.getByLabelText('New Password *');
+      const confirmPasswordInput = screen.getByLabelText('Confirm New Password *');
+      
+      fireEvent.change(newPasswordInput, { target: { value: 'NewPass123!' } });
+      fireEvent.change(confirmPasswordInput, { target: { value: 'NewPass123!' } });
+      
+      // Submit form
+      const changePasswordButton = screen.getByText('Change Password');
+      fireEvent.click(changePasswordButton);
+      
+      await waitFor(() => {
+        expect(mockApi.put).toHaveBeenCalledWith('/users/3/password', {
+          newPassword: 'NewPass123!'
+        });
+        expect(screen.getByText('Password reset successfully for user1')).toBeInTheDocument();
+      });
+    });
+
+    it('shows success message after password reset', async () => {
+      mockApi.put.mockResolvedValue({ data: { message: 'Password reset successfully' } });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('coach1')).toBeInTheDocument();
+      });
+      
+      // Click reset password for coach1
+      const resetButtons = screen.getAllByText('Reset Password');
+      fireEvent.click(resetButtons[1]);
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText('New Password *')).toBeInTheDocument();
+      });
+      
+      // Fill and submit form
+      fireEvent.change(screen.getByLabelText('New Password *'), { target: { value: 'NewPass123!' } });
+      fireEvent.change(screen.getByLabelText('Confirm New Password *'), { target: { value: 'NewPass123!' } });
+      fireEvent.click(screen.getByText('Change Password'));
+      
+      await waitFor(() => {
+        expect(screen.getByText('Password reset successfully for coach1')).toBeInTheDocument();
+      });
+    });
+
+    it('closes password dialog after successful reset', async () => {
+      mockApi.put.mockResolvedValue({ data: { message: 'Password reset successfully' } });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      // Open dialog
+      const resetButtons = screen.getAllByText('Reset Password');
+      fireEvent.click(resetButtons[2]);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for user1')).toBeInTheDocument();
+      });
+      
+      // Fill and submit
+      fireEvent.change(screen.getByLabelText('New Password *'), { target: { value: 'NewPass123!' } });
+      fireEvent.change(screen.getByLabelText('Confirm New Password *'), { target: { value: 'NewPass123!' } });
+      fireEvent.click(screen.getByText('Change Password'));
+      
+      await waitFor(() => {
+        expect(screen.queryByText('Reset Password for user1')).not.toBeInTheDocument();
+      });
+    });
+
+    it('closes password dialog when cancel is clicked', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      // Open dialog
+      const resetButtons = screen.getAllByText('Reset Password');
+      fireEvent.click(resetButtons[2]);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for user1')).toBeInTheDocument();
+      });
+      
+      // Click cancel
+      const cancelButton = screen.getByText('Cancel');
+      fireEvent.click(cancelButton);
+      
+      await waitFor(() => {
+        expect(screen.queryByText('Reset Password for user1')).not.toBeInTheDocument();
+      });
+    });
+
+    it('handles password reset API errors', async () => {
+      mockApi.put.mockRejectedValue({
+        response: {
+          data: {
+            error: 'Password too weak'
+          }
+        }
+      });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      // Open dialog and submit
+      const resetButtons = screen.getAllByText('Reset Password');
+      fireEvent.click(resetButtons[2]);
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText('New Password *')).toBeInTheDocument();
+      });
+      
+      fireEvent.change(screen.getByLabelText('New Password *'), { target: { value: 'weak' } });
+      fireEvent.change(screen.getByLabelText('Confirm New Password *'), { target: { value: 'weak' } });
+      fireEvent.click(screen.getByText('Change Password'));
+      
+      await waitFor(() => {
+        // Client-side validation shows error - there are two texts with "at least 8 characters" (error + hint)
+        const errorMessages = screen.getAllByText(/at least 8 characters/i);
+        expect(errorMessages.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('clears success message when opening password dialog again', async () => {
+      mockApi.put.mockResolvedValue({ data: { message: 'Password reset successfully' } });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      // First password reset
+      const resetButtons = screen.getAllByText('Reset Password');
+      fireEvent.click(resetButtons[2]);
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText('New Password *')).toBeInTheDocument();
+      });
+      
+      fireEvent.change(screen.getByLabelText('New Password *'), { target: { value: 'NewPass123!' } });
+      fireEvent.change(screen.getByLabelText('Confirm New Password *'), { target: { value: 'NewPass123!' } });
+      fireEvent.click(screen.getByText('Change Password'));
+      
+      await waitFor(() => {
+        expect(screen.getByText('Password reset successfully for user1')).toBeInTheDocument();
+      });
+      
+      // Open dialog for another user - should clear previous success message
+      await act(async () => {
+        const newResetButtons = screen.getAllByText('Reset Password');
+        fireEvent.click(newResetButtons[1]); // coach1
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for coach1')).toBeInTheDocument();
+      });
+    });
+
+    it('maintains user list when password dialog is open', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      // Open dialog
+      const resetButtons = screen.getAllByText('Reset Password');
+      fireEvent.click(resetButtons[2]);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for user1')).toBeInTheDocument();
+      });
+      
+      // User list should still be visible
+      expect(screen.getByText('admin@example.com')).toBeInTheDocument();
+      expect(screen.getByText('coach1@example.com')).toBeInTheDocument();
+      expect(screen.getByText('user1@example.com')).toBeInTheDocument();
+    });
+
+    it('resets selected user when dialog is closed', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      // Open dialog for user1
+      const resetButtons = screen.getAllByText('Reset Password');
+      fireEvent.click(resetButtons[2]);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for user1')).toBeInTheDocument();
+      });
+      
+      // Close dialog
+      fireEvent.click(screen.getByText('Cancel'));
+      
+      await waitFor(() => {
+        expect(screen.queryByText('Reset Password for user1')).not.toBeInTheDocument();
+      });
+      
+      // Open dialog for coach1 - should work correctly
+      const newResetButtons = screen.getAllByText('Reset Password');
+      fireEvent.click(newResetButtons[1]);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Reset Password for coach1')).toBeInTheDocument();
       });
     });
   });

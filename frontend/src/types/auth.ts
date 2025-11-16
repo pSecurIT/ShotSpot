@@ -10,6 +10,7 @@ export interface AuthContextType {
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  updateUser: (token: string, user: User) => void;
 }
 
 export interface AuthProviderProps {

@@ -18,10 +18,47 @@ If you discover a security vulnerability, please DO NOT create a public issue. I
 - Refresh tokens valid for 7 days
 - Rate limiting on auth endpoints
 - Password requirements:
-  - Minimum 12 characters
+  - Minimum 8 characters
   - Mix of uppercase, lowercase, numbers, symbols
-  - Password breach check
-  - Bcrypt hashing with work factor 12
+  - Bcrypt hashing with salt rounds 12 (OWASP 2024 recommendation)
+- Timing attack protection on login (prevents user enumeration)
+- Token expiration with clear error messages
+- Secure password generation using crypto.randomInt() with Fisher-Yates shuffle
+
+#### Default Admin User
+
+For first-time installations, the system automatically creates a default admin user on startup if no admin accounts exist:
+
+**Security Features:**
+- **Auto-generated secure password** (if not provided via environment)
+- **Forced password change** on first login - user cannot access other APIs until password is changed
+- **One-time credential display** - credentials shown only once during initial creation
+- **Idempotent creation** - safe to restart server, won't create duplicates
+
+**Configuration (Environment Variables):**
+```env
+DEFAULT_ADMIN_USERNAME=admin                    # Default: 'admin'
+DEFAULT_ADMIN_EMAIL=admin@shotspot.local       # Default: 'admin@shotspot.local'
+DEFAULT_ADMIN_PASSWORD=                        # Leave empty for auto-generation (recommended)
+```
+
+**First Login Process:**
+1. Start application → Default admin created automatically
+2. Check server logs for generated credentials (displayed once)
+3. Login with provided credentials
+4. System forces password change via `/api/auth/change-password` endpoint
+5. After password change, full system access is granted
+
+**Best Practices:**
+- ✅ Leave `DEFAULT_ADMIN_PASSWORD` empty for cryptographically secure auto-generation
+- ✅ Save initial credentials immediately from server logs
+- ✅ Change password on first login (enforced by system)
+- ✅ Remove `DEFAULT_ADMIN_PASSWORD` from environment after first login
+- ❌ Never commit default admin credentials to version control
+- ❌ Never use default credentials in production without changing them
+
+**Docker Usage:**
+Set environment variables in `.env` file or docker-compose.yml. The admin will be created when the container first starts with a clean database.
 
 ### Authorization
 

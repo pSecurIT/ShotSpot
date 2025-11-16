@@ -525,4 +525,456 @@ describe('🔐 Authentication API', () => {
       });
     });
   });
+
+  describe('🔐 POST /api/auth/change-password', () => {
+    let testUser;
+    let authToken;
+    const currentPassword = 'CurrentPass123!';
+    const newPassword = 'NewSecurePass456!';
+
+    beforeEach(async () => {
+      // Create test user with password_must_change flag
+      const hashedPassword = await bcrypt.hash(currentPassword, 12);
+      const result = await db.query(
+        `INSERT INTO users (username, email, password_hash, role, password_must_change) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING id, username, email, role`,
+        ['changepassuser', 'changepass@example.com', hashedPassword, 'user', true]
+      );
+      testUser = result.rows[0];
+      testUsers.push(testUser);
+
+      // Generate auth token
+      authToken = jwt.sign(
+        { 
+          userId: testUser.id, 
+          username: testUser.username, 
+          role: testUser.role,
+          passwordMustChange: true
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+    });
+
+    it('✅ should change password with valid credentials', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('message', 'Password changed successfully');
+      expect(response.body).toHaveProperty('token');
+
+      // Verify new password works
+      const loginResponse = await request(app)
+        .post('/api/auth/login')
+        .send({
+          username: 'changepassuser',
+          password: newPassword
+        })
+        .expect(200);
+
+      expect(loginResponse.body).toHaveProperty('token');
+
+      // Verify password_must_change flag is cleared
+      const userCheck = await db.query(
+        'SELECT password_must_change FROM users WHERE id = $1',
+        [testUser.id]
+      );
+      expect(userCheck.rows[0].password_must_change).toBe(false);
+    });
+
+    it('✅ should clear password_must_change flag after successful change', async () => {
+      await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword
+        })
+        .expect(200);
+
+      const userCheck = await db.query(
+        'SELECT password_must_change FROM users WHERE id = $1',
+        [testUser.id]
+      );
+      expect(userCheck.rows[0].password_must_change).toBe(false);
+    });
+
+    it('✅ should return new token without passwordMustChange claim', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword
+        })
+        .expect(200);
+
+      const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET);
+      expect(decoded.passwordMustChange).toBeUndefined();
+    });
+
+    it('❌ should reject with incorrect current password', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword: 'WrongPassword123!',
+          newPassword
+        })
+        .expect(401);
+
+      expect(response.body).toHaveProperty('error', 'Current password is incorrect');
+
+      // Verify password was not changed
+      const loginResponse = await request(app)
+        .post('/api/auth/login')
+        .send({
+          username: 'changepassuser',
+          password: currentPassword
+        })
+        .expect(200);
+
+      expect(loginResponse.body).toHaveProperty('token');
+    });
+
+    it('❌ should reject new password same as current password', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword: currentPassword
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toMatch(/same as.*current password/i);
+    });
+
+    it('❌ should reject weak new password', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword: 'weak'
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+      expect(Array.isArray(response.body.errors)).toBe(true);
+    });
+
+    it('❌ should reject password without uppercase', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword: 'testpass123!'
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+    });
+
+    it('❌ should reject password without lowercase', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword: 'TESTPASS123!'
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+    });
+
+    it('❌ should reject password without number', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword: 'TestPassword!'
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+    });
+
+    it('❌ should reject password without special character', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword: 'TestPassword123'
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+    });
+
+    it('❌ should reject password shorter than 8 characters', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword: 'Te1!'
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+    });
+
+    it('❌ should reject missing current password', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          newPassword
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+    });
+
+    it('❌ should reject missing new password', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+    });
+
+    it('❌ should reject request without authentication', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .send({
+          currentPassword,
+          newPassword
+        })
+        .expect(401);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('✅ should work for users without password_must_change flag', async () => {
+      // Create user without password_must_change flag
+      const normalPassword = 'NormalPass123!';
+      const hashedPassword = await bcrypt.hash(normalPassword, 12);
+      const result = await db.query(
+        `INSERT INTO users (username, email, password_hash, role, password_must_change) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING id, username, email, role`,
+        ['normaluser', 'normal@example.com', hashedPassword, 'user', false]
+      );
+      const normalUser = result.rows[0];
+      testUsers.push(normalUser);
+
+      const normalToken = jwt.sign(
+        { userId: normalUser.id, username: normalUser.username, role: normalUser.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${normalToken}`)
+        .send({
+          currentPassword: normalPassword,
+          newPassword: 'NewNormalPass456!'
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('message', 'Password changed successfully');
+    });
+
+    it('🔒 should use bcrypt with 12 rounds for new password', async () => {
+      await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword,
+          newPassword
+        })
+        .expect(200);
+
+      const userCheck = await db.query(
+        'SELECT password_hash FROM users WHERE id = $1',
+        [testUser.id]
+      );
+      const hash = userCheck.rows[0].password_hash;
+
+      // Bcrypt hashes with 12 rounds start with $2b$12$
+      expect(hash).toMatch(/^\$2[aby]\$12\$/);
+    });
+  });
+
+  describe('🚫 Password Change Enforcement Middleware', () => {
+    let testUser;
+    let authToken;
+    let normalUser;
+    let normalToken;
+
+    beforeEach(async () => {
+      // Create user with password_must_change = true
+      const hashedPassword = await bcrypt.hash('TestPass123!', 12);
+      const result = await db.query(
+        `INSERT INTO users (username, email, password_hash, role, password_must_change) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING id, username, email, role`,
+        ['mustchangeuser', 'mustchange@example.com', hashedPassword, 'user', true]
+      );
+      testUser = result.rows[0];
+      testUsers.push(testUser);
+
+      authToken = jwt.sign(
+        { 
+          userId: testUser.id, 
+          username: testUser.username, 
+          role: testUser.role,
+          passwordMustChange: true
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      // Create normal user with password_must_change = false
+      const normalResult = await db.query(
+        `INSERT INTO users (username, email, password_hash, role, password_must_change) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING id, username, email, role`,
+        ['normaluser', 'normal@example.com', hashedPassword, 'user', false]
+      );
+      normalUser = normalResult.rows[0];
+      testUsers.push(normalUser);
+
+      normalToken = jwt.sign(
+        { userId: normalUser.id, username: normalUser.username, role: normalUser.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+    });
+
+    it('✅ should allow access to /api/auth/change-password', async () => {
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword: 'TestPass123!',
+          newPassword: 'NewTestPass456!'
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('message', 'Password changed successfully');
+    });
+
+    it('✅ should allow access to /api/auth/change-password (whitelisted)', async () => {
+      // This test verifies that change-password is accessible even with password_must_change flag
+      const response = await request(app)
+        .post('/api/auth/change-password')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          currentPassword: 'TestPass123!',
+          newPassword: 'NewTestPass456!'
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('message', 'Password changed successfully');
+    });
+
+    it('✅ should allow access to /api/health', async () => {
+      const response = await request(app)
+        .get('/api/health')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('status', 'healthy');
+    });
+
+    it('❌ should block access to other API endpoints', async () => {
+      const response = await request(app)
+        .get('/api/teams')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toMatch(/password.*change/i);
+    });
+
+    it('✅ should allow normal users access to all endpoints', async () => {
+      const response = await request(app)
+        .get('/api/teams')
+        .set('Authorization', `Bearer ${normalToken}`)
+        .expect(200);
+
+      expect(Array.isArray(response.body)).toBe(true);
+    });
+
+    it('❌ should block POST requests to protected endpoints', async () => {
+      const response = await request(app)
+        .post('/api/teams')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ name: 'Test Team' })
+        .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('❌ should block PUT requests to protected endpoints', async () => {
+      const response = await request(app)
+        .put('/api/teams/1')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ name: 'Updated Team' })
+        .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('❌ should block DELETE requests to protected endpoints', async () => {
+      const response = await request(app)
+        .delete('/api/teams/1')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('✅ should include passwordMustChange in login response', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({
+          username: 'mustchangeuser',
+          password: 'TestPass123!'
+        })
+        .expect(200);
+
+      const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET);
+      expect(decoded.passwordMustChange).toBe(true);
+    });
+
+    it('✅ should not include passwordMustChange for normal users', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({
+          username: 'normaluser',
+          password: 'TestPass123!'
+        })
+        .expect(200);
+
+      const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET);
+      expect(decoded.passwordMustChange).toBeUndefined();
+    });
+  });
 });
