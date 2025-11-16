@@ -96,34 +96,61 @@ jobs:
 
       - name: Verify image was pushed
         run: |
+          set -euo pipefail
+
           echo "Verifying image was pushed successfully..."
           DIGEST="${{ steps.build.outputs.digest }}"
-          echo "Image digest: $DIGEST"
+          echo "Image digest: ${DIGEST}"
           echo ""
-          echo "All generated tags:"
+
+          # Try pull by digest (recommended)
+          if [ -n "${DIGEST}" ]; then
+            echo "Attempting to pull by digest: $DIGEST"
+            if docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"; then
+              echo "✅ Successfully verified image by digest"
+              exit 0
+            else
+              echo "⚠️ Failed to pull by digest; will attempt tag-based fallback"
+            fi
+          else
+            echo "⚠️ No digest available from build outputs"
+          fi
+
+          # Fallback: extract sha- tag created by docker/metadata-action
+          echo ""
+          echo "Available generated tags:"
           echo "${{ steps.meta.outputs.tags }}"
           echo ""
-          echo "Attempting to pull by digest (recommended)..."
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@$DIGEST || {
-            echo "Failed to pull by digest. Attempting to pull SHA tag from generated tags..."
-            # Try to extract the sha- tag created by docker/metadata-action
-            # Tags are newline-separated, extract just the tag part after the last colon
-            SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep -o 'sha-[0-9a-f]\+' | head -n1)
-            if [ -n "$SHA_TAG" ]; then
-              echo "Trying tag: $SHA_TAG"
-              docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$SHA_TAG || {
-                echo "Failed to pull by SHA tag: $SHA_TAG"
-                echo "Available tags:"
-                echo "${{ steps.meta.outputs.tags }}"
-                exit 1
-              }
+          SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | grep -Eo 'sha-[0-9a-f]+' | head -n1 || true)
+
+          if [ -n "$SHA_TAG" ]; then
+            echo "Attempting to pull tag: $SHA_TAG"
+            if docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHA_TAG}"; then
+              echo "✅ Successfully verified image by tag $SHA_TAG"
+              exit 0
             else
-              echo "No sha- tag found in generated tags:"
-              echo "${{ steps.meta.outputs.tags }}"
-              exit 1
+              echo "⚠️ Failed to pull tag $SHA_TAG"
             fi
-          }
-          echo "Successfully verified image exists and is accessible"
+          else
+            echo "⚠️ No sha- tag found in generated tags"
+          fi
+
+          # Final fallback: try shortened GITHUB_SHA (first 7 chars) — only if metadata didn't provide sha- tag
+          SHORT_SHA=$(echo "${GITHUB_SHA:-${{ github.sha }}}" | cut -c1-7)
+          if [ -n "$SHORT_SHA" ]; then
+            echo "Attempting to pull short-sha tag: sha-${SHORT_SHA}"
+            if docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHORT_SHA}"; then
+              echo "✅ Successfully verified image by short tag sha-${SHORT_SHA}"
+              exit 0
+            else
+              echo "⚠️ Failed to pull short-sha tag sha-${SHORT_SHA}"
+            fi
+          fi
+
+          echo ""
+          echo "❌ Failed to verify pushed image with any method"
+          echo "Available tags: ${{ steps.meta.outputs.tags }}"
+          exit 1
 
       - name: Generate build summary
         run: |
