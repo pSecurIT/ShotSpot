@@ -138,7 +138,7 @@ describe('🔐 Default Admin Initialization', () => {
 
       // Verify only one admin exists
       const adminQuery = await db.query(
-        "SELECT COUNT(*) as count FROM users WHERE role = 'admin'"
+        'SELECT COUNT(*) as count FROM users WHERE role = \'admin\''
       );
       expect(parseInt(adminQuery.rows[0].count)).toBe(1);
     });
@@ -157,7 +157,7 @@ describe('🔐 Default Admin Initialization', () => {
 
       // Verify no admin role was created
       const adminQuery = await db.query(
-        "SELECT COUNT(*) as count FROM users WHERE role = 'admin'"
+        'SELECT COUNT(*) as count FROM users WHERE role = \'admin\''
       );
       expect(parseInt(adminQuery.rows[0].count)).toBe(0);
     });

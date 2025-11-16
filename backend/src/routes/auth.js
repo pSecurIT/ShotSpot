@@ -189,7 +189,7 @@ router.post('/change-password', [
     let decoded;
     try {
       decoded = jwt.verify(token, jwtSecret);
-    } catch (err) {
+    } catch (_err) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 

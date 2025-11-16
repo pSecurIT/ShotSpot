@@ -441,7 +441,7 @@ describe('📊 Analytics Routes', () => {
     let subPlayer;
 
     beforeAll(async () => {
-      const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const _uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
       // Create a new game for play time tests
       const gameResult = await db.query(
