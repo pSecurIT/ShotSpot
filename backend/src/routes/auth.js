@@ -57,8 +57,8 @@ router.post('/register', validateRegistration, async (req, res) => {
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
+    // Hash password with bcrypt rounds = 12 (OWASP 2024 recommendation)
+    const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
     // Create user
@@ -96,11 +96,13 @@ router.post('/login', [
 
     // Find user by username or email
     const result = await db.query(
-      'SELECT id, username, email, password_hash, role FROM users WHERE username = $1 OR email = $1',
+      'SELECT id, username, email, password_hash, role, password_must_change FROM users WHERE username = $1 OR email = $1',
       [username]
     );
 
     if (result.rows.length === 0) {
+      // Timing attack protection: still hash to prevent user enumeration
+      await bcrypt.hash(password, 12);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -126,15 +128,18 @@ router.post('/login', [
       expiresIn = rawExpires; // string timespan like '1h', '30m'
     }
     
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        username: user.username,
-        role: user.role
-      },
-      jwtSecret,
-      { expiresIn }
-    );
+    // Only include passwordMustChange in JWT if it's true (cleaner tokens)
+    const tokenPayload = {
+      userId: user.id,
+      username: user.username,
+      role: user.role
+    };
+    
+    if (user.password_must_change) {
+      tokenPayload.passwordMustChange = true;
+    }
+    
+    const token = jwt.sign(tokenPayload, jwtSecret, { expiresIn });
 
     res.json({
       message: 'Logged in successfully',
@@ -143,12 +148,113 @@ router.post('/login', [
         id: user.id,
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role,
+        passwordMustChange: user.password_must_change || false
       }
     });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Error during login' });
+  }
+});
+
+// Change password endpoint (works even if password_must_change is true)
+// Note: In production, also apply CSRF protection middleware to this endpoint
+router.post('/change-password', [
+  body('currentPassword').notEmpty().withMessage('Current password is required'),
+  body('newPassword')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters long')
+    .matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9])/)
+    .withMessage('Password must include one lowercase letter, one uppercase letter, one number, and one special character')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    // Get token from header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const token = authHeader.substring(7);
+    const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, jwtSecret);
+    } catch (_err) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    // Get user from database
+    const result = await db.query(
+      'SELECT id, username, email, password_hash, role, password_must_change FROM users WHERE id = $1',
+      [decoded.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.rows[0];
+
+    // Verify current password
+    const validPassword = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Check if new password is different from current
+    const samePassword = await bcrypt.compare(newPassword, user.password_hash);
+    if (samePassword) {
+      return res.status(400).json({ error: 'New password cannot be the same as current password' });
+    }
+    
+    // TODO: Consider adding password history check (last 3-5 passwords)
+    // to prevent password reuse as per NIST guidelines
+
+    // Hash new password with bcrypt rounds = 12 (OWASP 2024 recommendation)
+    const salt = await bcrypt.genSalt(12);
+    const newPasswordHash = await bcrypt.hash(newPassword, salt);
+
+    // Update password and clear password_must_change flag
+    await db.query(
+      'UPDATE users SET password_hash = $1, password_must_change = false, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [newPasswordHash, user.id]
+    );
+
+    // Generate new token without passwordMustChange flag (only include when true)
+    const newToken = jwt.sign(
+      {
+        userId: user.id,
+        username: user.username,
+        role: user.role
+      },
+      jwtSecret,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
+    );
+
+    res.json({
+      message: 'Password changed successfully',
+      token: newToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        passwordMustChange: false
+      }
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Error changing password' });
   }
 });
 

@@ -11,10 +11,21 @@ validateEnv();
 
 // Test database connection before starting server
 import db from './db.js';
+import initDefaultAdmin from '../scripts/init-default-admin.js';
 
 try {
   await db.healthCheck();
   console.log('✓ Database connection established');
+  
+  // Initialize default admin user if needed (only in non-test environments)
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      await initDefaultAdmin();
+    } catch (adminErr) {
+      console.warn('⚠️  Default admin initialization encountered an issue:', adminErr.message);
+      // Don't exit - this is not fatal, admin might already exist or be created manually
+    }
+  }
 } catch (err) {
   console.error('✗ Failed to connect to database:', err.message);
   console.error('  Connection details:', {
