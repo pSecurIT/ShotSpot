@@ -9,6 +9,7 @@ import TimeoutManagement from './TimeoutManagement';
 import FreeShotPanel from './FreeShotPanel';
 import MatchCommentary from './MatchCommentary';
 import FocusMode from './FocusMode';
+import LiveDashboard from './LiveDashboard';
 import { useTimer } from '../hooks/useTimer';
 
 /**
@@ -1734,6 +1735,20 @@ const LiveMatch: React.FC = () => {
           <div className="score">{game.away_score}</div>
         </div>
       </div>
+
+      {/* Live Dashboard */}
+      <LiveDashboard
+        gameId={parseInt(gameId!)}
+        homeTeamId={game.home_team_id}
+        awayTeamId={game.away_team_id}
+        homeTeamName={game.home_team_name}
+        awayTeamName={game.away_team_name}
+        homeScore={game.home_score}
+        awayScore={game.away_score}
+        currentPeriod={timerState?.current_period || game.current_period}
+        numberOfPeriods={game.number_of_periods || 4}
+        timerState={timerState?.timer_state}
+      />
 
       {/* Timer Controls - Hidden in focus mode */}
       {!focusMode && (
