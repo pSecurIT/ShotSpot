@@ -8,6 +8,7 @@ interface ChangePasswordDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (token?: string, user?: { id: number; username: string; email: string; role: string; passwordMustChange: boolean }) => void;
+  isForced?: boolean;
 }
 
 const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
@@ -16,7 +17,8 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
   isOwnPassword,
   isOpen,
   onClose,
-  onSuccess
+  onSuccess,
+  isForced = false
 }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -116,17 +118,25 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
           <h3 style={styles.title}>
             {isOwnPassword ? 'Change Your Password' : `Reset Password for ${username}`}
           </h3>
-          <button
-            onClick={handleClose}
-            style={styles.closeButton}
-            disabled={loading}
-            aria-label="Close dialog"
-          >
-            ×
-          </button>
+          {!isForced && (
+            <button
+              onClick={handleClose}
+              style={styles.closeButton}
+              disabled={loading}
+              aria-label="Close dialog"
+            >
+              ×
+            </button>
+          )}
         </div>
 
         <form onSubmit={handleSubmit}>
+          {isForced && (
+            <div style={styles.warning}>
+              ⚠️ You must change your password before continuing. This is your first login or your password was reset by an administrator.
+            </div>
+          )}
+          
           {error && (
             <div style={styles.error}>
               {error}
@@ -187,14 +197,16 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
           </div>
 
           <div style={styles.actions}>
-            <button
-              type="button"
-              onClick={handleClose}
-              style={styles.cancelButton}
-              disabled={loading}
-            >
-              Cancel
-            </button>
+            {!isForced && (
+              <button
+                type="button"
+                onClick={handleClose}
+                style={styles.cancelButton}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            )}
             <button
               type="submit"
               style={styles.submitButton}
@@ -264,6 +276,15 @@ const styles = {
     borderRadius: '4px',
     marginBottom: '16px',
     fontSize: '0.9rem'
+  },
+  warning: {
+    backgroundColor: '#fff3cd',
+    color: '#856404',
+    padding: '12px',
+    borderRadius: '4px',
+    marginBottom: '16px',
+    fontSize: '0.9rem',
+    border: '1px solid #ffeaa7'
   },
   field: {
     marginBottom: '20px',

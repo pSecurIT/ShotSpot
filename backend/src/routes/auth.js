@@ -94,6 +94,10 @@ router.post('/login', [
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
+    // Get client info for login history (declare once at the top)
+    const ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
     // Find user by username or email
     const result = await db.query(
       'SELECT id, username, email, password_hash, role, password_must_change FROM users WHERE username = $1 OR email = $1',
@@ -101,6 +105,12 @@ router.post('/login', [
     );
 
     if (result.rows.length === 0) {
+      // Log failed login attempt for non-existent user
+      await db.query(
+        `INSERT INTO login_history (user_id, username, success, ip_address, user_agent, error_message) 
+         VALUES (NULL, $1, false, $2, $3, $4)`,
+        [username, ipAddress, userAgent, 'User not found']
+      );
       // Timing attack protection: still hash to prevent user enumeration
       await bcrypt.hash(password, 12);
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -110,9 +120,29 @@ router.post('/login', [
 
     // Verify password
     const validPassword = await bcrypt.compare(password, user.password_hash);
+    
     if (!validPassword) {
+      // Log failed login attempt
+      await db.query(
+        `INSERT INTO login_history (user_id, username, success, ip_address, user_agent, error_message) 
+         VALUES ($1, $2, false, $3, $4, $5)`,
+        [user.id, user.username, ipAddress, userAgent, 'Invalid password']
+      );
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    // Update last_login timestamp
+    await db.query(
+      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
+      [user.id]
+    );
+    
+    // Log successful login
+    await db.query(
+      `INSERT INTO login_history (user_id, username, success, ip_address, user_agent) 
+       VALUES ($1, $2, true, $3, $4)`,
+      [user.id, user.username, ipAddress, userAgent]
+    );
 
     // Generate JWT
     const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';

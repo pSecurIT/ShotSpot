@@ -224,10 +224,13 @@ For detailed installation instructions (including troubleshooting), see **[INSTA
 
 ### Authentication & Authorization
 
-- JWT-based authentication with refresh token rotation
-- Role-based access control (Coach, Assistant, Viewer)
-- Secure password hashing with bcrypt
+- JWT-based authentication with secure token handling
+- Role-based access control (Admin, Coach, User)
+- Secure password hashing with bcrypt (12 rounds)
 - Session management with secure cookie options
+- Login history tracking with IP address and user agent logging
+- Password strength validation (uppercase, lowercase, number, special character)
+- Forced password change on first login for admin-created users
 
 ### API Security
 
@@ -256,9 +259,25 @@ For detailed installation instructions (including troubleshooting), see **[INSTA
 ### Auditing
 
 - Comprehensive error logging
+- Login history tracking (success/failure, IP, user agent)
+- User activity monitoring (last login timestamps)
 - Authentication attempt tracking
 - Regular security dependency scanning
 - Automated vulnerability testing
+
+### Admin User Management
+
+- **User Creation**: Admin panel for creating new users with role assignment
+- **Role Management**: Change user roles (admin/coach/user) with hierarchy enforcement
+- **User Deactivation**: Soft delete users while preserving data integrity
+- **Bulk Operations**: Select multiple users for bulk role changes
+- **Profile Editing**: Update user details (username, email) with validation
+- **Activity Monitoring**: View login history and last login timestamps
+- **Data Export**: Export user lists to CSV for reporting
+- **Security Controls**: 
+  - Prevent self-demotion/deletion for admins
+  - Prevent deletion of last admin
+  - Audit trail for all user management actions
 
 For detailed security information, see [SECURITY.md](./SECURITY.md).
 
