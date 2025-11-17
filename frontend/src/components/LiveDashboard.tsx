@@ -200,16 +200,18 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({
 
   // Fetch data on mount and when game state changes
   useEffect(() => {
-    fetchTeamStats();
-    fetchPeriodScores();
-  }, [fetchTeamStats, fetchPeriodScores]);
+    // Perform data fetching - this is intentional and safe
+    void fetchTeamStats();
+    void fetchPeriodScores();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId, homeTeamId, awayTeamId]);
 
   // Auto-refresh stats every 10 seconds when timer is running
   useEffect(() => {
     if (timerState === 'running') {
       const interval = setInterval(() => {
-        fetchTeamStats();
-        fetchPeriodScores();
+        void fetchTeamStats();
+        void fetchPeriodScores();
       }, 10000); // Refresh every 10 seconds
 
       return () => clearInterval(interval);
