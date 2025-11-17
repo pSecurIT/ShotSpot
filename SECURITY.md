@@ -64,12 +64,37 @@ Set environment variables in `.env` file or docker-compose.yml. The admin will b
 
 - Role-based access control (RBAC)
 - Roles:
-  - Admin: Full system access
-  - Coach: Team and player management
-  - Assistant: Event recording only
-  - Viewer: Read-only access
-- Resource-level permissions
-- Action audit logging
+  - **Admin**: Full system access including user management
+  - **Coach**: Team, player, and game management
+  - **User**: Read-only access to assigned content
+- Resource-level permissions with middleware enforcement
+- Action audit logging with login history tracking
+
+#### User Management Security
+
+**Admin Controls:**
+- Create new users with automatic password generation
+- Assign and modify user roles with hierarchy enforcement
+- Deactivate/delete users with soft delete (preserves data integrity)
+- Bulk operations for role changes with validation
+- View login history and user activity monitoring
+- Export user data to CSV for compliance reporting
+
+**Security Measures:**
+- Admins cannot demote or delete themselves
+- System prevents deletion of the last admin account
+- Forced password change on first login for admin-created users
+- Role hierarchy enforcement (admins > coaches > users)
+- Login attempt tracking with IP address and user agent
+- Failed login attempt logging for security monitoring
+- Profile editing with username/email uniqueness validation
+
+**Audit Trail:**
+- All user management actions logged
+- Login history with success/failure status
+- Timestamp tracking for last login
+- IP address and user agent logging
+- Searchable and paginated login history (up to 100 records per query)
 
 ### API Security
 
@@ -163,11 +188,15 @@ Session security:
 ### Monitoring & Auditing
 
 #### Security Events
-- Failed login attempts
-- Password changes
-- Permission changes
-- Data export requests
-- Admin actions
+- Failed and successful login attempts (logged to login_history table)
+- Password changes and forced password resets
+- User creation and role changes
+- User deactivation/deletion attempts
+- Permission changes and privilege escalation attempts
+- Data export requests (CSV exports)
+- Admin actions (bulk operations, profile edits)
+- Last admin deletion attempts (blocked and logged)
+- Self-modification attempts (blocked and logged)
 - CSP violations
 - Rate limit violations
 - CSRF token failures

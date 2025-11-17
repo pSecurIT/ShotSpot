@@ -11,7 +11,7 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(''); // Only clear on new submit
 
     try {
       const result = await login(username, password);
@@ -26,6 +26,11 @@ const Login: React.FC = () => {
     }
   };
 
+  const handleInputChange = (setter: (value: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Don't clear error on input change - let user see the error while correcting
+    setter(e.target.value);
+  };
+
   return (
     <div className="form-container">
       <h2>Login to ShotSpot</h2>
@@ -37,7 +42,7 @@ const Login: React.FC = () => {
             type="text"
             id="username"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={handleInputChange(setUsername)}
             required
             placeholder="Enter your username or email"
           />
@@ -48,7 +53,7 @@ const Login: React.FC = () => {
             type="password"
             id="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={handleInputChange(setPassword)}
             required
           />
         </div>
