@@ -9,11 +9,19 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'user',
     password_must_change BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true NOT NULL,
+    last_login TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 COMMENT ON COLUMN users.password_must_change IS 'Forces user to change password on next login (used for default admin and password resets)';
+COMMENT ON COLUMN users.is_active IS 'Soft delete flag - false indicates user has been deactivated';
+COMMENT ON COLUMN users.last_login IS 'Timestamp of user''s most recent successful login';
+
+-- Create indexes for user activity tracking
+CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);
+CREATE INDEX IF NOT EXISTS idx_users_last_login ON users(last_login);
 
 -- Teams table
 CREATE TABLE IF NOT EXISTS teams (

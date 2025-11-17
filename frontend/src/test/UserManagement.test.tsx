@@ -20,6 +20,8 @@ const mockUsers = [
     username: 'admin',
     email: 'admin@example.com',
     role: 'admin',
+    is_active: true,
+    last_login: '2024-01-15T10:30:00Z',
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z'
   },
@@ -28,6 +30,8 @@ const mockUsers = [
     username: 'coach1',
     email: 'coach1@example.com',
     role: 'coach',
+    is_active: true,
+    last_login: '2024-01-14T08:00:00Z',
     created_at: '2024-01-02T00:00:00Z',
     updated_at: '2024-01-02T00:00:00Z'
   },
@@ -36,6 +40,8 @@ const mockUsers = [
     username: 'user1',
     email: 'user1@example.com',
     role: 'user',
+    is_active: true,
+    last_login: null,
     created_at: '2024-01-03T00:00:00Z',
     updated_at: '2024-01-03T00:00:00Z'
   }
@@ -118,9 +124,9 @@ describe('UserManagement Component', () => {
       // Check table headers
       expect(screen.getByText('Username')).toBeInTheDocument();
       expect(screen.getByText('Email')).toBeInTheDocument();
-      expect(screen.getByText('Current Role')).toBeInTheDocument();
-      expect(screen.getByText('Change Role')).toBeInTheDocument();
-      expect(screen.getByText('Password')).toBeInTheDocument();
+      expect(screen.getByText('Role')).toBeInTheDocument();
+      expect(screen.getByText('Last Login')).toBeInTheDocument();
+      expect(screen.getByText('Actions')).toBeInTheDocument();
     });
 
     it('displays all users in the table', async () => {
@@ -476,27 +482,473 @@ describe('UserManagement Component', () => {
     });
   });
 
-  describe('Password Reset Functionality', () => {
-    it('displays password column with reset buttons', async () => {
+  describe('Create User Functionality', () => {
+    it('displays create user button', async () => {
       renderUserManagement();
       
       await waitFor(() => {
-        expect(screen.getByText('Password')).toBeInTheDocument();
+        expect(screen.getByText('+ Create User')).toBeInTheDocument();
+      });
+    });
+
+    it('opens create user dialog when button is clicked', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('+ Create User')).toBeInTheDocument();
       });
       
-      const resetButtons = screen.getAllByText('Reset Password');
-      expect(resetButtons).toHaveLength(3); // One for each user
+      fireEvent.click(screen.getByText('+ Create User'));
+      
+      await waitFor(() => {
+        expect(screen.getByText('Create New User')).toBeInTheDocument();
+      });
+    });
+
+    it('shows success message after user creation', async () => {
+      mockApi.post.mockResolvedValue({
+        data: { id: 4, username: 'newuser', email: 'new@example.com', role: 'user' }
+      });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('+ Create User')).toBeInTheDocument();
+      });
+      
+      fireEvent.click(screen.getByText('+ Create User'));
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText('Username *')).toBeInTheDocument();
+      });
+      
+      // Fill form
+      fireEvent.change(screen.getByLabelText('Username *'), { target: { value: 'newuser' } });
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'new@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password *'), { target: { value: 'SecureP@ss123' } });
+      
+      // Submit
+      fireEvent.click(screen.getByText('Create User'));
+      
+      await waitFor(() => {
+        expect(screen.getByText('User newuser created successfully')).toBeInTheDocument();
+      });
+    });
+
+    it('refreshes user list after successful creation', async () => {
+      mockApi.post.mockResolvedValue({
+        data: { id: 4, username: 'newuser', email: 'new@example.com', role: 'user' }
+      });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('+ Create User')).toBeInTheDocument();
+      });
+      
+      // Initial fetch on mount
+      expect(mockApi.get).toHaveBeenCalledTimes(1);
+      
+      fireEvent.click(screen.getByText('+ Create User'));
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText('Username *')).toBeInTheDocument();
+      });
+      
+      fireEvent.change(screen.getByLabelText('Username *'), { target: { value: 'newuser' } });
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'new@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password *'), { target: { value: 'SecureP@ss123' } });
+      fireEvent.click(screen.getByText('Create User'));
+      
+      await waitFor(() => {
+        // Refresh fetch after creation
+        expect(mockApi.get).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe('Last Login Display', () => {
+    it('displays last login column header', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Last Login')).toBeInTheDocument();
+      });
+    });
+
+    it('displays "Never" for users who have not logged in', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Never')).toBeInTheDocument();
+      });
+    });
+
+    it('displays formatted last login time', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        const lastLoginCells = screen.getAllByText(/ago|Never/);
+        expect(lastLoginCells.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe('Delete User Functionality', () => {
+    it('displays delete button for each user', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        const deleteButtons = screen.getAllByTitle(/Delete user|Cannot delete yourself/);
+        expect(deleteButtons).toHaveLength(3);
+      });
+    });
+
+    it('disables delete button for current user', async () => {
+      renderUserManagement({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
+      
+      await waitFor(() => {
+        const deleteButtons = screen.getAllByTitle(/Delete user|Cannot delete yourself/);
+        const adminDeleteButton = deleteButtons[0];
+        expect(adminDeleteButton).toBeDisabled();
+      });
+    });
+
+    it('enables delete button for other users', async () => {
+      renderUserManagement({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
+      
+      await waitFor(() => {
+        const deleteButtons = screen.getAllByTitle(/Delete user|Cannot delete yourself/);
+        const coachDeleteButton = deleteButtons[1];
+        const userDeleteButton = deleteButtons[2];
+        
+        expect(coachDeleteButton).not.toBeDisabled();
+        expect(userDeleteButton).not.toBeDisabled();
+      });
+    });
+
+    it('shows confirmation buttons when delete is clicked', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      const user1DeleteButton = deleteButtons[deleteButtons.length - 1]; // Last user
+      
+      fireEvent.click(user1DeleteButton);
+      
+      await waitFor(() => {
+        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+        expect(screen.getByTitle('Cancel')).toBeInTheDocument();
+      });
+    });
+
+    it('cancels delete when cancel button is clicked', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+      
+      await waitFor(() => {
+        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+      });
+      
+      fireEvent.click(screen.getByTitle('Cancel'));
+      
+      await waitFor(() => {
+        expect(screen.queryByTitle('Confirm delete')).not.toBeInTheDocument();
+      });
+      
+      expect(mockApi.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes user when confirmed', async () => {
+      mockApi.delete.mockResolvedValue({ data: { message: 'User deactivated successfully' } });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+      
+      await waitFor(() => {
+        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+      });
+      
+      fireEvent.click(screen.getByTitle('Confirm delete'));
+      
+      await waitFor(() => {
+        expect(mockApi.delete).toHaveBeenCalledWith('/users/3');
+      });
+    });
+
+    it('shows success message after deletion', async () => {
+      mockApi.delete.mockResolvedValue({ data: { message: 'User deactivated successfully' } });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+      
+      await waitFor(() => {
+        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+      });
+      
+      fireEvent.click(screen.getByTitle('Confirm delete'));
+      
+      await waitFor(() => {
+        expect(screen.getByText('User deactivated successfully')).toBeInTheDocument();
+      });
+    });
+
+    it('refreshes user list after successful deletion', async () => {
+      mockApi.delete.mockResolvedValue({ data: { message: 'User deactivated successfully' } });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      // Initial fetch on mount
+      expect(mockApi.get).toHaveBeenCalledTimes(1);
+      
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+      
+      await waitFor(() => {
+        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+      });
+      
+      fireEvent.click(screen.getByTitle('Confirm delete'));
+      
+      await waitFor(() => {
+        // Refresh fetch after deletion
+        expect(mockApi.get).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('handles deletion API errors', async () => {
+      mockApi.delete.mockRejectedValue({
+        response: {
+          data: {
+            error: 'Cannot delete the last admin user'
+          }
+        }
+      });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        const usernameCells = screen.getAllByText('admin');
+        expect(usernameCells.length).toBeGreaterThan(0);
+      });
+      
+      const deleteButtons = screen.getAllByTitle(/Delete user|Cannot delete yourself/);
+      // Try to delete first enabled button
+      const enabledButton = deleteButtons.find(btn => !btn.hasAttribute('disabled'));
+      if (enabledButton) {
+        fireEvent.click(enabledButton);
+        
+        await waitFor(() => {
+          const confirmButton = screen.queryByTitle('Confirm delete');
+          if (confirmButton) {
+            fireEvent.click(confirmButton);
+          }
+        });
+        
+        await waitFor(() => {
+          expect(screen.getByText('Cannot delete the last admin user')).toBeInTheDocument();
+        });
+      }
+    });
+
+    it('handles deletion network errors', async () => {
+      mockApi.delete.mockRejectedValue(new Error('Network error'));
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+      
+      await waitFor(() => {
+        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+      });
+      
+      fireEvent.click(screen.getByTitle('Confirm delete'));
+      
+      await waitFor(() => {
+        expect(screen.getByText('Failed to delete user')).toBeInTheDocument();
+      });
+    });
+
+    it('clears confirmation state after deletion', async () => {
+      mockApi.delete.mockResolvedValue({ data: { message: 'User deactivated successfully' } });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+      
+      await waitFor(() => {
+        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+      });
+      
+      fireEvent.click(screen.getByTitle('Confirm delete'));
+      
+      await waitFor(() => {
+        expect(screen.queryByTitle('Confirm delete')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Edit User Functionality', () => {
+    it('displays edit button for each user', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        const editButtons = screen.getAllByTitle('Edit profile');
+        expect(editButtons).toHaveLength(3);
+      });
+    });
+
+    it('opens edit dialog when edit button is clicked', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      const editButtons = screen.getAllByTitle('Edit profile');
+      const user1EditButton = editButtons[2]; // user1's edit button
+      
+      fireEvent.click(user1EditButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Edit User Profile')).toBeInTheDocument();
+      });
+    });
+
+    it('pre-populates form with user data', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('coach1')).toBeInTheDocument();
+      });
+      
+      const editButtons = screen.getAllByTitle('Edit profile');
+      const coach1EditButton = editButtons[1]; // coach1's edit button
+      
+      fireEvent.click(coach1EditButton);
+      
+      await waitFor(() => {
+        const usernameInput = screen.getByLabelText('Username *') as HTMLInputElement;
+        const emailInput = screen.getByLabelText('Email *') as HTMLInputElement;
+        
+        expect(usernameInput.value).toBe('coach1');
+        expect(emailInput.value).toBe('coach1@example.com');
+      });
+    });
+
+    it('shows success message after successful edit', async () => {
+      mockApi.patch.mockResolvedValue({
+        data: { id: 3, username: 'updateduser', email: 'updated@example.com', role: 'user' }
+      });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      const editButtons = screen.getAllByTitle('Edit profile');
+      fireEvent.click(editButtons[2]);
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText('Username *')).toBeInTheDocument();
+      });
+      
+      fireEvent.change(screen.getByLabelText('Username *'), { target: { value: 'updateduser' } });
+      fireEvent.click(screen.getByText('Save Changes'));
+      
+      await waitFor(() => {
+        expect(screen.getByText('User updateduser updated successfully')).toBeInTheDocument();
+      });
+    });
+
+    it('refreshes user list after successful edit', async () => {
+      mockApi.patch.mockResolvedValue({
+        data: { id: 3, username: 'updateduser', email: 'updated@example.com', role: 'user' }
+      });
+      
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('user1')).toBeInTheDocument();
+      });
+      
+      // Initial fetch on mount
+      expect(mockApi.get).toHaveBeenCalledTimes(1);
+      
+      const editButtons = screen.getAllByTitle('Edit profile');
+      fireEvent.click(editButtons[2]);
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText('Username *')).toBeInTheDocument();
+      });
+      
+      fireEvent.change(screen.getByLabelText('Username *'), { target: { value: 'updateduser' } });
+      fireEvent.click(screen.getByText('Save Changes'));
+      
+      await waitFor(() => {
+        // Refresh fetch after edit
+        expect(mockApi.get).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe('Password Reset Functionality', () => {
+    it('displays password reset buttons', async () => {
+      renderUserManagement();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Actions')).toBeInTheDocument();
+      });
+      
+      const passwordButtons = screen.getAllByTitle('Reset password');
+      expect(passwordButtons).toHaveLength(3); // One for each user
     });
 
     it('opens password dialog when reset button is clicked', async () => {
       renderUserManagement();
       
       await waitFor(() => {
-        const resetButtons = screen.getAllByText('Reset Password');
+        const resetButtons = screen.getAllByTitle('Reset password');
         expect(resetButtons.length).toBeGreaterThan(0);
       });
       
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       const user1ResetButton = resetButtons[2]; // user1's reset button
       
       fireEvent.click(user1ResetButton);
@@ -513,7 +965,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('coach1')).toBeInTheDocument();
       });
       
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       const coach1ResetButton = resetButtons[1]; // coach1's reset button
       
       fireEvent.click(coach1ResetButton);
@@ -531,7 +983,7 @@ describe('UserManagement Component', () => {
         expect(usernameCells.length).toBeGreaterThan(0);
       });
       
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       const adminResetButton = resetButtons[0]; // admin's reset button
       
       fireEvent.click(adminResetButton);
@@ -549,7 +1001,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       const user1ResetButton = resetButtons[2]; // user1's reset button
       
       fireEvent.click(user1ResetButton);
@@ -570,7 +1022,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open password dialog for user1
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -606,7 +1058,7 @@ describe('UserManagement Component', () => {
       });
       
       // Click reset password for coach1
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       fireEvent.click(resetButtons[1]);
       
       await waitFor(() => {
@@ -633,7 +1085,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -658,7 +1110,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -690,7 +1142,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog and submit
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -718,7 +1170,7 @@ describe('UserManagement Component', () => {
       });
       
       // First password reset
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -735,7 +1187,7 @@ describe('UserManagement Component', () => {
       
       // Open dialog for another user - should clear previous success message
       await act(async () => {
-        const newResetButtons = screen.getAllByText('Reset Password');
+        const newResetButtons = screen.getAllByTitle('Reset password');
         fireEvent.click(newResetButtons[1]); // coach1
       });
       
@@ -752,7 +1204,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -773,7 +1225,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog for user1
-      const resetButtons = screen.getAllByText('Reset Password');
+      const resetButtons = screen.getAllByTitle('Reset password');
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -788,7 +1240,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog for coach1 - should work correctly
-      const newResetButtons = screen.getAllByText('Reset Password');
+      const newResetButtons = screen.getAllByTitle('Reset password');
       fireEvent.click(newResetButtons[1]);
       
       await waitFor(() => {
