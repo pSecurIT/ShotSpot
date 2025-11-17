@@ -12,6 +12,7 @@ services:
       POSTGRES_DB: shotspot_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ../backend/src/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     ports:
       - "5432:5432"
     healthcheck:
@@ -27,7 +28,7 @@ services:
         condition: service_healthy
     environment:
       PORT: 3001
-      NODE_ENV: production
+      NODE_ENV: development
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: shotspot_db
