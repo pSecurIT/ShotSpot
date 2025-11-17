@@ -21,6 +21,30 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Returns a cryptographically secure random integer between min (inclusive) and max (exclusive)
+  function secureRandomInt(min: number, max: number): number {
+    const range = max - min;
+    if (range <= 0) throw new Error("Invalid range");
+    const maxUint32 = 0xFFFFFFFF;
+    const maxAcceptable = Math.floor(maxUint32 / range) * range - 1;
+    let rand;
+    do {
+      const arr = new Uint32Array(1);
+      window.crypto.getRandomValues(arr);
+      rand = arr[0];
+    } while (rand > maxAcceptable);
+    return min + (rand % range);
+  }
+
+  // Fisher-Yates shuffle using cryptographically secure random numbers
+  function secureShuffle(array: string[]): string[] {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = secureRandomInt(0, i + 1);
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
   const generatePassword = () => {
     const length = 16;
     const lowercase = 'abcdefghijklmnopqrstuvwxyz';
@@ -30,19 +54,19 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
     
     // Ensure at least one of each required character type
     let generatedPassword = '';
-    generatedPassword += lowercase[Math.floor(Math.random() * lowercase.length)];
-    generatedPassword += uppercase[Math.floor(Math.random() * uppercase.length)];
-    generatedPassword += numbers[Math.floor(Math.random() * numbers.length)];
-    generatedPassword += special[Math.floor(Math.random() * special.length)];
+    generatedPassword += lowercase[secureRandomInt(0, lowercase.length)];
+    generatedPassword += uppercase[secureRandomInt(0, uppercase.length)];
+    generatedPassword += numbers[secureRandomInt(0, numbers.length)];
+    generatedPassword += special[secureRandomInt(0, special.length)];
     
     // Fill the rest randomly
     const allChars = lowercase + uppercase + numbers + special;
     for (let i = generatedPassword.length; i < length; i++) {
-      generatedPassword += allChars[Math.floor(Math.random() * allChars.length)];
+      generatedPassword += allChars[secureRandomInt(0, allChars.length)];
     }
     
-    // Shuffle the password
-    generatedPassword = generatedPassword.split('').sort(() => Math.random() - 0.5).join('');
+    // Shuffle the password securely
+    generatedPassword = secureShuffle(generatedPassword.split('')).join('');
     
     setPassword(generatedPassword);
     setShowPassword(true);
