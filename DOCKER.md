@@ -331,9 +331,10 @@ docker-compose -f docker-compose.dev.yml exec backend npm run seed
 #### Security Configuration
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `JWT_SECRET` | Yes | Secret for signing JWT tokens |
+| `JWT_SECRET` | Yes | Secret for signing JWT tokens (min 32 chars) |
 | `JWT_EXPIRES_IN` | No | Access token expiration (default: `1h`) |
 | `JWT_REFRESH_EXPIRES_IN` | No | Refresh token expiration (default: `7d`) |
+| `SESSION_SECURE` | No | Set to `false` for HTTP testing (default: auto-detect from NODE_ENV) |
 | `CORS_ORIGIN` | Yes | Allowed CORS origins (comma-separated) |
 
 #### Rate Limiting
@@ -541,6 +542,37 @@ services:
 
 # Regular backups
 0 2 * * * docker-compose exec db pg_dump -U shotspot_user shotspot_db > /backups/shotspot_$(date +\%Y\%m\%d).sql
+```
+
+#### 6. CSRF Token Error on Login
+
+**Symptom**: `Invalid CSRF token` error (403) when trying to log in
+
+**Root Cause**: In production mode with `NODE_ENV=production`, session cookies require HTTPS (`secure: true`). When testing locally on HTTP, cookies aren't sent.
+
+**Solutions**:
+```bash
+# Option 1: Add SESSION_SECURE=false to docker-compose.yml
+environment:
+  SESSION_SECURE: false  # Allows cookies over HTTP for local testing
+  NODE_ENV: production
+
+# Option 2: Use development mode for local testing
+environment:
+  NODE_ENV: development  # Automatically allows HTTP cookies
+
+# Option 3: Use HTTPS with proper SSL certificates
+# See nginx configuration for SSL setup
+```
+
+**Verify the fix**:
+```bash
+# Check browser DevTools -> Application -> Cookies
+# Should see 'sessionId' cookie with:
+# - Domain: localhost
+# - Path: /
+# - HttpOnly: true
+# - Secure: false (for HTTP testing)
 ```
 
 ### Debug Mode

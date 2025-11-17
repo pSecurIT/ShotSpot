@@ -194,7 +194,8 @@ app.use(session({
   saveUninitialized: true, // Changed to true to create session for CSRF token
   name: 'sessionId', // Change from default 'connect.sid'
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    // Allow SESSION_SECURE env var to override (useful for local Docker testing on HTTP)
+    secure: process.env.SESSION_SECURE === 'false' ? false : process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // Allow cross-site in development
     maxAge: parseInt(process.env.SESSION_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours

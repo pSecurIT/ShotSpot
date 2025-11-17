@@ -33,8 +33,19 @@ services:
       DB_NAME: shotspot_db
       DB_USER: shotspot_user
       DB_PASSWORD: changeme_local_testing
-      JWT_SECRET: changeme_local_testing_jwt_secret
+      DB_SSL: false
+      DB_MAX_CONNECTIONS: 20
+      DB_IDLE_TIMEOUT_MS: 30000
+      JWT_SECRET: changeme_local_testing_jwt_secret_minimum_32_chars
+      JWT_EXPIRES_IN: 1h
+      JWT_REFRESH_EXPIRES_IN: 7d
+      SESSION_SECURE: false
       CORS_ORIGIN: http://localhost:3001
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX: 100
+      LOG_LEVEL: info
+      LOG_FORMAT: combined
+      ENABLE_ERROR_NOTIFICATIONS: false
     ports:
       - "3001:3001"
     healthcheck:
