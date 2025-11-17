@@ -1,0 +1,333 @@
+@import './variables.css';
+
+/* Live Dashboard Container */
+.live-dashboard {
+  background: var(--background-white);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.live-dashboard.loading,
+.live-dashboard.error {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.live-dashboard.error {
+  color: var(--error-color);
+}
+
+/* Dashboard Header */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.dashboard-header h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  margin: 0;
+}
+
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background-color: #ff4444;
+  color: white;
+  border-radius: var(--border-radius-lg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Period Breakdown Section */
+.period-breakdown {
+  margin-bottom: var(--spacing-lg);
+}
+
+.period-breakdown h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+}
+
+.period-scores-table {
+  background: var(--background-light);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.period-scores-header,
+.period-scores-row {
+  display: grid;
+  grid-template-columns: 150px repeat(auto-fit, minmax(40px, 1fr)) 70px;
+  gap: 1px;
+  background: var(--border-color);
+}
+
+.period-scores-header {
+  background: var(--primary-color);
+}
+
+.period-scores-header > div {
+  background: var(--primary-color);
+  color: white;
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.period-scores-row > div {
+  background: var(--background-white);
+  padding: var(--spacing-md);
+  text-align: center;
+  font-weight: 500;
+}
+
+.period-scores-row.home > div {
+  background: #e3f2fd;
+}
+
+.period-scores-row.away > div {
+  background: #fce4ec;
+}
+
+.period-scores-row .team-name {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.period-label.current,
+.period-score.current {
+  font-weight: 700;
+  position: relative;
+}
+
+.period-label.current {
+  background: var(--accent-color) !important;
+}
+
+.period-score.current {
+  background: #fff3cd !important;
+  box-shadow: inset 0 0 0 2px var(--accent-color);
+}
+
+.total-score {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--primary-color);
+}
+
+/* Performance Metrics Section */
+.performance-metrics {
+  margin-top: var(--spacing-lg);
+}
+
+.performance-metrics h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-md);
+}
+
+/* Metric Card */
+.metric-card {
+  background: var(--background-light);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-normal);
+}
+
+.metric-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.metric-card h5 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 var(--spacing-md) 0;
+  color: var(--text-secondary);
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--spacing-sm);
+}
+
+/* Stat Comparison Layout */
+.stat-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+.stat-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  background: var(--background-white);
+}
+
+.stat-team.home {
+  border-left: 4px solid #2196F3;
+}
+
+.stat-team.away {
+  border-left: 4px solid #E91E63;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  line-height: 1;
+  margin-bottom: var(--spacing-xs);
+}
+
+.stat-detail {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.stat-subdetail {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-top: var(--spacing-xs);
+  text-align: center;
+}
+
+/* Shot Breakdown */
+.shot-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  width: 100%;
+}
+
+.shot-stat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.shot-stat.goal {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.shot-stat.miss {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.shot-stat.blocked {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .live-indicator {
+    align-self: flex-end;
+  }
+
+  .period-scores-header,
+  .period-scores-row {
+    grid-template-columns: 100px repeat(auto-fit, minmax(35px, 1fr)) 60px;
+    font-size: 0.875rem;
+  }
+
+  .period-scores-header > div {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.75rem;
+  }
+
+  .period-scores-row > div {
+    padding: var(--spacing-sm);
+    font-size: 0.875rem;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .live-dashboard {
+    padding: var(--spacing-md);
+  }
+
+  .dashboard-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .period-breakdown h4,
+  .performance-metrics h4 {
+    font-size: 1rem;
+  }
+
+  .stat-comparison {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+  }
+
+  .stat-team {
+    padding: var(--spacing-sm);
+  }
+}
