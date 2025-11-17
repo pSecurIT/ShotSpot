@@ -25,6 +25,7 @@ describe('👥 Users API', () => {
   let testUsers = [];
   let adminToken;
   let userToken;
+  let adminUser;
 
   beforeAll(async () => {
     console.log('✅ Users API test data initialized');
@@ -39,7 +40,7 @@ describe('👥 Users API', () => {
       RETURNING *
     `, [`admin_users_${Date.now()}`, 'admin@test.com', hashedPassword]);
     
-    const adminUser = adminResult.rows[0];
+    adminUser = adminResult.rows[0];
     testUsers.push(adminUser);
 
     // Create regular user
@@ -305,6 +306,474 @@ describe('👥 Users API', () => {
     });
   });
 
+  describe('➕ POST /api/users', () => {
+    let createdUserIds = [];
+
+    afterAll(async () => {
+      // Clean up created users
+      if (createdUserIds.length > 0) {
+        await db.query('DELETE FROM users WHERE id = ANY($1)', [createdUserIds]);
+      }
+    });
+
+    it('✅ should create new user as admin', async () => {
+      const newUser = {
+        username: `newuser_${Date.now()}`,
+        email: `newuser_${Date.now()}@test.com`,
+        password: 'SecureP@ss123',
+        role: 'user'
+      };
+
+      const response = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(newUser)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('id');
+      expect(response.body).toHaveProperty('username', newUser.username);
+      expect(response.body).toHaveProperty('email', newUser.email);
+      expect(response.body).toHaveProperty('role', 'user');
+      expect(response.body).toHaveProperty('is_active', true);
+      expect(response.body).not.toHaveProperty('password_hash');
+
+      createdUserIds.push(response.body.id);
+
+      // Verify password was hashed correctly
+      const dbResult = await db.query(
+        'SELECT password_hash FROM users WHERE id = $1',
+        [response.body.id]
+      );
+      const isPasswordValid = await bcrypt.compare('SecureP@ss123', dbResult.rows[0].password_hash);
+      expect(isPasswordValid).toBe(true);
+    });
+
+    it('✅ should create user with coach role', async () => {
+      const newCoach = {
+        username: `newcoach_${Date.now()}`,
+        email: `newcoach_${Date.now()}@test.com`,
+        password: 'CoachP@ss123',
+        role: 'coach'
+      };
+
+      const response = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(newCoach)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('role', 'coach');
+      createdUserIds.push(response.body.id);
+    });
+
+    it('✅ should create user with admin role', async () => {
+      const newAdmin = {
+        username: `newadmin_${Date.now()}`,
+        email: `newadmin_${Date.now()}@test.com`,
+        password: 'AdminP@ss123',
+        role: 'admin'
+      };
+
+      const response = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(newAdmin)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('role', 'admin');
+      createdUserIds.push(response.body.id);
+    });
+
+    it('❌ should reject duplicate username', async () => {
+      const existingUsername = testUsers[0].username;
+      
+      const response = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          username: existingUsername,
+          email: `unique_${Date.now()}@test.com`,
+          password: 'SecureP@ss123',
+          role: 'user'
+        })
+        .expect(400);
+
+      expect(response.body.error).toContain('already exists');
+    });
+
+    it('❌ should reject duplicate email', async () => {
+      const existingEmail = testUsers[0].email;
+      
+      const response = await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          username: `unique_${Date.now()}`,
+          email: existingEmail,
+          password: 'SecureP@ss123',
+          role: 'user'
+        })
+        .expect(400);
+
+      expect(response.body.error).toContain('already exists');
+    });
+
+    it('❌ should reject invalid username (special chars)', async () => {
+      await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          username: 'invalid user!',
+          email: `test_${Date.now()}@test.com`,
+          password: 'SecureP@ss123',
+          role: 'user'
+        })
+        .expect(400);
+    });
+
+    it('❌ should reject short username', async () => {
+      await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          username: 'ab',
+          email: `test_${Date.now()}@test.com`,
+          password: 'SecureP@ss123',
+          role: 'user'
+        })
+        .expect(400);
+    });
+
+    it('❌ should reject weak password (no uppercase)', async () => {
+      await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          username: `test_${Date.now()}`,
+          email: `test_${Date.now()}@test.com`,
+          password: 'weakpassword123!',
+          role: 'user'
+        })
+        .expect(400);
+    });
+
+    it('❌ should reject weak password (no special char)', async () => {
+      await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          username: `test_${Date.now()}`,
+          email: `test_${Date.now()}@test.com`,
+          password: 'NoSpecial123',
+          role: 'user'
+        })
+        .expect(400);
+    });
+
+    it('❌ should reject invalid email format', async () => {
+      await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          username: `test_${Date.now()}`,
+          email: 'notanemail',
+          password: 'SecureP@ss123',
+          role: 'user'
+        })
+        .expect(400);
+    });
+
+    it('❌ should reject invalid role', async () => {
+      await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          username: `test_${Date.now()}`,
+          email: `test_${Date.now()}@test.com`,
+          password: 'SecureP@ss123',
+          role: 'superadmin'
+        })
+        .expect(400);
+    });
+
+    it('❌ should reject non-admin users', async () => {
+      await request(app)
+        .post('/api/users')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          username: `test_${Date.now()}`,
+          email: `test_${Date.now()}@test.com`,
+          password: 'SecureP@ss123',
+          role: 'user'
+        })
+        .expect(403);
+    });
+
+    it('❌ should reject unauthenticated requests', async () => {
+      await request(app)
+        .post('/api/users')
+        .send({
+          username: `test_${Date.now()}`,
+          email: `test_${Date.now()}@test.com`,
+          password: 'SecureP@ss123',
+          role: 'user'
+        })
+        .expect(401);
+    });
+  });
+
+  describe('✏️ PATCH /api/users/:userId', () => {
+    let testUpdateUser;
+
+    beforeAll(async () => {
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      const result = await db.query(`
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, 'user')
+        RETURNING *
+      `, [`updatetest_${Date.now()}`, `updatetest_${Date.now()}@test.com`, hashedPassword]);
+      testUpdateUser = result.rows[0];
+    });
+
+    afterAll(async () => {
+      if (testUpdateUser) {
+        await db.query('DELETE FROM users WHERE id = $1', [testUpdateUser.id]);
+      }
+    });
+
+    it('✅ should update username as admin', async () => {
+      const newUsername = `updated_${Date.now()}`;
+
+      const response = await request(app)
+        .patch(`/api/users/${testUpdateUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ username: newUsername })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('username', newUsername);
+      expect(response.body).toHaveProperty('email', testUpdateUser.email);
+    });
+
+    it('✅ should update email as admin', async () => {
+      const newEmail = `updated_${Date.now()}@test.com`;
+
+      const response = await request(app)
+        .patch(`/api/users/${testUpdateUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: newEmail })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('email', newEmail);
+    });
+
+    it('✅ should update both username and email', async () => {
+      const timestamp = Date.now();
+      const newUsername = `both_${timestamp}`;
+      const newEmail = `both_${timestamp}@test.com`;
+
+      const response = await request(app)
+        .patch(`/api/users/${testUpdateUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ username: newUsername, email: newEmail })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('username', newUsername);
+      expect(response.body).toHaveProperty('email', newEmail);
+    });
+
+    it('✅ should allow user to update their own profile', async () => {
+      const targetUser = testUsers[1];
+      const newUsername = `selfupdate_${Date.now()}`;
+
+      const response = await request(app)
+        .patch(`/api/users/${targetUser.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ username: newUsername })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('username', newUsername);
+    });
+
+    it('❌ should reject updating to existing username', async () => {
+      const existingUsername = testUsers[0].username;
+
+      await request(app)
+        .patch(`/api/users/${testUpdateUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ username: existingUsername })
+        .expect(400);
+    });
+
+    it('❌ should reject updating to existing email', async () => {
+      const existingEmail = testUsers[0].email;
+
+      await request(app)
+        .patch(`/api/users/${testUpdateUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: existingEmail })
+        .expect(400);
+    });
+
+    it('❌ should reject invalid username format', async () => {
+      await request(app)
+        .patch(`/api/users/${testUpdateUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ username: 'invalid user!' })
+        .expect(400);
+    });
+
+    it('❌ should reject invalid email format', async () => {
+      await request(app)
+        .patch(`/api/users/${testUpdateUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ email: 'notanemail' })
+        .expect(400);
+    });
+
+    it('❌ should reject non-admin editing other users', async () => {
+      const targetUser = testUsers[0]; // Admin user
+
+      await request(app)
+        .patch(`/api/users/${targetUser.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ username: `hacked_${Date.now()}` })
+        .expect(403);
+    });
+
+    it('❌ should reject empty update', async () => {
+      await request(app)
+        .patch(`/api/users/${testUpdateUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({})
+        .expect(400);
+    });
+
+    it('❌ should return 404 for non-existent user', async () => {
+      await request(app)
+        .patch('/api/users/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ username: `test_${Date.now()}` })
+        .expect(404);
+    });
+  });
+
+  describe('🗑️ DELETE /api/users/:userId', () => {
+    let testDeleteUser;
+
+    beforeEach(async () => {
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      const result = await db.query(`
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, 'user')
+        RETURNING *
+      `, [`deletetest_${Date.now()}`, `deletetest_${Date.now()}@test.com`, hashedPassword]);
+      testDeleteUser = result.rows[0];
+    });
+
+    afterEach(async () => {
+      if (testDeleteUser) {
+        await db.query('DELETE FROM users WHERE id = $1', [testDeleteUser.id]);
+      }
+    });
+
+    it('✅ should soft delete user as admin', async () => {
+      const response = await request(app)
+        .delete(`/api/users/${testDeleteUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.message).toContain('deactivated');
+
+      // Verify user is soft deleted
+      const dbResult = await db.query(
+        'SELECT is_active FROM users WHERE id = $1',
+        [testDeleteUser.id]
+      );
+      expect(dbResult.rows[0].is_active).toBe(false);
+    });
+
+    it('✅ should exclude soft deleted users from GET /api/users', async () => {
+      // Soft delete the user
+      await request(app)
+        .delete(`/api/users/${testDeleteUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      // Verify user doesn't appear in list
+      const response = await request(app)
+        .get('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      const deletedUserInList = response.body.find(u => u.id === testDeleteUser.id);
+      expect(deletedUserInList).toBeUndefined();
+    });
+
+    it('❌ should prevent admin from deleting themselves', async () => {
+      const adminUser = testUsers[0];
+
+      await request(app)
+        .delete(`/api/users/${adminUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(403);
+    });
+
+    it('❌ should prevent deleting last admin', async () => {
+      // Create a temporary admin
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      const tempAdmin = await db.query(`
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, 'admin')
+        RETURNING *
+      `, [`tempadmin_${Date.now()}`, `tempadmin_${Date.now()}@test.com`, hashedPassword]);
+
+      const tempAdminUser = tempAdmin.rows[0];
+
+      // Deactivate all other admins except tempAdminUser
+      await db.query('UPDATE users SET is_active = false WHERE role = $1 AND id != $2', ['admin', tempAdminUser.id]);
+
+      // Try to delete the last admin using the original admin token
+      const response = await request(app)
+        .delete(`/api/users/${tempAdminUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(403);
+
+      expect(response.body.error).toContain('last admin');
+
+      // Cleanup: restore all admins and delete temp
+      await db.query('UPDATE users SET is_active = true WHERE role = $1', ['admin']);
+      await db.query('DELETE FROM users WHERE id = $1', [tempAdminUser.id]);
+    });
+
+    it('❌ should reject non-admin users', async () => {
+      await request(app)
+        .delete(`/api/users/${testDeleteUser.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(403);
+    });
+
+    it('❌ should return 404 for non-existent user', async () => {
+      await request(app)
+        .delete('/api/users/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+    });
+
+    it('❌ should return 404 for already deleted user', async () => {
+      // Soft delete once
+      await request(app)
+        .delete(`/api/users/${testDeleteUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      // Try to delete again
+      await request(app)
+        .delete(`/api/users/${testDeleteUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+    });
+  });
+
   describe('🧪 Edge Cases', () => {
     it('❌ should handle database errors gracefully', async () => {
       // This would require mocking the database to simulate errors
@@ -320,6 +789,136 @@ describe('👥 Users API', () => {
         .expect(400);
 
       expect(response.body).toHaveProperty('errors');
+    });
+  });
+
+  describe('📦 Bulk Role Change Operations', () => {
+    it('✅ should successfully change roles for multiple users', async () => {
+      // Use testUsers[1] and testUsers[2] to avoid changing admin's own role (testUsers[0])
+      const userIds = [testUsers[1].id, testUsers[2].id];
+      
+      const response = await request(app)
+        .post('/api/users/bulk-role-change')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ userIds, role: 'coach' })
+        .expect(200);
+
+      expect(response.body.message).toContain('2 user(s)');
+      expect(response.body.updated).toHaveLength(2);
+      expect(response.body.updated[0].role).toBe('coach');
+      expect(response.body.updated[1].role).toBe('coach');
+    });
+
+    it('❌ should reject empty user array', async () => {
+      await request(app)
+        .post('/api/users/bulk-role-change')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ userIds: [], role: 'coach' })
+        .expect(400);
+    });
+
+    it('❌ should reject invalid role', async () => {
+      await request(app)
+        .post('/api/users/bulk-role-change')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ userIds: [testUsers[0].id], role: 'superadmin' })
+        .expect(400);
+    });
+
+    it('❌ should prevent changing own role', async () => {
+      const response = await request(app)
+        .post('/api/users/bulk-role-change')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ userIds: [adminUser.id], role: 'user' })
+        .expect(403);
+
+      expect(response.body.error).toContain('own role');
+    });
+
+    it('❌ should reject non-admin users', async () => {
+      await request(app)
+        .post('/api/users/bulk-role-change')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ userIds: [testUsers[0].id], role: 'admin' })
+        .expect(403);
+    });
+
+    it('❌ should validate userIds are integers', async () => {
+      await request(app)
+        .post('/api/users/bulk-role-change')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ userIds: ['abc', 'def'], role: 'coach' })
+        .expect(400);
+    });
+
+    it('✅ should handle non-existent users gracefully', async () => {
+      const response = await request(app)
+        .post('/api/users/bulk-role-change')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ userIds: [999999, 999998], role: 'coach' })
+        .expect(200);
+
+      expect(response.body.updated).toHaveLength(0);
+    });
+  });
+
+  describe('📜 Login History Tracking', () => {
+    it('✅ should retrieve login history for own account', async () => {
+      const response = await request(app)
+        .get(`/api/users/${adminUser.id}/login-history`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('history');
+      expect(response.body).toHaveProperty('total');
+      expect(response.body).toHaveProperty('limit');
+      expect(response.body).toHaveProperty('offset');
+      expect(Array.isArray(response.body.history)).toBe(true);
+    });
+
+    it('✅ admin should view other users login history', async () => {
+      const response = await request(app)
+        .get(`/api/users/${testUsers[0].id}/login-history`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('history');
+    });
+
+    it('❌ non-admin should not view other users history', async () => {
+      await request(app)
+        .get(`/api/users/${adminUser.id}/login-history`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(403);
+    });
+
+    it('✅ should respect limit and offset parameters', async () => {
+      const response = await request(app)
+        .get(`/api/users/${adminUser.id}/login-history?limit=5&offset=0`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.limit).toBe(5);
+      expect(response.body.offset).toBe(0);
+      expect(response.body.history.length).toBeLessThanOrEqual(5);
+    });
+
+    it('✅ should cap limit at 100', async () => {
+      const response = await request(app)
+        .get(`/api/users/${adminUser.id}/login-history?limit=500`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.limit).toBe(100);
+    });
+
+    it('✅ should default to limit=50 if not provided', async () => {
+      const response = await request(app)
+        .get(`/api/users/${adminUser.id}/login-history`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.limit).toBe(50);
     });
   });
 });

@@ -18,7 +18,12 @@ const Navigation: React.FC = () => {
       // Update token and user in context (removes passwordMustChange flag)
       updateUser(token, updatedUser);
     }
+    
+    // Show success message
     alert('Password changed successfully!');
+    
+    // Refresh the page to clear any errors and reset state
+    window.location.reload();
   };
 
   return (
@@ -40,8 +45,14 @@ const Navigation: React.FC = () => {
               userId={user.id}
               username={user.username}
               isOwnPassword={true}
-              isOpen={showPasswordDialog}
-              onClose={() => setShowPasswordDialog(false)}
+              isOpen={showPasswordDialog || user.passwordMustChange === true}
+              isForced={user.passwordMustChange === true}
+              onClose={() => {
+                // Don't allow closing if password must be changed
+                if (!user.passwordMustChange) {
+                  setShowPasswordDialog(false);
+                }
+              }}
               onSuccess={handlePasswordChangeSuccess}
             />
           )}
