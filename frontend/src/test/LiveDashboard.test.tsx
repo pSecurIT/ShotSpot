@@ -63,7 +63,10 @@ describe('LiveDashboard Component', () => {
 
     render(<LiveDashboard {...mockGameProps} />);
 
-    expect(screen.getByText('📊 Live Match Dashboard')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('📊 Live Match Dashboard')).toBeInTheDocument();
+    });
+
     expect(screen.getByText('🔴 LIVE')).toBeInTheDocument();
   });
 
