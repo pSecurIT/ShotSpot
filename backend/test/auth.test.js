@@ -460,6 +460,95 @@ describe('🔐 Authentication API', () => {
       expect(usersStillExist.rows[0].count).toBeDefined();
     });
 
+    it('✅ should log failed login attempts to login_history', async () => {
+      // First create the user
+      const hashedPassword = await bcrypt.hash(validUserData.password, 10);
+      const result = await db.query(
+        'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
+        [validUserData.username, validUserData.email, hashedPassword, 'user']
+      );
+      testUsers.push(result.rows[0]);
+
+      // Attempt login with wrong password
+      await request(app)
+        .post('/api/auth/login')
+        .send({
+          username: validUserData.username,
+          password: 'wrongpassword'
+        })
+        .expect(401);
+
+      // Check that failed attempt was logged
+      const historyResult = await db.query(
+        'SELECT * FROM login_history WHERE username = $1 AND success = false ORDER BY created_at DESC LIMIT 1',
+        [validUserData.username]
+      );
+
+      expect(historyResult.rows.length).toBeGreaterThan(0);
+      const lastAttempt = historyResult.rows[0];
+      expect(lastAttempt.success).toBe(false);
+      expect(lastAttempt.error_message).toBe('Invalid password');
+      expect(lastAttempt.ip_address).toBeDefined();
+      expect(lastAttempt.user_agent).toBeDefined();
+    });
+
+    it('✅ should log successful login attempts to login_history', async () => {
+      // First create the user
+      const hashedPassword = await bcrypt.hash(validUserData.password, 10);
+      const result = await db.query(
+        'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
+        [validUserData.username, validUserData.email, hashedPassword, 'user']
+      );
+      testUsers.push(result.rows[0]);
+
+      // Successful login
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({
+          username: validUserData.username,
+          password: validUserData.password
+        })
+        .expect(200);
+
+      const userId = response.body.user.id;
+
+      // Check that successful attempt was logged
+      const historyResult = await db.query(
+        'SELECT * FROM login_history WHERE user_id = $1 AND success = true ORDER BY created_at DESC LIMIT 1',
+        [userId]
+      );
+
+      expect(historyResult.rows.length).toBeGreaterThan(0);
+      const lastAttempt = historyResult.rows[0];
+      expect(lastAttempt.success).toBe(true);
+      expect(lastAttempt.error_message).toBeNull();
+      expect(lastAttempt.username).toBe(validUserData.username);
+    });
+
+    it('✅ should log failed attempts for non-existent users', async () => {
+      const fakeUsername = 'nonexistentuser_' + Date.now();
+      
+      await request(app)
+        .post('/api/auth/login')
+        .send({
+          username: fakeUsername,
+          password: 'somepassword'
+        })
+        .expect(401);
+
+      // Check that failed attempt was logged
+      const historyResult = await db.query(
+        'SELECT * FROM login_history WHERE username = $1 AND success = false ORDER BY created_at DESC LIMIT 1',
+        [fakeUsername]
+      );
+
+      expect(historyResult.rows.length).toBeGreaterThan(0);
+      const lastAttempt = historyResult.rows[0];
+      expect(lastAttempt.success).toBe(false);
+      expect(lastAttempt.user_id).toBeNull();
+      expect(lastAttempt.error_message).toBe('User not found');
+    });
+
     it('❌ should not leak user existence through timing attacks', async () => {
       const startTime = Date.now();
       
