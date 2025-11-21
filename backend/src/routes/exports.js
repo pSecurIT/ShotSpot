@@ -385,7 +385,7 @@ router.get('/match-csv/:gameId', [
       csvOutput += await generatePlayersCSV(gameData.players);
     }
 
-    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=match-${gameId}.csv`);
     res.send(csvOutput);
   } catch (err) {
@@ -493,10 +493,6 @@ router.get('/season-csv', [
     .optional()
     .isInt({ min: 1 })
     .withMessage('Team ID must be a positive integer'),
-  query('player_id')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Player ID must be a positive integer'),
   query('start_date')
     .optional()
     .isISO8601()
@@ -511,7 +507,7 @@ router.get('/season-csv', [
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { team_id, player_id: _player_id, start_date, end_date } = req.query;
+  const { team_id, start_date, end_date } = req.query;
 
   try {
     const games = await fetchSeasonData(team_id, null, start_date, end_date);
@@ -539,7 +535,7 @@ router.get('/season-csv', [
         return res.status(500).json({ error: 'Failed to generate CSV' });
       }
 
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=season-report.csv');
       res.send(output);
     });
@@ -566,18 +562,14 @@ router.post('/bulk', [
     .withMessage('Each game ID must be a positive integer'),
   body('format')
     .isIn(['pdf', 'csv'])
-    .withMessage('Format must be pdf or csv'),
-  body('template')
-    .optional()
-    .isIn(['summary', 'detailed', 'coach'])
-    .withMessage('Template must be summary, detailed, or coach')
+    .withMessage('Format must be pdf or csv')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { game_ids, format, template: _template = 'summary' } = req.body;
+  const { game_ids, format } = req.body;
 
   try {
     if (format === 'pdf') {
@@ -646,7 +638,7 @@ router.post('/bulk', [
         }
       }
 
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=bulk-export.csv');
       res.send(csvOutput);
     }
@@ -668,10 +660,6 @@ router.get('/player-report/:playerId', [
   param('playerId')
     .isInt({ min: 1 })
     .withMessage('Player ID must be a positive integer'),
-  query('season')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Season must be a positive integer'),
   query('format')
     .optional()
     .isIn(['pdf', 'csv'])
@@ -683,7 +671,7 @@ router.get('/player-report/:playerId', [
   }
 
   const { playerId } = req.params;
-  const { season: _season, format = 'pdf' } = req.query;
+  const { format = 'pdf' } = req.query;
 
   try {
     // Fetch player info
@@ -788,7 +776,7 @@ router.get('/player-report/:playerId', [
           return res.status(500).json({ error: 'Failed to generate CSV' });
         }
 
-        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename=player-${playerId}-report.csv`);
         res.send(output);
       });
