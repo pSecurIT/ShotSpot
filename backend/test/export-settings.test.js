@@ -4,13 +4,13 @@ import db from '../src/db.js';
 import { generateTestToken } from './helpers/testHelpers.js';
 
 describe('⚙️ Export Settings Routes', () => {
-  let userToken;
+  let viewerToken;
   let userId;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Export Settings tests...');
-    userToken = generateTestToken('user');
-    userId = 1; // Assuming default user ID
+    viewerToken = generateTestToken('viewer');
+    userId = 1; // Assuming default viewer ID
   });
 
   beforeEach(async () => {
@@ -32,7 +32,7 @@ describe('⚙️ Export Settings Routes', () => {
       try {
         const response = await request(app)
           .get('/api/export-settings')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .expect('Content-Type', /json/)
           .expect(200);
 
@@ -58,7 +58,7 @@ describe('⚙️ Export Settings Routes', () => {
 
         const response = await request(app)
           .get('/api/export-settings')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .expect('Content-Type', /json/)
           .expect(200);
 
@@ -99,7 +99,7 @@ describe('⚙️ Export Settings Routes', () => {
 
         const response = await request(app)
           .put('/api/export-settings')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .send(updates)
           .expect('Content-Type', /json/)
           .expect(200);
@@ -122,7 +122,7 @@ describe('⚙️ Export Settings Routes', () => {
 
         const response = await request(app)
           .put('/api/export-settings')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .send(newSettings)
           .expect('Content-Type', /json/)
           .expect(200);
@@ -140,7 +140,7 @@ describe('⚙️ Export Settings Routes', () => {
       try {
         await request(app)
           .put('/api/export-settings')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .send({ default_format: 'invalid_format' })
           .expect(400);
       } catch (error) {
@@ -153,7 +153,7 @@ describe('⚙️ Export Settings Routes', () => {
       try {
         await request(app)
           .put('/api/export-settings')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .send({ auto_delete_after_days: -5 })
           .expect(400);
       } catch (error) {
@@ -166,7 +166,7 @@ describe('⚙️ Export Settings Routes', () => {
       try {
         const response = await request(app)
           .put('/api/export-settings')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .send({ auto_delete_after_days: null })
           .expect('Content-Type', /json/)
           .expect(200);
@@ -191,7 +191,7 @@ describe('⚙️ Export Settings Routes', () => {
 
         const response = await request(app)
           .post('/api/export-settings/reset')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .expect('Content-Type', /json/)
           .expect(200);
 
@@ -209,7 +209,7 @@ describe('⚙️ Export Settings Routes', () => {
       try {
         const response = await request(app)
           .post('/api/export-settings/reset')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .expect('Content-Type', /json/)
           .expect(200);
 
@@ -233,7 +233,7 @@ describe('⚙️ Export Settings Routes', () => {
         if (template.rows.length > 0) {
           const response = await request(app)
             .put('/api/export-settings')
-            .set('Authorization', `Bearer ${userToken}`)
+            .set('Authorization', `Bearer ${viewerToken}`)
             .send({ default_template_id: template.rows[0].id })
             .expect('Content-Type', /json/)
             .expect(200);
@@ -250,7 +250,7 @@ describe('⚙️ Export Settings Routes', () => {
       try {
         await request(app)
           .put('/api/export-settings')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .send({ default_template_id: 99999 })
           .expect(404);
       } catch (error) {

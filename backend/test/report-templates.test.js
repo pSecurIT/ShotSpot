@@ -6,14 +6,14 @@ import { generateTestToken } from './helpers/testHelpers.js';
 describe('📊 Report Templates Routes', () => {
   let adminToken;
   let coachToken;
-  let userToken;
+  let viewerToken;
   let testTemplateId;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Report Templates tests...');
     adminToken = generateTestToken('admin');
     coachToken = generateTestToken('coach');
-    userToken = generateTestToken('user');
+    viewerToken = generateTestToken('viewer');
   });
 
   beforeEach(async () => {
@@ -38,7 +38,7 @@ describe('📊 Report Templates Routes', () => {
       try {
         const response = await request(app)
           .get('/api/report-templates')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .expect('Content-Type', /json/)
           .expect(200);
 
@@ -148,7 +148,7 @@ describe('📊 Report Templates Routes', () => {
     it('❌ should not allow regular users to create templates', async () => {
       try {
         const templateData = {
-          name: 'User Template',
+          name: 'Viewer Template',
           type: 'custom',
           sections: ['game_info'],
           metrics: ['goals']
@@ -156,7 +156,7 @@ describe('📊 Report Templates Routes', () => {
 
         await request(app)
           .post('/api/report-templates')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .send(templateData)
           .expect(403);
       } catch (error) {
@@ -185,6 +185,15 @@ describe('📊 Report Templates Routes', () => {
 
   describe('📝 PUT /api/report-templates/:id - Update Template', () => {
     beforeEach(async () => {
+      // Create a test user
+      const userResult = await db.query(`
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
+        RETURNING id
+      `, ['testcoach', 'testcoach@test.com', '$2b$10$test', 'coach']);
+      const userId = userResult.rows[0].id;
+      
       // Create a test template
       const result = await db.query(`
         INSERT INTO report_templates (
@@ -197,7 +206,7 @@ describe('📊 Report Templates Routes', () => {
         'custom',
         false,
         true,
-        1, // Assuming coach user ID is 1
+        userId,
         JSON.stringify(['game_info']),
         JSON.stringify(['goals'])
       ]);
@@ -262,6 +271,15 @@ describe('📊 Report Templates Routes', () => {
 
   describe('🗑️ DELETE /api/report-templates/:id - Delete Template', () => {
     beforeEach(async () => {
+      // Create a test user
+      const userResult = await db.query(`
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
+        RETURNING id
+      `, ['testcoach2', 'testcoach2@test.com', '$2b$10$test', 'coach']);
+      const userId = userResult.rows[0].id;
+      
       // Create a test template
       const result = await db.query(`
         INSERT INTO report_templates (
@@ -274,7 +292,7 @@ describe('📊 Report Templates Routes', () => {
         'custom',
         false,
         true,
-        1,
+        userId,
         JSON.stringify(['game_info']),
         JSON.stringify(['goals'])
       ]);
@@ -345,7 +363,7 @@ describe('📊 Report Templates Routes', () => {
           
           const response = await request(app)
             .get(`/api/report-templates/${templateId}`)
-            .set('Authorization', `Bearer ${userToken}`)
+            .set('Authorization', `Bearer ${viewerToken}`)
             .expect('Content-Type', /json/)
             .expect(200);
 
@@ -362,7 +380,7 @@ describe('📊 Report Templates Routes', () => {
       try {
         await request(app)
           .get('/api/report-templates/99999')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .expect(404);
       } catch (error) {
         global.testContext.logTestError(error, '404 check failed');
