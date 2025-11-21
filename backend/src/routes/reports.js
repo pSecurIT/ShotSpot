@@ -258,17 +258,7 @@ router.get('/season/player/:playerId', [
 
     // Get total minutes played (this would need play time tracking)
     // For now, we'll estimate based on substitutions
-    const playTimeQuery = `
-      SELECT 
-        g.id as game_id,
-        COALESCE(gr.is_starting, false) as is_starting,
-        g.period_duration,
-        g.number_of_periods
-      FROM game_rosters gr
-      JOIN games g ON gr.game_id = g.id
-      WHERE gr.player_id = $1 AND g.status = 'completed' ${seasonFilter}
-    `;
-    const playTimeResult = await db.query(playTimeQuery, seasonParams);
+    // Note: This is a placeholder for future play time tracking implementation
 
     // Get shooting statistics
     const shootingStatsQuery = `
@@ -346,14 +336,14 @@ router.get('/season/player/:playerId', [
 
     const bestPerformance = performances.length > 0 
       ? performances.reduce((best, current) => 
-          current.goals > best.goals ? current : best
-        )
+        current.goals > best.goals ? current : best
+      )
       : null;
 
     const worstPerformance = performances.length > 0 
       ? performances.reduce((worst, current) => 
-          (current.shots > 0 && current.fg_percentage < worst.fg_percentage) ? current : worst
-        )
+        (current.shots > 0 && current.fg_percentage < worst.fg_percentage) ? current : worst
+      )
       : null;
 
     // Get career statistics (all seasons)
