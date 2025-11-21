@@ -379,8 +379,7 @@ describe('📤 Exports API', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           game_ids: [game1.id, game2.id],
-          format: 'pdf',
-          template: 'summary'
+          format: 'pdf'
         });
 
       expect(response.status).toBe(200);
