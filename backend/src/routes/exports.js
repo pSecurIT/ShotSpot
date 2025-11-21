@@ -439,10 +439,9 @@ router.post('/season-pdf', [
     // Filter info
     doc.fontSize(10);
     if (team_id) {
-      // Get the team name - check both home and away team to find the filtered team
-      const teamName = games[0].home_team_id === parseInt(team_id) 
-        ? games[0].home_team_name 
-        : games[0].away_team_name;
+      // Fetch the team name directly from the database to ensure accuracy
+      const teamResult = await db.query('SELECT name FROM teams WHERE id = $1', [team_id]);
+      const teamName = teamResult.rows.length > 0 ? teamResult.rows[0].name : 'Unknown Team';
       doc.text(`Team: ${teamName}`);
     }
     if (start_date) doc.text(`From: ${new Date(start_date).toLocaleDateString()}`);
