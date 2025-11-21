@@ -12,29 +12,48 @@
  * @returns {Object} Complete player report
  */
 export async function generatePlayerReport(playerId, opponentId = null) {
-  const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001/api/advanced-analytics';
+  const baseUrl = process.env.API_BASE_URL;
+  
+  if (!baseUrl) {
+    throw new Error('API_BASE_URL environment variable is not set');
+  }
   
   try {
     // Fetch all relevant data in parallel with error handling
     const [formTrends, fatigue, prediction, comparison, historical] = await Promise.all([
       fetch(`${baseUrl}/predictions/form-trends/${playerId}`).then(async r => {
-        if (!r.ok) throw new Error(`Form trends request failed: ${r.status}`);
+        if (!r.ok) {
+          const errorText = await r.text().catch(() => 'Unable to read response');
+          throw new Error(`Form trends request failed with status ${r.status}: ${errorText}`);
+        }
         return r.json();
       }),
       fetch(`${baseUrl}/predictions/fatigue/${playerId}`).then(async r => {
-        if (!r.ok) throw new Error(`Fatigue request failed: ${r.status}`);
+        if (!r.ok) {
+          const errorText = await r.text().catch(() => 'Unable to read response');
+          throw new Error(`Fatigue request failed with status ${r.status}: ${errorText}`);
+        }
         return r.json();
       }),
       fetch(`${baseUrl}/predictions/next-game/${playerId}${opponentId ? `?opponent_id=${opponentId}` : ''}`).then(async r => {
-        if (!r.ok) throw new Error(`Prediction request failed: ${r.status}`);
+        if (!r.ok) {
+          const errorText = await r.text().catch(() => 'Unable to read response');
+          throw new Error(`Prediction request failed with status ${r.status}: ${errorText}`);
+        }
         return r.json();
       }),
       fetch(`${baseUrl}/benchmarks/player-comparison/${playerId}`).then(async r => {
-        if (!r.ok) throw new Error(`Comparison request failed: ${r.status}`);
+        if (!r.ok) {
+          const errorText = await r.text().catch(() => 'Unable to read response');
+          throw new Error(`Comparison request failed with status ${r.status}: ${errorText}`);
+        }
         return r.json();
       }),
       fetch(`${baseUrl}/benchmarks/historical/player/${playerId}`).then(async r => {
-        if (!r.ok) throw new Error(`Historical request failed: ${r.status}`);
+        if (!r.ok) {
+          const errorText = await r.text().catch(() => 'Unable to read response');
+          throw new Error(`Historical request failed with status ${r.status}: ${errorText}`);
+        }
         return r.json();
       })
     ]);
@@ -74,12 +93,17 @@ export async function generatePlayerReport(playerId, opponentId = null) {
  * @returns {Object} Highlight reel data
  */
 export async function generateHighlightReel(gameId, maxClips = 20) {
-  const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001/api/advanced-analytics';
+  const baseUrl = process.env.API_BASE_URL;
+  
+  if (!baseUrl) {
+    throw new Error('API_BASE_URL environment variable is not set');
+  }
   
   try {
     const response = await fetch(`${baseUrl}/video/highlights/${gameId}?max_clips=${maxClips}`);
     if (!response.ok) {
-      throw new Error(`Highlight reel request failed: ${response.status}`);
+      const errorText = await response.text().catch(() => 'Unable to read response');
+      throw new Error(`Highlight reel request failed with status ${response.status}: ${errorText}`);
     }
     const data = await response.json();
     
@@ -120,16 +144,26 @@ export async function generateHighlightReel(gameId, maxClips = 20) {
  * @returns {Object} Team benchmarking data
  */
 export async function generateTeamBenchmarkReport(teamId, position = 'all') {
-  const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001/api/advanced-analytics';
+  const baseUrl = process.env.API_BASE_URL;
+  
+  if (!baseUrl) {
+    throw new Error('API_BASE_URL environment variable is not set');
+  }
   
   try {
     const [leagueAvg, teamHistorical] = await Promise.all([
       fetch(`${baseUrl}/benchmarks/league-averages?position=${position}`).then(async r => {
-        if (!r.ok) throw new Error(`League averages request failed: ${r.status}`);
+        if (!r.ok) {
+          const errorText = await r.text().catch(() => 'Unable to read response');
+          throw new Error(`League averages request failed with status ${r.status}: ${errorText}`);
+        }
         return r.json();
       }),
       fetch(`${baseUrl}/benchmarks/historical/team/${teamId}`).then(async r => {
-        if (!r.ok) throw new Error(`Team historical request failed: ${r.status}`);
+        if (!r.ok) {
+          const errorText = await r.text().catch(() => 'Unable to read response');
+          throw new Error(`Team historical request failed with status ${r.status}: ${errorText}`);
+        }
         return r.json();
       })
     ]);
