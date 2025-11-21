@@ -9,6 +9,28 @@ const router = express.Router();
 router.use(auth);
 
 /**
+ * Helper function to build season filter for SQL queries
+ * @param {number|string} seasonId - Season ID to filter by
+ * @param {number|string} year - Year to filter by
+ * @param {number} startParamIndex - Starting parameter index for SQL placeholders
+ * @returns {object} Object with filter string and parameters array
+ */
+function buildSeasonFilter(seasonId, year, startParamIndex = 2) {
+  if (seasonId) {
+    return {
+      filter: ` AND g.season_id = $${startParamIndex}`,
+      params: [seasonId]
+    };
+  } else if (year) {
+    return {
+      filter: ` AND EXTRACT(YEAR FROM g.date) = $${startParamIndex}`,
+      params: [year]
+    };
+  }
+  return { filter: '', params: [] };
+}
+
+/**
  * Get season performance report for a team
  * Returns overall record, standings, progression, and home/away performance
  */
@@ -27,16 +49,8 @@ router.get('/season/team/:teamId', [
 
   try {
     // Build season filter
-    let seasonFilter = '';
-    let seasonParams = [teamId];
-    
-    if (seasonId) {
-      seasonFilter = 'AND g.season_id = $2';
-      seasonParams.push(seasonId);
-    } else if (year) {
-      seasonFilter = 'AND EXTRACT(YEAR FROM g.date) = $2';
-      seasonParams.push(year);
-    }
+    const { filter: seasonFilter, params: filterParams } = buildSeasonFilter(seasonId, year);
+    const seasonParams = [teamId, ...filterParams];
 
     // Get overall record
     const recordQuery = `
@@ -340,9 +354,11 @@ router.get('/season/player/:playerId', [
       )
       : null;
 
-    const worstPerformance = performances.length > 0 
-      ? performances.reduce((worst, current) => 
-        (current.shots > 0 && current.fg_percentage < worst.fg_percentage) ? current : worst
+    // Find worst performance (only games with shots taken)
+    const performancesWithShots = performances.filter(p => p.shots > 0);
+    const worstPerformance = performancesWithShots.length > 0 
+      ? performancesWithShots.reduce((worst, current) => 
+        current.fg_percentage < worst.fg_percentage ? current : worst
       )
       : null;
 
