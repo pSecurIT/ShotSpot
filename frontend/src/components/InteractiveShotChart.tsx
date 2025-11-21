@@ -58,8 +58,8 @@ const InteractiveShotChart: React.FC<InteractiveShotChartProps> = ({
   const [showZoneOverlay, setShowZoneOverlay] = useState(true);
   const chartRef = useRef<HTMLDivElement>(null);
 
-  // Define court zones (9 zones: 3x3 grid)
-  const zones: Zone[] = [
+  // Define court zones (9 zones: 3x3 grid) - memoized to prevent recreation on every render
+  const zones: Zone[] = React.useMemo(() => [
     // Left third
     { id: 'left-top', name: 'Left Top', x: 0, y: 0, width: 33.33, height: 33.33, color: 'rgba(33, 150, 243, 0.2)' },
     { id: 'left-mid', name: 'Left Middle', x: 0, y: 33.33, width: 33.33, height: 33.33, color: 'rgba(33, 150, 243, 0.2)' },
@@ -72,7 +72,7 @@ const InteractiveShotChart: React.FC<InteractiveShotChartProps> = ({
     { id: 'right-top', name: 'Right Top', x: 66.67, y: 0, width: 33.33, height: 33.33, color: 'rgba(255, 152, 0, 0.2)' },
     { id: 'right-mid', name: 'Right Middle', x: 66.67, y: 33.33, width: 33.33, height: 33.33, color: 'rgba(255, 152, 0, 0.2)' },
     { id: 'right-bot', name: 'Right Bottom', x: 66.67, y: 66.66, width: 33.33, height: 33.34, color: 'rgba(255, 152, 0, 0.2)' }
-  ];
+  ], []);
 
   // Calculate zone statistics
   const getZoneStats = useCallback((zoneId: string): ZoneStats => {
