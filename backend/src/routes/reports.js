@@ -296,11 +296,15 @@ router.get('/momentum/:gameId', [
 
     if (recentShots.rows.length === 0) {
       return res.json({
+        window_size: window,
+        recent_shots_analyzed: 0,
         message: 'No shots data available yet',
         momentum: {
           home: 0,
-          away: 0
-        }
+          away: 0,
+          trend: 'even'
+        },
+        recent_shots: []
       });
     }
 
@@ -378,13 +382,13 @@ router.get('/compare/:gameId/:playerId1/:playerId2', [
         p.last_name,
         p.jersey_number,
         t.name as team_name,
-        COUNT(*) as total_shots,
+        COUNT(s.id) as total_shots,
         COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as goals,
         COUNT(CASE WHEN s.result = 'miss' THEN 1 END) as misses,
         COUNT(CASE WHEN s.result = 'blocked' THEN 1 END) as blocked,
         ROUND(
           COUNT(CASE WHEN s.result = 'goal' THEN 1 END)::numeric / 
-          NULLIF(COUNT(*)::numeric, 0) * 100, 
+          NULLIF(COUNT(s.id)::numeric, 0) * 100, 
           2
         ) as fg_percentage,
         ROUND(AVG(s.distance), 2) as avg_distance,
@@ -392,6 +396,7 @@ router.get('/compare/:gameId/:playerId1/:playerId2', [
         COUNT(CASE WHEN s.x_coord >= 33.33 AND s.x_coord < 66.67 THEN 1 END) as center_zone_shots,
         COUNT(CASE WHEN s.x_coord >= 66.67 THEN 1 END) as right_zone_shots
       FROM players p
+      JOIN teams t ON p.team_id = t.id
       LEFT JOIN shots s ON s.player_id = p.id AND s.game_id = $1
       WHERE p.id = $2 OR p.id = $3
       GROUP BY p.id, p.first_name, p.last_name, p.jersey_number, t.name
