@@ -580,20 +580,8 @@ router.get('/comparative/players/:playerId', [
   const { seasonId, year } = req.query;
 
   try {
-    // Build season filter
-    let seasonFilter = '';
-    let seasonParams = [playerId];
-    
-    if (seasonId) {
-      seasonFilter = 'AND g.season_id = $2';
-      seasonParams.push(seasonId);
-    } else if (year) {
-      seasonFilter = 'AND EXTRACT(YEAR FROM g.date) = $2';
-      seasonParams.push(year);
-    }
-
     // Get player info and stats
-    const playerQuery = `
+    let playerQuery = `
       SELECT 
         p.id,
         p.first_name,
@@ -614,13 +602,21 @@ router.get('/comparative/players/:playerId', [
       LEFT JOIN game_rosters gr ON gr.player_id = p.id
       LEFT JOIN games g ON gr.game_id = g.id AND g.status = 'completed'
       LEFT JOIN shots s ON s.player_id = p.id AND s.game_id = g.id
-      WHERE p.id = $1 ${seasonFilter.replace('$2', '$3')}
-      GROUP BY p.id, p.first_name, p.last_name, p.jersey_number, p.team_id, t.name
+      WHERE p.id = $1
     `;
-    const playerResult = await db.query(
-      playerQuery.replace('$3', seasonFilter ? '$2' : '$1'),
-      seasonParams
-    );
+    const playerParams = [playerId];
+    
+    if (seasonId) {
+      playerQuery += ' AND g.season_id = $2';
+      playerParams.push(seasonId);
+    } else if (year) {
+      playerQuery += ' AND EXTRACT(YEAR FROM g.date) = $2';
+      playerParams.push(year);
+    }
+    
+    playerQuery += ' GROUP BY p.id, p.first_name, p.last_name, p.jersey_number, p.team_id, t.name';
+    
+    const playerResult = await db.query(playerQuery, playerParams);
 
     if (playerResult.rows.length === 0) {
       return res.status(404).json({ error: 'Player not found' });
@@ -629,7 +625,7 @@ router.get('/comparative/players/:playerId', [
     const player = playerResult.rows[0];
 
     // Get team averages (players on same team)
-    const teamAvgQuery = `
+    let teamAvgQuery = `
       SELECT 
         AVG(player_stats.ppg) as avg_ppg,
         AVG(player_stats.fg_pct) as avg_fg_pct,
@@ -645,24 +641,28 @@ router.get('/comparative/players/:playerId', [
         FROM players p
         LEFT JOIN shots s ON s.player_id = p.id
         LEFT JOIN games g ON s.game_id = g.id AND g.status = 'completed'
-        WHERE p.team_id = $1 ${seasonFilter.replace('$2', '$3')}
-        GROUP BY p.id
-        HAVING COUNT(DISTINCT g.id) > 0
-      ) as player_stats
+        WHERE p.team_id = $1
     `;
     const teamAvgParams = [player.team_id];
+    
     if (seasonId) {
+      teamAvgQuery += ' AND g.season_id = $2';
       teamAvgParams.push(seasonId);
     } else if (year) {
+      teamAvgQuery += ' AND EXTRACT(YEAR FROM g.date) = $2';
       teamAvgParams.push(year);
     }
-    const teamAvgResult = await db.query(
-      teamAvgQuery.replace('$3', seasonFilter ? '$2' : '$1'),
-      teamAvgParams
-    );
+    
+    teamAvgQuery += `
+        GROUP BY p.id
+        HAVING COUNT(DISTINCT g.id) > 0
+      ) as player_stats
+    `;
+    
+    const teamAvgResult = await db.query(teamAvgQuery, teamAvgParams);
 
     // Get league averages (all players)
-    const leagueAvgQuery = `
+    let leagueAvgQuery = `
       SELECT 
         AVG(player_stats.ppg) as avg_ppg,
         AVG(player_stats.fg_pct) as avg_fg_pct,
@@ -678,21 +678,24 @@ router.get('/comparative/players/:playerId', [
         FROM players p
         LEFT JOIN shots s ON s.player_id = p.id
         LEFT JOIN games g ON s.game_id = g.id AND g.status = 'completed'
-        ${seasonFilter.replace('$1', 'p.id').replace('$2', '$1')}
+    `;
+    const leagueAvgParams = [];
+    
+    if (seasonId) {
+      leagueAvgQuery += ' WHERE g.season_id = $1';
+      leagueAvgParams.push(seasonId);
+    } else if (year) {
+      leagueAvgQuery += ' WHERE EXTRACT(YEAR FROM g.date) = $1';
+      leagueAvgParams.push(year);
+    }
+    
+    leagueAvgQuery += `
         GROUP BY p.id
         HAVING COUNT(DISTINCT g.id) > 0
       ) as player_stats
     `;
-    const leagueAvgParams = [];
-    if (seasonId) {
-      leagueAvgParams.push(seasonId);
-    } else if (year) {
-      leagueAvgParams.push(year);
-    }
-    const leagueAvgResult = await db.query(
-      seasonFilter ? leagueAvgQuery : leagueAvgQuery.replace('${seasonFilter.replace', '').replace('}', ''),
-      leagueAvgParams
-    );
+    
+    const leagueAvgResult = await db.query(leagueAvgQuery, leagueAvgParams);
 
     const gamesPlayed = parseInt(player.games_played) || 0;
     const playerPPG = gamesPlayed > 0 
