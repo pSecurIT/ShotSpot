@@ -28,6 +28,7 @@ import matchCommentaryRoutes from './routes/match-commentary.js';
 import userRoutes from './routes/users.js';
 import analyticsRoutes from './routes/analytics.js';
 import achievementsRoutes from './routes/achievements.js';
+import exportRoutes from './routes/export.js';
 
 const app = express();
 
@@ -278,6 +279,7 @@ app.use('/api/substitutions', substitutionsRoutes);
 app.use('/api/free-shots', freeShotsRoutes);
 app.use('/api/timeouts', timeoutsRoutes);
 app.use('/api/match-commentary', matchCommentaryRoutes);
+app.use('/api/export', exportRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {
