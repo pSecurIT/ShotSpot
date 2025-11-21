@@ -481,8 +481,18 @@ router.get('/games/:gameId/player/:playerId', [
     doc.moveDown(0.5);
     doc.fontSize(10).font('Helvetica');
     doc.text('This Game vs Season Average:');
+    
+    // Calculate season average goals per game for comparison
+    const seasonTotalShots = parseInt(seasonAvg.rows[0].total_shots) || 0;
+    const seasonTotalGoals = parseInt(seasonAvg.rows[0].goals) || 0;
+    const currentGameShots = parseInt(stats.total_shots) || 1;
+    const shotsPerGame = seasonTotalShots / Math.max(1, currentGameShots);
+    const seasonAvgGoalsPerGame = seasonTotalShots > 0 
+      ? Math.round(seasonTotalGoals / Math.max(1, shotsPerGame) * 100) / 100
+      : 0;
+    
     doc.text(`  FG%: ${stats.fg_percentage || 0}% vs ${seasonAvg.rows[0].fg_percentage || 0}%`);
-    doc.text(`  Goals per game: ${stats.goals} vs ${Math.round(seasonAvg.rows[0].goals / Math.max(1, seasonAvg.rows[0].total_shots / stats.total_shots || 1) * 100) / 100}`);
+    doc.text(`  Goals per game: ${stats.goals} vs ${seasonAvgGoalsPerGame}`);
     doc.moveDown();
 
     // Performance Notes
