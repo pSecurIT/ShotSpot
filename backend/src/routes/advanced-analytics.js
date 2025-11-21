@@ -204,7 +204,10 @@ router.get('/predictions/fatigue/:playerId', [
       `, [game.id, playerId, playerId]);
 
       // Calculate play time
-      const periodDuration = parseInt(game.period_duration.minutes) || 10;
+      // period_duration is stored as INTERVAL, extract minutes
+      const periodDurationMinutes = game.period_duration?.minutes || 
+        (typeof game.period_duration === 'string' ? parseInt(game.period_duration.split(' ')[0]) : null) || 10;
+      const periodDuration = periodDurationMinutes;
       const numberOfPeriods = game.number_of_periods || 4;
       const totalGameTime = periodDuration * numberOfPeriods * 60; // in seconds
 
@@ -772,6 +775,11 @@ router.get('/benchmarks/historical/:entityType/:entityId', [
           dateFilter = '';
       }
 
+      // Validate entityType to prevent SQL injection
+      if (!['player', 'team'].includes(entityType)) {
+        return res.status(400).json({ error: 'Invalid entity type' });
+      }
+      
       const column = entityType === 'player' ? 'player_id' : 'team_id';
       
       const stats = await db.query(`
@@ -1091,9 +1099,7 @@ async function calculatePercentile(playerId, metric, value) {
 
     return parseFloat((result.rows[0]?.percentile || 50).toFixed(1));
   } catch (err) {
-    if (process.env.NODE_ENV !== 'test') {
-      console.error('Error calculating percentile:', err);
-    }
+    console.error('Error calculating percentile:', err);
     return 50; // Default to 50th percentile on error
   }
 }
