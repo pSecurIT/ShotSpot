@@ -397,18 +397,17 @@ router.get('/games/:gameId/player/:playerId', [
       WHERE s.player_id = $1 AND g.status = 'completed'
     `, [playerId]);
 
-    // Get substitutions for play time
+    // Get substitutions
     const subsResult = await db.query(`
       SELECT 
         period,
-        EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
         CASE 
           WHEN player_in_id = $2 THEN 'in'
           WHEN player_out_id = $2 THEN 'out'
         END as type
       FROM substitutions
       WHERE game_id = $1 AND (player_in_id = $2 OR player_out_id = $2)
-      ORDER BY period, time_remaining_seconds DESC
+      ORDER BY period
     `, [gameId, playerId]);
 
     // Create PDF document
@@ -481,18 +480,9 @@ router.get('/games/:gameId/player/:playerId', [
     doc.moveDown(0.5);
     doc.fontSize(10).font('Helvetica');
     doc.text('This Game vs Season Average:');
-    
-    // Calculate season average goals per game for comparison
-    const seasonTotalShots = parseInt(seasonAvg.rows[0].total_shots) || 0;
-    const seasonTotalGoals = parseInt(seasonAvg.rows[0].goals) || 0;
-    const currentGameShots = parseInt(stats.total_shots) || 1;
-    const shotsPerGame = seasonTotalShots / Math.max(1, currentGameShots);
-    const seasonAvgGoalsPerGame = seasonTotalShots > 0 
-      ? Math.round(seasonTotalGoals / Math.max(1, shotsPerGame) * 100) / 100
-      : 0;
-    
     doc.text(`  FG%: ${stats.fg_percentage || 0}% vs ${seasonAvg.rows[0].fg_percentage || 0}%`);
-    doc.text(`  Goals per game: ${stats.goals} vs ${seasonAvgGoalsPerGame}`);
+    doc.text(`  Total Goals This Game: ${stats.goals}`);
+    doc.text(`  Career Total Goals: ${seasonAvg.rows[0].goals || 0}`);
     doc.moveDown();
 
     // Performance Notes
@@ -565,8 +555,8 @@ router.post('/games/:gameId/coach-analysis', [
         COUNT(to.id) as timeouts_used,
         to.period
       FROM timeouts to
-      JOIN teams t ON to.team_id = t.id
-      WHERE to.game_id = $1
+      LEFT JOIN teams t ON to.team_id = t.id
+      WHERE to.game_id = $1 AND to.team_id IS NOT NULL
       GROUP BY t.name, to.period
       ORDER BY to.period
     `, [gameId]);
