@@ -171,11 +171,11 @@ describe('📄 Reports Routes', () => {
 
     it('❌ should require coach or admin role', async () => {
       try {
-        const userToken = generateTestToken('user');
+        const viewerToken = generateTestToken('viewer');
         
         await request(app)
           .post('/api/reports/generate')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .send({
             template_id: templateId,
             report_type: 'game',
@@ -195,12 +195,21 @@ describe('📄 Reports Routes', () => {
     let reportId;
 
     beforeEach(async () => {
+      // Create a test user
+      const userResult = await db.query(`
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
+        RETURNING id
+      `, ['reportcoach', 'reportcoach@test.com', '$2b$10$test', 'coach']);
+      const userId = userResult.rows[0].id;
+      
       const result = await db.query(`
         INSERT INTO report_exports (
           template_id, generated_by, report_name, report_type, format, game_id
         ) VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-      `, [templateId, 1, 'Test Report', 'game', 'json', gameId]);
+      `, [templateId, userId, 'Test Report', 'game', 'json', gameId]);
       reportId = result.rows[0].id;
     });
 
@@ -238,12 +247,21 @@ describe('📄 Reports Routes', () => {
     let reportId;
 
     beforeEach(async () => {
+      // Create a test user
+      const userResult = await db.query(`
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
+        RETURNING id
+      `, ['reportcoach2', 'reportcoach2@test.com', '$2b$10$test', 'coach']);
+      const userId = userResult.rows[0].id;
+      
       const result = await db.query(`
         INSERT INTO report_exports (
           template_id, generated_by, report_name, report_type, format
         ) VALUES ($1, $2, $3, $4, $5)
         RETURNING *
-      `, [templateId, 1, 'Deletable Report', 'season', 'pdf']);
+      `, [templateId, userId, 'Deletable Report', 'season', 'pdf']);
       reportId = result.rows[0].id;
     });
 

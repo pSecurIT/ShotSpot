@@ -122,11 +122,11 @@ describe('📅 Scheduled Reports Routes', () => {
 
     it('❌ should require coach or admin role', async () => {
       try {
-        const userToken = generateTestToken('user');
+        const viewerToken = generateTestToken('viewer');
         
         await request(app)
           .post('/api/scheduled-reports')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${viewerToken}`)
           .send({
             name: 'Test Report',
             template_id: templateId,
@@ -144,12 +144,21 @@ describe('📅 Scheduled Reports Routes', () => {
     let reportId;
 
     beforeEach(async () => {
+      // Create a test user
+      const userResult = await db.query(`
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
+        RETURNING id
+      `, ['schedcoach', 'schedcoach@test.com', '$2b$10$test', 'coach']);
+      const userId = userResult.rows[0].id;
+      
       const result = await db.query(`
         INSERT INTO scheduled_reports (
           name, created_by, template_id, schedule_type
         ) VALUES ($1, $2, $3, $4)
         RETURNING *
-      `, ['Test Schedule', 1, templateId, 'weekly']);
+      `, ['Test Schedule', userId, templateId, 'weekly']);
       reportId = result.rows[0].id;
     });
 
@@ -180,12 +189,21 @@ describe('📅 Scheduled Reports Routes', () => {
     let reportId;
 
     beforeEach(async () => {
+      // Create a test user
+      const userResult = await db.query(`
+        INSERT INTO users (username, email, password_hash, role)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
+        RETURNING id
+      `, ['schedcoach2', 'schedcoach2@test.com', '$2b$10$test', 'coach']);
+      const userId = userResult.rows[0].id;
+      
       const result = await db.query(`
         INSERT INTO scheduled_reports (
           name, created_by, template_id, schedule_type
         ) VALUES ($1, $2, $3, $4)
         RETURNING *
-      `, ['Deletable Schedule', 1, templateId, 'monthly']);
+      `, ['Deletable Schedule', userId, templateId, 'monthly']);
       reportId = result.rows[0].id;
     });
 
