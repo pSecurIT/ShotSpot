@@ -28,6 +28,10 @@ import matchCommentaryRoutes from './routes/match-commentary.js';
 import userRoutes from './routes/users.js';
 import analyticsRoutes from './routes/analytics.js';
 import achievementsRoutes from './routes/achievements.js';
+import reportTemplatesRoutes from './routes/report-templates.js';
+import exportSettingsRoutes from './routes/export-settings.js';
+import scheduledReportsRoutes from './routes/scheduled-reports.js';
+import reportsRoutes from './routes/reports.js';
 
 const app = express();
 
@@ -278,6 +282,10 @@ app.use('/api/substitutions', substitutionsRoutes);
 app.use('/api/free-shots', freeShotsRoutes);
 app.use('/api/timeouts', timeoutsRoutes);
 app.use('/api/match-commentary', matchCommentaryRoutes);
+app.use('/api/report-templates', reportTemplatesRoutes);
+app.use('/api/export-settings', exportSettingsRoutes);
+app.use('/api/scheduled-reports', scheduledReportsRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {
