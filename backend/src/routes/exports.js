@@ -95,7 +95,7 @@ async function fetchGameData(gameId) {
 /**
  * Helper function to fetch season data
  */
-async function fetchSeasonData(teamId, seasonId, startDate, endDate) {
+async function fetchSeasonData(teamId, startDate, endDate) {
   const params = [];
   let whereConditions = [];
   let paramIndex = 1;
@@ -407,10 +407,6 @@ router.post('/season-pdf', [
     .optional()
     .isInt({ min: 1 })
     .withMessage('Team ID must be a positive integer'),
-  body('season_id')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Season ID must be a positive integer'),
   body('start_date')
     .optional()
     .isISO8601()
@@ -425,10 +421,10 @@ router.post('/season-pdf', [
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { team_id, season_id, start_date, end_date } = req.body;
+  const { team_id, start_date, end_date } = req.body;
 
   try {
-    const games = await fetchSeasonData(team_id, season_id, start_date, end_date);
+    const games = await fetchSeasonData(team_id, start_date, end_date);
     
     if (games.length === 0) {
       return res.status(404).json({ error: 'No games found for the specified criteria' });
@@ -443,7 +439,10 @@ router.post('/season-pdf', [
     // Filter info
     doc.fontSize(10);
     if (team_id) {
-      const teamName = games[0].home_team_name || games[0].away_team_name;
+      // Get the team name - check both home and away team to find the filtered team
+      const teamName = games[0].home_team_id === parseInt(team_id) 
+        ? games[0].home_team_name 
+        : games[0].away_team_name;
       doc.text(`Team: ${teamName}`);
     }
     if (start_date) doc.text(`From: ${new Date(start_date).toLocaleDateString()}`);
@@ -510,7 +509,7 @@ router.get('/season-csv', [
   const { team_id, start_date, end_date } = req.query;
 
   try {
-    const games = await fetchSeasonData(team_id, null, start_date, end_date);
+    const games = await fetchSeasonData(team_id, start_date, end_date);
     
     if (games.length === 0) {
       return res.status(404).json({ error: 'No games found for the specified criteria' });
