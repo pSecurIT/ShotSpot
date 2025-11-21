@@ -1,6 +1,7 @@
 import request from 'supertest';
 import app from '../src/app.js';
 import db from '../src/db.js';
+import jwt from 'jsonwebtoken';
 
 describe('📊 Export API Tests', () => {
   let authToken;
@@ -9,82 +10,77 @@ describe('📊 Export API Tests', () => {
   let testTeam2;
   let testPlayer1;
   let testPlayer2;
+  let testUser;
 
   beforeAll(async () => {
-    // Create test user and authenticate
-    const userResponse = await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'exporttester',
-        email: 'exporttest@test.com',
-        password: 'TestPass123!',
-        role: 'coach'
-      });
+    // Use unique identifiers to prevent conflicts
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    // Create test user with coach role directly in DB
+    const userResult = await db.query(`
+      INSERT INTO users (username, email, password_hash, role)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `, [`exporttester_${uniqueId}`, `exporttest_${uniqueId}@test.com`, 'hash', 'coach']);
+    testUser = userResult.rows[0];
+    
+    // Generate JWT token directly
+    authToken = jwt.sign({ id: testUser.id, role: 'coach' }, process.env.JWT_SECRET);
 
-    const loginResponse = await request(app)
-      .post('/api/auth/login')
-      .send({
-        username: 'exporttester',
-        password: 'TestPass123!'
-      });
+    // Create test teams directly in DB
+    const team1Result = await db.query(
+      'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      [`Export Test Team 1 ${uniqueId}`]
+    );
+    testTeam1 = team1Result.rows[0];
 
-    authToken = loginResponse.body.token;
+    const team2Result = await db.query(
+      'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      [`Export Test Team 2 ${uniqueId}`]
+    );
+    testTeam2 = team2Result.rows[0];
 
-    // Create test teams
-    const team1Response = await request(app)
-      .post('/api/teams')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({ name: 'Export Test Team 1' });
-    testTeam1 = team1Response.body;
+    // Create test players directly in DB
+    const player1Result = await db.query(`
+      INSERT INTO players (team_id, first_name, last_name, jersey_number, gender)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [testTeam1.id, 'Export', 'Player1', 10, 'male']);
+    testPlayer1 = player1Result.rows[0];
 
-    const team2Response = await request(app)
-      .post('/api/teams')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({ name: 'Export Test Team 2' });
-    testTeam2 = team2Response.body;
+    const player2Result = await db.query(`
+      INSERT INTO players (team_id, first_name, last_name, jersey_number, gender)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [testTeam2.id, 'Export', 'Player2', 20, 'female']);
+    testPlayer2 = player2Result.rows[0];
+    
+    // Create a third player for substitution
+    const player3Result = await db.query(`
+      INSERT INTO players (team_id, first_name, last_name, jersey_number, gender)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [testTeam1.id, 'Export', 'Player3', 11, 'male']);
+    const testPlayer3 = player3Result.rows[0];
 
-    // Create test players
-    const player1Response = await request(app)
-      .post('/api/players')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({
-        team_id: testTeam1.id,
-        first_name: 'Export',
-        last_name: 'Player1',
-        jersey_number: 10,
-        gender: 'male'
-      });
-    testPlayer1 = player1Response.body;
-
-    const player2Response = await request(app)
-      .post('/api/players')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({
-        team_id: testTeam2.id,
-        first_name: 'Export',
-        last_name: 'Player2',
-        jersey_number: 20,
-        gender: 'female'
-      });
-    testPlayer2 = player2Response.body;
-
-    // Create a test game
-    const gameResponse = await request(app)
-      .post('/api/games')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({
-        home_team_id: testTeam1.id,
-        away_team_id: testTeam2.id,
-        date: new Date().toISOString(),
-        status: 'in_progress'
-      });
-    testGame = gameResponse.body;
+    // Create a test game directly in DB
+    const gameResult = await db.query(`
+      INSERT INTO games (home_team_id, away_team_id, date, status)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `, [testTeam1.id, testTeam2.id, new Date().toISOString(), 'in_progress']);
+    testGame = gameResult.rows[0];
 
     // Add game roster entries
     await db.query(`
       INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position)
-      VALUES ($1, $2, $3, true, true, 'offense'), ($4, $5, $6, false, true, 'defense')
-    `, [testGame.id, testTeam1.id, testPlayer1.id, testGame.id, testTeam2.id, testPlayer2.id]);
+      VALUES ($1, $2, $3, true, true, 'offense')
+    `, [testGame.id, testTeam1.id, testPlayer1.id]);
+    
+    await db.query(`
+      INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position)
+      VALUES ($1, $2, $3, false, true, 'defense')
+    `, [testGame.id, testTeam2.id, testPlayer2.id]);
 
     // Add some test shots
     await db.query(`
@@ -95,11 +91,11 @@ describe('📊 Export API Tests', () => {
         ($1, $2, $3, 60.0, 55.0, 'goal', 2, '09:45:00', 'penalty', 3.0)
     `, [testGame.id, testPlayer1.id, testTeam1.id, testPlayer2.id, testTeam2.id]);
 
-    // Add a substitution
+    // Add a substitution (player3 in, player1 out)
     await db.query(`
       INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, time_remaining, reason)
       VALUES ($1, $2, $3, $4, 1, '07:00:00', 'tactical')
-    `, [testGame.id, testTeam1.id, testPlayer1.id, testPlayer1.id]);
+    `, [testGame.id, testTeam1.id, testPlayer3.id, testPlayer1.id]);
 
     // Add a timeout
     await db.query(`
@@ -119,13 +115,12 @@ describe('📊 Export API Tests', () => {
     if (testGame) {
       await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
     }
-    if (testTeam1) {
-      await db.query('DELETE FROM teams WHERE id = $1', [testTeam1.id]);
+    if (testTeam1 && testTeam2) {
+      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [testTeam1.id, testTeam2.id]);
     }
-    if (testTeam2) {
-      await db.query('DELETE FROM teams WHERE id = $1', [testTeam2.id]);
+    if (testUser) {
+      await db.query('DELETE FROM users WHERE id = $1', [testUser.id]);
     }
-    await db.query('DELETE FROM users WHERE username = $1', ['exporttester']);
   });
 
   describe('🎯 Match Export', () => {
