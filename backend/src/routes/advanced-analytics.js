@@ -205,9 +205,7 @@ router.get('/predictions/fatigue/:playerId', [
 
       // Calculate play time
       // period_duration is stored as INTERVAL, extract minutes
-      const periodDurationMinutes = game.period_duration?.minutes || 
-        (typeof game.period_duration === 'string' ? parseInt(game.period_duration.split(' ')[0]) : null) || 10;
-      const periodDuration = periodDurationMinutes;
+      const periodDuration = parsePeriodDuration(game.period_duration);
       const numberOfPeriods = game.number_of_periods || 4;
       const totalGameTime = periodDuration * numberOfPeriods * 60; // in seconds
 
@@ -719,8 +717,12 @@ router.get('/benchmarks/player-comparison/:playerId', [
         avg_shot_distance: parseFloat(league.avg_shot_distance) || 0
       },
       comparison: {
-        shots_vs_league: parseFloat(((player.avg_shots_per_game - league.avg_shots_per_game) / league.avg_shots_per_game * 100).toFixed(2)),
-        goals_vs_league: parseFloat(((player.avg_goals_per_game - league.avg_goals_per_game) / league.avg_goals_per_game * 100).toFixed(2)),
+        shots_vs_league: league.avg_shots_per_game > 0 
+          ? parseFloat(((player.avg_shots_per_game - league.avg_shots_per_game) / league.avg_shots_per_game * 100).toFixed(2))
+          : 0,
+        goals_vs_league: league.avg_goals_per_game > 0
+          ? parseFloat(((player.avg_goals_per_game - league.avg_goals_per_game) / league.avg_goals_per_game * 100).toFixed(2))
+          : 0,
         fg_vs_league: parseFloat((player.avg_fg_percentage - league.avg_fg_percentage).toFixed(2)),
         distance_vs_league: parseFloat((player.avg_shot_distance - league.avg_shot_distance).toFixed(2))
       },
@@ -780,23 +782,43 @@ router.get('/benchmarks/historical/:entityType/:entityId', [
         return res.status(400).json({ error: 'Invalid entity type' });
       }
       
-      const column = entityType === 'player' ? 'player_id' : 'team_id';
+      // Use separate queries for each entity type to avoid SQL injection
+      let queryText;
+      if (entityType === 'player') {
+        queryText = `
+          SELECT 
+            COUNT(DISTINCT s.game_id) as games_played,
+            COUNT(*) as total_shots,
+            COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as total_goals,
+            ROUND(
+              COUNT(CASE WHEN s.result = 'goal' THEN 1 END)::numeric / 
+              NULLIF(COUNT(*)::numeric, 0) * 100, 
+              2
+            ) as avg_fg_percentage,
+            ROUND(AVG(s.distance), 2) as avg_distance
+          FROM shots s
+          JOIN games g ON s.game_id = g.id
+          WHERE s.player_id = $1 ${dateFilter}
+        `;
+      } else {
+        queryText = `
+          SELECT 
+            COUNT(DISTINCT s.game_id) as games_played,
+            COUNT(*) as total_shots,
+            COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as total_goals,
+            ROUND(
+              COUNT(CASE WHEN s.result = 'goal' THEN 1 END)::numeric / 
+              NULLIF(COUNT(*)::numeric, 0) * 100, 
+              2
+            ) as avg_fg_percentage,
+            ROUND(AVG(s.distance), 2) as avg_distance
+          FROM shots s
+          JOIN games g ON s.game_id = g.id
+          WHERE s.team_id = $1 ${dateFilter}
+        `;
+      }
       
-      const stats = await db.query(`
-        SELECT 
-          COUNT(DISTINCT s.game_id) as games_played,
-          COUNT(*) as total_shots,
-          COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as total_goals,
-          ROUND(
-            COUNT(CASE WHEN s.result = 'goal' THEN 1 END)::numeric / 
-            NULLIF(COUNT(*)::numeric, 0) * 100, 
-            2
-          ) as avg_fg_percentage,
-          ROUND(AVG(s.distance), 2) as avg_distance
-        FROM shots s
-        JOIN games g ON s.game_id = g.id
-        WHERE s.${column} = $1 ${dateFilter}
-      `, [entityId]);
+      const stats = await db.query(queryText, [entityId]);
 
       const result = stats.rows[0];
       
@@ -1075,6 +1097,36 @@ router.get('/video/report-data/:gameId', [
     res.status(500).json({ error: 'Failed to fetch video report data' });
   }
 });
+
+// Helper function to parse period duration from PostgreSQL INTERVAL
+function parsePeriodDuration(periodDuration) {
+  // Default to 10 minutes if null/undefined
+  if (!periodDuration) return 10;
+  
+  // If it's already a number, return it
+  if (typeof periodDuration === 'number') return periodDuration;
+  
+  // If it has a minutes property (PostgreSQL node-pg object)
+  if (periodDuration.minutes !== undefined) return periodDuration.minutes;
+  
+  // If it's a string, try to parse it
+  if (typeof periodDuration === 'string') {
+    // Format: "00:10:00" or "10 minutes"
+    const minutesMatch = periodDuration.match(/(\d+)\s*minutes?/i);
+    if (minutesMatch) return parseInt(minutesMatch[1]);
+    
+    // Try HH:MM:SS format
+    const timeMatch = periodDuration.match(/(\d+):(\d+):(\d+)/);
+    if (timeMatch) {
+      const hours = parseInt(timeMatch[1]);
+      const minutes = parseInt(timeMatch[2]);
+      return hours * 60 + minutes;
+    }
+  }
+  
+  // Default fallback
+  return 10;
+}
 
 // Helper function to calculate percentile rank
 async function calculatePercentile(playerId, metric, value) {
