@@ -35,14 +35,23 @@ export function sanitizeQueryForLogging(queryText, maxLength = 100) {
 
   // Remove any potential sensitive data patterns
   let sanitized = queryText
-    // Remove string literals that might contain sensitive data
+    // First, sanitize sensitive fields (before removing string literals)
+    // This catches patterns like: password='value', token='value', etc.
+    .replace(/password\s*=\s*'[^']*'/gi, '******')
+    .replace(/password\s*=\s*"[^"]*"/gi, '******')
+    .replace(/password\s*=\s*[^\s,)'"]+/gi, '******')
+    .replace(/token\s*=\s*'[^']*'/gi, 'token=***')
+    .replace(/token\s*=\s*"[^"]*"/gi, 'token=***')
+    .replace(/token\s*=\s*[^\s,)'"]+/gi, 'token=***')
+    .replace(/secret\s*=\s*'[^']*'/gi, 'secret=***')
+    .replace(/secret\s*=\s*"[^"]*"/gi, 'secret=***')
+    .replace(/secret\s*=\s*[^\s,)'"]+/gi, 'secret=***')
+    .replace(/api[_-]?key\s*=\s*'[^']*'/gi, 'api_key=***')
+    .replace(/api[_-]?key\s*=\s*"[^"]*"/gi, 'api_key=***')
+    .replace(/api[_-]?key\s*=\s*[^\s,)'"]+/gi, 'api_key=***')
+    // Then remove remaining string literals that might contain other sensitive data
     .replace(/'[^']*'/g, '\'***\'')
     .replace(/"[^"]*"/g, '"***"')
-    // Remove potential passwords, tokens, secrets
-    .replace(/password\s*=\s*[^\s,)]+/gi, 'password=***')
-    .replace(/token\s*=\s*[^\s,)]+/gi, 'token=***')
-    .replace(/secret\s*=\s*[^\s,)]+/gi, 'secret=***')
-    .replace(/api[_-]?key\s*=\s*[^\s,)]+/gi, 'api_key=***')
     // Normalize whitespace
     .replace(/\s+/g, ' ')
     .trim();

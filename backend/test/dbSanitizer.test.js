@@ -19,7 +19,7 @@ describe('🔒 Database Sanitizer Utility', () => {
     it('✅ should sanitize password fields', () => {
       const query = 'UPDATE users SET password = \'secret123\' WHERE id = 1';
       const result = sanitizeQueryForLogging(query);
-      expect(result).toContain('password=***');
+      expect(result).toContain('******');
       expect(result).not.toContain('secret123');
     });
 
@@ -33,7 +33,10 @@ describe('🔒 Database Sanitizer Utility', () => {
     it('✅ should sanitize API key fields', () => {
       const query = 'INSERT INTO config (api_key) VALUES (\'key123\')';
       const result = sanitizeQueryForLogging(query);
-      expect(result).toContain('api_key=***');
+      // After string literal sanitization, the value becomes '***'
+      expect(result).toContain('(api_key)');
+      expect(result).toContain('\'***\'');
+      expect(result).not.toContain('key123');
     });
 
     it('✅ should truncate long queries', () => {
