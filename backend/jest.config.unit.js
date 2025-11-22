@@ -11,7 +11,8 @@ export default {
     '**/test/validateEnv.test.js',
     '**/test/errorNotification.test.js',
     '**/test/csrf.test.js',
-    '**/test/init-default-admin.test.js'
+    '**/test/init-default-admin.test.js',
+    '**/test/dbSanitizer.test.js'
   ],
   
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],

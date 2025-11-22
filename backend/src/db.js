@@ -2,6 +2,12 @@ import pkg from 'pg';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { 
+  sanitizeDbError, 
+  createQueryLogMetadata,
+  sanitizeQueryForLogging, // eslint-disable-line no-unused-vars -- Re-exported for other modules
+  sanitizeQueryObject // eslint-disable-line no-unused-vars -- Re-exported for other modules
+} from './utils/dbSanitizer.js';
 
 // Load environment variables
 let currentFilePath;
@@ -104,14 +110,16 @@ const query = async (text, params) => {
     const duration = Date.now() - start;
     
     // Only log in non-test environments or for slow queries
-    // Note: We don't log the query text to avoid logging sensitive user data
+    // Note: We use sanitized metadata to avoid logging sensitive user data
     if (process.env.NODE_ENV !== 'test' || duration > 100) {
-      console.log('Executed query', { duration, rows: res.rowCount });
+      const logMetadata = createQueryLogMetadata(text, duration, res.rowCount, false);
+      console.log('Executed query', logMetadata);
     }
     return res;
   } catch (err) {
-    // Log error without exposing full query text to avoid logging sensitive data
-    console.error('Error executing query', { error: err.message, code: err.code });
+    // Log sanitized error information to avoid exposing sensitive data
+    const sanitizedError = sanitizeDbError(err);
+    console.error('Error executing query', sanitizedError);
     throw err;
   } finally {
     client.release();
@@ -126,8 +134,10 @@ export async function dbHealthCheck() {
     client.release();
     return true;
   } catch (err) {
-    console.error('Database health check failed:', err);
-    throw new Error(`Database connection failed: ${err.message}`);
+    // Use sanitized error to avoid exposing sensitive connection details
+    const sanitizedError = sanitizeDbError(err);
+    console.error('Database health check failed:', sanitizedError);
+    throw new Error(`Database connection failed: ${sanitizedError.message}`);
   }
 }
 
@@ -141,6 +151,9 @@ export async function closePool() {
     throw err;
   }
 }
+
+// Re-export sanitizer utilities for use in other modules
+export { sanitizeDbError, sanitizeQueryForLogging, sanitizeQueryObject } from './utils/dbSanitizer.js';
 
 export default {
   query,
