@@ -37,9 +37,13 @@ const query = async (text, params) => {
     // Validate that query uses parameterized format for security
     // This helps prevent SQL injection by ensuring queries use placeholders
     if (params && params.length > 0 && !isParameterizedQuery(text)) {
+      const sanitizedText = sanitizeQueryForLogging(text);
+      console.error('Invalid query format - must use parameterized placeholders:', sanitizedText);
       throw new Error('Query must use parameterized format ($1, $2, etc.) when parameters are provided');
     }
     
+    // Execute query using pg library's built-in parameterization which safely escapes values
+    // The pg library ensures params are properly escaped and prevents SQL injection
     const res = await client.query(text, params);
     const duration = Date.now() - start;
 
@@ -66,6 +70,7 @@ const query = async (text, params) => {
 export async function dbHealthCheck() {
   const client = await pool.connect();
   try {
+    // Safe: hardcoded query with no user input
     await client.query('SELECT 1');
     client.release();
     return true;
