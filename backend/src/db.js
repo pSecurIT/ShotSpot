@@ -51,7 +51,7 @@ const query = async (text, params) => {
       const sanitizedText = sanitizeQueryForLogging(text);
       // Only log param count, not actual param values to prevent sensitive data exposure
       const paramCount = Array.isArray(params) ? params.length : 0;
-      const logMetadata = createQueryLogMetadata(sanitizedTextForLogging, duration, res.rowCount, false);
+      const logMetadata = createQueryLogMetadata(sanitizedText, duration, res.rowCount, false);
       console.log('Executed query', { ...logMetadata, paramCount });
     }
     return res;
