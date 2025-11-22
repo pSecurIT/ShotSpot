@@ -3,8 +3,7 @@ import dotenv from 'dotenv';
 import {
   sanitizeDbError,
   createQueryLogMetadata,
-  sanitizeQueryForLogging,
-  sanitizeQueryObject
+  sanitizeQueryForLogging
 } from './utils/dbSanitizer.js';
 
 // Load environment variables
@@ -41,9 +40,10 @@ const query = async (text, params) => {
     // Note: We use sanitized metadata to avoid logging sensitive user data
     if (process.env.NODE_ENV !== 'test' || duration > 100) {
       const sanitizedTextForLogging = sanitizeQueryForLogging(text);
-      const sanitizedParamsForLogging = sanitizeQueryObject(params);
+      // Only log param count, not actual param values to prevent sensitive data exposure
+      const paramCount = Array.isArray(params) ? params.length : 0;
       const logMetadata = createQueryLogMetadata(sanitizedTextForLogging, duration, res.rowCount, false);
-      console.log('Executed query', { ...logMetadata, params: sanitizedParamsForLogging });
+      console.log('Executed query', { ...logMetadata, paramCount });
     }
     return res;
   } catch (err) {
@@ -80,7 +80,7 @@ export async function closePool() {
 }
 
 // Re-export sanitizer utilities for use in other modules
-export { sanitizeDbError, sanitizeQueryForLogging, sanitizeQueryObject } from './utils/dbSanitizer.js';
+export { sanitizeDbError, sanitizeQueryForLogging } from './utils/dbSanitizer.js';
 
 export default {
   query,
