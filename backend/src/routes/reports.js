@@ -552,13 +552,13 @@ router.post('/games/:gameId/coach-analysis', [
     const timeoutStats = await db.query(`
       SELECT 
         t.name as team_name,
-        COUNT(to.id) as timeouts_used,
-        to.period
-      FROM timeouts to
-      LEFT JOIN teams t ON to.team_id = t.id
-      WHERE to.game_id = $1 AND to.team_id IS NOT NULL
-      GROUP BY t.name, to.period
-      ORDER BY to.period
+        COUNT(timeout_alias.id) as timeouts_used,
+        timeout_alias.period
+      FROM timeouts timeout_alias
+      LEFT JOIN teams t ON timeout_alias.team_id = t.id
+      WHERE timeout_alias.game_id = $1 AND timeout_alias.team_id IS NOT NULL
+      GROUP BY t.name, timeout_alias.period
+      ORDER BY timeout_alias.period
     `, [gameId]);
 
     // Get substitution patterns
