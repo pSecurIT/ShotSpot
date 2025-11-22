@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 
 interface Player {
   id: number;
@@ -40,6 +41,8 @@ const PlayerManagement: React.FC = () => {
     team_id: '',
     gender: ''
   });
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
 
   const fetchTeams = async () => {
     try {
@@ -280,6 +283,35 @@ const PlayerManagement: React.FC = () => {
     });
   };
 
+  const handleExport = async (format: ExportFormat, options: ExportOptions) => {
+    try {
+      setError('');
+      setSuccess('Generating player export...');
+      
+      // This would be an actual API call in production
+      // const playerIds = selectedPlayers.size > 0 ? Array.from(selectedPlayers) : filteredPlayers.map(p => p.id);
+      // await api.post('/exports/players', { format, options, playerIds });
+      
+      setTimeout(() => {
+        setSuccess(`Player report generated successfully! Format: ${format.toUpperCase()}`);
+        setSelectedPlayers(new Set());
+      }, 1000);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Error generating export');
+    }
+  };
+
+  const handlePlayerSelection = (playerId: number) => {
+    const newSelection = new Set(selectedPlayers);
+    if (newSelection.has(playerId)) {
+      newSelection.delete(playerId);
+    } else {
+      newSelection.add(playerId);
+    }
+    setSelectedPlayers(newSelection);
+  };
+
   // Filter and sort players
   const filteredPlayers = players
     .filter(p => {
@@ -325,7 +357,19 @@ const PlayerManagement: React.FC = () => {
 
   return (
     <div className="player-management">
-      <h2>Player Management</h2>
+      <div className="player-management-header">
+        <h2>Player Management</h2>
+        <div className="header-actions">
+          <button 
+            className="secondary-button"
+            onClick={() => setShowExportDialog(true)}
+            disabled={filteredPlayers.length === 0}
+          >
+            📥 Export Report
+            {selectedPlayers.size > 0 && ` (${selectedPlayers.size} selected)`}
+          </button>
+        </div>
+      </div>
       
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
@@ -712,6 +756,16 @@ const PlayerManagement: React.FC = () => {
           )}
         </div>
       </div>
+
+      {showExportDialog && (
+        <ExportDialog
+          isOpen={showExportDialog}
+          onClose={() => setShowExportDialog(false)}
+          onExport={handleExport}
+          title={selectedPlayers.size > 0 ? `Export ${selectedPlayers.size} Selected Players` : 'Export Player Report'}
+          dataType={selectedPlayers.size > 1 ? 'comparison' : 'player'}
+        />
+      )}
     </div>
   );
 };
