@@ -8,7 +8,7 @@ query-filters:
   - exclude:
       id: js/sql-injection
       files:
-        - backend/src/db.js
+        - "**/backend/src/db.js"
 
 paths:
   - frontend/src
