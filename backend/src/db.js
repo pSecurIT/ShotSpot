@@ -3,7 +3,8 @@ import dotenv from 'dotenv';
 import {
   sanitizeDbError,
   createQueryLogMetadata,
-  sanitizeQueryForLogging
+  sanitizeQueryForLogging,
+  isParameterizedQuery
 } from './utils/dbSanitizer.js';
 
 // Load environment variables
@@ -33,6 +34,12 @@ const query = async (text, params) => {
   const client = await pool.connect();
   const start = Date.now();
   try {
+    // Validate that query uses parameterized format for security
+    // This helps prevent SQL injection by ensuring queries use placeholders
+    if (params && params.length > 0 && !isParameterizedQuery(text)) {
+      throw new Error('Query must use parameterized format ($1, $2, etc.) when parameters are provided');
+    }
+    
     const res = await client.query(text, params);
     const duration = Date.now() - start;
 
