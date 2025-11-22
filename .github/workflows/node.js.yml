@@ -118,6 +118,15 @@ jobs:
       working-directory: frontend
       run: npm ci
 
+    - name: Ensure Rollup native binary (CI)
+      working-directory: frontend
+      run: |
+        # Only needed for Linux runners (ubuntu-latest)
+        if [ "$(uname -s)" = "Linux" ]; then
+          echo "Installing Rollup native package for Linux..."
+          npm i --no-save @rollup/rollup-linux-x64-gnu
+        fi
+
     - name: Run Frontend Linting
       working-directory: frontend
       run: npm run lint
