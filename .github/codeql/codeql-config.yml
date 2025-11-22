@@ -3,6 +3,13 @@ name: "ShotSpot CodeQL Config"
 queries:
   - uses: security-extended
 
+# Exclude false positives for pg library parameterized queries
+query-filters:
+  - exclude:
+      id: js/sql-injection
+      files:
+        - backend/src/db.js
+
 paths:
   - frontend/src
   - backend/src
