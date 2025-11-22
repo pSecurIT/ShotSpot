@@ -89,12 +89,12 @@ describe('📊 Reports Routes', () => {
 
     // Add game roster
     await db.query(
-      'INSERT INTO game_rosters (game_id, player_id, is_starting) VALUES ($1, $2, true)',
-      [testGame.id, player1.id]
+      'INSERT INTO game_rosters (game_id, team_id, player_id, is_starting) VALUES ($1, $2, $3, true)',
+      [testGame.id, team1.id, player1.id]
     );
     await db.query(
-      'INSERT INTO game_rosters (game_id, player_id, is_starting) VALUES ($1, $2, true)',
-      [testGame.id, player3.id]
+      'INSERT INTO game_rosters (game_id, team_id, player_id, is_starting) VALUES ($1, $2, $3, true)',
+      [testGame.id, team2.id, player3.id]
     );
 
     // Create diverse shot data
