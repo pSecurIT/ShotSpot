@@ -334,7 +334,9 @@ router.get('/season/csv', [
       `;
 
       if (player_id) {
-        playerStatsQuery += ` AND p.id = ${player_id}`;
+        // Use a parameter placeholder instead of direct interpolation
+        playerStatsQuery += ` AND p.id = $${gameParams.length + 1}`;
+        gameParams.push(player_id);
       }
 
       playerStatsQuery += ' ORDER BY goals DESC, total_shots DESC';
