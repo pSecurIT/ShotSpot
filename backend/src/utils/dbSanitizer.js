@@ -12,7 +12,7 @@
  * @param {string} suffix - Suffix to add when truncated (default: '...')
  * @returns {string} - Truncated string
  */
-function truncateString(input, maxLength = 50, suffix = '...') {
+export function truncateString(input, maxLength = 50, suffix = '...') {
   // Handle null/undefined - return empty string for backward compatibility
   if (input === null || input === undefined) {
     return '';

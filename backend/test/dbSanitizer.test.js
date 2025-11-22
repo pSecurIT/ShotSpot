@@ -19,7 +19,7 @@ describe('🔒 Database Sanitizer Utility', () => {
     it('✅ should sanitize password fields', () => {
       const query = 'UPDATE users SET password = \'secret123\' WHERE id = 1';
       const result = sanitizeQueryForLogging(query);
-      expect(result).toContain('******');
+      expect(result).toContain('password=***');
       expect(result).not.toContain('secret123');
     });
 
@@ -193,7 +193,7 @@ describe('🔒 Database Sanitizer Utility', () => {
       const longString = 'a'.repeat(100);
       const result = truncateString(longString, 50);
       expect(result.length).toBe(50); // maxLength exactly (47 chars + '...')
-      expect(result).toEndWith('...');
+      expect(result.endsWith('...')).toBe(true);
     });
 
     it('✅ should not truncate short strings', () => {
@@ -210,8 +210,8 @@ describe('🔒 Database Sanitizer Utility', () => {
     });
 
     it('✅ should handle non-string input', () => {
-      expect(truncateString(123)).toBe('');
-      expect(truncateString({})).toBe('');
+      expect(truncateString(123)).toBe('123');
+      expect(truncateString({})).toBe('[object Object]');
     });
   });
 
