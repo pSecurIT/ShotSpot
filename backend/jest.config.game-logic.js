@@ -17,7 +17,11 @@ export default {
     '**/test/substitutions.test.js',
     '**/test/match-events.test.js',
     '**/test/game-rosters.test.js',
-    '**/test/timer.test.js'
+    '**/test/timer.test.js',
+    '**/test/timeouts.test.js',
+    '**/test/achievements.test.js',
+    '**/test/analytics.test.js',
+    '**/test/export.test.js'
   ],
   
   // Use different database name for isolation
@@ -41,6 +45,10 @@ export default {
     'src/routes/match-events.js',
     'src/routes/game-rosters.js',
     'src/routes/timer.js',
+    'src/routes/timeouts.js',
+    'src/routes/achievements.js',
+    'src/routes/analytics.js',
+    'src/routes/export.js',
     '!src/index.js'
   ],
   coverageDirectory: 'coverage/game-logic',
