@@ -104,12 +104,14 @@ const query = async (text, params) => {
     const duration = Date.now() - start;
     
     // Only log in non-test environments or for slow queries
+    // Note: We don't log the query text to avoid logging sensitive user data
     if (process.env.NODE_ENV !== 'test' || duration > 100) {
-      console.log('Executed query', { text, duration, rows: res.rowCount });
+      console.log('Executed query', { duration, rows: res.rowCount });
     }
     return res;
   } catch (err) {
-    console.error('Error executing query', { text, error: err.message });
+    // Log error without exposing full query text to avoid logging sensitive data
+    console.error('Error executing query', { error: err.message, code: err.code });
     throw err;
   } finally {
     client.release();
