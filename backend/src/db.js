@@ -46,9 +46,8 @@ const query = async (text, params) => {
     
     // Execute query using pg library's built-in parameterization which safely escapes values
     // The pg library ensures params are properly escaped and prevents SQL injection
-    // lgtm[js/sql-injection]
-    // codeql[js/sql-injection] - Safe: using pg library's parameterized queries with validation
-    const res = await client.query(text, params);
+    // lgtm[js/sql-injection] codeql[js/sql-injection]
+    const res = await client.query(text, params); // SAFE: parameterized query with pg library
     const duration = Date.now() - start;
 
     // Only log in non-test environments or for slow queries
