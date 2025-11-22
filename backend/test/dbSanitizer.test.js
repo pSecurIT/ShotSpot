@@ -192,7 +192,7 @@ describe('🔒 Database Sanitizer Utility', () => {
     it('✅ should truncate long strings', () => {
       const longString = 'a'.repeat(100);
       const result = truncateString(longString, 50);
-      expect(result.length).toBe(53); // 50 + '...'
+      expect(result.length).toBe(50); // maxLength exactly (47 chars + '...')
       expect(result).toEndWith('...');
     });
 

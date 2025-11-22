@@ -6,19 +6,40 @@
  */
 
 /**
- * Truncates a string to a maximum length, adding ellipsis if truncated
- * @param {string} str - The string to truncate
+ * Truncates a string to a maximum length, optionally adding a suffix
+ * @param {string} input - The string to truncate
  * @param {number} maxLength - Maximum length (default: 50)
+ * @param {string} suffix - Suffix to add when truncated (default: '...')
  * @returns {string} - Truncated string
  */
-function truncateString(str, maxLength = 50) {
-  if (!str || typeof str !== 'string') {
+function truncateString(input, maxLength = 50, suffix = '...') {
+  // Handle null/undefined - return empty string for backward compatibility
+  if (input === null || input === undefined) {
     return '';
   }
+  
+  // Convert non-strings to string
+  const str = typeof input === 'string' ? input : String(input);
+  
+  // If suffix is longer than maxLength, truncate it
+  if (suffix.length > maxLength) {
+    suffix = suffix.slice(0, maxLength);
+  }
+  
+  // If string fits within maxLength, return as-is
   if (str.length <= maxLength) {
     return str;
   }
-  return str.substring(0, maxLength) + '...';
+  
+  // Calculate space available for original string content
+  const allowed = maxLength - suffix.length;
+  if (allowed <= 0) {
+    // No room for original string, return truncated suffix
+    return suffix.slice(0, maxLength);
+  }
+  
+  // Return truncated string with suffix
+  return str.slice(0, allowed) + suffix;
 }
 
 /**
