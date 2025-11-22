@@ -87,6 +87,21 @@ ShotSpot now includes comprehensive real-time match reporting capabilities:
 
 - Heatmaps & shot charts (partially implemented)
 - Player performance over time (available via reports API)
+
+## 📊 Match Reports
+
+Generate comprehensive PDF reports for post-match analysis:
+
+- **Post-Match Summary**: Game statistics, period-by-period scoring, team comparison, top performers, and shot chart visualization
+- **Player Performance**: Individual stats, zone-based shooting efficiency, substitutions, and season comparison
+- **Coach's Analysis**: Tactical insights, possession stats, substitution patterns, momentum analysis, and custom notes
+
+See [REPORTS_API.md](REPORTS_API.md) for detailed API documentation.
+
+## Next up (features to come)
+
+- ✅ Heatmaps & shot charts (implemented in reports)
+- ✅ Player performance over time (implemented in player report)
 - Sync across multiple devices
 - Video tagging integration
 - Integration with competition platforms or league databases
