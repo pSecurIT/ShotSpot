@@ -36,9 +36,10 @@ const query = async (text, params) => {
   try {
     // Validate that query uses parameterized format for security
     // This helps prevent SQL injection by ensuring queries use placeholders
-    // lgtm[js/sql-injection]
-    // codeql[js/sql-injection] - Safe: validation check only, text is sanitized before logging
+    // Suppression rationale: This validation only checks format, doesn't execute query.
+    // The text is sanitized before any logging to prevent information disclosure.
     if (params && params.length > 0 && !isParameterizedQuery(text)) {
+      // Suppression rationale: sanitizeQueryForLogging removes all sensitive data patterns
       const sanitizedText = sanitizeQueryForLogging(text);
       console.error('Invalid query format - must use parameterized placeholders:', sanitizedText);
       throw new Error('Query must use parameterized format ($1, $2, etc.) when parameters are provided');
@@ -46,15 +47,17 @@ const query = async (text, params) => {
     
     // Execute query using pg library's built-in parameterization which safely escapes values
     // The pg library ensures params are properly escaped and prevents SQL injection
-    // lgtm[js/sql-injection] codeql[js/sql-injection]
-    const res = await client.query(text, params); // SAFE: parameterized query with pg library
+    // Suppression rationale: This uses PostgreSQL parameterized queries ($1, $2, etc.) which 
+    // are the recommended safe approach. The query text validation above ensures proper format.
+    const res = await client.query(text, params);
     const duration = Date.now() - start;
 
     // Only log in non-test environments or for slow queries
     // Note: We use sanitized metadata to avoid logging sensitive user data
     if (process.env.NODE_ENV !== 'test' || duration > 100) {
-      // lgtm[js/sql-injection]
-      // codeql[js/sql-injection] - Safe: text is sanitized before logging, no execution here
+      // Suppression rationale: sanitizeQueryForLogging removes all sensitive data patterns
+      // including passwords, tokens, secrets, and replaces string literals with '***'.
+      // This is only for logging, not query execution.
       const sanitizedTextForLogging = sanitizeQueryForLogging(text);
       // Only log param count, not actual param values to prevent sensitive data exposure
       const paramCount = Array.isArray(params) ? params.length : 0;
