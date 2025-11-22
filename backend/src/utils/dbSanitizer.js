@@ -58,18 +58,18 @@ export function sanitizeQueryForLogging(queryText, maxLength = 100) {
   let sanitized = queryText
     // First, sanitize sensitive fields (before removing string literals)
     // This catches patterns like: password='value', token='value', etc.
-    .replace(/password\s*=\s*'[^']*'/gi, '******')
-    .replace(/password\s*=\s*"[^"]*"/gi, '******')
-    .replace(/password\s*=\s*[^\s,)'"]+/gi, '******')
-    .replace(/token\s*=\s*'[^']*'/gi, 'token=***')
-    .replace(/token\s*=\s*"[^"]*"/gi, 'token=***')
-    .replace(/token\s*=\s*[^\s,)'"]+/gi, 'token=***')
-    .replace(/secret\s*=\s*'[^']*'/gi, 'secret=***')
-    .replace(/secret\s*=\s*"[^"]*"/gi, 'secret=***')
-    .replace(/secret\s*=\s*[^\s,)'"]+/gi, 'secret=***')
-    .replace(/api[_-]?key\s*=\s*'[^']*'/gi, 'api_key=***')
-    .replace(/api[_-]?key\s*=\s*"[^"]*"/gi, 'api_key=***')
-    .replace(/api[_-]?key\s*=\s*[^\s,)'"]+/gi, 'api_key=***')
+    // Handle password, pass, pwd - key=value and key:value and JSON-style
+    .replace(/\b(password|pass|pwd)\s*[:=]\s*'[^']*'/gi, '$1=***')
+    .replace(/\b(password|pass|pwd)\s*[:=]\s*"[^"]*"/gi, '$1=***')
+    .replace(/\b(password|pass|pwd)\s*[:=]\s*[^\s,)\]\}]+/gi, '$1=***')
+    .replace(/"?(password|pass|pwd)"?\s*:\s*"[^"]*"/gi, '"$1":***')
+    .replace(/'(password|pass|pwd)'\s*:\s*'[^']*'/gi, "'$1':***")
+    // Handle token, auth_token, api_key, secret, access_token
+    .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*'[^']*'/gi, '$1=***')
+    .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*"[^"]*"/gi, '$1=***')
+    .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*[^\s,)\]\}]+/gi, '$1=***')
+    .replace(/"?(token|auth_token|api[_-]?key|secret|access_token)"?\s*:\s*"[^"]*"/gi, '"$1":***')
+    .replace(/'(token|auth_token|api[_-]?key|secret|access_token)'\s*:\s*'[^']*'/gi, "'$1':***")
     // Then remove remaining string literals that might contain other sensitive data
     .replace(/'[^']*'/g, '\'***\'')
     .replace(/"[^"]*"/g, '"***"')
@@ -100,8 +100,22 @@ export function sanitizeDbError(error) {
   // Remove sensitive information from error messages
   if (sanitized.message) {
     sanitized.message = sanitized.message
+      // Handle password, pass, pwd - key=value and key:value and JSON-style
+      .replace(/\b(password|pass|pwd)\s*[:=]\s*'[^']*'/gi, '$1=***')
+      .replace(/\b(password|pass|pwd)\s*[:=]\s*"[^"]*"/gi, '$1=***')
+      .replace(/\b(password|pass|pwd)\s*[:=]\s*[^\s,)\]\}]+/gi, '$1=***')
+      .replace(/"?(password|pass|pwd)"?\s*:\s*"[^"]*"/gi, '"$1":***')
+      .replace(/'(password|pass|pwd)'\s*:\s*'[^']*'/gi, "'$1':***")
+      // Handle token, auth_token, api_key, secret, access_token
+      .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*'[^']*'/gi, '$1=***')
+      .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*"[^"]*"/gi, '$1=***')
+      .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*[^\s,)\]\}]+/gi, '$1=***')
+      .replace(/"?(token|auth_token|api[_-]?key|secret|access_token)"?\s*:\s*"[^"]*"/gi, '"$1":***')
+      .replace(/'(token|auth_token|api[_-]?key|secret|access_token)'\s*:\s*'[^']*'/gi, "'$1':***")
+      // Then remove remaining string literals
       .replace(/'[^']*'/g, '\'***\'')
       .replace(/"[^"]*"/g, '"***"')
+      // Handle remaining unquoted sensitive words
       .replace(/password[^\s]*/gi, 'password***')
       .replace(/token[^\s]*/gi, 'token***');
   }
