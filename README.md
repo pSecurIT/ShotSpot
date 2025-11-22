@@ -70,10 +70,38 @@
 - **✅ Offline support**: Full functionality without internet connection (see [OFFLINE.md](OFFLINE.md))
 - Auto-saving and data persistence
 
+## 📊 Real-Time Match Reports (NEW!)
+
+ShotSpot now includes comprehensive real-time match reporting capabilities:
+
+- **Live Match Dashboard**: Real-time game state snapshots with scores, shot summaries, and top scorers
+- **Period Reports**: Detailed statistics for each game period
+- **Momentum Tracker**: Real-time momentum calculations based on recent performance
+- **Player Comparison**: Side-by-side player performance analysis
+- **Substitution Suggestions**: Data-driven recommendations based on player performance
+- **Downloadable Reports**: Export complete game data in JSON format
+
+📖 **Full API Documentation**: See [REPORTS_API.md](REPORTS_API.md) for complete endpoint details, examples, and integration guides.
+
 ## Next up (features to come)
 
-- Heatmaps & shot charts
-- Player performance over time
+- Heatmaps & shot charts (partially implemented)
+- Player performance over time (available via reports API)
+
+## 📊 Match Reports
+
+Generate comprehensive PDF reports for post-match analysis:
+
+- **Post-Match Summary**: Game statistics, period-by-period scoring, team comparison, top performers, and shot chart visualization
+- **Player Performance**: Individual stats, zone-based shooting efficiency, substitutions, and season comparison
+- **Coach's Analysis**: Tactical insights, possession stats, substitution patterns, momentum analysis, and custom notes
+
+See [REPORTS_API.md](REPORTS_API.md) for detailed API documentation.
+
+## Next up (features to come)
+
+- ✅ Heatmaps & shot charts (implemented in reports)
+- ✅ Player performance over time (implemented in player report)
 - Sync across multiple devices
 - Video tagging integration
 - Integration with competition platforms or league databases
@@ -214,9 +242,10 @@ npm run lint
 | **[OFFLINE.md](OFFLINE.md)** | Offline functionality guide | 15 min |
 | **[SECURITY.md](SECURITY.md)** | Security best practices | 10 min |
 | **[SECRETS.md](SECRETS.md)** | Secrets management | 5 min |
+| **[REPORTS_API.md](REPORTS_API.md)** | Real-Time Match Reports API | 15 min |
 | **[frontend/README.md](frontend/README.md)** | Frontend development | 10 min |
 
-**Total Documentation**: 105 minutes of comprehensive guides
+**Total Documentation**: 120 minutes of comprehensive guides
 
 For detailed installation instructions (including troubleshooting), see **[INSTALLATION.md](INSTALLATION.md)**.
 
