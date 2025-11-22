@@ -204,38 +204,38 @@ router.get('/match/:gameId/csv', [
     // Shots Section
     csvContent += '=== SHOTS ===\n';
     const shotsHeaders = ['ID', 'Period', 'Time Remaining (seconds)', 'X Coord', 'Y Coord', 
-                          'Result', 'Shot Type', 'Distance', 'Player Name', 'Jersey Number', 
-                          'Team Name', 'Timestamp'];
+      'Result', 'Shot Type', 'Distance', 'Player Name', 'Jersey Number', 
+      'Team Name', 'Timestamp'];
     csvContent += arrayToCSV(shotsResult.rows, shotsHeaders);
     csvContent += '\n\n';
 
     // Substitutions Section
     csvContent += '=== SUBSTITUTIONS ===\n';
     const subsHeaders = ['ID', 'Period', 'Time Remaining (seconds)', 'Player In', 
-                         'Player In Jersey', 'Player Out', 'Player Out Jersey', 
-                         'Team Name', 'Reason', 'Timestamp'];
+      'Player In Jersey', 'Player Out', 'Player Out Jersey', 
+      'Team Name', 'Reason', 'Timestamp'];
     csvContent += arrayToCSV(substitutionsResult.rows, subsHeaders);
     csvContent += '\n\n';
 
     // Timeouts Section
     csvContent += '=== TIMEOUTS ===\n';
     const timeoutsHeaders = ['ID', 'Period', 'Time Remaining (seconds)', 'Team Name', 
-                             'Timeout Type', 'Duration (seconds)', 'Reason', 
-                             'Called By', 'Timestamp'];
+      'Timeout Type', 'Duration (seconds)', 'Reason', 
+      'Called By', 'Timestamp'];
     csvContent += arrayToCSV(timeoutsResult.rows, timeoutsHeaders);
     csvContent += '\n\n';
 
     // Fouls Section
     csvContent += '=== FOULS ===\n';
     const foulsHeaders = ['ID', 'Event Type', 'Period', 'Time Remaining (seconds)', 
-                          'Player Name', 'Jersey Number', 'Team Name', 'Details', 'Timestamp'];
+      'Player Name', 'Jersey Number', 'Team Name', 'Details', 'Timestamp'];
     csvContent += arrayToCSV(foulsResult.rows, foulsHeaders);
     csvContent += '\n\n';
 
     // Player Participation Section
     csvContent += '=== PLAYER PARTICIPATION ===\n';
     const participationHeaders = ['Player Name', 'Jersey Number', 'Team Name', 'Is Captain', 
-                                  'Is Starting', 'Starting Position', 'Total Shots', 'Goals'];
+      'Is Starting', 'Starting Position', 'Total Shots', 'Goals'];
     csvContent += arrayToCSV(participationResult.rows, participationHeaders);
 
     // Set response headers for CSV download
@@ -269,7 +269,7 @@ router.get('/season/csv', [
 
   const { date_from, date_to, team_id, player_id, include } = req.query;
   const includeOptions = include ? include.split(',').map(s => s.trim()) : 
-                         ['player_stats', 'team_stats', 'head_to_head', 'shot_zones', 'events'];
+    ['player_stats', 'team_stats', 'head_to_head', 'shot_zones', 'events'];
 
   try {
     let csvContent = '';
@@ -343,14 +343,37 @@ router.get('/season/csv', [
 
       csvContent += '=== PLAYER STATISTICS ===\n';
       const playerStatsHeaders = ['Player ID', 'Player Name', 'Jersey Number', 'Team Name', 
-                                  'Games Played', 'Total Shots', 'Goals', 'Misses', 'Blocked',
-                                  'Field Goal Percentage', 'Avg Shot Distance'];
+        'Games Played', 'Total Shots', 'Goals', 'Misses', 'Blocked',
+        'Field Goal Percentage', 'Avg Shot Distance'];
       csvContent += arrayToCSV(playerStatsResult.rows, playerStatsHeaders);
       csvContent += '\n\n';
     }
 
     // Team Statistics
     if (includeOptions.includes('team_stats')) {
+      // Build subquery filter for shots with proper parameter indexing
+      let shotFilterClause = '';
+      const shotFilterParams = [];
+      let shotParamOffset = gameParams.length;
+      
+      if (date_from) {
+        shotFilterClause += ` AND g2.date >= $${shotParamOffset + shotFilterParams.length + 1}`;
+        shotFilterParams.push(date_from);
+      }
+      if (date_to) {
+        shotFilterClause += ` AND g2.date <= $${shotParamOffset + shotFilterParams.length + 1}`;
+        shotFilterParams.push(date_to);
+      }
+      
+      // For the second subquery, parameters need different indices
+      let shotFilterClause2 = '';
+      if (date_from) {
+        shotFilterClause2 += ` AND g2.date >= $${shotParamOffset + shotFilterParams.length + 1}`;
+      }
+      if (date_to) {
+        shotFilterClause2 += ` AND g2.date <= $${shotParamOffset + shotFilterParams.length + 2}`;
+      }
+      
       const teamStatsQuery = `
         SELECT 
           t.id as team_id,
@@ -372,13 +395,13 @@ router.get('/season/csv', [
           COALESCE(
             (SELECT COUNT(*) FROM shots s 
              JOIN games g2 ON s.game_id = g2.id 
-             WHERE s.team_id = t.id ${gameFilter.replace('WHERE g.', 'AND g2.')}),
+             WHERE s.team_id = t.id AND g2.status = 'completed'${shotFilterClause}),
             0
           ) as total_shots,
           COALESCE(
             (SELECT COUNT(*) FROM shots s 
              JOIN games g2 ON s.game_id = g2.id 
-             WHERE s.team_id = t.id AND s.result = 'goal' ${gameFilter.replace('WHERE g.', 'AND g2.')}),
+             WHERE s.team_id = t.id AND s.result = 'goal' AND g2.status = 'completed'${shotFilterClause2}),
             0
           ) as shot_goals
         FROM teams t
@@ -389,12 +412,12 @@ router.get('/season/csv', [
         ORDER BY wins DESC, total_goals_for DESC
       `;
 
-      const teamStatsResult = await db.query(teamStatsQuery, gameParams);
+      const teamStatsResult = await db.query(teamStatsQuery, [...gameParams, ...shotFilterParams, ...shotFilterParams]);
 
       csvContent += '=== TEAM STATISTICS ===\n';
       const teamStatsHeaders = ['Team ID', 'Team Name', 'Games Played', 'Total Goals For', 
-                                'Total Goals Against', 'Wins', 'Losses', 'Draws',
-                                'Total Shots', 'Shot Goals'];
+        'Total Goals Against', 'Wins', 'Losses', 'Draws',
+        'Total Shots', 'Shot Goals'];
       csvContent += arrayToCSV(teamStatsResult.rows, teamStatsHeaders);
       csvContent += '\n\n';
     }
@@ -424,7 +447,7 @@ router.get('/season/csv', [
 
       csvContent += '=== HEAD-TO-HEAD RECORDS ===\n';
       const headToHeadHeaders = ['Home Team', 'Away Team', 'Games Played', 'Home Wins', 
-                                 'Away Wins', 'Draws', 'Total Home Goals', 'Total Away Goals'];
+        'Away Wins', 'Draws', 'Total Home Goals', 'Total Away Goals'];
       csvContent += arrayToCSV(headToHeadResult.rows, headToHeadHeaders);
       csvContent += '\n\n';
     }
@@ -557,8 +580,8 @@ router.get('/season/csv', [
 
       csvContent += '=== TIMELINE OF EVENTS ===\n';
       const eventsHeaders = ['Event Type', 'Game Date', 'Matchup', 'Period', 
-                             'Time Remaining (seconds)', 'Player Name', 'Team Name', 
-                             'Event Details', 'Timestamp'];
+        'Time Remaining (seconds)', 'Player Name', 'Team Name', 
+        'Event Details', 'Timestamp'];
       csvContent += arrayToCSV(eventsResult.rows, eventsHeaders);
     }
 
@@ -593,7 +616,7 @@ router.get('/games/csv', [
 
   const { game_ids, date_from, date_to, team_id, columns } = req.query;
   const includeColumns = columns ? columns.split(',').map(s => s.trim()) : 
-                         ['shots', 'substitutions', 'timeouts', 'fouls', 'participation'];
+    ['shots', 'substitutions', 'timeouts', 'fouls', 'participation'];
 
   try {
     // Build game filter
@@ -701,8 +724,8 @@ router.get('/games/csv', [
 
       csvContent += '=== SHOTS (ALL GAMES) ===\n';
       const shotsHeaders = ['Game ID', 'Game Date', 'Matchup', 'Period', 'Time Remaining (seconds)',
-                            'X Coord', 'Y Coord', 'Result', 'Shot Type', 'Distance', 
-                            'Player Name', 'Jersey Number', 'Team Name'];
+        'X Coord', 'Y Coord', 'Result', 'Shot Type', 'Distance', 
+        'Player Name', 'Jersey Number', 'Team Name'];
       csvContent += arrayToCSV(shotsResult.rows, shotsHeaders);
       csvContent += '\n\n';
     }
@@ -736,8 +759,8 @@ router.get('/games/csv', [
 
       csvContent += '=== SUBSTITUTIONS (ALL GAMES) ===\n';
       const subsHeaders = ['Game ID', 'Game Date', 'Matchup', 'Period', 'Time Remaining (seconds)',
-                           'Player In', 'Player In Jersey', 'Player Out', 'Player Out Jersey', 
-                           'Team Name', 'Reason'];
+        'Player In', 'Player In Jersey', 'Player Out', 'Player Out Jersey', 
+        'Team Name', 'Reason'];
       csvContent += arrayToCSV(subsResult.rows, subsHeaders);
       csvContent += '\n\n';
     }
@@ -768,7 +791,7 @@ router.get('/games/csv', [
 
       csvContent += '=== TIMEOUTS (ALL GAMES) ===\n';
       const timeoutsHeaders = ['Game ID', 'Game Date', 'Matchup', 'Period', 'Time Remaining (seconds)',
-                               'Team Name', 'Timeout Type', 'Duration (seconds)', 'Reason', 'Called By'];
+        'Team Name', 'Timeout Type', 'Duration (seconds)', 'Reason', 'Called By'];
       csvContent += arrayToCSV(timeoutsResult.rows, timeoutsHeaders);
       csvContent += '\n\n';
     }
@@ -799,7 +822,7 @@ router.get('/games/csv', [
 
       csvContent += '=== FOULS (ALL GAMES) ===\n';
       const foulsHeaders = ['Game ID', 'Game Date', 'Matchup', 'Period', 'Time Remaining (seconds)',
-                            'Player Name', 'Jersey Number', 'Team Name', 'Details'];
+        'Player Name', 'Jersey Number', 'Team Name', 'Details'];
       csvContent += arrayToCSV(foulsResult.rows, foulsHeaders);
       csvContent += '\n\n';
     }
@@ -838,8 +861,8 @@ router.get('/games/csv', [
 
       csvContent += '=== PLAYER PARTICIPATION (ALL GAMES) ===\n';
       const participationHeaders = ['Game ID', 'Game Date', 'Matchup', 'Player Name', 'Jersey Number',
-                                    'Team Name', 'Is Captain', 'Is Starting', 'Starting Position', 
-                                    'Total Shots', 'Goals'];
+        'Team Name', 'Is Captain', 'Is Starting', 'Starting Position', 
+        'Total Shots', 'Goals'];
       csvContent += arrayToCSV(participationResult.rows, participationHeaders);
     }
 
