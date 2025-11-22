@@ -808,3 +808,486 @@ Planned improvements for future versions:
 - Email delivery of reports
 - Batch report generation for multiple games
 - Export to other formats (Excel, CSV, JSON)
+
+---
+
+# Season & Historical Reports API Documentation
+
+This section describes the season and historical reporting endpoints for analyzing team and player performance over time.
+
+## Overview
+
+The Season & Historical Reports API provides:
+- Season performance reports for teams
+- Player season summaries with career statistics
+- Comparative analysis (team vs league, player vs team/league)
+- Season-over-season comparisons
+- Historical trends and insights
+
+All endpoints require authentication via Bearer token in the Authorization header.
+
+## Endpoints
+
+### 1. Season Team Performance Report
+
+**GET** `/api/reports/season/team/:teamId`
+
+Returns comprehensive season performance metrics for a team including record, standings, trends, and home/away splits.
+
+**Parameters:**
+- `teamId` (path, integer, required) - The unique identifier of the team
+- `seasonId` (query, integer, optional) - Filter by specific season ID
+- `year` (query, integer, optional) - Filter by year (2000-2100)
+
+**Response:**
+```json
+{
+  "overall_record": {
+    "wins": 15,
+    "losses": 5,
+    "draws": 2,
+    "total_games": 22,
+    "win_percentage": 68.18,
+    "points_for": 330,
+    "points_against": 280,
+    "point_differential": 50
+  },
+  "home_away_performance": [
+    {
+      "venue": "home",
+      "games": 11,
+      "wins": 9,
+      "losses": 2,
+      "draws": 0,
+      "win_percentage": 81.82,
+      "avg_points_for": 15.5,
+      "avg_points_against": 12.3
+    },
+    {
+      "venue": "away",
+      "games": 11,
+      "wins": 6,
+      "losses": 3,
+      "draws": 2,
+      "win_percentage": 54.55,
+      "avg_points_for": 14.2,
+      "avg_points_against": 13.8
+    }
+  ],
+  "scoring_trends": [
+    {
+      "game_id": 1,
+      "date": "2024-01-15T18:00:00Z",
+      "points_for": 15,
+      "points_against": 12,
+      "result": "W"
+    }
+  ],
+  "shooting_trends": [
+    {
+      "game_id": 1,
+      "date": "2024-01-15T18:00:00Z",
+      "shots": 25,
+      "goals": 15,
+      "fg_percentage": 60.0
+    }
+  ],
+  "indoor_outdoor_comparison": [
+    {
+      "season_type": "indoor",
+      "games": 12,
+      "wins": 8,
+      "avg_points_for": 15.2,
+      "avg_points_against": 12.8
+    },
+    {
+      "season_type": "outdoor",
+      "games": 10,
+      "wins": 7,
+      "avg_points_for": 14.8,
+      "avg_points_against": 13.2
+    }
+  ]
+}
+```
+
+**Use Cases:**
+- Season review and analysis
+- Identifying home court advantage
+- Tracking improvement over time
+- Strategic planning for future seasons
+
+---
+
+### 2. Player Season Summary
+
+**GET** `/api/reports/season/player/:playerId`
+
+Returns detailed season statistics and career data for an individual player.
+
+**Parameters:**
+- `playerId` (path, integer, required) - The unique identifier of the player
+- `seasonId` (query, integer, optional) - Filter by specific season ID
+- `year` (query, integer, optional) - Filter by year (2000-2100)
+
+**Response:**
+```json
+{
+  "player": {
+    "id": 5,
+    "first_name": "Alice",
+    "last_name": "Johnson",
+    "jersey_number": 10,
+    "team_name": "Team A"
+  },
+  "season_summary": {
+    "games_played": 20,
+    "total_minutes": null,
+    "total_shots": 150,
+    "total_goals": 95,
+    "fg_percentage": 63.33,
+    "avg_distance": 5.8,
+    "points_per_game": 4.75
+  },
+  "shooting_zones_heatmap": [
+    {
+      "zone_x": "left",
+      "zone_y": "near",
+      "shots": 30,
+      "goals": 20,
+      "fg_percentage": 66.67
+    },
+    {
+      "zone_x": "center",
+      "zone_y": "mid",
+      "shots": 50,
+      "goals": 35,
+      "fg_percentage": 70.0
+    }
+  ],
+  "game_performance": [
+    {
+      "game_id": 1,
+      "date": "2024-01-15T18:00:00Z",
+      "shots": 8,
+      "goals": 5,
+      "fg_percentage": 62.5
+    }
+  ],
+  "best_performance": {
+    "game_id": 5,
+    "date": "2024-02-10T18:00:00Z",
+    "shots": 10,
+    "goals": 9,
+    "fg_percentage": 90.0
+  },
+  "worst_performance": {
+    "game_id": 12,
+    "date": "2024-03-15T18:00:00Z",
+    "shots": 8,
+    "goals": 2,
+    "fg_percentage": 25.0
+  },
+  "career_statistics": {
+    "games": 45,
+    "shots": 320,
+    "goals": 200,
+    "fg_percentage": 62.5
+  }
+}
+```
+
+**Use Cases:**
+- Player development tracking
+- Performance evaluation
+- Contract negotiations
+- Recruitment decisions
+- Identifying shooting strengths/weaknesses
+
+---
+
+### 3. Team Comparative Analysis
+
+**GET** `/api/reports/comparative/teams/:teamId`
+
+Compares team performance against league averages and provides season-over-season analysis.
+
+**Parameters:**
+- `teamId` (path, integer, required) - The unique identifier of the team
+- `compareSeasonId` (query, integer, optional) - Season ID to compare against
+- `compareYear` (query, integer, optional) - Year to compare against (2000-2100)
+
+**Response:**
+```json
+{
+  "team_stats": {
+    "games": 22,
+    "avg_points_for": 15.0,
+    "avg_points_against": 12.7,
+    "win_percentage": 68.18,
+    "fg_percentage": 58.5
+  },
+  "league_averages": {
+    "avg_points": 13.5,
+    "avg_win_percentage": 50.0,
+    "avg_fg_percentage": 52.0
+  },
+  "comparison_to_league": {
+    "points_diff": 1.5,
+    "win_pct_diff": 18.18,
+    "fg_pct_diff": 6.5
+  },
+  "season_over_season": {
+    "current_season": {
+      "games": 22,
+      "avg_points_for": 15.0,
+      "avg_points_against": 12.7,
+      "win_percentage": 68.18
+    },
+    "compare_season": {
+      "games": 20,
+      "avg_points_for": 13.5,
+      "avg_points_against": 14.2,
+      "win_percentage": 45.0
+    },
+    "changes": {
+      "points_for_change": 1.5,
+      "points_against_change": -1.5,
+      "win_percentage_change": 23.18
+    }
+  }
+}
+```
+
+**Use Cases:**
+- Benchmarking team performance
+- Identifying improvement areas
+- Strategic planning
+- Measuring coaching effectiveness
+
+---
+
+### 4. Player Comparative Analysis
+
+**GET** `/api/reports/comparative/players/:playerId`
+
+Compares player performance against team and league averages.
+
+**Parameters:**
+- `playerId` (path, integer, required) - The unique identifier of the player
+- `seasonId` (query, integer, optional) - Filter by specific season ID
+- `year` (query, integer, optional) - Filter by year (2000-2100)
+
+**Response:**
+```json
+{
+  "player": {
+    "id": 5,
+    "first_name": "Alice",
+    "last_name": "Johnson",
+    "jersey_number": 10,
+    "team_name": "Team A"
+  },
+  "player_stats": {
+    "games_played": 20,
+    "total_shots": 150,
+    "total_goals": 95,
+    "fg_percentage": 63.33,
+    "points_per_game": 4.75,
+    "shots_per_game": 7.5
+  },
+  "team_averages": {
+    "avg_ppg": 3.2,
+    "avg_fg_percentage": 55.0,
+    "avg_shots_per_game": 6.0
+  },
+  "league_averages": {
+    "avg_ppg": 2.8,
+    "avg_fg_percentage": 52.0,
+    "avg_shots_per_game": 5.5
+  },
+  "comparison_to_team": {
+    "ppg_diff": 1.55,
+    "fg_pct_diff": 8.33,
+    "shots_per_game_diff": 1.5
+  },
+  "comparison_to_league": {
+    "ppg_diff": 1.95,
+    "fg_pct_diff": 11.33,
+    "shots_per_game_diff": 2.0
+  }
+}
+```
+
+**Use Cases:**
+- Player evaluation
+- Contract negotiations
+- Recruitment analysis
+- Position benchmarking
+- Identifying standout performers
+
+---
+
+## Database Schema
+
+### Seasons Table
+
+The reports API uses a `seasons` table to organize games:
+
+```sql
+CREATE TABLE seasons (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    season_type VARCHAR(20), -- indoor, outdoor, mixed
+    is_active BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+The `games` table includes a `season_id` foreign key to associate games with seasons.
+
+---
+
+## Authentication
+
+All endpoints require a valid JWT token in the Authorization header:
+
+```
+Authorization: Bearer <your-jwt-token>
+```
+
+---
+
+## Error Responses
+
+### 400 Bad Request
+```json
+{
+  "errors": [
+    {
+      "msg": "Team ID must be an integer",
+      "param": "teamId",
+      "location": "params"
+    }
+  ]
+}
+```
+
+### 401 Unauthorized
+```json
+{
+  "error": "No token provided"
+}
+```
+
+### 404 Not Found
+```json
+{
+  "error": "Player not found"
+}
+```
+
+### 500 Internal Server Error
+```json
+{
+  "error": "Failed to fetch season team report"
+}
+```
+
+---
+
+## Rate Limiting
+
+These endpoints are subject to the standard API rate limit:
+- 5000 requests per 15 minutes in production
+- Unlimited in development mode
+
+---
+
+## Best Practices
+
+1. **Season Filtering**: Use `seasonId` for precise filtering, `year` for broader analysis
+2. **Caching**: Cache reports for 1 hour as season data changes infrequently
+3. **Pagination**: For large datasets, consider implementing client-side pagination
+4. **Comparative Analysis**: Compare similar time periods for accurate insights
+5. **Historical Trends**: Use game_performance arrays to identify patterns over time
+
+---
+
+## Integration Examples
+
+### JavaScript/Fetch
+```javascript
+// Get team season report
+const response = await fetch(`/api/reports/season/team/${teamId}?year=2024`, {
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  }
+});
+const report = await response.json();
+console.log('Win percentage:', report.overall_record.win_percentage);
+```
+
+### React Hook
+```javascript
+const useTeamSeasonReport = (teamId, year) => {
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchReport = async () => {
+      setLoading(true);
+      const response = await fetch(
+        `/api/reports/season/team/${teamId}?year=${year}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      const data = await response.json();
+      setReport(data);
+      setLoading(false);
+    };
+    
+    fetchReport();
+  }, [teamId, year]);
+  
+  return { report, loading };
+};
+```
+
+### Player Season Summary
+```javascript
+const getPlayerSeasonSummary = async (playerId, seasonId) => {
+  const url = seasonId 
+    ? `/api/reports/season/player/${playerId}?seasonId=${seasonId}`
+    : `/api/reports/season/player/${playerId}`;
+    
+  const response = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  
+  return await response.json();
+};
+```
+
+---
+
+## Future Enhancements
+
+Planned features for season and historical reports:
+- Multi-season aggregation and trends
+- Player position-based averages
+- Advanced statistical metrics (PER, efficiency ratings)
+- Injury impact analysis
+- Coaching change impact tracking
+- Playoff vs regular season comparison
+- Export to PDF/Excel formats
+- Custom date range filtering
+
+---
+
+## Support
+
+For issues or questions about the Season & Historical Reports API, please contact the development team or file an issue in the GitHub repository.
