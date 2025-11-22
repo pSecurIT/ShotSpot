@@ -2,118 +2,40 @@ import pkg from 'pg';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { 
-  sanitizeDbError, 
+import {
+  sanitizeDbError,
   createQueryLogMetadata,
   sanitizeQueryForLogging, // eslint-disable-line no-unused-vars -- Re-exported for other modules
   sanitizeQueryObject // eslint-disable-line no-unused-vars -- Re-exported for other modules
 } from './utils/dbSanitizer.js';
 
 // Load environment variables
-let currentFilePath;
-try {
-  currentFilePath = fileURLToPath(import.meta.url);
-} catch (_error) {
-  // Fallback for test environment
-  currentFilePath = __filename;
-}
-const currentDirPath = dirname(currentFilePath);
-dotenv.config({ path: join(currentDirPath, '..', '.env') });
+dotenv.config();
 
 const { Pool } = pkg;
-
-// Log the configuration (without sensitive data) - silent in test environment
-if (process.env.NODE_ENV !== 'test') {
-  console.log('Database configuration:', {
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
-    hasPassword: !!process.env.DB_PASSWORD,
-    max: parseInt(process.env.DB_MAX_CONNECTIONS) || 20,
-    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
-  });
-}
-
-// Database configuration with explicit fallbacks (never default to "root")
-const requiredDbConfig = {
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost', 
-  database: process.env.DB_NAME || (process.env.NODE_ENV === 'test' ? 'shotspot_test_db' : 'shotspot_db'),
-  password: process.env.DB_PASSWORD || (process.env.NODE_ENV === 'test' ? 'postgres' : ''),
-  port: parseInt(process.env.DB_PORT) || 5432
-};
-
-// Validate all required fields are present
-Object.entries(requiredDbConfig).forEach(([key, value]) => {
-  if (!value && key !== 'password') { // Password can be empty in some setups
-    throw new Error(`Missing required database configuration: ${key}. Current value: "${value}"`);
-  }
-});
-
-// Determine SSL configuration
-let sslConfig;
-if (process.env.DB_SSL === 'false' || process.env.DB_SSL === '0') {
-  // Explicitly disabled
-  sslConfig = false;
-} else if (process.env.NODE_ENV === 'production') {
-  // Production default: require SSL with cert validation
-  sslConfig = { rejectUnauthorized: true };
-} else {
-  // Development/test: no SSL
-  sslConfig = false;
-}
+let currentFilePath;
 
 const pool = new Pool({
-  ...requiredDbConfig,
-  // Optimize connection pool for test environment
-  max: process.env.NODE_ENV === 'test' ? 5 : (parseInt(process.env.DB_MAX_CONNECTIONS) || 20),
-  idleTimeoutMillis: process.env.NODE_ENV === 'test' ? 1000 : (parseInt(process.env.DB_IDLE_TIMEOUT_MS) || 30000),
-  connectionTimeoutMillis: process.env.NODE_ENV === 'test' ? 1000 : 2000,
-  acquireTimeoutMillis: process.env.NODE_ENV === 'test' ? 1000 : 30000,
-  ssl: sslConfig
+  connectionString: process.env.DATABASE_URL,
+  max: Number(process.env.DB_MAX_CLIENTS) || 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
-
-// Error handling
-pool.on('error', (err, _client) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
-
-// Test connection on startup - silent in test environment
-(async () => {
-  try {
-    const client = await pool.connect();
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('Successfully connected to the database');
-    }
-    client.release();
-  } catch (err) {
-    console.error('Error connecting to the database:', err.message);
-    if (process.env.NODE_ENV !== 'test') {
-      console.error('Connection details:', {
-        user: process.env.DB_USER,
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
-        port: process.env.DB_PORT,
-        hasPassword: !!process.env.DB_PASSWORD
-      });
-    }
-  }
-})();
 
 const query = async (text, params) => {
   const client = await pool.connect();
+  const start = Date.now();
   try {
-    const start = Date.now();
     const res = await client.query(text, params);
     const duration = Date.now() - start;
-    
+
     // Only log in non-test environments or for slow queries
     // Note: We use sanitized metadata to avoid logging sensitive user data
     if (process.env.NODE_ENV !== 'test' || duration > 100) {
-      const logMetadata = createQueryLogMetadata(text, duration, res.rowCount, false);
-      console.log('Executed query', logMetadata);
+      const sanitizedTextForLogging = sanitizeQueryForLogging(text);
+      const sanitizedParamsForLogging = sanitizeQueryObject(params);
+      const logMetadata = createQueryLogMetadata(sanitizedTextForLogging, duration, res.rowCount, false);
+      console.log('Executed query', { ...logMetadata, params: sanitizedParamsForLogging });
     }
     return res;
   } catch (err) {
@@ -126,10 +48,9 @@ const query = async (text, params) => {
   }
 };
 
-// Database health check function that throws error on failure
 export async function dbHealthCheck() {
+  const client = await pool.connect();
   try {
-    const client = await pool.connect();
     await client.query('SELECT 1');
     client.release();
     return true;
@@ -141,14 +62,12 @@ export async function dbHealthCheck() {
   }
 }
 
-// Function to close all database connections
 export async function closePool() {
   try {
     await pool.end();
-    console.log('Database pool has been closed');
   } catch (err) {
-    console.error('Error closing database pool:', err);
-    throw err;
+    const sanitizedError = sanitizeDbError(err);
+    console.error('Error closing DB pool:', sanitizedError);
   }
 }
 
@@ -158,6 +77,5 @@ export { sanitizeDbError, sanitizeQueryForLogging, sanitizeQueryObject } from '.
 export default {
   query,
   healthCheck: dbHealthCheck,
-  pool, // Exported for testing purposes
-  closePool // Export for test cleanup
+  closePool,
 };
