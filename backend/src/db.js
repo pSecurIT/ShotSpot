@@ -1,24 +1,32 @@
 import pkg from 'pg';
 import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 import {
   sanitizeDbError,
   createQueryLogMetadata,
-  sanitizeQueryForLogging, // eslint-disable-line no-unused-vars -- Re-exported for other modules
-  sanitizeQueryObject // eslint-disable-line no-unused-vars -- Re-exported for other modules
+  sanitizeQueryForLogging,
+  sanitizeQueryObject
 } from './utils/dbSanitizer.js';
 
 // Load environment variables
 dotenv.config();
 
 const { Pool } = pkg;
-let currentFilePath;
+
+// Construct connection string from individual variables if DATABASE_URL is not provided
+const connectionConfig = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT) || 5432,
+    database: process.env.DB_NAME,
+  };
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: Number(process.env.DB_MAX_CLIENTS) || 20,
-  idleTimeoutMillis: 30000,
+  ...connectionConfig,
+  max: Number(process.env.DB_MAX_CONNECTIONS) || Number(process.env.DB_MAX_CLIENTS) || 20,
+  idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
   connectionTimeoutMillis: 2000,
 });
 

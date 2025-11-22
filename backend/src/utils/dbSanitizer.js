@@ -61,15 +61,15 @@ export function sanitizeQueryForLogging(queryText, maxLength = 100) {
     // Handle password, pass, pwd - key=value and key:value and JSON-style
     .replace(/\b(password|pass|pwd)\s*[:=]\s*'[^']*'/gi, '$1=***')
     .replace(/\b(password|pass|pwd)\s*[:=]\s*"[^"]*"/gi, '$1=***')
-    .replace(/\b(password|pass|pwd)\s*[:=]\s*[^\s,)\]\}]+/gi, '$1=***')
+    .replace(/\b(password|pass|pwd)\s*[:=]\s*[^\s,)\]}]+/gi, '$1=***')
     .replace(/"?(password|pass|pwd)"?\s*:\s*"[^"]*"/gi, '"$1":***')
-    .replace(/'(password|pass|pwd)'\s*:\s*'[^']*'/gi, "'$1':***")
+    .replace(/'(password|pass|pwd)'\s*:\s*'[^']*'/gi, '\'$1\':***')
     // Handle token, auth_token, api_key, secret, access_token
     .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*'[^']*'/gi, '$1=***')
     .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*"[^"]*"/gi, '$1=***')
-    .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*[^\s,)\]\}]+/gi, '$1=***')
+    .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*[^\s,)\]}]+/gi, '$1=***')
     .replace(/"?(token|auth_token|api[_-]?key|secret|access_token)"?\s*:\s*"[^"]*"/gi, '"$1":***')
-    .replace(/'(token|auth_token|api[_-]?key|secret|access_token)'\s*:\s*'[^']*'/gi, "'$1':***")
+    .replace(/'(token|auth_token|api[_-]?key|secret|access_token)'\s*:\s*'[^']*'/gi, '\'$1\':***')
     // Then remove remaining string literals that might contain other sensitive data
     .replace(/'[^']*'/g, '\'***\'')
     .replace(/"[^"]*"/g, '"***"')
@@ -103,15 +103,15 @@ export function sanitizeDbError(error) {
       // Handle password, pass, pwd - key=value and key:value and JSON-style
       .replace(/\b(password|pass|pwd)\s*[:=]\s*'[^']*'/gi, '$1=***')
       .replace(/\b(password|pass|pwd)\s*[:=]\s*"[^"]*"/gi, '$1=***')
-      .replace(/\b(password|pass|pwd)\s*[:=]\s*[^\s,)\]\}]+/gi, '$1=***')
+      .replace(/\b(password|pass|pwd)\s*[:=]\s*[^\s,)\]}]+/gi, '$1=***')
       .replace(/"?(password|pass|pwd)"?\s*:\s*"[^"]*"/gi, '"$1":***')
-      .replace(/'(password|pass|pwd)'\s*:\s*'[^']*'/gi, "'$1':***")
+      .replace(/'(password|pass|pwd)'\s*:\s*'[^']*'/gi, '\'$1\':***')
       // Handle token, auth_token, api_key, secret, access_token
       .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*'[^']*'/gi, '$1=***')
       .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*"[^"]*"/gi, '$1=***')
-      .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*[^\s,)\]\}]+/gi, '$1=***')
+      .replace(/\b(token|auth_token|api[_-]?key|secret|access_token)\s*[:=]\s*[^\s,)\]}]+/gi, '$1=***')
       .replace(/"?(token|auth_token|api[_-]?key|secret|access_token)"?\s*:\s*"[^"]*"/gi, '"$1":***')
-      .replace(/'(token|auth_token|api[_-]?key|secret|access_token)'\s*:\s*'[^']*'/gi, "'$1':***")
+      .replace(/'(token|auth_token|api[_-]?key|secret|access_token)'\s*:\s*'[^']*'/gi, '\'$1\':***')
       // Then remove remaining string literals
       .replace(/'[^']*'/g, '\'***\'')
       .replace(/"[^"]*"/g, '"***"')
