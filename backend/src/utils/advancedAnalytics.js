@@ -236,7 +236,7 @@ export function determineTrend(dataPoints) {
 export function formatForPDF(reportData) {
   return {
     metadata: {
-      title: `Advanced Analytics Report`,
+      title: 'Advanced Analytics Report',
       generated_at: new Date().toISOString(),
       report_version: '1.0'
     },
