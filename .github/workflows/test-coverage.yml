@@ -49,6 +49,10 @@ jobs:
         cd frontend && npm ci
         cd ../backend && npm ci
     
+    - name: Check migration consistency
+      run: |
+        cd backend && npm run check-migrations
+    
     - name: Wait for PostgreSQL
       run: |
         until pg_isready -h 127.0.0.1 -p 5432 -U postgres; do

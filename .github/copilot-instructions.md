@@ -19,6 +19,32 @@
 3. **Offline Sync**: Service worker caches API responses  IndexedDB queues writes  background sync on reconnect
 4. **Migrations**: SQL files in backend/src/migrations/*.sql run alphabetically on DB init
 
+### ⚠️ CRITICAL: Database Migration Protocol
+**EVERY new migration file MUST be added to ALL three setup scripts:**
+1. `backend/scripts/setup-db.js` - Production database setup
+2. `backend/scripts/setup-test-db.js` - Test database setup
+3. `backend/scripts/setup-parallel-dbs.js` - Parallel test databases
+
+**Automated Safeguards:**
+- Pre-commit hook: Blocks commits if migrations are missing from setup scripts
+- GitHub Actions: `npm run check-migrations` runs before tests
+- Local check: `cd backend && npm run check-migrations`
+
+**When creating a new migration:**
+1. Create SQL file in `backend/src/migrations/` (use descriptive name with prefix like `add_`, `create_`, `modify_`)
+2. Add filename to migration arrays in ALL three setup scripts (alphabetical order)
+3. Run `npm run check-migrations` to verify
+4. Test locally with `npm run setup-test-db`
+5. Commit will auto-verify via pre-commit hook
+
+**If migration check fails:**
+```bash
+cd backend
+npm run check-migrations  # See which migrations are missing
+# Add missing migrations to all three scripts
+npm run check-migrations  # Verify fix
+```
+
 ### Key Architectural Decisions
 - **No ORM**: Direct SQL for transparency and performance (see backend/src/routes/teams.js for patterns)
 - **Serial Testing**: Jest maxWorkers: 1 prevents DB race conditions
