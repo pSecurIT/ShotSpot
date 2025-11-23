@@ -6,6 +6,15 @@ import { configDefaults } from 'vitest/config';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: './index.html',
+      }
+    },
+    outDir: 'dist',
+  },
+  publicDir: 'public',
   test: {
     globals: true,
     environment: 'jsdom',

@@ -58,6 +58,7 @@
   - Vite (build tool & dev server)
   - Vitest for unit testing
   - Cypress for E2E testing
+  - **Capacitor.js** for native mobile apps (iOS & Android)
 - Back-end: Node.js + Express
 - Database: PostgreSQL
 
@@ -68,6 +69,7 @@
 - Court visualization to tap/click shot locations
 - Undo/Edit options for fast corrections during live play
 - **✅ Offline support**: Full functionality without internet connection (see [OFFLINE.md](OFFLINE.md))
+- **📱 Native mobile apps**: Available for iOS and Android (see [MOBILE.md](MOBILE.md))
 - Auto-saving and data persistence
 
 ## 📊 Real-Time Match Reports (NEW!)
