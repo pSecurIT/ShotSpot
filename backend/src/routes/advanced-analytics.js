@@ -184,24 +184,24 @@ router.get('/predictions/fatigue/:playerId', [
       const isStarter = rostersResult.rows[0]?.is_starting || false;
 
       // Get substitutions
-    const subsResult = await db.query(`
-      SELECT 
-        player_in_id as player_id,
-        period,
-        EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
-        'in' as type
-      FROM substitutions
-      WHERE game_id = $1 AND player_in_id = $2
-      UNION ALL
-      SELECT 
-        player_out_id as player_id,
-        period,
-        EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
-        'out' as type
-      FROM substitutions
-      WHERE game_id = $1 AND player_out_id = $3
-      ORDER BY period, time_remaining_seconds DESC
-    `, [game.id, playerId, playerId]);      // Calculate play time
+      const subsResult = await db.query(`
+        SELECT 
+          player_in_id as player_id,
+          period,
+          EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
+          'in' as type
+        FROM substitutions
+        WHERE game_id = $1 AND player_in_id = $2
+        UNION ALL
+        SELECT 
+          player_out_id as player_id,
+          period,
+          EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
+          'out' as type
+        FROM substitutions
+        WHERE game_id = $1 AND player_out_id = $3
+        ORDER BY period, time_remaining_seconds DESC
+      `, [game.id, playerId, playerId]);      // Calculate play time
       // period_duration is stored as INTERVAL, extract minutes
       const periodDuration = parsePeriodDuration(game.period_duration);
       const numberOfPeriods = game.number_of_periods || 4;
