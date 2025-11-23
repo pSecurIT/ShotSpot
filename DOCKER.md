@@ -150,8 +150,8 @@ JWT_REFRESH_EXPIRES_IN=7d
 CORS_ORIGIN=https://shotspot.example.com
 
 # Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW_MS=300000
+RATE_LIMIT_MAX=1000
 
 # Logging
 LOG_LEVEL=info
@@ -340,8 +340,8 @@ docker-compose -f docker-compose.dev.yml exec backend npm run seed
 #### Rate Limiting
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RATE_LIMIT_WINDOW_MS` | `900000` | Rate limit window (15 minutes) |
-| `RATE_LIMIT_MAX` | `100` | Max requests per window |
+| `RATE_LIMIT_WINDOW_MS` | `300000` | Rate limit window (5 minutes) |
+| `RATE_LIMIT_MAX` | `1000` | Max requests per window |
 
 #### Logging
 | Variable | Default | Description |
