@@ -10,6 +10,7 @@ import FreeShotPanel from './FreeShotPanel';
 import MatchCommentary from './MatchCommentary';
 import FocusMode from './FocusMode';
 import LiveDashboard from './LiveDashboard';
+import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useTimer } from '../hooks/useTimer';
 
 /**
@@ -184,6 +185,9 @@ const LiveMatch: React.FC = () => {
 
   // Active tab for Enhanced Match Events
   const [activeTab, setActiveTab] = useState<'timeline' | 'faults' | 'timeouts' | 'freeshots' | 'commentary'>('timeline');
+
+  // Export dialog state
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   /**
    * Focus mode state for mobile-optimized fullscreen experience
@@ -922,6 +926,27 @@ const LiveMatch: React.FC = () => {
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error ending game');
+    }
+  };
+
+  const handleExport = async (format: ExportFormat, options: ExportOptions) => {
+    try {
+      setError(null);
+      setSuccess('Generating export...');
+      
+      // This would be an actual API call in production
+      // await api.post(`/exports/game/${gameId}`, { format, options });
+      
+      // Log the export parameters for debugging
+      console.log('Export requested:', { gameId, format, options });
+      
+      // Simulate export generation
+      setTimeout(() => {
+        setSuccess(`Export generated successfully! Format: ${format.toUpperCase()}`);
+      }, 1000);
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string } }; message?: string };
+      setError(err.response?.data?.error || 'Error generating export');
     }
   };
 
@@ -1883,6 +1908,12 @@ const LiveMatch: React.FC = () => {
                   >
                     📈 Analytics
                   </button>
+                  <button
+                    className="tab-button export-button"
+                    onClick={() => setShowExportDialog(true)}
+                  >
+                    📥 Export
+                  </button>
                 </div>
               </div>
 
@@ -1965,6 +1996,16 @@ const LiveMatch: React.FC = () => {
             </div>
           </div>
       </div>
+
+      {showExportDialog && (
+        <ExportDialog
+          isOpen={showExportDialog}
+          onClose={() => setShowExportDialog(false)}
+          onExport={handleExport}
+          title={`Export Game: ${game.home_team_name} vs ${game.away_team_name}`}
+          dataType="game"
+        />
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 
 interface Team {
   id: number;
@@ -10,6 +11,8 @@ const TeamManagement: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [newTeamName, setNewTeamName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
 
   const fetchTeams = async () => {
     try {
@@ -44,6 +47,22 @@ const TeamManagement: React.FC = () => {
     }
   };
 
+  const handleExport = async (format: ExportFormat, options: ExportOptions) => {
+    try {
+      setError(null);
+      // This would be an actual API call in production
+      // await api.post(`/exports/team/${selectedTeamId}`, { format, options });
+      
+      const teamName = teams.find(t => t.id === selectedTeamId)?.name || 'team';
+      
+      // Log the export parameters for debugging
+      console.log('Export requested:', { teamId: selectedTeamId, teamName, format, options });
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string } }; message?: string };
+      setError(err.response?.data?.error || 'Error generating export');
+    }
+  };
+
   return (
     <div>
       <h2>Team Management</h2>
@@ -69,10 +88,32 @@ const TeamManagement: React.FC = () => {
         <h3>Teams</h3>
         {teams.map(team => (
           <div key={team.id} className="team-item">
-            {team.name}
+            <span>{team.name}</span>
+            <button 
+              className="secondary-button"
+              onClick={() => {
+                setSelectedTeamId(team.id);
+                setShowExportDialog(true);
+              }}
+            >
+              📥 Export Season Summary
+            </button>
           </div>
         ))}
       </div>
+
+      {showExportDialog && selectedTeamId && (
+        <ExportDialog
+          isOpen={showExportDialog}
+          onClose={() => {
+            setShowExportDialog(false);
+            setSelectedTeamId(null);
+          }}
+          onExport={handleExport}
+          title={`Export ${teams.find(t => t.id === selectedTeamId)?.name} Season Summary`}
+          dataType="team"
+        />
+      )}
     </div>
   );
 };
