@@ -60,6 +60,13 @@ export const processQueue = async (): Promise<{
 
   for (const action of actions) {
     try {
+      // Ensure data is properly formatted as string
+      // If data is already a string, use it directly; otherwise stringify it
+      let body: string | undefined;
+      if (action.type !== 'DELETE') {
+        body = typeof action.data === 'string' ? action.data : JSON.stringify(action.data);
+      }
+
       const response = await fetch(action.endpoint, {
         method: action.type,
         headers: {
@@ -69,7 +76,7 @@ export const processQueue = async (): Promise<{
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           })
         },
-        body: action.type !== 'DELETE' ? JSON.stringify(action.data) : undefined
+        body
       });
 
       if (response.ok) {
