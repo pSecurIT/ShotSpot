@@ -102,7 +102,8 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
     try {
       const response = await api.get(`/substitutions/${gameId}`);
       // Show only the 5 most recent
-      setRecentSubstitutions(response.data.slice(0, 5));
+      const data = Array.isArray(response.data) ? response.data : [];
+      setRecentSubstitutions(data.slice(0, 5));
     } catch (err) {
       console.error('Error fetching substitutions:', err);
     }
