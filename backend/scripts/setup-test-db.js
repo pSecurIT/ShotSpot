@@ -111,6 +111,7 @@ async function setupTestDb() {
       'add_attacking_side.sql',
       'add_starting_position.sql',
       'add_achievements_system.sql',
+      'add_advanced_analytics.sql',
       'add_password_must_change.sql',
       'add_user_activity_tracking.sql',
       'add_login_history.sql',

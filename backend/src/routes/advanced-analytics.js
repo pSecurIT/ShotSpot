@@ -25,7 +25,7 @@ router.get('/predictions/form-trends/:playerId', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { playerId } = req.params;
+  const playerId = parseInt(req.params.playerId);
   const { games = 5 } = req.query;
 
   try {
@@ -142,21 +142,21 @@ router.get('/predictions/fatigue/:playerId', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { playerId } = req.params;
-  const { game_id } = req.query;
+  const playerId = parseInt(req.params.playerId);
+  const gameId = req.query.game_id ? parseInt(req.query.game_id) : null;
 
   try {
     // Get recent games (last 5) if no specific game
     let gamesQuery;
     let gamesParams;
     
-    if (game_id) {
+    if (gameId) {
       gamesQuery = `
         SELECT id, date, period_duration, number_of_periods
         FROM games 
         WHERE id = $1
       `;
-      gamesParams = [game_id];
+      gamesParams = [gameId];
     } else {
       gamesQuery = `
         SELECT DISTINCT g.id, g.date, g.period_duration, g.number_of_periods
@@ -184,26 +184,24 @@ router.get('/predictions/fatigue/:playerId', [
       const isStarter = rostersResult.rows[0]?.is_starting || false;
 
       // Get substitutions
-      const subsResult = await db.query(`
-        SELECT 
-          player_in_id as player_id,
-          period,
-          EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
-          'in' as type
-        FROM substitutions
-        WHERE game_id = $1 AND player_in_id = $2
-        UNION ALL
-        SELECT 
-          player_out_id as player_id,
-          period,
-          EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
-          'out' as type
-        FROM substitutions
-        WHERE game_id = $1 AND player_out_id = $2
-        ORDER BY period, time_remaining_seconds DESC
-      `, [game.id, playerId, playerId]);
-
-      // Calculate play time
+    const subsResult = await db.query(`
+      SELECT 
+        player_in_id as player_id,
+        period,
+        EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
+        'in' as type
+      FROM substitutions
+      WHERE game_id = $1 AND player_in_id = $2
+      UNION ALL
+      SELECT 
+        player_out_id as player_id,
+        period,
+        EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
+        'out' as type
+      FROM substitutions
+      WHERE game_id = $1 AND player_out_id = $3
+      ORDER BY period, time_remaining_seconds DESC
+    `, [game.id, playerId, playerId]);      // Calculate play time
       // period_duration is stored as INTERVAL, extract minutes
       const periodDuration = parsePeriodDuration(game.period_duration);
       const numberOfPeriods = game.number_of_periods || 4;
@@ -345,18 +343,18 @@ router.get('/predictions/next-game/:playerId', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { playerId } = req.params;
-  const { opponent_id } = req.query;
+  const playerId = parseInt(req.params.playerId);
+  const opponentId = req.query.opponent_id ? parseInt(req.query.opponent_id) : null;
 
   try {
     // Get recent performance (last 10 games)
     const recentPerf = await db.query(`
       SELECT 
-        COUNT(*) as total_shots,
-        COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as total_goals,
+        SUM(shots_per_game) as total_shots,
+        SUM(goals_per_game) as total_goals,
         ROUND(
-          COUNT(CASE WHEN s.result = 'goal' THEN 1 END)::numeric / 
-          NULLIF(COUNT(*)::numeric, 0) * 100, 
+          SUM(goals_per_game)::numeric / 
+          NULLIF(SUM(shots_per_game)::numeric, 0) * 100, 
           2
         ) as avg_fg_percentage,
         ROUND(AVG(shots_per_game), 2) as avg_shots_per_game,
@@ -364,12 +362,13 @@ router.get('/predictions/next-game/:playerId', [
       FROM (
         SELECT 
           g.id,
+          g.date,
           COUNT(*) as shots_per_game,
           COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as goals_per_game
         FROM shots s
         JOIN games g ON s.game_id = g.id
         WHERE s.player_id = $1
-        GROUP BY g.id
+        GROUP BY g.id, g.date
         ORDER BY g.date DESC
         LIMIT 10
       ) subquery
@@ -409,21 +408,24 @@ router.get('/predictions/next-game/:playerId', [
     // If opponent specified, get historical matchup data
     let matchupAdjustment = 0;
     let matchupResult;
-    if (opponent_id) {
+    if (opponentId) {
       matchupResult = await db.query(`
         SELECT 
-          ROUND(AVG(
+          ROUND(AVG(fg_percentage), 2) as matchup_fg_percentage
+        FROM (
+          SELECT 
+            g.id,
             CAST(COUNT(CASE WHEN s.result = 'goal' THEN 1 END) AS numeric) / 
-            NULLIF(COUNT(*), 0) * 100
-          ), 2) as matchup_fg_percentage
-        FROM shots s
-        JOIN games g ON s.game_id = g.id
-        WHERE s.player_id = $1
-          AND (
-            (g.home_team_id = $2 OR g.away_team_id = $2)
-          )
-        GROUP BY g.id
-      `, [playerId, opponent_id]);
+            NULLIF(COUNT(*), 0) * 100 as fg_percentage
+          FROM shots s
+          JOIN games g ON s.game_id = g.id
+          WHERE s.player_id = $1
+            AND (
+              (g.home_team_id = $2 OR g.away_team_id = $2)
+            )
+          GROUP BY g.id
+        ) matchup_games
+      `, [playerId, opponentId]);
 
       if (matchupResult.rows[0]?.matchup_fg_percentage) {
         const matchupFG = parseFloat(matchupResult.rows[0].matchup_fg_percentage);
@@ -444,13 +446,13 @@ router.get('/predictions/next-game/:playerId', [
     if (formResult.rows[0]?.confidence_score) {
       confidence = (confidence + parseFloat(formResult.rows[0].confidence_score)) / 2;
     }
-    if (opponent_id && matchupResult.rows[0]?.matchup_fg_percentage) {
+    if (opponentId && matchupResult.rows[0]?.matchup_fg_percentage) {
       confidence += 10;
     }
 
     const prediction = {
       player_id: playerId,
-      opponent_id: opponent_id || null,
+      opponent_id: opponentId || null,
       predicted_fg_percentage: parseFloat(predicted_fg.toFixed(2)),
       predicted_shots,
       predicted_goals,
@@ -481,7 +483,7 @@ router.get('/predictions/next-game/:playerId', [
       prediction.predicted_shots,
       prediction.confidence_score,
       form_trend,
-      JSON.stringify({ adjustments: prediction.adjustments, opponent_id })
+      JSON.stringify({ adjustments: prediction.adjustments, opponent_id: opponentId })
     ]);
 
     res.json(prediction);
@@ -516,8 +518,8 @@ router.get('/benchmarks/league-averages', [
     // Calculate league averages from all games
     const leagueAvg = await db.query(`
       SELECT 
-        COUNT(DISTINCT s.game_id) as total_games,
-        COUNT(DISTINCT s.player_id) as total_players,
+        COUNT(DISTINCT game_id) as total_games,
+        COUNT(DISTINCT player_id) as total_players,
         ROUND(AVG(shots_per_game), 2) as avg_shots_per_game,
         ROUND(AVG(goals_per_game), 2) as avg_goals_per_game,
         ROUND(AVG(fg_percentage), 2) as avg_fg_percentage,
@@ -545,7 +547,7 @@ router.get('/benchmarks/league-averages', [
     if (position !== 'all') {
       positionAvg = await db.query(`
         SELECT 
-          COUNT(DISTINCT s.player_id) as total_players,
+          COUNT(DISTINCT player_id) as total_players,
           ROUND(AVG(shots_per_game), 2) as avg_shots_per_game,
           ROUND(AVG(goals_per_game), 2) as avg_goals_per_game,
           ROUND(AVG(fg_percentage), 2) as avg_fg_percentage
@@ -635,14 +637,14 @@ router.get('/benchmarks/player-comparison/:playerId', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { playerId } = req.params;
+  const playerId = parseInt(req.params.playerId);
   const { games = 10 } = req.query;
 
   try {
     // Get player stats
     const playerStats = await db.query(`
       SELECT 
-        COUNT(DISTINCT s.game_id) as games_played,
+        COUNT(DISTINCT game_id) as games_played,
         ROUND(AVG(shots_per_game), 2) as avg_shots_per_game,
         ROUND(AVG(goals_per_game), 2) as avg_goals_per_game,
         ROUND(AVG(fg_percentage), 2) as avg_fg_percentage,
@@ -650,6 +652,7 @@ router.get('/benchmarks/player-comparison/:playerId', [
       FROM (
         SELECT 
           s.game_id,
+          g.date,
           COUNT(*) as shots_per_game,
           COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as goals_per_game,
           ROUND(
@@ -661,7 +664,7 @@ router.get('/benchmarks/player-comparison/:playerId', [
         FROM shots s
         JOIN games g ON s.game_id = g.id
         WHERE s.player_id = $1
-        GROUP BY s.game_id
+        GROUP BY s.game_id, g.date
         ORDER BY g.date DESC
         LIMIT $2
       ) player_games
