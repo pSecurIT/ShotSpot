@@ -263,7 +263,7 @@ For detailed installation instructions (including troubleshooting), see **[INSTA
 
 ### API Security
 
-- Rate limiting: 100 requests per 15 minutes per IP
+- Rate limiting: 1000 requests per 5 minutes per IP
 - Request throttling for brute force prevention
 - CORS configuration with strict origin validation
 - Request size limits to prevent DoS attacks
@@ -323,8 +323,8 @@ CSRF_SECRET=your-super-secure-csrf-secret
 
 # API Security
 CORS_ORIGIN=http://localhost:3000
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW_MS=300000
+RATE_LIMIT_MAX=1000
 RATE_LIMIT_SKIP_TRUSTED=true
 API_MAX_PAYLOAD_SIZE=10kb
 TRUSTED_IPS=127.0.0.1
