@@ -5,14 +5,12 @@ import { generateTestToken } from './helpers/testHelpers.js';
 
 describe('📅 Scheduled Reports Routes', () => {
   let coachToken;
-  let adminToken;
   let templateId;
   let teamId;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Scheduled Reports tests...');
     coachToken = generateTestToken('coach');
-    adminToken = generateTestToken('admin');
     
     // Ensure test user exists
     try {

@@ -115,7 +115,7 @@ async function setupTestDb() {
       'add_user_activity_tracking.sql',
       'add_login_history.sql',
       'add_export_configuration.sql',
-      'seed_default_report_templates.sql'
+      'seed_default_report_templates.sql',
       'add_seasons.sql',
       'seed_achievements.sql'
     ];
