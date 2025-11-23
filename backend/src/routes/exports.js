@@ -569,6 +569,15 @@ router.post('/bulk', [
 
   const { game_ids, format } = req.body;
 
+  // Defensive check to ensure game_ids is a real array and also cap its size
+  if (!Array.isArray(game_ids)) {
+    return res.status(400).json({ error: 'game_ids must be an array' });
+  }
+  const MAX_BULK_GAMES = 1000;
+  if (game_ids.length > MAX_BULK_GAMES) {
+    return res.status(400).json({ error: `Cannot export more than ${MAX_BULK_GAMES} games at once` });
+  }
+
   try {
     if (format === 'pdf') {
       const doc = new PDFDocument({ margin: 50 });
