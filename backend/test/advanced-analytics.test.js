@@ -233,9 +233,11 @@ describe('📊 Advanced Analytics Routes', () => {
       });
 
       it('❌ should require authentication', async () => {
-        await request(app)
+        const response = await request(app)
           .get(`/api/advanced-analytics/predictions/form-trends/${player1.id}`)
           .expect(401);
+        
+        expect(response.body).toHaveProperty('error');
       });
     });
 
@@ -439,7 +441,7 @@ describe('📊 Advanced Analytics Routes', () => {
       });
 
       it('❌ should deny regular users', async () => {
-        await request(app)
+        const response = await request(app)
           .post('/api/advanced-analytics/video/link-event')
           .set('Authorization', `Bearer ${userToken}`)
           .send({
@@ -448,6 +450,8 @@ describe('📊 Advanced Analytics Routes', () => {
             timestamp_start: 120
           })
           .expect(403);
+        
+        expect(response.body).toHaveProperty('error');
       });
 
       it('❌ should validate required fields', async () => {
@@ -560,17 +564,20 @@ describe('📊 Advanced Analytics Routes', () => {
     });
 
     it('❌ should require authentication for all endpoints', async () => {
-      await request(app)
+      const res1 = await request(app)
         .get(`/api/advanced-analytics/predictions/form-trends/${player1.id}`)
         .expect(401);
+      expect(res1.body).toHaveProperty('error');
 
-      await request(app)
+      const res2 = await request(app)
         .get('/api/advanced-analytics/benchmarks/league-averages')
         .expect(401);
+      expect(res2.body).toHaveProperty('error');
 
-      await request(app)
+      const res3 = await request(app)
         .get(`/api/advanced-analytics/video/game/${game1.id}`)
         .expect(401);
+      expect(res3.body).toHaveProperty('error');
     });
   });
 });
