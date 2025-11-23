@@ -27,8 +27,10 @@ describe('📄 Reports Routes', () => {
 
   beforeEach(async () => {
     try {
-      // Clear test data
+      // Clear test data in correct order (respecting foreign keys)
       await db.query('DELETE FROM report_exports');
+      await db.query('DELETE FROM games');
+      await db.query('DELETE FROM teams');
       
       // Setup test data
       const template = await db.query('SELECT id FROM report_templates WHERE is_default = true LIMIT 1');

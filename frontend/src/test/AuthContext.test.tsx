@@ -105,14 +105,27 @@ describe('AuthContext', () => {
       // Mock console.error to avoid noise in test output
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      // This test expects the AuthContext to throw on invalid JSON since it doesn't handle it
-      expect(() => {
-        render(
-          <AuthProvider>
-            <TestComponent />
-          </AuthProvider>
-        );
-      }).toThrow();
+      // AuthContext now handles invalid JSON gracefully with try-catch
+      const { getByTestId } = render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      // Should render without crashing, user should be null
+      expect(getByTestId('username')).toHaveTextContent('null');
+      expect(getByTestId('email')).toHaveTextContent('null');
+      expect(getByTestId('role')).toHaveTextContent('null');
+      
+      // Verify localStorage was cleaned up
+      expect(localStorage.getItem('user')).toBeNull();
+      expect(localStorage.getItem('token')).toBeNull();
+      
+      // Verify error was logged
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to parse stored user data:',
+        expect.any(Error)
+      );
 
       consoleSpy.mockRestore();
     });
