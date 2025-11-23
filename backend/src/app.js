@@ -32,6 +32,10 @@ import reportTemplatesRoutes from './routes/report-templates.js';
 import exportSettingsRoutes from './routes/export-settings.js';
 import scheduledReportsRoutes from './routes/scheduled-reports.js';
 import reportsRoutes from './routes/reports.js';
+import exportsRoutes from './routes/exports.js';
+import reportsRoutes from './routes/reports.js';
+import exportRoutes from './routes/export.js';
+
 
 const app = express();
 
@@ -274,6 +278,8 @@ app.use('/api/match-events', matchEventsRoutes);
 app.use('/api/shots', shotsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/achievements', achievementsRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/export', exportRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/timer', timerRoutes);
 app.use('/api/possessions', possessionsRoutes);
@@ -286,6 +292,7 @@ app.use('/api/report-templates', reportTemplatesRoutes);
 app.use('/api/export-settings', exportSettingsRoutes);
 app.use('/api/scheduled-reports', scheduledReportsRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/exports', exportsRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {
