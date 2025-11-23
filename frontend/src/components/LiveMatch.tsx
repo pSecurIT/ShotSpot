@@ -937,6 +937,9 @@ const LiveMatch: React.FC = () => {
       // This would be an actual API call in production
       // await api.post(`/exports/game/${gameId}`, { format, options });
       
+      // Log the export parameters for debugging
+      console.log('Export requested:', { gameId, format, options });
+      
       // Simulate export generation
       setTimeout(() => {
         setSuccess(`Export generated successfully! Format: ${format.toUpperCase()}`);

@@ -289,8 +289,11 @@ const PlayerManagement: React.FC = () => {
       setSuccess('Generating player export...');
       
       // This would be an actual API call in production
-      // const playerIds = selectedPlayers.size > 0 ? Array.from(selectedPlayers) : filteredPlayers.map(p => p.id);
+      const playerIds = selectedPlayers.size > 0 ? Array.from(selectedPlayers) : filteredPlayers.map(p => p.id);
       // await api.post('/exports/players', { format, options, playerIds });
+      
+      // Log the export parameters for debugging
+      console.log('Export requested:', { format, options, playerIds });
       
       setTimeout(() => {
         setSuccess(`Player report generated successfully! Format: ${format.toUpperCase()}`);
@@ -300,16 +303,6 @@ const PlayerManagement: React.FC = () => {
       const error = err as { response?: { data?: { error?: string } }; message?: string };
       setError(error.response?.data?.error || 'Error generating export');
     }
-  };
-
-  const handlePlayerSelection = (playerId: number) => {
-    const newSelection = new Set(selectedPlayers);
-    if (newSelection.has(playerId)) {
-      newSelection.delete(playerId);
-    } else {
-      newSelection.add(playerId);
-    }
-    setSelectedPlayers(newSelection);
   };
 
   // Filter and sort players
