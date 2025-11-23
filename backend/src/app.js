@@ -29,6 +29,9 @@ import userRoutes from './routes/users.js';
 import analyticsRoutes from './routes/analytics.js';
 import achievementsRoutes from './routes/achievements.js';
 import exportsRoutes from './routes/exports.js';
+import reportsRoutes from './routes/reports.js';
+import exportRoutes from './routes/export.js';
+
 
 const app = express();
 
@@ -271,6 +274,8 @@ app.use('/api/match-events', matchEventsRoutes);
 app.use('/api/shots', shotsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/achievements', achievementsRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/export', exportRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/timer', timerRoutes);
 app.use('/api/possessions', possessionsRoutes);
