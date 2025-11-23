@@ -116,6 +116,8 @@ async function setupTestDb() {
       'add_login_history.sql',
       'add_export_configuration.sql',
       'seed_default_report_templates.sql'
+      'add_seasons.sql',
+      'seed_achievements.sql'
     ];
 
     for (const migrationFile of migrations) {
