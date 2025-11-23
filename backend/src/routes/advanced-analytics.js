@@ -1153,7 +1153,8 @@ async function calculatePercentile(playerId, metric, value) {
       FROM player_averages
     `, [value]);
 
-    return parseFloat((result.rows[0]?.percentile || 50).toFixed(1));
+    const percentile = result.rows[0]?.percentile;
+    return percentile !== null && percentile !== undefined ? parseFloat(parseFloat(percentile).toFixed(1)) : 50;
   } catch (err) {
     console.error('Error calculating percentile:', err);
     return 50; // Default to 50th percentile on error
