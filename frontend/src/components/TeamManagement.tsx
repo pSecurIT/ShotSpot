@@ -54,7 +54,9 @@ const TeamManagement: React.FC = () => {
       // await api.post(`/exports/team/${selectedTeamId}`, { format, options });
       
       const teamName = teams.find(t => t.id === selectedTeamId)?.name || 'team';
-      console.log(`Exporting ${teamName} as ${format}`);
+      
+      // Log the export parameters for debugging
+      console.log('Export requested:', { teamId: selectedTeamId, teamName, format, options });
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error generating export');

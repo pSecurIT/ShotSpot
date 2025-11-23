@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
-import api from '../utils/api';
 import '../styles/ExportCenter.css';
 
 interface ExportRecord {
@@ -26,8 +25,7 @@ const ExportCenter: React.FC = () => {
   const [recentExports, setRecentExports] = useState<ExportRecord[]>([]);
   const [templates, setTemplates] = useState<ExportTemplate[]>([]);
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
-  const [selectedExportType, setSelectedExportType] = useState<'game' | 'player' | 'team' | 'comparison'>('game');
+  const [selectedExportType] = useState<'game' | 'player' | 'team' | 'comparison'>('game');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
@@ -107,6 +105,9 @@ const ExportCenter: React.FC = () => {
       
       // This would be an actual API call in production
       // await api.post('/exports', { format, options, dataType: selectedExportType });
+      
+      // Log the export parameters for debugging
+      console.log('Export requested:', { format, options, dataType: selectedExportType });
       
       setSuccess('Export started successfully! Check recent exports for progress.');
       setTimeout(() => {
@@ -293,7 +294,10 @@ const ExportCenter: React.FC = () => {
               <p>Export templates help you quickly generate reports with predefined settings.</p>
               <button 
                 className="secondary-button"
-                onClick={() => setShowTemplateDialog(true)}
+                onClick={() => {
+                  // Template creation functionality to be implemented
+                  setSuccess('Template creation feature coming soon!');
+                }}
               >
                 + Create Template
               </button>
