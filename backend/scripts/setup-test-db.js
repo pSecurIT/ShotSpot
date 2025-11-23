@@ -114,7 +114,8 @@ async function setupTestDb() {
       'add_password_must_change.sql',
       'add_user_activity_tracking.sql',
       'add_login_history.sql',
-      'add_seasons.sql'
+      'add_seasons.sql',
+      'seed_achievements.sql'
     ];
 
     for (const migrationFile of migrations) {
