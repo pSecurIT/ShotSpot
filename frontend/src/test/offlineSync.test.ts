@@ -217,6 +217,92 @@ describe('Offline Sync Manager', () => {
       );
     });
 
+    it('should correctly handle object data without double-encoding', async () => {
+      const data = { username: 'admin', password: 'testpass' };
+      await queueAction('POST', '/api/auth/login', data);
+      
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ token: 'mock-token' })
+      } as Response);
+      
+      await processQueue();
+      
+      // Verify the body is stringified once, not double-encoded
+      const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+      const body = fetchCall[1]?.body as string;
+      
+      expect(body).toBe(JSON.stringify(data));
+      expect(body).not.toContain('\\"'); // Should not have escaped quotes
+      
+      // Parse it back to verify it's valid JSON
+      const parsed = JSON.parse(body);
+      expect(parsed).toEqual(data);
+    });
+
+    it('should handle already-stringified data without double-encoding', async () => {
+      const data = { username: 'admin', password: 'testpass' };
+      const stringifiedData = JSON.stringify(data);
+      
+      // Simulate data that's already been stringified (edge case)
+      await queueAction('POST', '/api/auth/login', stringifiedData as unknown as object);
+      
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ token: 'mock-token' })
+      } as Response);
+      
+      await processQueue();
+      
+      // Verify the body uses the already-stringified data
+      const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+      const body = fetchCall[1]?.body as string;
+      
+      // Body should be the string as-is, not double-encoded
+      expect(body).toBe(stringifiedData);
+      expect(body).not.toMatch(/^"\\{/); // Should not start with escaped brace
+      
+      // Parse it back to verify it's valid JSON
+      const parsed = JSON.parse(body);
+      expect(parsed).toEqual(data);
+    });
+
+    it('should handle complex nested objects without double-encoding', async () => {
+      const data = {
+        game: {
+          team_home_id: 1,
+          team_away_id: 2,
+          date: '2025-11-23',
+          location: 'Test Arena'
+        },
+        events: [
+          { type: 'goal', player_id: 5 },
+          { type: 'timeout', timestamp: 1234567890 }
+        ]
+      };
+      
+      await queueAction('POST', '/api/games', data);
+      
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => ({ id: 1 })
+      } as Response);
+      
+      await processQueue();
+      
+      const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+      const body = fetchCall[1]?.body as string;
+      
+      // Verify it's properly stringified once
+      const parsed = JSON.parse(body);
+      expect(parsed).toEqual(data);
+      expect(parsed.game).toEqual(data.game);
+      expect(parsed.events).toEqual(data.events);
+    });
+
     it('should not send body for DELETE requests', async () => {
       await queueAction('DELETE', '/api/players/5', null);
       
