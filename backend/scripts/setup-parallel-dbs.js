@@ -139,6 +139,7 @@ async function setupParallelDatabases() {
           '../src/migrations/add_attacking_side.sql',
           '../src/migrations/add_starting_position.sql',
           '../src/migrations/add_achievements_system.sql',
+          '../src/migrations/add_advanced_analytics.sql',
           '../src/migrations/add_export_configuration.sql',
           '../src/migrations/add_password_must_change.sql',
           '../src/migrations/add_user_activity_tracking.sql',

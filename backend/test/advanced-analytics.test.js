@@ -99,6 +99,14 @@ describe('📊 Advanced Analytics Routes', () => {
     );
     game2 = game2Result.rows[0];
 
+    // Create a third game for form trends (needs 3+ games)
+    const game3Result = await db.query(
+      `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score, current_period)
+       VALUES ($1, $2, CURRENT_TIMESTAMP - INTERVAL '1 day', 'completed', 20, 16, 4) RETURNING *`,
+      [team1.id, team2.id]
+    );
+    const game3 = game3Result.rows[0];
+
     // Create diverse shot data for player1 across games
     // Game 1: 8 shots, 5 goals (62.5% FG)
     const game1Shots = [
@@ -126,6 +134,22 @@ describe('📊 Advanced Analytics Routes', () => {
       { x: 90, y: 50, result: 'miss', game: game2.id, player: player1.id, team: team1.id, distance: 9.0, period: 4 },
     ];
 
+    // Game 3: 12 shots, 9 goals (75% FG) - continuing improvement trend
+    const game3Shots = [
+      { x: 10, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 5.5, period: 1 },
+      { x: 15, y: 45, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 6.0, period: 1 },
+      { x: 20, y: 55, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 7.0, period: 1 },
+      { x: 25, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 5.0, period: 1 },
+      { x: 30, y: 50, result: 'miss', game: game3.id, player: player1.id, team: team1.id, distance: 4.5, period: 2 },
+      { x: 40, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 4.0, period: 2 },
+      { x: 50, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 3.5, period: 2 },
+      { x: 60, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 4.5, period: 3 },
+      { x: 70, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 6.5, period: 3 },
+      { x: 80, y: 50, result: 'miss', game: game3.id, player: player1.id, team: team1.id, distance: 8.0, period: 4 },
+      { x: 85, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 7.0, period: 4 },
+      { x: 90, y: 50, result: 'miss', game: game3.id, player: player1.id, team: team1.id, distance: 9.0, period: 4 },
+    ];
+
     // Player 2 shots
     const player2Shots = [
       { x: 30, y: 40, result: 'goal', game: game1.id, player: player2.id, team: team1.id, distance: 5.0, period: 1 },
@@ -141,7 +165,7 @@ describe('📊 Advanced Analytics Routes', () => {
       { x: 60, y: 50, result: 'goal', game: game1.id, player: player3.id, team: team2.id, distance: 4.5, period: 3 },
     ];
 
-    const allShots = [...game1Shots, ...game2Shots, ...player2Shots, ...player3Shots];
+    const allShots = [...game1Shots, ...game2Shots, ...game3Shots, ...player2Shots, ...player3Shots];
 
     for (const shot of allShots) {
       const result = await db.query(
@@ -163,6 +187,12 @@ describe('📊 Advanced Analytics Routes', () => {
       `INSERT INTO game_rosters (game_id, team_id, player_id, is_starting, starting_position)
        VALUES ($1, $2, $3, true, 'offense')`,
       [game2.id, team1.id, player1.id]
+    );
+
+    await db.query(
+      `INSERT INTO game_rosters (game_id, team_id, player_id, is_starting, starting_position)
+       VALUES ($1, $2, $3, true, 'offense')`,
+      [game3.id, team1.id, player1.id]
     );
 
     console.log('✅ Advanced Analytics test setup complete');
