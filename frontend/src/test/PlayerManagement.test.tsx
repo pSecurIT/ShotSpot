@@ -121,6 +121,17 @@ describe('PlayerManagement', () => {
   });
 
   it('displays error when player creation fails', async () => {
+    // Reset and setup mock for this specific test
+    vi.clearAllMocks();
+    (api.get as jest.Mock).mockImplementation((url: string) => {
+      if (url === '/teams') {
+        return Promise.resolve({ data: mockTeams });
+      }
+      if (url === '/players') {
+        return Promise.resolve({ data: mockPlayers });
+      }
+    });
+    
     (api.post as jest.Mock).mockRejectedValueOnce({
       response: { data: { error: 'Jersey number already taken' } }
     });
@@ -152,6 +163,27 @@ describe('PlayerManagement', () => {
   });
 
   it('clears form after successful player creation', async () => {
+    // Reset and setup mock for this specific test to ensure success
+    vi.clearAllMocks();
+    (api.get as jest.Mock).mockImplementation((url: string) => {
+      if (url === '/teams') {
+        return Promise.resolve({ data: mockTeams });
+      }
+      if (url === '/players') {
+        return Promise.resolve({ data: mockPlayers });
+      }
+    });
+    
+    (api.post as jest.Mock).mockResolvedValueOnce({
+      data: {
+        id: 3,
+        team_id: 1,
+        first_name: 'New',
+        last_name: 'Player',
+        jersey_number: 30
+      }
+    });
+
     render(<PlayerManagement />);
 
     await waitFor(() => {
