@@ -3,11 +3,21 @@ import { body, param, query, validationResult } from 'express-validator';
 import crypto from 'crypto';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(auth);
+
+// Apply rate limiting middleware to all routes in this router
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+router.use(limiter);
 
 /**
  * Get all report exports (history)
