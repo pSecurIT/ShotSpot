@@ -9,6 +9,9 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import AchievementBadge from './AchievementBadge';
 import Leaderboard from './Leaderboard';
 import AchievementNotification from './AchievementNotification';
+import InteractiveShotChart from './InteractiveShotChart';
+import PlayerComparisonRadar from './PlayerComparisonRadar';
+import PossessionFlowDiagram from './PossessionFlowDiagram';
 import { Achievement, LeaderboardPlayer } from '../types/achievements';
 import api from '../utils/api';
 import courtImageUrl from '../img/Korfbalveld-breed.PNG';
@@ -81,6 +84,19 @@ interface TeamSummary {
   misses: number;
   blocked: number;
   fg_percentage: number;
+}
+
+interface Possession {
+  id: number;
+  game_id: number;
+  team_id: number;
+  period: number;
+  started_at: string;
+  ended_at: string | null;
+  shots_taken: number;
+  team_name?: string;
+  duration?: number;
+  result?: 'goal' | 'turnover' | 'end_period' | 'active';
 }
 
 interface GameSummary {
@@ -199,7 +215,7 @@ interface MatchupAnalysis {
   };
 }
 
-type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts' | 'performance' | 'historical' | 'achievements';
+type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts' | 'performance' | 'historical' | 'achievements' | 'interactive' | 'comparison' | 'possession';
 
 const ShotAnalytics: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -235,6 +251,10 @@ const ShotAnalytics: React.FC = () => {
   const [selectedAchievementPlayer, setSelectedAchievementPlayer] = useState<number | null>(null);
   const [leaderboardType, setLeaderboardType] = useState<'global' | 'team'>('global');
   const [unlockedAchievement, setUnlockedAchievement] = useState<Achievement | null>(null);
+
+  // New visualization states
+  const [possessions, setPossessions] = useState<Possession[]>([]);
+  const [comparisonPlayers, setComparisonPlayers] = useState<PlayerStats[]>([]);
 
   // Filter states
   const [gridSize, setGridSize] = useState(10);
@@ -545,6 +565,31 @@ const ShotAnalytics: React.FC = () => {
     }
   }, [leaderboardType, selectedTeam]);
 
+  // New: Fetch possessions data
+  const fetchPossessions = useCallback(async () => {
+    if (!gameId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await api.get<Possession[]>(`/possessions/${gameId}`);
+      // Calculate duration for each possession
+      const possessionsWithDuration = response.data.map(p => ({
+        ...p,
+        duration: p.ended_at 
+          ? Math.floor((new Date(p.ended_at).getTime() - new Date(p.started_at).getTime()) / 1000)
+          : 0
+      }));
+      setPossessions(possessionsWithDuration);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || 'Failed to load possession data');
+    } finally {
+      setLoading(false);
+    }
+  }, [gameId]);
+
   // Phase 5: WebSocket connection - join/leave game room
   useEffect(() => {
     if (!gameId || !socket) return;
@@ -634,6 +679,20 @@ const ShotAnalytics: React.FC = () => {
       case 'shot-chart':
         fetchShotChart();
         break;
+      case 'interactive':
+        // Interactive shot chart needs shot data
+        fetchShotChart();
+        break;
+      case 'comparison':
+        // Comparison view needs player stats
+        fetchPlayerStats();
+        if (teams.length === 0) fetchGameSummary();
+        break;
+      case 'possession':
+        // Possession flow needs possessions data
+        fetchPossessions();
+        if (teams.length === 0) fetchGameSummary();
+        break;
       case 'players':
         fetchPlayerStats();
         // Fetch game summary to populate teams dropdown
@@ -665,7 +724,7 @@ const ShotAnalytics: React.FC = () => {
         fetchLeaderboard();
         break;
     }
-  }, [activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends, fetchPlayerDevelopment, fetchTeamTendencies, fetchMatchupAnalysis, fetchAchievements, fetchLeaderboard, selectedPlayerId, selectedTeam, selectedOpponentId, teams.length]);
+  }, [activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends, fetchPlayerDevelopment, fetchTeamTendencies, fetchMatchupAnalysis, fetchAchievements, fetchLeaderboard, fetchPossessions, selectedPlayerId, selectedTeam, selectedOpponentId, teams.length]);
 
   // Fetch player achievements when player selection changes
   useEffect(() => {
@@ -1873,6 +1932,77 @@ const ShotAnalytics: React.FC = () => {
     );
   };
 
+  // New: Render interactive shot chart view
+  const renderInteractiveShotChart = () => {
+    return (
+      <div className="analytics-view">
+        <InteractiveShotChart
+          shots={shotChartData}
+          title="Interactive Shot Chart with Clickable Zones"
+          showZones={true}
+          showExportButtons={true}
+        />
+      </div>
+    );
+  };
+
+  // New: Render player comparison view
+  const renderPlayerComparison = () => {
+    const handlePlayerSelect = (playerId: number) => {
+      const player = playerStats.find(p => p.player_id === playerId);
+      if (player && comparisonPlayers.length < 4) {
+        setComparisonPlayers(prev => [...prev, player]);
+      }
+    };
+
+    const handlePlayerRemove = (playerId: number) => {
+      setComparisonPlayers(prev => prev.filter(p => p.player_id !== playerId));
+    };
+
+    return (
+      <div className="analytics-view">
+        <PlayerComparisonRadar
+          players={comparisonPlayers}
+          availablePlayers={playerStats}
+          onPlayerSelect={handlePlayerSelect}
+          onPlayerRemove={handlePlayerRemove}
+          maxPlayers={4}
+        />
+      </div>
+    );
+  };
+
+  // New: Render possession flow view
+  const renderPossessionFlow = () => {
+    // Get team names from teams state
+    const homeTeam = teams.find(t => t.id === teams[0]?.id);
+    const awayTeam = teams.find(t => t.id === teams[1]?.id);
+
+    if (!homeTeam || !awayTeam) {
+      return (
+        <div className="analytics-view">
+          <div className="empty-state">
+            <p>Loading team information...</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="analytics-view">
+        <PossessionFlowDiagram
+          possessions={possessions}
+          homeTeamId={homeTeam.id}
+          awayTeamId={awayTeam.id}
+          homeTeamName={homeTeam.name}
+          awayTeamName={awayTeam.name}
+          currentPeriod={selectedPeriod || undefined}
+          showExportButtons={true}
+        />
+      </div>
+    );
+  };
+
   // Phase 6: Render achievements view
   const renderAchievements = () => {
     return (
@@ -1996,6 +2126,27 @@ const ShotAnalytics: React.FC = () => {
             🎯 Shot Chart
           </button>
           <button
+            className={`view-tab ${activeView === 'interactive' ? 'active' : ''}`}
+            onClick={() => setActiveView('interactive')}
+            title="Interactive shot chart with clickable zones"
+          >
+            🎨 Interactive
+          </button>
+          <button
+            className={`view-tab ${activeView === 'comparison' ? 'active' : ''}`}
+            onClick={() => setActiveView('comparison')}
+            title="Compare players with radar charts"
+          >
+            👥 Compare
+          </button>
+          <button
+            className={`view-tab ${activeView === 'possession' ? 'active' : ''}`}
+            onClick={() => setActiveView('possession')}
+            title="Possession flow diagram"
+          >
+            🔄 Possession
+          </button>
+          <button
             className={`view-tab ${activeView === 'players' ? 'active' : ''}`}
             onClick={() => setActiveView('players')}
             title="Keyboard: 3"
@@ -2105,6 +2256,9 @@ const ShotAnalytics: React.FC = () => {
         <>
           {activeView === 'heatmap' && renderHeatmap()}
           {activeView === 'shot-chart' && renderShotChart()}
+          {activeView === 'interactive' && renderInteractiveShotChart()}
+          {activeView === 'comparison' && renderPlayerComparison()}
+          {activeView === 'possession' && renderPossessionFlow()}
           {activeView === 'players' && renderPlayerStats()}
           {activeView === 'summary' && renderGameSummary()}
           {activeView === 'charts' && renderAdvancedCharts()}
