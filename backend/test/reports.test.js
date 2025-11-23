@@ -12,6 +12,17 @@ describe('📄 Reports Routes', () => {
   beforeAll(async () => {
     console.log('🔧 Setting up Reports tests...');
     coachToken = generateTestToken('coach');
+    
+    // Ensure test user exists
+    try {
+      await db.query(`
+        INSERT INTO users (id, username, email, password_hash, role)
+        VALUES (1, 'testuser', 'testuser@test.com', '$2b$10$test', 'coach')
+        ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
+      `);
+    } catch (error) {
+      console.log('Test user setup:', error.message);
+    }
   });
 
   beforeEach(async () => {
@@ -195,14 +206,8 @@ describe('📄 Reports Routes', () => {
     let reportId;
 
     beforeEach(async () => {
-      // Create a test user
-      const userResult = await db.query(`
-        INSERT INTO users (username, email, password_hash, role)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
-        RETURNING id
-      `, ['reportcoach', 'reportcoach@test.com', '$2b$10$test', 'coach']);
-      const userId = userResult.rows[0].id;
+      // Use the test user that was created in beforeAll (ID 1)
+      const userId = 1;
       
       const result = await db.query(`
         INSERT INTO report_exports (
@@ -247,14 +252,8 @@ describe('📄 Reports Routes', () => {
     let reportId;
 
     beforeEach(async () => {
-      // Create a test user
-      const userResult = await db.query(`
-        INSERT INTO users (username, email, password_hash, role)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
-        RETURNING id
-      `, ['reportcoach2', 'reportcoach2@test.com', '$2b$10$test', 'coach']);
-      const userId = userResult.rows[0].id;
+      // Use the test user that was created in beforeAll (ID 1)
+      const userId = 1;
       
       const result = await db.query(`
         INSERT INTO report_exports (

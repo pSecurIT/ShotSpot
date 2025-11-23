@@ -35,8 +35,10 @@ module.exports = async () => {
     
     // Define tables to truncate in the correct order (child tables first due to foreign keys)
     const tablesToTruncate = [
+      'report_exports', 'scheduled_reports', 'export_settings', 
       'substitutions', 'game_rosters', 'ball_possessions', 
-      'shots', 'game_events', 'players', 'games', 'teams', 'users'
+      'shots', 'game_events', 'players', 'games', 'teams', 'users',
+      'report_templates'
     ];
     
     // Only truncate tables that exist
@@ -46,6 +48,17 @@ module.exports = async () => {
         console.log(`🧹 GLOBAL SETUP: Truncated ${table}`);
       } else {
         console.log(`⚠️  GLOBAL SETUP: Table ${table} does not exist, skipping`);
+      }
+    }
+    
+    // Reseed default report templates
+    if (existingTables.includes('report_templates')) {
+      const fs = require('fs');
+      const seedPath = path.join(__dirname, 'src/migrations/seed_default_report_templates.sql');
+      if (fs.existsSync(seedPath)) {
+        const seedSQL = fs.readFileSync(seedPath, 'utf8');
+        await pool.query(seedSQL);
+        console.log('🌱 GLOBAL SETUP: Reseeded default report templates');
       }
     }
     
