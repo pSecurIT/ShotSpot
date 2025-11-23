@@ -1,148 +1,99 @@
 import pkg from 'pg';
 import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import {
+  sanitizeDbError,
+  createQueryLogMetadata,
+  sanitizeQueryForLogging,
+  isParameterizedQuery
+} from './utils/dbSanitizer.js';
 
 // Load environment variables
-let currentFilePath;
-try {
-  currentFilePath = fileURLToPath(import.meta.url);
-} catch (_error) {
-  // Fallback for test environment
-  currentFilePath = __filename;
-}
-const currentDirPath = dirname(currentFilePath);
-dotenv.config({ path: join(currentDirPath, '..', '.env') });
+dotenv.config();
 
 const { Pool } = pkg;
 
-// Log the configuration (without sensitive data) - silent in test environment
-if (process.env.NODE_ENV !== 'test') {
-  console.log('Database configuration:', {
+// Construct connection string from individual variables if DATABASE_URL is not provided
+const connectionConfig = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
     user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
     host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT) || 5432,
     database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
-    hasPassword: !!process.env.DB_PASSWORD,
-    max: parseInt(process.env.DB_MAX_CONNECTIONS) || 20,
-    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
-  });
-}
-
-// Database configuration with explicit fallbacks (never default to "root")
-const requiredDbConfig = {
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost', 
-  database: process.env.DB_NAME || (process.env.NODE_ENV === 'test' ? 'shotspot_test_db' : 'shotspot_db'),
-  password: process.env.DB_PASSWORD || (process.env.NODE_ENV === 'test' ? 'postgres' : ''),
-  port: parseInt(process.env.DB_PORT) || 5432
-};
-
-// Validate all required fields are present
-Object.entries(requiredDbConfig).forEach(([key, value]) => {
-  if (!value && key !== 'password') { // Password can be empty in some setups
-    throw new Error(`Missing required database configuration: ${key}. Current value: "${value}"`);
-  }
-});
-
-// Determine SSL configuration
-let sslConfig;
-if (process.env.DB_SSL === 'false' || process.env.DB_SSL === '0') {
-  // Explicitly disabled
-  sslConfig = false;
-} else if (process.env.NODE_ENV === 'production') {
-  // Production default: require SSL with cert validation
-  sslConfig = { rejectUnauthorized: true };
-} else {
-  // Development/test: no SSL
-  sslConfig = false;
-}
+  };
 
 const pool = new Pool({
-  ...requiredDbConfig,
-  // Optimize connection pool for test environment
-  max: process.env.NODE_ENV === 'test' ? 5 : (parseInt(process.env.DB_MAX_CONNECTIONS) || 20),
-  idleTimeoutMillis: process.env.NODE_ENV === 'test' ? 1000 : (parseInt(process.env.DB_IDLE_TIMEOUT_MS) || 30000),
-  connectionTimeoutMillis: process.env.NODE_ENV === 'test' ? 1000 : 2000,
-  acquireTimeoutMillis: process.env.NODE_ENV === 'test' ? 1000 : 30000,
-  ssl: sslConfig
+  ...connectionConfig,
+  max: Number(process.env.DB_MAX_CONNECTIONS) || Number(process.env.DB_MAX_CLIENTS) || 20,
+  idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
+  connectionTimeoutMillis: 2000,
 });
-
-// Error handling
-pool.on('error', (err, _client) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
-
-// Test connection on startup - silent in test environment
-(async () => {
-  try {
-    const client = await pool.connect();
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('Successfully connected to the database');
-    }
-    client.release();
-  } catch (err) {
-    console.error('Error connecting to the database:', err.message);
-    if (process.env.NODE_ENV !== 'test') {
-      console.error('Connection details:', {
-        user: process.env.DB_USER,
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
-        port: process.env.DB_PORT,
-        hasPassword: !!process.env.DB_PASSWORD
-      });
-    }
-  }
-})();
 
 const query = async (text, params) => {
   const client = await pool.connect();
+  const start = Date.now();
   try {
-    const start = Date.now();
+    // Validate that query uses parameterized format for security
+    if (params && params.length > 0 && !isParameterizedQuery(text)) {
+      const sanitizedText = sanitizeQueryForLogging(text);
+      console.error('Invalid query format - must use parameterized placeholders:', sanitizedText);
+      throw new Error('Query must use parameterized format ($1, $2, etc.) when parameters are provided');
+    }
+    
+    // Execute query using pg library's built-in parameterization which safely escapes values
     const res = await client.query(text, params);
     const duration = Date.now() - start;
-    
+
     // Only log in non-test environments or for slow queries
+    // Note: We use sanitized metadata to avoid logging sensitive user data
     if (process.env.NODE_ENV !== 'test' || duration > 100) {
-      console.log('Executed query', { text, duration, rows: res.rowCount });
+      const sanitizedText = sanitizeQueryForLogging(text);
+      // Only log param count, not actual param values to prevent sensitive data exposure
+      const paramCount = Array.isArray(params) ? params.length : 0;
+      const logMetadata = createQueryLogMetadata(sanitizedText, duration, res.rowCount, false);
+      console.log('Executed query', { ...logMetadata, paramCount });
     }
     return res;
   } catch (err) {
-    console.error('Error executing query', { text, error: err.message });
+    // Log sanitized error information to avoid exposing sensitive data
+    const sanitizedError = sanitizeDbError(err);
+    console.error('Error executing query', sanitizedError);
     throw err;
   } finally {
     client.release();
   }
 };
 
-// Database health check function that throws error on failure
 export async function dbHealthCheck() {
+  const client = await pool.connect();
   try {
-    const client = await pool.connect();
+    // Safe: hardcoded query with no user input
     await client.query('SELECT 1');
     client.release();
     return true;
   } catch (err) {
-    console.error('Database health check failed:', err);
-    throw new Error(`Database connection failed: ${err.message}`);
+    // Use sanitized error to avoid exposing sensitive connection details
+    const sanitizedError = sanitizeDbError(err);
+    console.error('Database health check failed:', sanitizedError);
+    throw new Error(`Database connection failed: ${sanitizedError.message}`);
   }
 }
 
-// Function to close all database connections
 export async function closePool() {
   try {
     await pool.end();
-    console.log('Database pool has been closed');
   } catch (err) {
-    console.error('Error closing database pool:', err);
-    throw err;
+    const sanitizedError = sanitizeDbError(err);
+    console.error('Error closing DB pool:', sanitizedError);
   }
 }
+
+// Re-export sanitizer utilities for use in other modules
+export { sanitizeDbError, sanitizeQueryForLogging } from './utils/dbSanitizer.js';
 
 export default {
   query,
   healthCheck: dbHealthCheck,
-  pool, // Exported for testing purposes
-  closePool // Export for test cleanup
+  closePool,
 };

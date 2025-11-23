@@ -215,7 +215,8 @@ async function main() {
       '../src/migrations/seed_achievements.sql',
       '../src/migrations/add_password_must_change.sql',
       '../src/migrations/add_user_activity_tracking.sql',
-      '../src/migrations/add_login_history.sql'
+      '../src/migrations/add_login_history.sql',
+      '../src/migrations/add_seasons.sql'
     ];
 
     console.log('Applying database migrations...');
