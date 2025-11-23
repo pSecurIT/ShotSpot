@@ -10,7 +10,9 @@ export default {
   testMatch: [
     '**/test/validateEnv.test.js',
     '**/test/errorNotification.test.js',
-    '**/test/csrf.test.js'
+    '**/test/csrf.test.js',
+    '**/test/init-default-admin.test.js',
+    '**/test/dbSanitizer.test.js'
   ],
   
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
@@ -28,6 +30,7 @@ export default {
   collectCoverageFrom: [
     'src/utils/*.js',
     'src/middleware/csrf.js',
+    'scripts/init-default-admin.js',
     '!src/index.js',
     '!src/app.js'
   ],
