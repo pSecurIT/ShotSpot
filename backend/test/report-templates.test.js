@@ -14,6 +14,17 @@ describe('📊 Report Templates Routes', () => {
     adminToken = generateTestToken('admin');
     coachToken = generateTestToken('coach');
     viewerToken = generateTestToken('viewer');
+    
+    // Ensure test user exists (user ID 1 is used in tokens)
+    try {
+      await db.query(`
+        INSERT INTO users (id, username, email, password_hash, role)
+        VALUES (1, 'testuser', 'testuser@test.com', '$2b$10$test', 'coach')
+        ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
+      `);
+    } catch (error) {
+      console.log('Test user setup:', error.message);
+    }
   });
 
   beforeEach(async () => {
@@ -185,14 +196,8 @@ describe('📊 Report Templates Routes', () => {
 
   describe('📝 PUT /api/report-templates/:id - Update Template', () => {
     beforeEach(async () => {
-      // Create a test user
-      const userResult = await db.query(`
-        INSERT INTO users (username, email, password_hash, role)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
-        RETURNING id
-      `, ['testcoach', 'testcoach@test.com', '$2b$10$test', 'coach']);
-      const userId = userResult.rows[0].id;
+      // Use the test user that was created in beforeAll (ID 1)
+      const userId = 1;
       
       // Create a test template
       const result = await db.query(`
@@ -271,14 +276,8 @@ describe('📊 Report Templates Routes', () => {
 
   describe('🗑️ DELETE /api/report-templates/:id - Delete Template', () => {
     beforeEach(async () => {
-      // Create a test user
-      const userResult = await db.query(`
-        INSERT INTO users (username, email, password_hash, role)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
-        RETURNING id
-      `, ['testcoach2', 'testcoach2@test.com', '$2b$10$test', 'coach']);
-      const userId = userResult.rows[0].id;
+      // Use the test user that was created in beforeAll (ID 1)
+      const userId = 1;
       
       // Create a test template
       const result = await db.query(`

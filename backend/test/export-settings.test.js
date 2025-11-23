@@ -11,6 +11,17 @@ describe('⚙️ Export Settings Routes', () => {
     console.log('🔧 Setting up Export Settings tests...');
     viewerToken = generateTestToken('viewer');
     userId = 1; // Assuming default viewer ID
+    
+    // Ensure test user exists
+    try {
+      await db.query(`
+        INSERT INTO users (id, username, email, password_hash, role)
+        VALUES (1, 'testuser', 'testuser@test.com', '$2b$10$test', 'viewer')
+        ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
+      `);
+    } catch (error) {
+      console.log('Test user setup:', error.message);
+    }
   });
 
   beforeEach(async () => {
@@ -192,6 +203,8 @@ describe('⚙️ Export Settings Routes', () => {
         const response = await request(app)
           .post('/api/export-settings/reset')
           .set('Authorization', `Bearer ${viewerToken}`)
+          .set('Content-Type', 'application/json')
+          .send({})
           .expect('Content-Type', /json/)
           .expect(200);
 
@@ -210,6 +223,8 @@ describe('⚙️ Export Settings Routes', () => {
         const response = await request(app)
           .post('/api/export-settings/reset')
           .set('Authorization', `Bearer ${viewerToken}`)
+          .set('Content-Type', 'application/json')
+          .send({})
           .expect('Content-Type', /json/)
           .expect(200);
 

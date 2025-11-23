@@ -12,7 +12,8 @@ INSERT INTO report_templates (
     metrics,
     branding,
     language
-) VALUES (
+)
+SELECT
     'Summary Report',
     'summary',
     true,
@@ -22,7 +23,9 @@ INSERT INTO report_templates (
     '["total_shots", "field_goal_percentage", "goals", "top_3_players"]'::jsonb,
     '{"primary_color": "#1976d2", "secondary_color": "#424242"}'::jsonb,
     'en'
-) ON CONFLICT DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM report_templates WHERE name = 'Summary Report' AND is_default = true
+);
 
 -- Detailed Template - Comprehensive match analysis
 INSERT INTO report_templates (
@@ -35,7 +38,8 @@ INSERT INTO report_templates (
     metrics,
     branding,
     language
-) VALUES (
+)
+SELECT
     'Detailed Report',
     'detailed',
     true,
@@ -45,7 +49,9 @@ INSERT INTO report_templates (
     '["total_shots", "field_goal_percentage", "goals", "misses", "blocked", "avg_distance", "zone_performance", "play_time", "possession_duration"]'::jsonb,
     '{"primary_color": "#1976d2", "secondary_color": "#424242"}'::jsonb,
     'en'
-) ON CONFLICT DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM report_templates WHERE name = 'Detailed Report' AND is_default = true
+);
 
 -- Coach-Focused Template - Tactical insights for coaches
 INSERT INTO report_templates (
@@ -58,7 +64,8 @@ INSERT INTO report_templates (
     metrics,
     branding,
     language
-) VALUES (
+)
+SELECT
     'Coach-Focused Report',
     'coach_focused',
     true,
@@ -68,7 +75,9 @@ INSERT INTO report_templates (
     '["field_goal_percentage", "zone_success_rates", "streak_data", "period_trends", "player_efficiency", "play_time", "shot_selection"]'::jsonb,
     '{"primary_color": "#2e7d32", "secondary_color": "#424242"}'::jsonb,
     'en'
-) ON CONFLICT DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM report_templates WHERE name = 'Coach-Focused Report' AND is_default = true
+);
 
 -- Season Summary Template - End of season comprehensive report
 INSERT INTO report_templates (
@@ -81,7 +90,8 @@ INSERT INTO report_templates (
     metrics,
     branding,
     language
-) VALUES (
+)
+SELECT
     'Season Summary Report',
     'summary',
     true,
@@ -91,4 +101,6 @@ INSERT INTO report_templates (
     '["total_games", "wins", "losses", "total_goals", "avg_fg_percentage", "best_performers", "improvement_trends"]'::jsonb,
     '{"primary_color": "#f57c00", "secondary_color": "#424242"}'::jsonb,
     'en'
-) ON CONFLICT DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM report_templates WHERE name = 'Season Summary Report' AND is_default = true
+);
