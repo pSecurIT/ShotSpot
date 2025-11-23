@@ -546,33 +546,64 @@ services:
 
 #### 6. CSRF Token Error on Login
 
-**Symptom**: `Invalid CSRF token` error (403) when trying to log in
+**Symptom**: `Invalid CSRF token` error (403) when trying to log in, or "Session not initialized" errors
 
-**Root Cause**: In production mode with `NODE_ENV=production`, session cookies require HTTPS (`secure: true`). When testing locally on HTTP, cookies aren't sent.
+**Root Cause**: Session cookies are not being set correctly in Docker. This happens because:
+1. The `secure` flag is set to `true` in production mode, but Docker runs on HTTP by default
+2. Cookie domain/SameSite settings don't match the Docker environment
+3. Sessions aren't persisting between requests
 
 **Solutions**:
+
+**RECOMMENDED: Add these environment variables to your `.env` file or `docker-compose.yml`:**
 ```bash
-# Option 1: Add SESSION_SECURE=false to docker-compose.yml
-environment:
-  SESSION_SECURE: false  # Allows cookies over HTTP for local testing
-  NODE_ENV: production
+# In your .env file (copy from .env.docker.example):
+SESSION_SECURE=false       # CRITICAL: Must be false for HTTP (Docker default)
+SESSION_SAME_SITE=lax      # Required for Docker cross-origin requests
+COOKIE_DOMAIN=             # Leave empty - browser handles domain automatically
+SESSION_SECRET=your-session-secret-here  # Use a secure random string
+```
 
-# Option 2: Use development mode for local testing
+**In docker-compose.yml** (already configured if using latest version):
+```yaml
 environment:
-  NODE_ENV: development  # Automatically allows HTTP cookies
+  SESSION_SECURE: ${SESSION_SECURE:-false}
+  SESSION_SAME_SITE: ${SESSION_SAME_SITE:-lax}
+  COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+  SESSION_SECRET: ${SESSION_SECRET:-}
+```
 
-# Option 3: Use HTTPS with proper SSL certificates
-# See nginx configuration for SSL setup
+**After configuration changes**:
+```bash
+# Restart the containers
+docker-compose down
+docker-compose up -d
+
+# Clear browser cookies and try again
+# Open DevTools -> Application -> Cookies -> Clear all
 ```
 
 **Verify the fix**:
 ```bash
 # Check browser DevTools -> Application -> Cookies
-# Should see 'sessionId' cookie with:
-# - Domain: localhost
+# You should see 'sessionId' cookie with:
+# - Domain: localhost (or your Docker host)
 # - Path: /
 # - HttpOnly: true
-# - Secure: false (for HTTP testing)
+# - Secure: false (for HTTP)
+# - SameSite: Lax
+
+# Test CSRF token endpoint
+curl -v http://localhost:3001/api/auth/csrf
+# Should return: {"csrfToken":"..."}
+```
+
+**Alternative for production with HTTPS**:
+```bash
+# Only if you have valid SSL certificates
+SESSION_SECURE=true
+NODE_ENV=production
+# Configure nginx with SSL (see nginx configuration section)
 ```
 
 ### Debug Mode

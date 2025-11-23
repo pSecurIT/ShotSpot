@@ -43,7 +43,7 @@ app.use(helmet({
       scriptSrc: ['\'self\'', '\'unsafe-inline\''], // Allow inline scripts for SPA
       styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://fonts.googleapis.com'], // Allow inline styles and Google Fonts
       imgSrc: ['\'self\'', 'data:', 'blob:'], // Allow data URIs and blobs for images
-      connectSrc: ['\'self\''], // API calls to same origin
+      connectSrc: ['\'self\'', 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'], // API calls + Google Fonts for service worker
       fontSrc: ['\'self\'', 'data:', 'https://fonts.gstatic.com'], // Allow Google Fonts
       objectSrc: ['\'none\''],
       mediaSrc: ['\'self\''],
@@ -56,7 +56,7 @@ app.use(helmet({
       upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
       reportUri: process.env.CSP_REPORT_URI || '/api/csp-report'
     },
-    reportOnly: false
+    reportOnly: process.env.NODE_ENV !== 'production' // Report-only in development
   },
   crossOriginEmbedderPolicy: false, // Disable for SPA compatibility
   crossOriginOpenerPolicy: { policy: 'same-origin' },
@@ -197,13 +197,16 @@ app.use(session({
   saveUninitialized: true, // Changed to true to create session for CSRF token
   name: 'sessionId', // Change from default 'connect.sid'
   cookie: {
-    // Allow SESSION_SECURE env var to override (useful for local Docker testing on HTTP)
-    secure: process.env.SESSION_SECURE === 'false' ? false : process.env.NODE_ENV === 'production',
+    // Allow SESSION_SECURE env var to override (useful for Docker/local testing on HTTP)
+    // In Docker without HTTPS, secure must be false
+    secure: process.env.SESSION_SECURE === 'true' ? true : false,
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // Allow cross-site in development
+    // Use 'lax' for Docker compatibility - allows cookies to be sent on initial navigation
+    sameSite: process.env.SESSION_SAME_SITE || 'lax',
     maxAge: parseInt(process.env.SESSION_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
-    domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined
+    // Don't set domain in Docker - let browser handle it
+    domain: process.env.COOKIE_DOMAIN || undefined
   },
   rolling: true, // Refresh session with each request
   unset: 'destroy'
@@ -424,12 +427,16 @@ if (serveFrontend) {
     }
   }));
   
-  // SPA fallback - serve index.html for all non-API routes
+  // SPA fallback - serve index.html for all non-API, non-asset routes
   // Use middleware instead of route pattern for path-to-regexp v8 compatibility
   app.use((req, res) => {
     // Don't serve index.html for API routes (includes /api/health)
     if (req.path.startsWith('/api/')) {
       return res.status(404).json({ error: 'Route not found' });
+    }
+    // Don't serve index.html for static assets (express.static already handled these)
+    if (req.path.startsWith('/assets/') || req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+      return res.status(404).json({ error: 'Asset not found' });
     }
     // Serve index.html for all other GET requests (SPA routing)
     if (req.method === 'GET') {
