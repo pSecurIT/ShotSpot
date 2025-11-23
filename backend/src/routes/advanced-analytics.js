@@ -399,17 +399,18 @@ router.get('/predictions/next-game/:playerId', [
     // Adjust prediction based on form
     let adjustment = 0;
     switch (form_trend) {
-      case 'hot': adjustment = 10; break;
-      case 'improving': adjustment = 5; break;
-      case 'declining': adjustment = -5; break;
-      case 'cold': adjustment = -10; break;
-      default: adjustment = 0;
+    case 'hot': adjustment = 10; break;
+    case 'improving': adjustment = 5; break;
+    case 'declining': adjustment = -5; break;
+    case 'cold': adjustment = -10; break;
+    default: adjustment = 0;
     }
 
     // If opponent specified, get historical matchup data
     let matchupAdjustment = 0;
+    let matchupResult;
     if (opponent_id) {
-      const matchupResult = await db.query(`
+      matchupResult = await db.query(`
         SELECT 
           ROUND(AVG(
             CAST(COUNT(CASE WHEN s.result = 'goal' THEN 1 END) AS numeric) / 
@@ -509,7 +510,7 @@ router.get('/benchmarks/league-averages', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { competition = 'default', season = 'current', position = 'all', min_games = 3 } = req.query;
+  const { competition = 'default', season = 'current', position = 'all' } = req.query;
 
   try {
     // Calculate league averages from all games
@@ -761,20 +762,20 @@ router.get('/benchmarks/historical/:entityType/:entityId', [
       let dateFilter = '';
       
       switch (period) {
-        case 'last_7_days':
-          dateFilter = "AND g.date >= CURRENT_DATE - INTERVAL '7 days'";
-          break;
-        case 'last_30_days':
-          dateFilter = "AND g.date >= CURRENT_DATE - INTERVAL '30 days'";
-          break;
-        case 'last_90_days':
-          dateFilter = "AND g.date >= CURRENT_DATE - INTERVAL '90 days'";
-          break;
-        case 'season':
-          dateFilter = "AND g.date >= CURRENT_DATE - INTERVAL '1 year'";
-          break;
-        default:
-          dateFilter = '';
+      case 'last_7_days':
+        dateFilter = 'AND g.date >= CURRENT_DATE - INTERVAL \'7 days\'';
+        break;
+      case 'last_30_days':
+        dateFilter = 'AND g.date >= CURRENT_DATE - INTERVAL \'30 days\'';
+        break;
+      case 'last_90_days':
+        dateFilter = 'AND g.date >= CURRENT_DATE - INTERVAL \'90 days\'';
+        break;
+      case 'season':
+        dateFilter = 'AND g.date >= CURRENT_DATE - INTERVAL \'1 year\'';
+        break;
+      default:
+        dateFilter = '';
       }
 
       // Validate entityType to prevent SQL injection
@@ -913,7 +914,7 @@ router.post('/video/link-event', requireRole(['admin', 'coach']), [
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `, [game_id, event_type, event_id, video_url, timestamp_start, timestamp_end, 
-        description, is_highlight, tags]);
+      description, is_highlight, tags]);
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
