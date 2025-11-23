@@ -94,6 +94,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT secret required}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      SESSION_SECRET: ${SESSION_SECRET:-${JWT_SECRET}}
+      CSRF_SECRET: ${CSRF_SECRET:-}
+      
+      # Session Configuration (Docker-specific)
+      SESSION_SECURE: ${SESSION_SECURE:-false}
+      SESSION_SAME_SITE: ${SESSION_SAME_SITE:-lax}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
       
       # Default Admin User (created on first startup)
       DEFAULT_ADMIN_USERNAME: ${DEFAULT_ADMIN_USERNAME:-admin}
