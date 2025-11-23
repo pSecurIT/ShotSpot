@@ -45,6 +45,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
+    "test:run": "vitest run",
     "coverage": "vitest run --coverage",
     "test:ci": "vitest run --coverage --reporter=verbose",
     "cypress:open": "cypress open",
