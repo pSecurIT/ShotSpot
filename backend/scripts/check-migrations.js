@@ -52,7 +52,7 @@ for (const scriptPath of SETUP_SCRIPTS) {
     missing.forEach(m => console.error(`     - ${m}`));
     allGood = false;
   } else {
-    console.log(`  ✅ All migrations present`);
+    console.log('  ✅ All migrations present');
   }
   console.log('');
 }
