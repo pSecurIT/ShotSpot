@@ -28,6 +28,7 @@ import matchCommentaryRoutes from './routes/match-commentary.js';
 import userRoutes from './routes/users.js';
 import analyticsRoutes from './routes/analytics.js';
 import achievementsRoutes from './routes/achievements.js';
+import exportsRoutes from './routes/exports.js';
 import reportsRoutes from './routes/reports.js';
 import exportRoutes from './routes/export.js';
 
@@ -286,6 +287,7 @@ app.use('/api/substitutions', substitutionsRoutes);
 app.use('/api/free-shots', freeShotsRoutes);
 app.use('/api/timeouts', timeoutsRoutes);
 app.use('/api/match-commentary', matchCommentaryRoutes);
+app.use('/api/exports', exportsRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {
