@@ -95,7 +95,7 @@ describe('Team Routes', () => {
 ### Middleware Stack (order critical!)
 In backend/src/app.js - applied in this exact order:
 1. helmet()                    // CSP, HSTS, X-Frame-Options
-2. rateLimit()                 // 100 req/15min (skipped in tests)
+2. rateLimit()                 // 1000 req/5min (skipped in tests)
 3. cors()                      // CORS_ORIGIN validation
 4. express.json()              // Body parser (10kb limit)
 5. csrf.middleware             // CSRF protection

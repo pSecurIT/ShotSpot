@@ -256,8 +256,8 @@ SESSION_SECRET=<secure-random-64-chars>
 
 # API
 CORS_ORIGIN=https://shotspot.yourclub.com
-RATE_LIMIT_MAX=100
-RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=1000
+RATE_LIMIT_WINDOW_MS=300000
 
 # Server
 NODE_ENV=production
@@ -514,8 +514,8 @@ NODE_ENV=production
 CORS_ORIGIN=https://shotspot.yourclub.com
 
 # Rate limiting (stricter)
-RATE_LIMIT_MAX=100
-RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=1000
+RATE_LIMIT_WINDOW_MS=300000
 
 # Shorter JWT expiry
 JWT_EXPIRES_IN=15m
