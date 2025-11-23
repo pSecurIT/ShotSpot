@@ -512,6 +512,11 @@ npm run start:frontend                # Frontend only
 cd frontend && npm run build          # Build frontend
 cd frontend && npm run preview        # Preview build
 
+# Mobile Apps (see MOBILE.md for details)
+npm run mobile:sync                   # Build and sync to mobile
+npm run mobile:android                # Open Android Studio
+npm run mobile:ios                    # Open Xcode (macOS)
+
 # Testing
 npm test                              # Run tests
 npm run test:watch                    # Watch mode
@@ -544,6 +549,7 @@ npm outdated                          # Check for updates
 
 - **[QUICKSTART.md](QUICKSTART.md)** - 5-minute quick start
 - **[INSTALLATION.md](INSTALLATION.md)** - Complete installation guide
+- **[MOBILE.md](MOBILE.md)** - Build native iOS & Android apps
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment
 - **[SECURITY.md](SECURITY.md)** - Security guidelines
 - **[README.md](README.md)** - Project overview

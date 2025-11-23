@@ -13,7 +13,10 @@
     "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
     "test": "cd backend && npm test",
     "test:watch": "cd backend && npm run test:watch",
-    "test:coverage": "cd backend && npm run test:coverage"
+    "test:coverage": "cd backend && npm run test:coverage",
+    "mobile:sync": "cd frontend && npm run mobile:sync",
+    "mobile:android": "cd frontend && npm run mobile:android",
+    "mobile:ios": "cd frontend && npm run mobile:ios"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

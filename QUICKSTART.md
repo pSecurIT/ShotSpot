@@ -139,6 +139,17 @@ Find your laptop IP:
 # macOS/Linux: ifconfig
 ```
 
+### 📱 Mobile Apps
+
+Want native iOS/Android apps? See [MOBILE.md](MOBILE.md) for complete instructions:
+
+```bash
+# Quick mobile build
+cd frontend
+npm run mobile:android  # Opens Android Studio
+npm run mobile:ios      # Opens Xcode (macOS only)
+```
+
 ---
 
 ## 🔥 Common Commands
@@ -186,6 +197,7 @@ npm run setup-db           # Reset/setup database
 ## 📖 Full Documentation
 
 - **Complete Guide**: [INSTALLATION.md](INSTALLATION.md)
+- **Mobile Apps**: [MOBILE.md](MOBILE.md) - Build native iOS & Android apps
 - **Deployment**: [DEPLOYMENT.md](DEPLOYMENT.md)
 - **Security**: [SECURITY.md](SECURITY.md)
 
