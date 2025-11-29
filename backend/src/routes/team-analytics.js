@@ -646,11 +646,24 @@ async function calculateTeamRanking(teamId, seasonId = null) {
   const goalsAgainst = parseInt(stats.goals_against) || 0;
   const cleanSheets = parseInt(stats.clean_sheets) || 0;
 
-  // Calculate points (3 for win, 1 for draw)
+  // Calculate points using standard football/korfball scoring (3 for win, 1 for draw)
   const points = (wins * 3) + draws;
 
-  // Calculate ELO-style rating
-  // Base rating of 1000, +/- based on performance
+  /**
+   * Calculate simplified performance rating
+   * 
+   * This is a simplified rating system inspired by ELO, designed for team rankings:
+   * - Base rating: 1000 (average team)
+   * - Win rate contribution: 0-200 points (100% wins = +200)
+   *   - Multiplier 200 chosen to create meaningful separation between teams
+   *   - A team winning 50% of games gets +100, 100% gets +200
+   * - Goal difference contribution: variable based on average margin
+   *   - Multiplier 50 per goal per game to reward offensive dominance
+   *   - A team averaging +2 goals per game gets +100
+   * 
+   * Note: This is not a true ELO system (which requires opponent ratings).
+   * For a full ELO implementation, consider storing and updating ratings after each game.
+   */
   let rating = 1000;
   if (gamesPlayed > 0) {
     const winRate = wins / gamesPlayed;

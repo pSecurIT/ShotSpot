@@ -266,7 +266,8 @@ router.put('/:id', [
 
     if (settings !== undefined) {
       updates.push(`settings = $${paramCount}`);
-      params.push(JSON.stringify(settings));
+      // PostgreSQL's pg driver handles JSONB conversion natively when passing objects
+      params.push(settings);
       paramCount++;
     }
 
@@ -563,17 +564,24 @@ router.post('/:id/bracket/generate', [
     const brackets = [];
     let matchNumber = 1;
 
-    // Round names
-    const roundNames = {
-      1: 'Round of 32',
-      2: 'Round of 16',
-      3: 'Quarter Finals',
-      4: 'Semi Finals',
-      5: 'Final'
+    /**
+     * Get descriptive name for a tournament round based on position from final
+     * @param {number} roundsFromFinal - How many rounds before the final (0 = final)
+     * @param {number} teamsInRound - Number of teams in this round
+     */
+    const getRoundName = (roundsFromFinal, teamsInRound) => {
+      switch (roundsFromFinal) {
+      case 0: return 'Final';
+      case 1: return 'Semi Finals';
+      case 2: return 'Quarter Finals';
+      default: return `Round of ${teamsInRound}`;
+      }
     };
 
     // First round with teams
     const firstRoundMatches = perfectBracketSize / 2;
+    const firstRoundName = getRoundName(rounds - 1, perfectBracketSize);
+    
     for (let i = 0; i < firstRoundMatches; i++) {
       const homeTeam = teams[i * 2] ? teams[i * 2].team_id : null;
       const awayTeam = teams[i * 2 + 1] ? teams[i * 2 + 1].team_id : null;
@@ -587,7 +595,7 @@ router.post('/:id/bracket/generate', [
           (competition_id, round_number, round_name, match_number, home_team_id, away_team_id, winner_team_id, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id
-      `, [id, 1, roundNames[rounds] || `Round ${1}`, matchNumber, homeTeam, awayTeam, winnerTeamId, status]);
+      `, [id, 1, firstRoundName, matchNumber, homeTeam, awayTeam, winnerTeamId, status]);
 
       brackets.push({
         id: result.rows[0].id,
@@ -602,9 +610,9 @@ router.post('/:id/bracket/generate', [
     // Generate subsequent rounds
     for (let round = 2; round <= rounds; round++) {
       const matchesInRound = perfectBracketSize / Math.pow(2, round);
-      const roundName = round === rounds ? 'Final' :
-        round === rounds - 1 ? 'Semi Finals' :
-          round === rounds - 2 ? 'Quarter Finals' : `Round of ${matchesInRound * 2}`;
+      const teamsInRound = matchesInRound * 2;
+      const roundsFromFinal = rounds - round;
+      const roundName = getRoundName(roundsFromFinal, teamsInRound);
 
       for (let i = 0; i < matchesInRound; i++) {
         const result = await db.query(`
