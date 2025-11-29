@@ -127,7 +127,15 @@ jobs:
       - name: Build iOS app
         working-directory: frontend/ios/App
         run: |
-          xcodebuild -workspace App.xcworkspace \n            -scheme App \n            -configuration Debug \n            -destination 'generic/platform=iOS' \n            -archivePath $PWD/build/App.xcarchive \n            clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -archivePath $PWD/build/App.xcarchive \
+            clean build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
