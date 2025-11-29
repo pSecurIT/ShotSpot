@@ -38,10 +38,18 @@ export default {
         plugins: [
           '@babel/plugin-syntax-import-attributes',
           ['babel-plugin-transform-import-meta', { module: 'ES6' }]
-        ]
+        ],
+        // Prevent babel-plugin-istanbul from being auto-injected during coverage
+        env: {
+          test: {
+            plugins: []
+          }
+        }
       }
     ]
   },
+  // Use Jest's built-in coverage instead of babel-plugin-istanbul
+  coverageProvider: 'v8',
   moduleFileExtensions: ['js', 'mjs', 'cjs', 'jsx', 'json'],
   testEnvironmentOptions: {
     url: 'http://localhost'
