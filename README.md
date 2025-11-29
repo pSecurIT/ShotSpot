@@ -69,8 +69,9 @@
 - Court visualization to tap/click shot locations
 - Undo/Edit options for fast corrections during live play
 - **✅ Offline support**: Full functionality without internet connection (see [OFFLINE.md](OFFLINE.md))
-- **📱 Native mobile apps**: Available for iOS and Android (see [MOBILE.md](MOBILE.md))
-- **🚀 Automated deployment**: CI/CD pipelines for App Store and Google Play (see [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md))
+- **📱 Native mobile apps**: Available for iOS and Android (see [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md))
+- **📦 Mobile releases**: Packaged APK/IPA files for easy distribution (see [MOBILE_RELEASE.md](MOBILE_RELEASE.md))
+- **🚀 Automated deployment**: CI/CD pipelines for App Store and Google Play
 - Auto-saving and data persistence
 
 ## 📊 Real-Time Match Reports (NEW!)
@@ -314,6 +315,53 @@ For detailed installation instructions (including troubleshooting), see **[INSTA
   - Audit trail for all user management actions
 
 For detailed security information, see [SECURITY.md](./SECURITY.md).
+
+## 📱 Mobile App Distribution
+
+ShotSpot provides native Android and iOS apps with easy distribution options:
+
+### For End Users (Non-Technical)
+
+**Option 1: App Stores (Recommended)**
+- Download from Google Play Store (Android)
+- Download from Apple App Store (iOS)
+- Automatic updates included
+
+**Option 2: Direct Download (Android)**
+- Download APK file from [GitHub Releases](https://github.com/pSecurIT/Korfball-game-statistics/releases)
+- Enable "Install from Unknown Sources" in Android settings
+- Tap APK file to install
+
+**Option 3: Beta Testing**
+- Join TestFlight beta (iOS)
+- Join Google Play beta program (Android)
+
+### For Developers
+
+**Create Release Packages**:
+```bash
+# Create new release with automated packaging
+npm run release:create
+
+# Or manually build packages
+npm run mobile:build:android  # Creates APK
+npm run mobile:build:ios      # Prepares IPA
+```
+
+**Release Artifacts Generated**:
+- `app-release.apk` - Android install file (~10-20 MB)
+- `app-release.aab` - Google Play bundle (~8-15 MB)
+- `App.ipa` - iOS install file (~15-30 MB)
+
+**Automated CI/CD**:
+- Push a tag (e.g., `v1.0.0`) to trigger GitHub Actions
+- Packages are automatically built and uploaded to releases
+- Takes ~15-20 minutes to complete both platforms
+
+For complete mobile deployment documentation, see:
+- [MOBILE_RELEASE.md](MOBILE_RELEASE.md) - Package creation and distribution guide
+- [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md) - Full deployment setup
+- [MOBILE_DEPLOYMENT_QUICKSTART.md](MOBILE_DEPLOYMENT_QUICKSTART.md) - Quick start guide
 
 ## 🔑 Secrets Management
 
