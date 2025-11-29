@@ -16,7 +16,11 @@
     "test:coverage": "cd backend && npm run test:coverage",
     "mobile:sync": "cd frontend && npm run mobile:sync",
     "mobile:android": "cd frontend && npm run mobile:android",
-    "mobile:ios": "cd frontend && npm run mobile:ios"
+    "mobile:ios": "cd frontend && npm run mobile:ios",
+    "mobile:build:android": "cd frontend && npm run build && npx cap sync android && cd android && ./gradlew assembleRelease",
+    "mobile:build:ios": "cd frontend && npm run build && npx cap sync ios",
+    "release:create": "node scripts/create-release.js",
+    "release:changelog": "node scripts/generate-changelog.js"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
