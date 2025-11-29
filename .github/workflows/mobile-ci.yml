@@ -127,12 +127,15 @@ jobs:
       - name: Build iOS app
         working-directory: frontend/ios/App
         run: |
-          xcodebuild -workspace App.xcworkspace \
+          xcodebuild \
+            -workspace App.xcworkspace \
             -scheme App \
             -configuration Debug \
             -destination 'generic/platform=iOS' \
             -archivePath $PWD/build/App.xcarchive \
-            clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+            clean build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
@@ -160,6 +163,10 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Build web app
+        working-directory: frontend
+        run: npm run build
 
       - name: Validate Capacitor Config
         working-directory: frontend
@@ -192,7 +199,7 @@ jobs:
           echo "APK Size: $APK_SIZE_MB MB"
           
           # Fail if APK is larger than 50MB (adjust threshold as needed)
-          if (( $(echo "$APK_SIZE_MB > 50" | bc -l) )); then
+          if (( $(echo " $APK_SIZE_MB > 50" | bc -l) )); then
             echo "❌ APK size ($APK_SIZE_MB MB) exceeds 50MB threshold"
             exit 1
           else
