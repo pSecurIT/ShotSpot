@@ -46,6 +46,10 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL_PREVIEW || 'https://preview.shotspot.com/api' }}
         run: npm run build
 
+      - name: Add Android platform
+        working-directory: frontend
+        run: npx cap add android
+
       - name: Sync Capacitor
         working-directory: frontend
         run: npx cap sync android
@@ -116,6 +120,10 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL_PREVIEW || 'https://preview.shotspot.com/api' }}
         run: npm run build
+
+      - name: Add iOS platform
+        working-directory: frontend
+        run: npx cap add ios
 
       - name: Sync Capacitor
         working-directory: frontend
