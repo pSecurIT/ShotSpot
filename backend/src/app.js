@@ -35,6 +35,8 @@ import scheduledReportsRoutes from './routes/scheduled-reports.js';
 import reportsRoutes from './routes/reports.js';
 import exportsRoutes from './routes/exports.js';
 import exportRoutes from './routes/export.js';
+import competitionsRoutes from './routes/competitions.js';
+import teamAnalyticsRoutes from './routes/team-analytics.js';
 
 
 const app = express();
@@ -296,6 +298,8 @@ app.use('/api/report-templates', reportTemplatesRoutes);
 app.use('/api/export-settings', exportSettingsRoutes);
 app.use('/api/scheduled-reports', scheduledReportsRoutes);
 app.use('/api/exports', exportsRoutes);
+app.use('/api/competitions', competitionsRoutes);
+app.use('/api/team-analytics', teamAnalyticsRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {

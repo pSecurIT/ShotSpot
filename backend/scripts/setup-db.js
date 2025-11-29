@@ -219,7 +219,8 @@ async function main() {
       '../src/migrations/add_login_history.sql',
       '../src/migrations/add_export_configuration.sql',
       '../src/migrations/seed_default_report_templates.sql',
-      '../src/migrations/add_seasons.sql'
+      '../src/migrations/add_seasons.sql',
+      '../src/migrations/add_competition_management.sql'
     ];
 
     console.log('Applying database migrations...');

@@ -118,7 +118,8 @@ async function setupTestDb() {
       'add_export_configuration.sql',
       'seed_default_report_templates.sql',
       'add_seasons.sql',
-      'seed_achievements.sql'
+      'seed_achievements.sql',
+      'add_competition_management.sql'
     ];
 
     for (const migrationFile of migrations) {
