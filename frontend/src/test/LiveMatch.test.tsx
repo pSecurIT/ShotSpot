@@ -561,8 +561,10 @@ describe('LiveMatch', () => {
         expect(screen.getByText('Live Match')).toBeInTheDocument();
       });
 
-      // Component should fetch active possession
-      expect(mockApi.get).toHaveBeenCalledWith('/possessions/1/active');
+      // Component should fetch active possession - need to wait for the useEffect to run
+      await waitFor(() => {
+        expect(mockApi.get).toHaveBeenCalledWith('/possessions/1/active');
+      });
     });
 
     it('handles 404 errors for no active possession gracefully', async () => {
