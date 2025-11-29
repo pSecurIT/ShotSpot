@@ -204,11 +204,22 @@ describe('PlayerManagement', () => {
     const submitButton = screen.getByText('Add Player');
     await userEvent.click(submitButton);
 
+    // Wait for success message first to ensure the async operation completed
     await waitFor(() => {
-      expect(firstNameInput).toHaveValue('');
-      expect(lastNameInput).toHaveValue('');
-      expect(jerseyInput).toHaveValue(null);
-      expect(teamSelect).toHaveValue('');
+      expect(screen.getByText('Player added successfully!')).toBeInTheDocument();
+    });
+
+    // Re-query form elements after state update to avoid stale references (race condition fix)
+    await waitFor(() => {
+      const updatedFirstNameInput = screen.getByRole('textbox', { name: /first name/i });
+      const updatedLastNameInput = screen.getByRole('textbox', { name: /last name/i });
+      const updatedJerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });
+      const updatedTeamSelect = document.getElementById('team_id') as HTMLSelectElement;
+      
+      expect(updatedFirstNameInput).toHaveValue('');
+      expect(updatedLastNameInput).toHaveValue('');
+      expect(updatedJerseyInput).toHaveValue(null);
+      expect(updatedTeamSelect).toHaveValue('');
     });
   });
 
