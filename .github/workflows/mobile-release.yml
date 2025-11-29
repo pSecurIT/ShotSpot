@@ -289,7 +289,7 @@ jobs:
         working-directory: frontend/ios/App
         run: |
           set -e
-          echo "No signing credentials detected — building for iOS Simulator (unsigned)"
+          echo "No signing credentials detected - building for iOS Simulator (unsigned)"
           mkdir -p build
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
@@ -328,9 +328,9 @@ jobs:
 
       - name: Upload to App Store Connect
         if: |
+          success() && 
           env.signing_required == 'true' &&
-          (success() && 
-          github.event_name == 'release' || 
+          (github.event_name == 'release' || 
           github.event.inputs.release_type == 'production')
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
