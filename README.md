@@ -70,6 +70,7 @@
 - Undo/Edit options for fast corrections during live play
 - **✅ Offline support**: Full functionality without internet connection (see [OFFLINE.md](OFFLINE.md))
 - **📱 Native mobile apps**: Available for iOS and Android (see [MOBILE.md](MOBILE.md))
+- **🚀 Automated deployment**: CI/CD pipelines for App Store and Google Play (see [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md))
 - Auto-saving and data persistence
 
 ## 📊 Real-Time Match Reports (NEW!)
@@ -242,6 +243,8 @@ npm run lint
 | **[BUILD.md](BUILD.md)** | Build/run command reference | 10 min |
 | **[DEPLOYMENT.md](DEPLOYMENT.md)** | Production deployment guide | 20 min |
 | **[OFFLINE.md](OFFLINE.md)** | Offline functionality guide | 15 min |
+| **[MOBILE.md](MOBILE.md)** | Mobile app development | 20 min |
+| **[MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md)** | Mobile CI/CD & app store deployment | 30 min |
 | **[SECURITY.md](SECURITY.md)** | Security best practices | 10 min |
 | **[SECRETS.md](SECRETS.md)** | Secrets management | 5 min |
 | **[REPORTS_API.md](REPORTS_API.md)** | Real-Time Match Reports API | 15 min |
