@@ -1,5 +1,8 @@
 name: Mobile Preview Build
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
