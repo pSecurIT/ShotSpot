@@ -38,6 +38,7 @@ jobs:
     name: Android Release Build
     runs-on: ubuntu-latest
     if: |
+      github.event_name == 'push' ||
       github.event_name == 'release' || 
       (github.event_name == 'workflow_dispatch' && 
        (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both'))
@@ -172,6 +173,7 @@ jobs:
     name: iOS Release Build
     runs-on: macos-latest
     if: |
+      github.event_name == 'push' ||
       github.event_name == 'release' || 
       (github.event_name == 'workflow_dispatch' && 
        (github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both'))
