@@ -4,6 +4,9 @@ permissions:
   contents: write
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types: [published]
   workflow_dispatch:
@@ -130,19 +133,21 @@ jobs:
         working-directory: frontend/android
         run: ./gradlew assembleRelease --stacktrace
 
-      - name: Upload AAB to Google Play
-        if: |
-          success() && 
-          github.event_name == 'release' || 
-          github.event.inputs.release_type == 'production'
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.psecurit.shotspot
-          releaseFiles: frontend/android/app/build/outputs/bundle/release/app-release.aab
-          track: ${{ github.event.inputs.release_type || 'internal' }}
-          status: completed
-          whatsNewDirectory: frontend/android/release-notes
+      # Disabled: Upload AAB to Google Play
+      # Uncomment this step when you're ready to publish to Google Play
+      # - name: Upload AAB to Google Play
+      #   if: |
+      #     success() && 
+      #     github.event_name == 'release' || 
+      #     github.event.inputs.release_type == 'production'
+      #   uses: r0adkll/upload-google-play@v1
+      #   with:
+      #     serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+      #     packageName: com.psecurit.shotspot
+      #     releaseFiles: frontend/android/app/build/outputs/bundle/release/app-release.aab
+      #     track: ${{ github.event.inputs.release_type || 'internal' }}
+      #     status: completed
+      #     whatsNewDirectory: frontend/android/release-notes
 
       - name: Upload Release Artifacts
         uses: actions/upload-artifact@v4
