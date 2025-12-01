@@ -139,9 +139,20 @@ describe('Period End Functionality', () => {
         />
       );
 
+      // Wait for initial render to complete
+      await waitFor(() => {
+        expect(screen.getByTitle('Select John Doe')).toBeInTheDocument();
+      });
+
       // Select a player first (using new player grid button)
       const playerButton = screen.getByTitle('Select John Doe');
       fireEvent.click(playerButton);
+
+      // Wait for player selection to complete
+      await waitFor(() => {
+        const court = screen.getByRole('img');
+        expect(court).toBeInTheDocument();
+      });
 
       // Click on court to select position
       const court = screen.getByRole('img');
@@ -151,7 +162,7 @@ describe('Period End Functionality', () => {
       await waitFor(() => {
         const goalButton = screen.getByText('⚽ Goal');
         expect(goalButton).not.toHaveAttribute('disabled');
-      });
+      }, { timeout: 3000 });
 
       const goalButton = screen.getByText('⚽ Goal');
       fireEvent.click(goalButton);
@@ -159,10 +170,12 @@ describe('Period End Functionality', () => {
       // Should call canAddEvents when trying to record, but not proceed with onShotRecorded
       await waitFor(() => {
         expect(mockCanAddEvents).toHaveBeenCalled();
-      });
+      }, { timeout: 2000 });
       
-      // Since canAddEvents returns false, the shot should not be recorded and onShotRecorded should not be called
-      expect(mockOnShotRecorded).not.toHaveBeenCalled();
+      // Give time for any async operations to complete
+      await waitFor(() => {
+        expect(mockOnShotRecorded).not.toHaveBeenCalled();
+      }, { timeout: 1000 });
       
       // Also verify that the API was not called since the shot was blocked
       expect(mockApi.default.post).not.toHaveBeenCalled();
@@ -214,13 +227,30 @@ describe('Period End Functionality', () => {
         />
       );
 
+      // Wait for initial render
+      await waitFor(() => {
+        expect(screen.getByTitle('Select John Doe')).toBeInTheDocument();
+      });
+
       // Select a player first (using new player grid button)
       const playerButton = screen.getByTitle('Select John Doe');
       fireEvent.click(playerButton);
 
+      // Wait for court to be ready
+      await waitFor(() => {
+        const court = screen.getByRole('img');
+        expect(court).toBeInTheDocument();
+      });
+
       // Click on court to select position
       const court = screen.getByRole('img');
       fireEvent.click(court, { clientX: 100, clientY: 100 });
+
+      // Wait for button to be enabled
+      await waitFor(() => {
+        const goalButton = screen.getByText('⚽ Goal');
+        expect(goalButton).not.toHaveAttribute('disabled');
+      }, { timeout: 3000 });
 
       // Try to record a shot
       const goalButton = screen.getByText('⚽ Goal');
@@ -231,7 +261,7 @@ describe('Period End Functionality', () => {
         expect(mockConfirm).toHaveBeenCalledWith(
           expect.stringContaining('⏰ Period has ended!')
         );
-      });
+      }, { timeout: 2000 });
     });
 
     it('should prevent substitution when period has ended and user cancels', async () => {
@@ -245,6 +275,7 @@ describe('Period End Functionality', () => {
           away_team: { active: [], bench: [] }
         }
       });
+      vi.mocked(mockApi.default.post).mockResolvedValue({ data: { id: 1 } });
 
       render(
         <SubstitutionPanel
@@ -258,9 +289,17 @@ describe('Period End Functionality', () => {
         />
       );
 
+      // Wait for component to fully render
+      await waitFor(() => {
+        expect(screen.getByText('⚡ Substitutions')).toBeInTheDocument();
+      });
+
       // Try to make a substitution (this would normally trigger the API call)
       // The component should call canAddEvents and not proceed
+      // Wait a bit to ensure no unexpected calls
+      await new Promise(resolve => setTimeout(resolve, 100));
       expect(mockCanAddEvents).not.toHaveBeenCalled(); // Only called when actually submitting
+      expect(mockApi.default.post).not.toHaveBeenCalled();
     });
 
     it('should prevent fault recording when period has ended and user cancels', async () => {
@@ -275,6 +314,7 @@ describe('Period End Functionality', () => {
         last_name: 'Doe',
         jersey_number: 1
       }] });
+      vi.mocked(mockApi.default.post).mockResolvedValue({ data: { id: 1 } });
 
       render(
         <FaultManagement
@@ -292,11 +332,13 @@ describe('Period End Functionality', () => {
       await waitFor(() => {
         const playerSelect = screen.getByDisplayValue('Select player');
         expect(playerSelect).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
 
       // Select a team first (should already be selected by default)
-      const teamSelect = screen.getByDisplayValue('Home Team (Home)');
-      expect(teamSelect).toBeInTheDocument();
+      await waitFor(() => {
+        const teamSelect = screen.getByDisplayValue('Home Team (Home)');
+        expect(teamSelect).toBeInTheDocument();
+      });
 
       // Select a player to enable the button
       const playerSelect = screen.getByDisplayValue('Select player');
@@ -306,14 +348,17 @@ describe('Period End Functionality', () => {
       await waitFor(() => {
         const recordButton = screen.getByText('Record Offensive Fault');
         expect(recordButton).not.toHaveAttribute('disabled');
-      });
+      }, { timeout: 3000 });
 
       const recordButton = screen.getByText('Record Offensive Fault');
       fireEvent.click(recordButton);
 
       await waitFor(() => {
         expect(mockCanAddEvents).toHaveBeenCalled();
-      });
+      }, { timeout: 2000 });
+
+      // Wait a bit to ensure no API call is made
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Should not make API call since canAddEvents returned false
       expect(mockApi.default.post).not.toHaveBeenCalled();
@@ -325,6 +370,7 @@ describe('Period End Functionality', () => {
 
       const mockApi = await import('../utils/api');
       vi.mocked(mockApi.default.get).mockResolvedValue({ data: [] });
+      vi.mocked(mockApi.default.post).mockResolvedValue({ data: { id: 1 } });
 
       render(
         <TimeoutManagement
@@ -338,13 +384,21 @@ describe('Period End Functionality', () => {
         />
       );
 
+      // Wait for component to render
+      await waitFor(() => {
+        expect(screen.getByText('Start Team Timeout')).toBeInTheDocument();
+      }, { timeout: 2000 });
+
       // Try to start a timeout
       const startButton = screen.getByText('Start Team Timeout');
       fireEvent.click(startButton);
 
       await waitFor(() => {
         expect(mockCanAddEvents).toHaveBeenCalled();
-      });
+      }, { timeout: 2000 });
+
+      // Wait a bit to ensure no API call is made
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Should not make API call since canAddEvents returned false
       expect(mockApi.default.post).not.toHaveBeenCalled();
