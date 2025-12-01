@@ -188,7 +188,7 @@ jobs:
     
     steps:
       - name: Download Android APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: android-debug-apk
 
