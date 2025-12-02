@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
 # Security: Update Alpine packages to fix vulnerabilities
-RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
+RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
 
 WORKDIR /app
 

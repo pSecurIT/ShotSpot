@@ -78,5 +78,8 @@
     ">0.2%",
     "not dead",
     "not op_mini all"
-  ]
+  ],
+  "overrides": {
+    "glob": ">=11.1.0"
+  }
 }

@@ -55,8 +55,8 @@ router.get('/me', async (req, res) => {
 // Get login history for a user (admin can view any, users can view their own)
 router.get('/:userId/login-history', async (req, res) => {
   const { userId } = req.params;
-  const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-  const offset = parseInt(req.query.offset) || 0;
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+  const offset = parseInt(req.query.offset, 10) || 0;
 
   try {
     // Check if user is admin or viewing their own history
@@ -138,7 +138,7 @@ router.put('/:userId/role', [
 // Update user password (self or admin)
 router.put('/:userId/password', [
   body('currentPassword')
-    .if((value, { req }) => req.user.id === parseInt(req.params.userId))
+    .if((value, { req }) => req.user.id === parseInt(req.params.userId, 10))
     .notEmpty()
     .withMessage('Current password is required'),
   body('newPassword')
@@ -154,15 +154,19 @@ router.put('/:userId/password', [
 
   const { userId } = req.params;
   const { currentPassword, newPassword } = req.body;
+  const userIdNum = parseInt(userId, 10);
+  if (isNaN(userIdNum)) {
+    return res.status(400).json({ error: 'Invalid user ID' });
+  }
 
   // Only allow users to change their own password unless they're admin
-  if (req.user.id !== parseInt(userId) && req.user.role !== 'admin') {
+  if (req.user.id !== userIdNum && req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Not authorized to change other users\' passwords' });
   }
 
   try {
     // If user is changing their own password, verify current password
-    if (req.user.id === parseInt(userId)) {
+    if (req.user.id === userIdNum) {
       const user = await db.query(
         'SELECT password_hash FROM users WHERE id = $1',
         [userId]
@@ -270,9 +274,13 @@ router.patch('/:userId', [
 
   const { userId } = req.params;
   const { username, email } = req.body;
+  const userIdNum = parseInt(userId, 10);
+  if (isNaN(userIdNum)) {
+    return res.status(400).json({ error: 'Invalid user ID' });
+  }
 
   // Only allow users to edit their own profile unless they're admin
-  if (req.user.id !== parseInt(userId) && req.user.role !== 'admin') {
+  if (req.user.id !== userIdNum && req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Not authorized to edit other users\' profiles' });
   }
 
