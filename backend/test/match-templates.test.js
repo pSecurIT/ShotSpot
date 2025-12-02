@@ -1,6 +1,6 @@
 import request from 'supertest';
 import app from '../src/app.js';
-import pool from '../src/db.js';
+import db from '../src/db.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
@@ -15,7 +15,7 @@ describe('Match Templates API', () => {
   beforeAll(async () => {
     // Create an admin user
     const hashedPassword = await bcrypt.hash('adminpassword', 10);
-    const userResult = await pool.query(
+    const userResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
       ['templateadmin', 'templateadmin@test.com', hashedPassword, 'admin']
     );
@@ -27,7 +27,7 @@ describe('Match Templates API', () => {
     );
 
     // Create a coach user
-    const coachResult = await pool.query(
+    const coachResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
       ['templatecoach', 'templatecoach@test.com', hashedPassword, 'coach']
     );
@@ -39,7 +39,7 @@ describe('Match Templates API', () => {
     );
 
     // Create a regular user
-    const regularUserResult = await pool.query(
+    const regularUserResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
       ['templateuser', 'templateuser@test.com', hashedPassword, 'user']
     );
@@ -53,9 +53,9 @@ describe('Match Templates API', () => {
 
   afterAll(async () => {
     // Clean up
-    await pool.query('DELETE FROM match_templates WHERE created_by IN ($1, $2, $3)', [userId, coachId, regularUserId]);
-    await pool.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [userId, coachId, regularUserId]);
-    await pool.end();
+    await db.query('DELETE FROM match_templates WHERE created_by IN ($1, $2, $3)', [userId, coachId, regularUserId]);
+    await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [userId, coachId, regularUserId]);
+    // Note: Don't call db.closePool() as it's a singleton that might be needed by other tests
   });
 
   describe('GET /api/match-templates', () => {
@@ -305,20 +305,20 @@ describe('Match Templates API', () => {
 
     beforeAll(async () => {
       // Create teams
-      const homeTeamRes = await pool.query(
+      const homeTeamRes = await db.query(
         'INSERT INTO teams (name) VALUES ($1) RETURNING id',
         ['Template Test Home']
       );
       homeTeamId = homeTeamRes.rows[0].id;
 
-      const awayTeamRes = await pool.query(
+      const awayTeamRes = await db.query(
         'INSERT INTO teams (name) VALUES ($1) RETURNING id',
         ['Template Test Away']
       );
       awayTeamId = awayTeamRes.rows[0].id;
 
       // Create a game
-      const gameRes = await pool.query(
+      const gameRes = await db.query(
         `INSERT INTO games (home_team_id, away_team_id, date, status) 
          VALUES ($1, $2, $3, $4) RETURNING id`,
         [homeTeamId, awayTeamId, new Date().toISOString(), 'scheduled']
@@ -338,8 +338,8 @@ describe('Match Templates API', () => {
     });
 
     afterAll(async () => {
-      await pool.query('DELETE FROM games WHERE id = $1', [gameId]);
-      await pool.query('DELETE FROM teams WHERE id IN ($1, $2)', [homeTeamId, awayTeamId]);
+      await db.query('DELETE FROM games WHERE id = $1', [gameId]);
+      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [homeTeamId, awayTeamId]);
     });
 
     it('should apply template to a scheduled game', async () => {
@@ -354,7 +354,7 @@ describe('Match Templates API', () => {
 
     it('should not apply template to game in progress', async () => {
       // Update game to in_progress
-      await pool.query('UPDATE games SET status = $1 WHERE id = $2', ['in_progress', gameId]);
+      await db.query('UPDATE games SET status = $1 WHERE id = $2', ['in_progress', gameId]);
 
       const res = await request(app)
         .post(`/api/match-templates/${templateId}/apply-to-game/${gameId}`)
@@ -364,7 +364,7 @@ describe('Match Templates API', () => {
       expect(res.body.error).toContain('in progress');
 
       // Reset game status
-      await pool.query('UPDATE games SET status = $1 WHERE id = $2', ['scheduled', gameId]);
+      await db.query('UPDATE games SET status = $1 WHERE id = $2', ['scheduled', gameId]);
     });
 
     it('should return 404 for non-existent template', async () => {
