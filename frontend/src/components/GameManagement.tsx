@@ -27,10 +27,6 @@ interface MatchTemplate {
   description: string | null;
   number_of_periods: number;
   period_duration_minutes: number;
-  overtime_enabled: boolean;
-  overtime_period_duration_minutes: number;
-  max_overtime_periods: number;
-  golden_goal_overtime: boolean;
   competition_type: string | null;
   is_system_template: boolean;
 }
@@ -358,8 +354,7 @@ const GameManagement: React.FC = () => {
                   <optgroup label="📌 System Templates">
                     {templates.filter(t => t.is_system_template).map(template => (
                       <option key={template.id} value={template.id}>
-                        {template.name} ({template.number_of_periods}×{template.period_duration_minutes}min
-                        {template.overtime_enabled ? ', OT' : ''})
+                        {template.name} ({template.number_of_periods}×{template.period_duration_minutes}min)
                       </option>
                     ))}
                   </optgroup>
@@ -367,8 +362,7 @@ const GameManagement: React.FC = () => {
                     <optgroup label="👤 My Templates">
                       {templates.filter(t => !t.is_system_template).map(template => (
                         <option key={template.id} value={template.id}>
-                          {template.name} ({template.number_of_periods}×{template.period_duration_minutes}min
-                          {template.overtime_enabled ? ', OT' : ''})
+                          {template.name} ({template.number_of_periods}×{template.period_duration_minutes}min)
                         </option>
                       ))}
                     </optgroup>
@@ -383,11 +377,6 @@ const GameManagement: React.FC = () => {
                     return (
                       <>
                         <strong>{t.name}</strong>: {t.number_of_periods} periods × {t.period_duration_minutes} min
-                        {t.overtime_enabled && (
-                          <> | OT: up to {t.max_overtime_periods} × {t.overtime_period_duration_minutes} min
-                            {t.golden_goal_overtime && ' (Golden Goal)'}
-                          </>
-                        )}
                       </>
                     );
                   })()}
