@@ -24,5 +24,8 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "overrides": {
+    "glob": ">=11.1.0"
   }
 }

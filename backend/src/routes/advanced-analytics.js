@@ -25,7 +25,10 @@ router.get('/predictions/form-trends/:playerId', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const playerId = parseInt(req.params.playerId);
+  const playerId = parseInt(req.params.playerId, 10);
+  if (isNaN(playerId)) {
+    return res.status(400).json({ error: 'Invalid player ID' });
+  }
   const { games = 5 } = req.query;
 
   try {
@@ -142,8 +145,14 @@ router.get('/predictions/fatigue/:playerId', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const playerId = parseInt(req.params.playerId);
-  const gameId = req.query.game_id ? parseInt(req.query.game_id) : null;
+  const playerId = parseInt(req.params.playerId, 10);
+  if (isNaN(playerId)) {
+    return res.status(400).json({ error: 'Invalid player ID' });
+  }
+  const gameId = req.query.game_id ? parseInt(req.query.game_id, 10) : null;
+  if (gameId !== null && isNaN(gameId)) {
+    return res.status(400).json({ error: 'Invalid game ID' });
+  }
 
   try {
     // Get recent games (last 5) if no specific game
@@ -343,8 +352,14 @@ router.get('/predictions/next-game/:playerId', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const playerId = parseInt(req.params.playerId);
-  const opponentId = req.query.opponent_id ? parseInt(req.query.opponent_id) : null;
+  const playerId = parseInt(req.params.playerId, 10);
+  if (isNaN(playerId)) {
+    return res.status(400).json({ error: 'Invalid player ID' });
+  }
+  const opponentId = req.query.opponent_id ? parseInt(req.query.opponent_id, 10) : null;
+  if (opponentId !== null && isNaN(opponentId)) {
+    return res.status(400).json({ error: 'Invalid opponent ID' });
+  }
 
   try {
     // Get recent performance (last 10 games)

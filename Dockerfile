@@ -54,7 +54,7 @@ FROM node:lts-alpine
 
 # Security: Update packages and install only necessary tools
 RUN apk update && \
-    apk upgrade && \
+    apk upgrade --no-cache && \
     apk add --no-cache \
     dumb-init \
     tini && \

@@ -29,11 +29,14 @@ router.get('/head-to-head/:team1Id/:team2Id', [
   }
 
   let { team1Id, team2Id } = req.params;
-  const limit = parseInt(req.query.limit) || 10;
+  const limit = parseInt(req.query.limit, 10) || 10;
 
   // Ensure consistent ordering (team1 < team2)
-  team1Id = parseInt(team1Id);
-  team2Id = parseInt(team2Id);
+  team1Id = parseInt(team1Id, 10);
+  team2Id = parseInt(team2Id, 10);
+  if (isNaN(team1Id) || isNaN(team2Id)) {
+    return res.status(400).json({ error: 'Invalid team IDs' });
+  }
   if (team1Id > team2Id) {
     [team1Id, team2Id] = [team2Id, team1Id];
   }
@@ -236,7 +239,7 @@ router.get('/rankings', [
   }
 
   const { season_id } = req.query;
-  const limit = parseInt(req.query.limit) || 20;
+  const limit = parseInt(req.query.limit, 10) || 20;
 
   try {
     let queryText;
