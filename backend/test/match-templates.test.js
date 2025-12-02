@@ -89,10 +89,6 @@ describe('Match Templates API', () => {
           description: 'A test template',
           number_of_periods: 2,
           period_duration_minutes: 15,
-          overtime_enabled: true,
-          overtime_period_duration_minutes: 5,
-          max_overtime_periods: 2,
-          golden_goal_overtime: true,
           competition_type: 'cup'
         });
 
@@ -100,8 +96,6 @@ describe('Match Templates API', () => {
       expect(res.body.name).toBe('Test Admin Template');
       expect(res.body.number_of_periods).toBe(2);
       expect(res.body.period_duration_minutes).toBe(15);
-      expect(res.body.overtime_enabled).toBe(true);
-      expect(res.body.golden_goal_overtime).toBe(true);
       expect(res.body.is_system_template).toBe(false);
     });
 
@@ -175,7 +169,7 @@ describe('Match Templates API', () => {
     beforeAll(async () => {
       const res = await request(app)
         .post('/api/match-templates')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${coachToken}`)
         .send({
           name: 'Get Test Template',
           number_of_periods: 3
@@ -222,12 +216,12 @@ describe('Match Templates API', () => {
         .set('Authorization', `Bearer ${coachToken}`)
         .send({
           name: 'Updated Template Name',
-          overtime_enabled: true
+          period_duration_minutes: 12
         });
 
       expect(res.statusCode).toBe(200);
       expect(res.body.name).toBe('Updated Template Name');
-      expect(res.body.overtime_enabled).toBe(true);
+      expect(res.body.period_duration_minutes).toBe(12);
     });
 
     it('should allow admin to update any template', async () => {
@@ -338,11 +332,7 @@ describe('Match Templates API', () => {
         .send({
           name: 'Apply Test Template',
           number_of_periods: 2,
-          period_duration_minutes: 15,
-          overtime_enabled: true,
-          overtime_period_duration_minutes: 7,
-          max_overtime_periods: 3,
-          golden_goal_overtime: true
+          period_duration_minutes: 15
         });
       templateId = res.body.id;
     });
@@ -360,9 +350,6 @@ describe('Match Templates API', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.message).toBe('Template applied successfully');
       expect(res.body.game.number_of_periods).toBe(2);
-      expect(res.body.game.overtime_enabled).toBe(true);
-      expect(res.body.game.max_overtime_periods).toBe(3);
-      expect(res.body.game.golden_goal_overtime).toBe(true);
     });
 
     it('should not apply template to game in progress', async () => {

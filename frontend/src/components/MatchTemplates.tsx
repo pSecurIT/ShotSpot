@@ -8,10 +8,6 @@ interface MatchTemplate {
   description: string | null;
   number_of_periods: number;
   period_duration_minutes: number;
-  overtime_enabled: boolean;
-  overtime_period_duration_minutes: number;
-  max_overtime_periods: number;
-  golden_goal_overtime: boolean;
   competition_type: string | null;
   is_system_template: boolean;
   created_by: number | null;
@@ -42,10 +38,6 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
     description: '',
     number_of_periods: 4,
     period_duration_minutes: 10,
-    overtime_enabled: false,
-    overtime_period_duration_minutes: 5,
-    max_overtime_periods: 2,
-    golden_goal_overtime: false,
     competition_type: ''
   });
 
@@ -73,10 +65,6 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
       description: '',
       number_of_periods: 4,
       period_duration_minutes: 10,
-      overtime_enabled: false,
-      overtime_period_duration_minutes: 5,
-      max_overtime_periods: 2,
-      golden_goal_overtime: false,
       competition_type: ''
     });
     setEditingTemplate(null);
@@ -118,10 +106,6 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
       description: template.description || '',
       number_of_periods: template.number_of_periods,
       period_duration_minutes: template.period_duration_minutes,
-      overtime_enabled: template.overtime_enabled,
-      overtime_period_duration_minutes: template.overtime_period_duration_minutes,
-      max_overtime_periods: template.max_overtime_periods,
-      golden_goal_overtime: template.golden_goal_overtime,
       competition_type: template.competition_type || ''
     });
     setShowForm(true);
@@ -259,61 +243,6 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
             </div>
           </div>
 
-          <div className="form-section">
-            <h4>⚡ Overtime Settings</h4>
-            <div className="form-field checkbox-field">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={formData.overtime_enabled}
-                  onChange={(e) => setFormData({ ...formData, overtime_enabled: e.target.checked })}
-                />
-                Enable Overtime
-              </label>
-            </div>
-            
-            {formData.overtime_enabled && (
-              <>
-                <div className="form-row">
-                  <div className="form-field">
-                    <label htmlFor="overtime-duration">Overtime Period Duration (minutes)</label>
-                    <input
-                      id="overtime-duration"
-                      type="number"
-                      value={formData.overtime_period_duration_minutes}
-                      onChange={(e) => setFormData({ ...formData, overtime_period_duration_minutes: parseInt(e.target.value) || 5 })}
-                      min={1}
-                      max={30}
-                    />
-                  </div>
-                  
-                  <div className="form-field">
-                    <label htmlFor="max-overtime">Max Overtime Periods</label>
-                    <input
-                      id="max-overtime"
-                      type="number"
-                      value={formData.max_overtime_periods}
-                      onChange={(e) => setFormData({ ...formData, max_overtime_periods: parseInt(e.target.value) || 2 })}
-                      min={1}
-                      max={10}
-                    />
-                  </div>
-                </div>
-                
-                <div className="form-field checkbox-field">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={formData.golden_goal_overtime}
-                      onChange={(e) => setFormData({ ...formData, golden_goal_overtime: e.target.checked })}
-                    />
-                    ⚽ Golden Goal (overtime ends when a goal is scored)
-                  </label>
-                </div>
-              </>
-            )}
-          </div>
-
           <div className="form-actions">
             <button type="submit" className="primary-button">
               {editingTemplate ? 'Update Template' : 'Create Template'}
@@ -353,22 +282,6 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
                     {template.number_of_periods} × {template.period_duration_minutes} min
                   </span>
                 </div>
-                
-                {template.overtime_enabled && (
-                  <>
-                    <div className="detail-row">
-                      <span className="detail-label">⚡ Overtime:</span>
-                      <span className="detail-value">
-                        Up to {template.max_overtime_periods} × {template.overtime_period_duration_minutes} min
-                      </span>
-                    </div>
-                    {template.golden_goal_overtime && (
-                      <div className="detail-row">
-                        <span className="detail-value golden-goal">⚽ Golden Goal</span>
-                      </div>
-                    )}
-                  </>
-                )}
               </div>
               
               <div className="template-actions">
@@ -417,22 +330,6 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
                       {template.number_of_periods} × {template.period_duration_minutes} min
                     </span>
                   </div>
-                  
-                  {template.overtime_enabled && (
-                    <>
-                      <div className="detail-row">
-                        <span className="detail-label">⚡ Overtime:</span>
-                        <span className="detail-value">
-                          Up to {template.max_overtime_periods} × {template.overtime_period_duration_minutes} min
-                        </span>
-                      </div>
-                      {template.golden_goal_overtime && (
-                        <div className="detail-row">
-                          <span className="detail-value golden-goal">⚽ Golden Goal</span>
-                        </div>
-                      )}
-                    </>
-                  )}
                 </div>
                 
                 <div className="template-actions">
