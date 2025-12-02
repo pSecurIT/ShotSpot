@@ -8,6 +8,11 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(auth);
 
+// Default match configuration constants
+const DEFAULT_NUMBER_OF_PERIODS = 4;
+const DEFAULT_OVERTIME_ENABLED = false;
+const DEFAULT_MAX_OVERTIME_PERIODS = 2;
+
 /**
  * Helper function to parse PostgreSQL interval to seconds
  * PostgreSQL intervals can be returned as objects with various properties
@@ -349,9 +354,9 @@ router.post('/:gameId/next-period', [
     }
 
     const game = gameResult.rows[0];
-    const numberOfPeriods = game.number_of_periods || 4;
-    const overtimeEnabled = game.overtime_enabled || false;
-    const maxOvertimePeriods = game.max_overtime_periods || 2;
+    const numberOfPeriods = game.number_of_periods || DEFAULT_NUMBER_OF_PERIODS;
+    const overtimeEnabled = game.overtime_enabled || DEFAULT_OVERTIME_ENABLED;
+    const maxOvertimePeriods = game.max_overtime_periods || DEFAULT_MAX_OVERTIME_PERIODS;
 
     // Check if we're already at the final period
     if (!game.is_overtime && game.current_period >= numberOfPeriods) {
