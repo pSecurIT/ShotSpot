@@ -15,10 +15,6 @@ const mockTemplates = [
     description: 'Standard korfball league match with 4 periods of 10 minutes each',
     number_of_periods: 4,
     period_duration_minutes: 10,
-    overtime_enabled: false,
-    overtime_period_duration_minutes: 5,
-    max_overtime_periods: 2,
-    golden_goal_overtime: false,
     competition_type: 'league',
     is_system_template: true,
     created_by: null,
@@ -27,14 +23,10 @@ const mockTemplates = [
   },
   {
     id: 2,
-    name: 'Cup Match with Overtime',
-    description: 'Cup match with overtime allowed',
+    name: 'Cup Match',
+    description: 'Cup match with 4 periods of 10 minutes',
     number_of_periods: 4,
     period_duration_minutes: 10,
-    overtime_enabled: true,
-    overtime_period_duration_minutes: 5,
-    max_overtime_periods: 2,
-    golden_goal_overtime: false,
     competition_type: 'cup',
     is_system_template: true,
     created_by: null,
@@ -47,10 +39,6 @@ const mockTemplates = [
     description: 'A custom template',
     number_of_periods: 2,
     period_duration_minutes: 15,
-    overtime_enabled: true,
-    overtime_period_duration_minutes: 5,
-    max_overtime_periods: 2,
-    golden_goal_overtime: true,
     competition_type: 'friendly',
     is_system_template: false,
     created_by: 1,
@@ -90,7 +78,7 @@ describe('MatchTemplates', () => {
       expect(screen.getByText('Standard League Match')).toBeInTheDocument();
     });
     
-    expect(screen.getByText('Cup Match with Overtime')).toBeInTheDocument();
+    expect(screen.getByText('Cup Match')).toBeInTheDocument();
     expect(screen.getByText('My Custom Template')).toBeInTheDocument();
   });
 
@@ -110,26 +98,6 @@ describe('MatchTemplates', () => {
     });
   });
 
-  it('should show overtime badge for templates with overtime enabled', async () => {
-    renderWithProviders(<MatchTemplates />);
-    
-    await waitFor(() => {
-      expect(screen.getByText('Cup Match with Overtime')).toBeInTheDocument();
-    });
-    
-    // Check for overtime details
-    const overtimeElements = screen.getAllByText(/Overtime:/i);
-    expect(overtimeElements.length).toBeGreaterThan(0);
-  });
-
-  it('should show golden goal indicator for templates with golden goal', async () => {
-    renderWithProviders(<MatchTemplates />);
-    
-    await waitFor(() => {
-      expect(screen.getByText('⚽ Golden Goal')).toBeInTheDocument();
-    });
-  });
-
   it('should show create template form when clicking new template button', async () => {
     renderWithProviders(<MatchTemplates />);
     
@@ -141,24 +109,6 @@ describe('MatchTemplates', () => {
     
     expect(screen.getByText('Create New Template')).toBeInTheDocument();
     expect(screen.getByLabelText('Template Name *')).toBeInTheDocument();
-  });
-
-  it('should show overtime settings when overtime is enabled in form', async () => {
-    renderWithProviders(<MatchTemplates />);
-    
-    await waitFor(() => {
-      expect(screen.getByText('+ New Template')).toBeInTheDocument();
-    });
-    
-    fireEvent.click(screen.getByText('+ New Template'));
-    
-    // Enable overtime
-    const overtimeCheckbox = screen.getByLabelText('Enable Overtime');
-    fireEvent.click(overtimeCheckbox);
-    
-    // Check for golden goal option in form (use getAllBy since there can be multiple)
-    const goldenGoalElements = screen.getAllByText(/Golden Goal/);
-    expect(goldenGoalElements.length).toBeGreaterThan(0);
   });
 
   it('should call onSelectTemplate when in selection mode', async () => {
@@ -230,7 +180,6 @@ describe('MatchTemplates', () => {
       name: 'New Test Template',
       number_of_periods: 4,
       period_duration_minutes: 10,
-      overtime_enabled: false,
       is_system_template: false
     });
 

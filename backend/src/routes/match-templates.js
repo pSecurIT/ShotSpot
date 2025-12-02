@@ -96,22 +96,6 @@ router.post('/', [
     .optional()
     .isInt({ min: 1, max: 60 })
     .withMessage('Period duration must be between 1 and 60 minutes'),
-  body('overtime_enabled')
-    .optional()
-    .isBoolean()
-    .withMessage('Overtime enabled must be a boolean'),
-  body('overtime_period_duration_minutes')
-    .optional()
-    .isInt({ min: 1, max: 30 })
-    .withMessage('Overtime period duration must be between 1 and 30 minutes'),
-  body('max_overtime_periods')
-    .optional()
-    .isInt({ min: 1, max: 10 })
-    .withMessage('Max overtime periods must be between 1 and 10'),
-  body('golden_goal_overtime')
-    .optional()
-    .isBoolean()
-    .withMessage('Golden goal overtime must be a boolean'),
   body('competition_type')
     .optional()
     .isIn(['league', 'cup', 'friendly', 'tournament'])
@@ -127,10 +111,6 @@ router.post('/', [
     description,
     number_of_periods = 4,
     period_duration_minutes = 10,
-    overtime_enabled = false,
-    overtime_period_duration_minutes = 5,
-    max_overtime_periods = 2,
-    golden_goal_overtime = false,
     competition_type
   } = req.body;
 
@@ -140,14 +120,12 @@ router.post('/', [
     const result = await pool.query(
       `INSERT INTO match_templates (
         name, description, number_of_periods, period_duration_minutes,
-        overtime_enabled, overtime_period_duration_minutes, max_overtime_periods,
-        golden_goal_overtime, competition_type, created_by, is_system_template
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)
+        competition_type, created_by, is_system_template
+      ) VALUES ($1, $2, $3, $4, $5, $6, false)
       RETURNING *`,
       [
         name, description, number_of_periods, period_duration_minutes,
-        overtime_enabled, overtime_period_duration_minutes, max_overtime_periods,
-        golden_goal_overtime, competition_type, userId
+        competition_type, userId
       ]
     );
 
@@ -190,22 +168,6 @@ router.put('/:id', [
     .optional()
     .isInt({ min: 1, max: 60 })
     .withMessage('Period duration must be between 1 and 60 minutes'),
-  body('overtime_enabled')
-    .optional()
-    .isBoolean()
-    .withMessage('Overtime enabled must be a boolean'),
-  body('overtime_period_duration_minutes')
-    .optional()
-    .isInt({ min: 1, max: 30 })
-    .withMessage('Overtime period duration must be between 1 and 30 minutes'),
-  body('max_overtime_periods')
-    .optional()
-    .isInt({ min: 1, max: 10 })
-    .withMessage('Max overtime periods must be between 1 and 10'),
-  body('golden_goal_overtime')
-    .optional()
-    .isBoolean()
-    .withMessage('Golden goal overtime must be a boolean'),
   body('competition_type')
     .optional()
     .isIn(['league', 'cup', 'friendly', 'tournament'])
@@ -250,8 +212,7 @@ router.put('/:id', [
 
     const fields = [
       'name', 'description', 'number_of_periods', 'period_duration_minutes',
-      'overtime_enabled', 'overtime_period_duration_minutes', 'max_overtime_periods',
-      'golden_goal_overtime', 'competition_type'
+      'competition_type'
     ];
 
     for (const field of fields) {
@@ -381,27 +342,18 @@ router.post('/:id/apply-to-game/:gameId', [
 
     // Convert period duration to interval format
     const periodDuration = `00:${String(template.period_duration_minutes).padStart(2, '0')}:00`;
-    const overtimeDuration = `00:${String(template.overtime_period_duration_minutes).padStart(2, '0')}:00`;
 
     // Apply template to game
     const _updateResult = await pool.query(
       `UPDATE games SET
         number_of_periods = $1,
         period_duration = $2::interval,
-        overtime_enabled = $3,
-        overtime_period_duration = $4::interval,
-        max_overtime_periods = $5,
-        golden_goal_overtime = $6,
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7
+       WHERE id = $3
        RETURNING *`,
       [
         template.number_of_periods,
         periodDuration,
-        template.overtime_enabled,
-        overtimeDuration,
-        template.max_overtime_periods,
-        template.golden_goal_overtime,
         gameId
       ]
     );

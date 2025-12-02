@@ -216,23 +216,7 @@ router.put('/:id', [
   body('period_duration')
     .optional()
     .matches(/^\d{2}:\d{2}:\d{2}$/)
-    .withMessage('Period duration must be in format HH:MM:SS'),
-  body('overtime_enabled')
-    .optional()
-    .isBoolean()
-    .withMessage('Overtime enabled must be a boolean'),
-  body('overtime_period_duration')
-    .optional()
-    .matches(/^\d{2}:\d{2}:\d{2}$/)
-    .withMessage('Overtime period duration must be in format HH:MM:SS'),
-  body('max_overtime_periods')
-    .optional()
-    .isInt({ min: 1, max: 10 })
-    .withMessage('Max overtime periods must be between 1 and 10'),
-  body('golden_goal_overtime')
-    .optional()
-    .isBoolean()
-    .withMessage('Golden goal overtime must be a boolean')
+    .withMessage('Period duration must be in format HH:MM:SS')
 ], async (req, res) => {
   // Check for validation errors
   const errors = validationResult(req);
@@ -241,11 +225,7 @@ router.put('/:id', [
   }
 
   const { id } = req.params;
-  const { 
-    status, home_score, away_score, date, home_attacking_side, 
-    number_of_periods, period_duration,
-    overtime_enabled, overtime_period_duration, max_overtime_periods, golden_goal_overtime
-  } = req.body;
+  const { status, home_score, away_score, date, home_attacking_side, number_of_periods, period_duration } = req.body;
 
   try {
     // Check if game exists
@@ -298,30 +278,6 @@ router.put('/:id', [
     if (period_duration !== undefined) {
       updates.push(`period_duration = $${paramCount}`);
       params.push(period_duration);
-      paramCount++;
-    }
-
-    if (overtime_enabled !== undefined) {
-      updates.push(`overtime_enabled = $${paramCount}`);
-      params.push(overtime_enabled);
-      paramCount++;
-    }
-
-    if (overtime_period_duration !== undefined) {
-      updates.push(`overtime_period_duration = $${paramCount}`);
-      params.push(overtime_period_duration);
-      paramCount++;
-    }
-
-    if (max_overtime_periods !== undefined) {
-      updates.push(`max_overtime_periods = $${paramCount}`);
-      params.push(max_overtime_periods);
-      paramCount++;
-    }
-
-    if (golden_goal_overtime !== undefined) {
-      updates.push(`golden_goal_overtime = $${paramCount}`);
-      params.push(golden_goal_overtime);
       paramCount++;
     }
 

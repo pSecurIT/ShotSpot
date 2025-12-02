@@ -8,11 +8,6 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(auth);
 
-// Default match configuration constants
-const DEFAULT_NUMBER_OF_PERIODS = 4;
-const DEFAULT_OVERTIME_ENABLED = false;
-const DEFAULT_MAX_OVERTIME_PERIODS = 2;
-
 /**
  * Helper function to parse PostgreSQL interval to seconds
  * PostgreSQL intervals can be returned as objects with various properties
@@ -354,183 +349,57 @@ router.post('/:gameId/next-period', [
     }
 
     const game = gameResult.rows[0];
-    const numberOfPeriods = game.number_of_periods || DEFAULT_NUMBER_OF_PERIODS;
-    const overtimeEnabled = game.overtime_enabled || DEFAULT_OVERTIME_ENABLED;
-    const maxOvertimePeriods = game.max_overtime_periods || DEFAULT_MAX_OVERTIME_PERIODS;
 
-    // Check if we're already at the final period
-    if (!game.is_overtime && game.current_period >= numberOfPeriods) {
-      // At final regular period - check if overtime is enabled
-      if (!overtimeEnabled) {
-        return res.status(400).json({ 
-          error: 'Already at final period. Overtime is not enabled for this game.',
-          currentPeriod: game.current_period,
-          isOvertime: game.is_overtime || false
-        });
-      }
-      
-      // Check if game is tied (overtime only allowed if tied)
-      if (game.home_score !== game.away_score) {
-        return res.status(400).json({
-          error: 'Cannot go to overtime - scores are not tied',
-          homeScore: game.home_score,
-          awayScore: game.away_score
-        });
-      }
-      
-      // Start overtime
-      const result = await db.query(
-        `UPDATE games 
-         SET is_overtime = true,
-             overtime_period_number = 1,
-             current_period = current_period + 1,
-             timer_state = 'stopped',
-             time_remaining = NULL,
-             timer_started_at = NULL,
-             timer_paused_at = NULL,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING *`,
-        [gameId]
-      );
-
-      // Create period_end event for the last regular period
-      await db.query(
-        `INSERT INTO game_events (game_id, event_type, team_id, period, details)
-         VALUES ($1, 'period_end', $2, $3, $4)`,
-        [
-          gameId,
-          game.home_team_id,
-          game.current_period,
-          JSON.stringify({ period_number: game.current_period })
-        ]
-      );
-
-      // Create overtime_start event
-      await db.query(
-        `INSERT INTO game_events (game_id, event_type, team_id, period, details)
-         VALUES ($1, 'overtime_start', $2, $3, $4)`,
-        [
-          gameId,
-          game.home_team_id,
-          result.rows[0].current_period,
-          JSON.stringify({ overtime_period_number: 1 })
-        ]
-      );
-
-      return res.json({
-        message: 'Started overtime period 1',
-        current_period: result.rows[0].current_period,
-        is_overtime: true,
-        overtime_period_number: 1,
-        timer_state: result.rows[0].timer_state
-      });
-    }
-
-    // Check if we're in overtime and at max overtime periods
-    if (game.is_overtime && game.overtime_period_number >= maxOvertimePeriods) {
+    if (game.current_period >= 4) {
       return res.status(400).json({ 
-        error: 'Already at maximum overtime periods',
-        overtimePeriodNumber: game.overtime_period_number,
-        maxOvertimePeriods: maxOvertimePeriods
+        error: 'Already at final period',
+        currentPeriod: game.current_period
       });
     }
 
-    // Move to next period (either regular or overtime)
-    let result;
-    if (game.is_overtime) {
-      // Move to next overtime period
-      result = await db.query(
-        `UPDATE games 
-         SET overtime_period_number = overtime_period_number + 1,
-             current_period = current_period + 1,
-             timer_state = 'stopped',
-             time_remaining = NULL,
-             timer_started_at = NULL,
-             timer_paused_at = NULL,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING *`,
-        [gameId]
-      );
+    // Stop timer and move to next period
+    const result = await db.query(
+      `UPDATE games 
+       SET current_period = current_period + 1,
+           timer_state = 'stopped',
+           time_remaining = NULL,
+           timer_started_at = NULL,
+           timer_paused_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING *`,
+      [gameId]
+    );
 
-      // Create overtime_period_end event
-      await db.query(
-        `INSERT INTO game_events (game_id, event_type, team_id, period, details)
-         VALUES ($1, 'overtime_period_end', $2, $3, $4)`,
-        [
-          gameId,
-          game.home_team_id,
-          game.current_period,
-          JSON.stringify({ overtime_period_number: game.overtime_period_number })
-        ]
-      );
+    // Create a period_end event for the previous period
+    await db.query(
+      `INSERT INTO game_events (game_id, event_type, team_id, period, details)
+       VALUES ($1, 'period_end', $2, $3, $4)`,
+      [
+        gameId,
+        game.home_team_id,
+        game.current_period,
+        JSON.stringify({ period_number: game.current_period })
+      ]
+    );
 
-      // Create next overtime period start event
-      await db.query(
-        `INSERT INTO game_events (game_id, event_type, team_id, period, details)
-         VALUES ($1, 'overtime_period_start', $2, $3, $4)`,
-        [
-          gameId,
-          game.home_team_id,
-          result.rows[0].current_period,
-          JSON.stringify({ overtime_period_number: result.rows[0].overtime_period_number })
-        ]
-      );
+    // Create a period_start event for the new period
+    await db.query(
+      `INSERT INTO game_events (game_id, event_type, team_id, period, details)
+       VALUES ($1, 'period_start', $2, $3, $4)`,
+      [
+        gameId,
+        game.home_team_id,
+        result.rows[0].current_period,
+        JSON.stringify({ period_number: result.rows[0].current_period })
+      ]
+    );
 
-      return res.json({
-        message: `Moved to overtime period ${result.rows[0].overtime_period_number}`,
-        current_period: result.rows[0].current_period,
-        is_overtime: true,
-        overtime_period_number: result.rows[0].overtime_period_number,
-        timer_state: result.rows[0].timer_state
-      });
-    } else {
-      // Move to next regular period
-      result = await db.query(
-        `UPDATE games 
-         SET current_period = current_period + 1,
-             timer_state = 'stopped',
-             time_remaining = NULL,
-             timer_started_at = NULL,
-             timer_paused_at = NULL,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING *`,
-        [gameId]
-      );
-
-      // Create a period_end event for the previous period
-      await db.query(
-        `INSERT INTO game_events (game_id, event_type, team_id, period, details)
-         VALUES ($1, 'period_end', $2, $3, $4)`,
-        [
-          gameId,
-          game.home_team_id,
-          game.current_period,
-          JSON.stringify({ period_number: game.current_period })
-        ]
-      );
-
-      // Create a period_start event for the new period
-      await db.query(
-        `INSERT INTO game_events (game_id, event_type, team_id, period, details)
-         VALUES ($1, 'period_start', $2, $3, $4)`,
-        [
-          gameId,
-          game.home_team_id,
-          result.rows[0].current_period,
-          JSON.stringify({ period_number: result.rows[0].current_period })
-        ]
-      );
-
-      res.json({
-        message: 'Moved to next period',
-        current_period: result.rows[0].current_period,
-        is_overtime: false,
-        timer_state: result.rows[0].timer_state
-      });
-    }
+    res.json({
+      message: 'Moved to next period',
+      current_period: result.rows[0].current_period,
+      timer_state: result.rows[0].timer_state
+    });
   } catch (error) {
     console.error('Error changing period:', error);
     res.status(500).json({ error: 'Failed to change period' });
