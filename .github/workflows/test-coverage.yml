@@ -46,8 +46,8 @@ jobs:
     
     - name: Install dependencies
       run: |
-        cd frontend && npm ci
-        cd ../backend && npm ci
+        cd frontend && npm ci --include=optional
+        cd ../backend && npm ci --include=optional
     
     - name: Check migration consistency
       run: |
