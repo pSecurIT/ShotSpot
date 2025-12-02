@@ -151,7 +151,7 @@ jobs:
       #     whatsNewDirectory: frontend/android/release-notes
 
       - name: Upload Release Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: android-release
           path: |
@@ -357,7 +357,7 @@ jobs:
 
       - name: Upload Release Artifacts (signed)
         if: env.signing_required == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ios-release
           path: |
@@ -367,7 +367,7 @@ jobs:
 
       - name: Upload Build Artifacts (unsigned)
         if: env.signing_required == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ios-simulator-build
           path: frontend/ios/App/build/DerivedData
