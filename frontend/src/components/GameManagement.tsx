@@ -21,16 +21,32 @@ interface Game {
   updated_at: string;
 }
 
+interface MatchTemplate {
+  id: number;
+  name: string;
+  description: string | null;
+  number_of_periods: number;
+  period_duration_minutes: number;
+  overtime_enabled: boolean;
+  overtime_period_duration_minutes: number;
+  max_overtime_periods: number;
+  golden_goal_overtime: boolean;
+  competition_type: string | null;
+  is_system_template: boolean;
+}
+
 const GameManagement: React.FC = () => {
   const navigate = useNavigate();
   const [games, setGames] = useState<Game[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [templates, setTemplates] = useState<MatchTemplate[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
   
   // Form state for creating new game
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [newGame, setNewGame] = useState({
     home_team_id: '',
     away_team_id: '',
@@ -41,6 +57,15 @@ const GameManagement: React.FC = () => {
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleGameId, setRescheduleGameId] = useState<number | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const response = await api.get('/match-templates');
+      setTemplates(response.data);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    }
+  }, []);
 
   const fetchTeams = useCallback(async () => {
     try {
@@ -69,7 +94,8 @@ const GameManagement: React.FC = () => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTeams();
     fetchGames();
-  }, [fetchTeams, fetchGames]);
+    fetchTemplates();
+  }, [fetchTeams, fetchGames, fetchTemplates]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -92,16 +118,37 @@ const GameManagement: React.FC = () => {
     }
 
     try {
+      // Create the game first
       const response = await api.post('/games', {
         home_team_id: parseInt(newGame.home_team_id),
         away_team_id: parseInt(newGame.away_team_id),
         date: new Date(newGame.date).toISOString()
       });
       
-      setGames([response.data, ...games]);
+      const createdGame = response.data;
+      
+      // Apply template if selected
+      if (selectedTemplate) {
+        try {
+          await api.post(`/match-templates/${selectedTemplate}/apply-to-game/${createdGame.id}`);
+          // Re-fetch the game to get updated data with template applied
+          const updatedResponse = await api.get(`/games/${createdGame.id}`);
+          setGames([updatedResponse.data, ...games]);
+          setSuccess('Game created with template applied successfully');
+        } catch (templateErr) {
+          console.error('Error applying template:', templateErr);
+          // Game was created but template failed, still show the game
+          setGames([createdGame, ...games]);
+          setSuccess('Game created, but template could not be applied');
+        }
+      } else {
+        setGames([createdGame, ...games]);
+        setSuccess('Game created successfully');
+      }
+      
       setNewGame({ home_team_id: '', away_team_id: '', date: '' });
+      setSelectedTemplate('');
       setShowCreateForm(false);
-      setSuccess('Game created successfully');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
@@ -298,6 +345,54 @@ const GameManagement: React.FC = () => {
                   required
                 />
               </label>
+            </div>
+
+            <div className="form-field">
+              <label>
+                Match Template (Optional):
+                <select
+                  value={selectedTemplate}
+                  onChange={(e) => setSelectedTemplate(e.target.value)}
+                >
+                  <option value="">No template (use default settings)</option>
+                  <optgroup label="📌 System Templates">
+                    {templates.filter(t => t.is_system_template).map(template => (
+                      <option key={template.id} value={template.id}>
+                        {template.name} ({template.number_of_periods}×{template.period_duration_minutes}min
+                        {template.overtime_enabled ? ', OT' : ''})
+                      </option>
+                    ))}
+                  </optgroup>
+                  {templates.filter(t => !t.is_system_template).length > 0 && (
+                    <optgroup label="👤 My Templates">
+                      {templates.filter(t => !t.is_system_template).map(template => (
+                        <option key={template.id} value={template.id}>
+                          {template.name} ({template.number_of_periods}×{template.period_duration_minutes}min
+                          {template.overtime_enabled ? ', OT' : ''})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </label>
+              {selectedTemplate && templates.find(t => t.id === parseInt(selectedTemplate)) && (
+                <p className="template-preview">
+                  {(() => {
+                    const t = templates.find(tpl => tpl.id === parseInt(selectedTemplate));
+                    if (!t) return null;
+                    return (
+                      <>
+                        <strong>{t.name}</strong>: {t.number_of_periods} periods × {t.period_duration_minutes} min
+                        {t.overtime_enabled && (
+                          <> | OT: up to {t.max_overtime_periods} × {t.overtime_period_duration_minutes} min
+                            {t.golden_goal_overtime && ' (Golden Goal)'}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
+                </p>
+              )}
             </div>
 
             <button type="submit" className="primary-button">

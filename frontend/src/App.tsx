@@ -8,6 +8,7 @@ import GameManagement from './components/GameManagement';
 import LiveMatch from './components/LiveMatch';
 import ShotAnalytics from './components/ShotAnalytics';
 import ExportCenter from './components/ExportCenter';
+import MatchTemplates from './components/MatchTemplates';
 import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -90,6 +91,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <ExportCenter />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/templates" 
+                element={
+                  <ProtectedRoute>
+                    <MatchTemplates />
                   </ProtectedRoute>
                 } 
               />
