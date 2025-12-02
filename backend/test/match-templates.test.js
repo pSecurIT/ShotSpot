@@ -11,17 +11,19 @@ describe('Match Templates API', () => {
   let coachId;
   let userToken;
   let regularUserId;
+  // Unique suffix to avoid duplicate key constraint errors across test runs
+  const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   
   beforeAll(async () => {
     // Create an admin user
     const hashedPassword = await bcrypt.hash('adminpassword', 10);
     const userResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
-      ['templateadmin', 'templateadmin@test.com', hashedPassword, 'admin']
+      [`templateadmin_${uniqueSuffix}`, `templateadmin_${uniqueSuffix}@test.com`, hashedPassword, 'admin']
     );
     userId = userResult.rows[0].id;
     authToken = jwt.sign(
-      { id: userId, username: 'templateadmin', role: 'admin' },
+      { id: userId, username: `templateadmin_${uniqueSuffix}`, role: 'admin' },
       process.env.JWT_SECRET || 'test-secret',
       { expiresIn: '1h' }
     );
@@ -29,11 +31,11 @@ describe('Match Templates API', () => {
     // Create a coach user
     const coachResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
-      ['templatecoach', 'templatecoach@test.com', hashedPassword, 'coach']
+      [`templatecoach_${uniqueSuffix}`, `templatecoach_${uniqueSuffix}@test.com`, hashedPassword, 'coach']
     );
     coachId = coachResult.rows[0].id;
     coachToken = jwt.sign(
-      { id: coachId, username: 'templatecoach', role: 'coach' },
+      { id: coachId, username: `templatecoach_${uniqueSuffix}`, role: 'coach' },
       process.env.JWT_SECRET || 'test-secret',
       { expiresIn: '1h' }
     );
@@ -41,19 +43,29 @@ describe('Match Templates API', () => {
     // Create a regular user
     const regularUserResult = await db.query(
       'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
-      ['templateuser', 'templateuser@test.com', hashedPassword, 'user']
+      [`templateuser_${uniqueSuffix}`, `templateuser_${uniqueSuffix}@test.com`, hashedPassword, 'user']
     );
     regularUserId = regularUserResult.rows[0].id;
     userToken = jwt.sign(
-      { id: regularUserId, username: 'templateuser', role: 'user' },
+      { id: regularUserId, username: `templateuser_${uniqueSuffix}`, role: 'user' },
       process.env.JWT_SECRET || 'test-secret',
       { expiresIn: '1h' }
+    );
+
+    // Seed a system template if none exist (for deterministic tests)
+    await db.query(
+      `INSERT INTO match_templates 
+        (name, description, is_system_template, number_of_periods, period_duration_minutes)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT DO NOTHING`,
+      [`__CI_System_Template_${uniqueSuffix}__`, 'Seeded for tests', true, 2, 15]
     );
   });
 
   afterAll(async () => {
     // Clean up
     await db.query('DELETE FROM match_templates WHERE created_by IN ($1, $2, $3)', [userId, coachId, regularUserId]);
+    await db.query('DELETE FROM match_templates WHERE name = $1', [`__CI_System_Template_${uniqueSuffix}__`]);
     await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [userId, coachId, regularUserId]);
     // Note: Don't call db.closePool() as it's a singleton that might be needed by other tests
   });
@@ -302,18 +314,20 @@ describe('Match Templates API', () => {
     let gameId;
     let homeTeamId;
     let awayTeamId;
+    // Use unique names to avoid duplicate key constraint errors
+    const applyTestSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     beforeAll(async () => {
-      // Create teams
+      // Create teams with unique names
       const homeTeamRes = await db.query(
         'INSERT INTO teams (name) VALUES ($1) RETURNING id',
-        ['Template Test Home']
+        [`Template Test Home_${applyTestSuffix}`]
       );
       homeTeamId = homeTeamRes.rows[0].id;
 
       const awayTeamRes = await db.query(
         'INSERT INTO teams (name) VALUES ($1) RETURNING id',
-        ['Template Test Away']
+        [`Template Test Away_${applyTestSuffix}`]
       );
       awayTeamId = awayTeamRes.rows[0].id;
 
@@ -325,12 +339,12 @@ describe('Match Templates API', () => {
       );
       gameId = gameRes.rows[0].id;
 
-      // Create a template
+      // Create a template with unique name
       const res = await request(app)
         .post('/api/match-templates')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          name: 'Apply Test Template',
+          name: `Apply Test Template_${applyTestSuffix}`,
           number_of_periods: 2,
           period_duration_minutes: 15
         });
@@ -338,8 +352,16 @@ describe('Match Templates API', () => {
     });
 
     afterAll(async () => {
-      await db.query('DELETE FROM games WHERE id = $1', [gameId]);
-      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [homeTeamId, awayTeamId]);
+      // Clean up in order (games first, then teams, then template)
+      if (gameId) {
+        await db.query('DELETE FROM games WHERE id = $1', [gameId]);
+      }
+      if (homeTeamId && awayTeamId) {
+        await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [homeTeamId, awayTeamId]);
+      }
+      if (templateId) {
+        await db.query('DELETE FROM match_templates WHERE id = $1', [templateId]);
+      }
     });
 
     it('should apply template to a scheduled game', async () => {
