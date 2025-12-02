@@ -76,7 +76,7 @@ COMMENT ON COLUMN games.overtime_period_number IS 'Current overtime period numbe
 INSERT INTO match_templates (name, description, number_of_periods, period_duration_minutes, overtime_enabled, overtime_period_duration_minutes, max_overtime_periods, golden_goal_overtime, competition_type, is_system_template)
 VALUES 
     ('Standard League Match', 'Standard korfball league match with 4 periods of 10 minutes each', 4, 10, false, 5, 2, false, 'league', true),
-    ('Cup Match with Overtime', 'Cup match with overtime allowed (2 periods of 5 minutes each)', 4, 10, true, 5, 2, false, 'cup', true),
+    ('Cup Match with Overtime', 'Cup match with 4 periods of 10 minutes plus overtime (up to 2 periods of 5 minutes each)', 4, 10, true, 5, 2, false, 'cup', true),
     ('Cup Match Golden Goal', 'Cup match with golden goal overtime', 4, 10, true, 5, 2, true, 'cup', true),
     ('Tournament Short Match', 'Short format for tournaments (2 periods of 7 minutes)', 2, 7, false, 3, 2, false, 'tournament', true),
     ('Friendly Match', 'Flexible friendly match (2 periods of 15 minutes)', 2, 15, false, 5, 1, false, 'friendly', true),
