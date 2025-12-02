@@ -17,7 +17,8 @@ ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
 # Security: Use npm ci for reproducible builds and verify checksums
 # Install as root for speed (no chown needed on node_modules)
 # Note: Keep optional deps for build tools like Rollup that need platform-specific binaries
-RUN npm ci --ignore-scripts && \
+# Include optional dependencies explicitly to avoid missing peer dependency errors
+RUN npm ci --include=optional --ignore-scripts && \
     npm cache clean --force
 
 # Copy frontend source (already owned by root, no chown needed yet)
@@ -43,7 +44,8 @@ ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
 # Security: Use npm ci with --ignore-scripts to prevent malicious postinstall scripts
 # Install as root for speed (no chown needed on node_modules)
 # Note: Keep optional deps - backend may need platform-specific modules
-RUN npm ci --ignore-scripts && \
+# Include optional dependencies explicitly to avoid missing peer dependency errors
+RUN npm ci --include=optional --ignore-scripts && \
     npm cache clean --force
 
 # Copy backend source (already owned by root)
