@@ -129,4 +129,16 @@ app.set('io', io);
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log('WebSocket server ready for connections');
+  
+  // Start Twizzit sync scheduler (only in production)
+  if (process.env.NODE_ENV !== 'test') {
+    import('./services/twizzit-scheduler.js')
+      .then(({ startScheduler }) => {
+        startScheduler();
+      })
+      .catch(err => {
+        console.error('⚠️  Failed to start Twizzit scheduler:', err.message);
+        // Don't exit - scheduler failure is not fatal
+      });
+  }
 });

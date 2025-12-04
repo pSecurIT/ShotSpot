@@ -2875,6 +2875,26 @@ select.error:focus {
   border-radius: var(--border-radius-md);
 }
 
+.team-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.team-status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.team-status-badge.synced {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #90caf9;
+}
+
 .form-section {
   background-color: white;
   padding: 2rem;
@@ -3227,6 +3247,12 @@ select.error:focus {
 .player-status-badge.archived {
   background-color: #757575;
   color: white;
+}
+
+.player-status-badge.synced {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #90caf9;
 }
 
 /* Archive/Reactivate buttons in edit form */

@@ -221,7 +221,8 @@ async function main() {
       '../src/migrations/seed_default_report_templates.sql',
       '../src/migrations/add_seasons.sql',
       '../src/migrations/add_competition_management.sql',
-      '../src/migrations/add_match_templates.sql'
+      '../src/migrations/add_match_templates.sql',
+      '../src/migrations/add_twizzit_integration.sql'
     ];
 
     console.log('Applying database migrations...');

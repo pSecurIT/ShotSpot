@@ -14,6 +14,8 @@ interface Player {
   goals?: number;
   total_shots?: number;
   team_name?: string;
+  sync_source?: 'manual' | 'twizzit' | null;
+  last_synced_at?: string | null;
 }
 
 interface Team {
@@ -719,6 +721,11 @@ const PlayerManagement: React.FC = () => {
                     )}
                     {!player.is_active && (
                       <span className="player-status-badge archived">Archived</span>
+                    )}
+                    {player.sync_source === 'twizzit' && (
+                      <span className="player-status-badge synced" title={`Synced from Twizzit${player.last_synced_at ? ` on ${new Date(player.last_synced_at).toLocaleString()}` : ''}`}>
+                        🔄 Twizzit
+                      </span>
                     )}
                   </div>
                   
