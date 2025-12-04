@@ -322,6 +322,7 @@ const UserManagement: React.FC = () => {
                     onClick={() => handleEditUser(user.id)}
                     style={styles.editButton}
                     title="Edit profile"
+                    aria-label="Edit profile"
                   >
                     ✏️
                   </button>
@@ -329,6 +330,7 @@ const UserManagement: React.FC = () => {
                     onClick={() => handleResetPassword(user)}
                     style={styles.passwordButton}
                     title="Reset password"
+                    aria-label="Reset password"
                   >
                     🔑
                   </button>
@@ -338,6 +340,7 @@ const UserManagement: React.FC = () => {
                         onClick={() => handleDeleteUser(user.id)}
                         style={styles.confirmDeleteButton}
                         title="Confirm delete"
+                        aria-label="Confirm delete"
                       >
                         ✓
                       </button>
@@ -345,6 +348,7 @@ const UserManagement: React.FC = () => {
                         onClick={() => setDeleteConfirm(null)}
                         style={styles.cancelDeleteButton}
                         title="Cancel"
+                        aria-label="Cancel"
                       >
                         ✗
                       </button>
@@ -355,6 +359,7 @@ const UserManagement: React.FC = () => {
                       style={styles.deleteButton}
                       disabled={user.id === currentUser.id}
                       title={user.id === currentUser.id ? 'Cannot delete yourself' : 'Delete user'}
+                      aria-label={user.id === currentUser.id ? 'Cannot delete yourself' : 'Delete user'}
                     >
                       🗑️
                     </button>

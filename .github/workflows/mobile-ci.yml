@@ -49,13 +49,60 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Add Android platform
+      - name: Add Android platform (robust)
         working-directory: frontend
-        run: npx cap add android
+        run: |
+          set -euo pipefail
+          echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
+          
+          # Validate Capacitor config exists and show which one
+          if [ -f capacitor.config.json ]; then
+            echo "::notice::Using capacitor.config.json"
+            cat capacitor.config.json
+          elif [ -f capacitor.config.ts ]; then
+            echo "::notice::Using capacitor.config.ts"
+          else
+            echo "::error::Missing Capacitor config file"
+            exit 1
+          fi
+          
+          # Validate dist directory exists
+          if [ ! -d dist ]; then
+            echo "::error::Web build output directory 'dist' not found"
+            exit 1
+          fi
+          echo "::notice::Web build output 'dist' directory found"
+          
+          # If android dir exists, sync instead of add
+          if [ -d android ]; then
+            echo "::notice::android directory already exists — running 'npx cap sync android'"
+            npx cap sync android || { echo "::error::npx cap sync android failed"; exit 1; }
+            exit 0
+          fi
 
-      - name: Sync Capacitor
-        working-directory: frontend
-        run: npx cap sync android
+          # Force reinstall @capacitor/android to ensure templates are intact
+          echo "::notice::Force reinstalling @capacitor/android to fix potential corruption"
+          npm install @capacitor/android --no-save --include=optional --force || { 
+            echo "::error::Failed to install @capacitor/android"; 
+            npm ls --depth=0 || true; 
+            exit 1; 
+          }
+
+          # Try to add platform, if add fails clean up and retry once
+          if npx cap add android; then
+            echo "::notice::npx cap add android succeeded"
+          else
+            echo "::warning::npx cap add android failed — cleaning up and reinstalling"
+            rm -rf android node_modules/@capacitor/android || true
+            npm install @capacitor/android --no-save --include=optional --force
+            echo "::notice::Retrying npx cap add android after cleanup"
+            npx cap add android || {
+              echo "::error::cap add failed twice. Diagnostics:"
+              npm ls @capacitor/cli @capacitor/core @capacitor/android --depth=0 || true
+              npx cap --version || true
+              exit 1
+            }
+          fi
 
       - name: Build Android Debug APK
         working-directory: frontend/android
@@ -112,13 +159,60 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Add iOS platform
+      - name: Add iOS platform (robust)
         working-directory: frontend
-        run: npx cap add ios
+        run: |
+          set -euo pipefail
+          echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
+          
+          # Validate Capacitor config exists and show which one
+          if [ -f capacitor.config.json ]; then
+            echo "::notice::Using capacitor.config.json"
+            cat capacitor.config.json
+          elif [ -f capacitor.config.ts ]; then
+            echo "::notice::Using capacitor.config.ts"
+          else
+            echo "::error::Missing Capacitor config file"
+            exit 1
+          fi
+          
+          # Validate dist directory exists
+          if [ ! -d dist ]; then
+            echo "::error::Web build output directory 'dist' not found"
+            exit 1
+          fi
+          echo "::notice::Web build output 'dist' directory found"
+          
+          # If ios dir exists, sync instead of add
+          if [ -d ios ]; then
+            echo "::notice::ios directory exists — running 'npx cap sync ios'"
+            npx cap sync ios || { echo "::error::npx cap sync ios failed"; exit 1; }
+            exit 0
+          fi
 
-      - name: Sync Capacitor
-        working-directory: frontend
-        run: npx cap sync ios
+          # Force reinstall @capacitor/ios to ensure templates are intact
+          echo "::notice::Force reinstalling @capacitor/ios to fix potential corruption"
+          npm install @capacitor/ios --no-save --include=optional --force || { 
+            echo "::error::Failed to install @capacitor/ios"; 
+            npm ls --depth=0 || true; 
+            exit 1; 
+          }
+
+          # Try to add platform, if add fails clean up and retry once
+          if npx cap add ios; then
+            echo "::notice::npx cap add ios succeeded"
+          else
+            echo "::warning::npx cap add ios failed — cleaning up and reinstalling"
+            rm -rf ios node_modules/@capacitor/ios || true
+            npm install @capacitor/ios --no-save --include=optional --force
+            echo "::notice::Retrying npx cap add ios after cleanup"
+            npx cap add ios || {
+              echo "::error::cap add failed twice. Diagnostics:"
+              npm ls @capacitor/cli @capacitor/core @capacitor/ios --depth=0 || true
+              npx cap --version || true
+              exit 1
+            }
+          fi
 
       - name: Install iOS dependencies
         working-directory: frontend/ios/App
