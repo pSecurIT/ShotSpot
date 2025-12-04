@@ -58,7 +58,7 @@ jobs:
           # If android dir exists, sync instead of add
           if [ -d android ]; then
             echo "::notice::android directory already exists — running 'npx cap sync android'"
-            npx cap sync android --interactive=false || { echo "::error::npx cap sync android failed"; exit 1; }
+            npx cap sync android || { echo "::error::npx cap sync android failed"; exit 1; }
             exit 0
           fi
 
@@ -69,13 +69,13 @@ jobs:
           fi
 
           # Try to add platform, if add fails clean up and fall back to sync
-          if npx cap add android --interactive=false; then
+          if npx cap add android; then
             echo "::notice::npx cap add android succeeded"
           else
             echo "::warning::npx cap add android failed — cleaning up partial android directory"
             rm -rf android || true
             echo "::notice::Attempting npx cap sync android with diagnostics"
-            npx cap sync android --interactive=false || {
+            npx cap sync android || {
               echo "::error::cap add/sync failed. Capacitor versions:"
               npm ls @capacitor/cli @capacitor/core @capacitor/android --depth=0 || true
               exit 1
@@ -146,7 +146,7 @@ jobs:
           # If ios dir exists, sync instead of add
           if [ -d ios ]; then
             echo "::notice::ios directory exists — running 'npx cap sync ios'"
-            npx cap sync ios --interactive=false || { echo "::error::npx cap sync ios failed"; exit 1; }
+            npx cap sync ios || { echo "::error::npx cap sync ios failed"; exit 1; }
             exit 0
           fi
 
@@ -157,13 +157,13 @@ jobs:
           fi
 
           # Try to add platform, if add fails clean up and fall back to sync
-          if npx cap add ios --interactive=false; then
+          if npx cap add ios; then
             echo "::notice::npx cap add ios succeeded"
           else
             echo "::warning::npx cap add ios failed — cleaning up partial ios directory"
             rm -rf ios || true
             echo "::notice::Attempting npx cap sync ios with diagnostics"
-            npx cap sync ios --interactive=false || {
+            npx cap sync ios || {
               echo "::error::cap add/sync failed. Capacitor versions:"
               npm ls @capacitor/cli @capacitor/core @capacitor/ios --depth=0 || true
               exit 1
