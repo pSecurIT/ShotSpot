@@ -68,15 +68,15 @@ jobs:
             npm install @capacitor/android --no-save --include=optional || { echo "::error::Failed to install @capacitor/android"; npm ls --depth=0 || true; exit 1; }
           fi
 
-          # Try to add platform, if add fails clean up and fall back to sync
+          # Try to add platform, if add fails clean up and retry once
           if npx cap add android; then
             echo "::notice::npx cap add android succeeded"
           else
             echo "::warning::npx cap add android failed — cleaning up partial android directory"
             rm -rf android || true
-            echo "::notice::Attempting npx cap sync android with diagnostics"
-            npx cap sync android || {
-              echo "::error::cap add/sync failed. Capacitor versions:"
+            echo "::notice::Retrying npx cap add android after cleanup"
+            npx cap add android || {
+              echo "::error::cap add failed twice. Capacitor versions:"
               npm ls @capacitor/cli @capacitor/core @capacitor/android --depth=0 || true
               exit 1
             }
@@ -156,15 +156,15 @@ jobs:
             npm install @capacitor/ios --no-save --include=optional || { echo "::error::Failed to install @capacitor/ios"; npm ls --depth=0 || true; exit 1; }
           fi
 
-          # Try to add platform, if add fails clean up and fall back to sync
+          # Try to add platform, if add fails clean up and retry once
           if npx cap add ios; then
             echo "::notice::npx cap add ios succeeded"
           else
             echo "::warning::npx cap add ios failed — cleaning up partial ios directory"
             rm -rf ios || true
-            echo "::notice::Attempting npx cap sync ios with diagnostics"
-            npx cap sync ios || {
-              echo "::error::cap add/sync failed. Capacitor versions:"
+            echo "::notice::Retrying npx cap add ios after cleanup"
+            npx cap add ios || {
+              echo "::error::cap add failed twice. Capacitor versions:"
               npm ls @capacitor/cli @capacitor/core @capacitor/ios --depth=0 || true
               exit 1
             }
