@@ -46,8 +46,14 @@ jobs:
     
     - name: Install dependencies
       run: |
-        cd frontend && npm ci
-        cd ../backend && npm ci
+        cd frontend && npm ci --include=optional
+        cd ../backend && npm ci --include=optional
+    
+    - name: Install frontend optional native bindings (temporary workaround)
+      working-directory: frontend
+      run: |
+        echo "Installing optional native dependencies to provide rollup native binding for linux-x64"
+        npm install --include=optional --no-audit --no-fund
     
     - name: Check migration consistency
       run: |
