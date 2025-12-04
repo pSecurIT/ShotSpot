@@ -55,6 +55,20 @@ jobs:
           set -euo pipefail
           echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
           
+          # Validate Capacitor config exists
+          if [ ! -f capacitor.config.ts ] && [ ! -f capacitor.config.json ]; then
+            echo "::error::Missing Capacitor config file (capacitor.config.ts or capacitor.config.json)"
+            exit 1
+          fi
+          echo "::notice::Capacitor config file found"
+          
+          # Validate dist directory exists
+          if [ ! -d dist ]; then
+            echo "::error::Web build output directory 'dist' not found"
+            exit 1
+          fi
+          echo "::notice::Web build output 'dist' directory found"
+          
           # If android dir exists, sync instead of add
           if [ -d android ]; then
             echo "::notice::android directory already exists — running 'npx cap sync android'"
@@ -142,6 +156,20 @@ jobs:
         run: |
           set -euo pipefail
           echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
+          
+          # Validate Capacitor config exists
+          if [ ! -f capacitor.config.ts ] && [ ! -f capacitor.config.json ]; then
+            echo "::error::Missing Capacitor config file (capacitor.config.ts or capacitor.config.json)"
+            exit 1
+          fi
+          echo "::notice::Capacitor config file found"
+          
+          # Validate dist directory exists
+          if [ ! -d dist ]; then
+            echo "::error::Web build output directory 'dist' not found"
+            exit 1
+          fi
+          echo "::notice::Web build output 'dist' directory found"
           
           # If ios dir exists, sync instead of add
           if [ -d ios ]; then
