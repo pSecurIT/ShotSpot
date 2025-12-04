@@ -49,9 +49,29 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Add Android platform
+      - name: Add Android platform (robust)
         working-directory: frontend
-        run: npx cap add android
+        run: |
+          set -euo pipefail
+          
+          # Skip if android directory already exists
+          if [ -d "android" ]; then
+            echo "✅ Android platform already exists, skipping cap add"
+          else
+            # Ensure @capacitor/android is installed
+            if ! npm list @capacitor/android > /dev/null 2>&1; then
+              echo "📦 Installing @capacitor/android..."
+              npm install @capacitor/android --no-save
+            fi
+            
+            # Try to add Android platform with retry
+            echo "🔧 Adding Android platform..."
+            if ! npx cap add android; then
+              echo "⚠️ First attempt failed, retrying after cache clean..."
+              npm cache clean --force
+              npx cap add android
+            fi
+          fi
 
       - name: Sync Capacitor
         working-directory: frontend
