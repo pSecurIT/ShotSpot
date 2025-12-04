@@ -55,12 +55,16 @@ jobs:
           set -euo pipefail
           echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
           
-          # Validate Capacitor config exists
-          if [ ! -f capacitor.config.ts ] && [ ! -f capacitor.config.json ]; then
-            echo "::error::Missing Capacitor config file (capacitor.config.ts or capacitor.config.json)"
+          # Validate Capacitor config exists and show which one
+          if [ -f capacitor.config.json ]; then
+            echo "::notice::Using capacitor.config.json"
+            cat capacitor.config.json
+          elif [ -f capacitor.config.ts ]; then
+            echo "::notice::Using capacitor.config.ts"
+          else
+            echo "::error::Missing Capacitor config file"
             exit 1
           fi
-          echo "::notice::Capacitor config file found"
           
           # Validate dist directory exists
           if [ ! -d dist ]; then
@@ -161,12 +165,16 @@ jobs:
           set -euo pipefail
           echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
           
-          # Validate Capacitor config exists
-          if [ ! -f capacitor.config.ts ] && [ ! -f capacitor.config.json ]; then
-            echo "::error::Missing Capacitor config file (capacitor.config.ts or capacitor.config.json)"
+          # Validate Capacitor config exists and show which one
+          if [ -f capacitor.config.json ]; then
+            echo "::notice::Using capacitor.config.json"
+            cat capacitor.config.json
+          elif [ -f capacitor.config.ts ]; then
+            echo "::notice::Using capacitor.config.ts"
+          else
+            echo "::error::Missing Capacitor config file"
             exit 1
           fi
-          echo "::notice::Capacitor config file found"
           
           # Validate dist directory exists
           if [ ! -d dist ]; then
