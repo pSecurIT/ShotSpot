@@ -69,7 +69,7 @@ jobs:
              frontend/android/app/build/outputs/apk/debug/ShotSpot-${BRANCH_NAME}-${TIMESTAMP}.apk
 
       - name: Upload Preview APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: android-preview-apk
           path: frontend/android/app/build/outputs/apk/debug/*.apk
@@ -147,7 +147,7 @@ jobs:
             clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
       - name: Upload iOS Build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ios-preview-build
           path: frontend/ios/App/build
