@@ -367,7 +367,8 @@ describe('Match Templates API', () => {
     it('should apply template to a scheduled game', async () => {
       const res = await request(app)
         .post(`/api/match-templates/${templateId}/apply-to-game/${gameId}`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json');
 
       expect(res.statusCode).toBe(200);
       expect(res.body.message).toBe('Template applied successfully');
@@ -380,7 +381,8 @@ describe('Match Templates API', () => {
 
       const res = await request(app)
         .post(`/api/match-templates/${templateId}/apply-to-game/${gameId}`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json');
 
       expect(res.statusCode).toBe(400);
       expect(res.body.error).toContain('in progress');
@@ -392,7 +394,8 @@ describe('Match Templates API', () => {
     it('should return 404 for non-existent template', async () => {
       const res = await request(app)
         .post(`/api/match-templates/99999/apply-to-game/${gameId}`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json');
 
       expect(res.statusCode).toBe(404);
     });
@@ -400,7 +403,8 @@ describe('Match Templates API', () => {
     it('should return 404 for non-existent game', async () => {
       const res = await request(app)
         .post(`/api/match-templates/${templateId}/apply-to-game/99999`)
-        .set('Authorization', `Bearer ${authToken}`);
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json');
 
       expect(res.statusCode).toBe(404);
     });
