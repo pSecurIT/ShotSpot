@@ -76,22 +76,26 @@ jobs:
             exit 0
           fi
 
-          # Ensure @capacitor/android is installed in node_modules (non-persistent)
-          if ! npm ls @capacitor/android >/dev/null 2>&1; then
-            echo "::notice::@capacitor/android missing — installing locally (no-save)"
-            npm install @capacitor/android --no-save --include=optional || { echo "::error::Failed to install @capacitor/android"; npm ls --depth=0 || true; exit 1; }
-          fi
+          # Force reinstall @capacitor/android to ensure templates are intact
+          echo "::notice::Force reinstalling @capacitor/android to fix potential corruption"
+          npm install @capacitor/android --no-save --include=optional --force || { 
+            echo "::error::Failed to install @capacitor/android"; 
+            npm ls --depth=0 || true; 
+            exit 1; 
+          }
 
           # Try to add platform, if add fails clean up and retry once
           if npx cap add android; then
             echo "::notice::npx cap add android succeeded"
           else
-            echo "::warning::npx cap add android failed — cleaning up partial android directory"
-            rm -rf android || true
+            echo "::warning::npx cap add android failed — cleaning up and reinstalling"
+            rm -rf android node_modules/@capacitor/android || true
+            npm install @capacitor/android --no-save --include=optional --force
             echo "::notice::Retrying npx cap add android after cleanup"
             npx cap add android || {
-              echo "::error::cap add failed twice. Capacitor versions:"
+              echo "::error::cap add failed twice. Diagnostics:"
               npm ls @capacitor/cli @capacitor/core @capacitor/android --depth=0 || true
+              npx cap --version || true
               exit 1
             }
           fi
@@ -178,22 +182,26 @@ jobs:
             exit 0
           fi
 
-          # Ensure @capacitor/ios is installed in node_modules (non-persistent)
-          if ! npm ls @capacitor/ios >/dev/null 2>&1; then
-            echo "::notice::@capacitor/ios missing — installing locally (no-save)"
-            npm install @capacitor/ios --no-save --include=optional || { echo "::error::Failed to install @capacitor/ios"; npm ls --depth=0 || true; exit 1; }
-          fi
+          # Force reinstall @capacitor/ios to ensure templates are intact
+          echo "::notice::Force reinstalling @capacitor/ios to fix potential corruption"
+          npm install @capacitor/ios --no-save --include=optional --force || { 
+            echo "::error::Failed to install @capacitor/ios"; 
+            npm ls --depth=0 || true; 
+            exit 1; 
+          }
 
           # Try to add platform, if add fails clean up and retry once
           if npx cap add ios; then
             echo "::notice::npx cap add ios succeeded"
           else
-            echo "::warning::npx cap add ios failed — cleaning up partial ios directory"
-            rm -rf ios || true
+            echo "::warning::npx cap add ios failed — cleaning up and reinstalling"
+            rm -rf ios node_modules/@capacitor/ios || true
+            npm install @capacitor/ios --no-save --include=optional --force
             echo "::notice::Retrying npx cap add ios after cleanup"
             npx cap add ios || {
-              echo "::error::cap add failed twice. Capacitor versions:"
+              echo "::error::cap add failed twice. Diagnostics:"
               npm ls @capacitor/cli @capacitor/core @capacitor/ios --depth=0 || true
+              npx cap --version || true
               exit 1
             }
           fi
