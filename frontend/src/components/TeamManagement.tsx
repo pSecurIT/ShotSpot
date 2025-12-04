@@ -5,6 +5,8 @@ import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 interface Team {
   id: number;
   name: string;
+  sync_source?: 'manual' | 'twizzit' | null;
+  last_synced_at?: string | null;
 }
 
 const TeamManagement: React.FC = () => {
@@ -88,7 +90,14 @@ const TeamManagement: React.FC = () => {
         <h3>Teams</h3>
         {teams.map(team => (
           <div key={team.id} className="team-item">
-            <span>{team.name}</span>
+            <div className="team-info">
+              <span>{team.name}</span>
+              {team.sync_source === 'twizzit' && (
+                <span className="team-status-badge synced" title={`Synced from Twizzit${team.last_synced_at ? ` on ${new Date(team.last_synced_at).toLocaleString()}` : ''}`}>
+                  🔄 Twizzit
+                </span>
+              )}
+            </div>
             <button 
               className="secondary-button"
               onClick={() => {

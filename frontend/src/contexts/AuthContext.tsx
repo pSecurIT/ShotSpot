@@ -3,7 +3,7 @@ import { AxiosError } from 'axios';
 import { User, AuthContextType, AuthProviderProps } from '../types/auth';
 import api, { getCsrfToken } from '../utils/api';
 
-const AuthContext = createContext<AuthContextType | null>(null);
+export const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

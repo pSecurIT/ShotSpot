@@ -1,0 +1,1176 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Twizzit API",
+    "version": "1.0",
+    "description": "KBKB (Belgian Korfball Federation) member management and team sync API"
+  },
+  "servers": [
+    {
+      "url": "https://api.twizzit.com",
+      "description": "Production server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Access token is missing or invalid"
+      }
+    },
+    "schemas": {
+      "season": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "start-date": {
+            "type": "string"
+          },
+          "end-date": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "current-organizations": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "group": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "short-name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "integer"
+          },
+          "club": {
+            "type": "integer"
+          },
+          "season": {
+            "$ref": "#/components/schemas/season"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "extra-field-values": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "extra-field": {
+                  "$ref": "#/components/schemas/extra-field"
+                },
+                "value": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    },
+                    "attributes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "attribute-id": {
+                            "type": "integer"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "extra-field": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "object",
+            "properties": {
+              "EN": {
+                "type": "string"
+              },
+              "NL": {
+                "type": "string"
+              },
+              "FR": {
+                "type": "string"
+              }
+            }
+          },
+          "type": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": []
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/extra-field-attribute"
+            }
+          }
+        }
+      },
+      "extra-field-attribute": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "group-type": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "group-category": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "object",
+            "properties": {
+              "EN": {
+                "type": "string"
+              },
+              "NL": {
+                "type": "string"
+              },
+              "FR": {
+                "type": "string"
+              }
+            }
+          },
+          "color": {
+            "type": "string"
+          },
+          "group-type": {
+            "$ref": "#/components/schemas/group-type"
+          }
+        }
+      },
+      "event-type": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "event-sub-type": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "object",
+            "properties": {
+              "EN": {
+                "type": "string"
+              },
+              "NL": {
+                "type": "string"
+              },
+              "FR": {
+                "type": "string"
+              }
+            }
+          },
+          "color": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "event-type": {
+            "type": "integer"
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "organization": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "contact-function": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "object",
+            "properties": {
+              "EN": {
+                "type": "string"
+              },
+              "NL": {
+                "type": "string"
+              },
+              "FR": {
+                "type": "string"
+              }
+            }
+          },
+          "type": {
+            "type": "integer"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "contact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "first-name": {
+            "type": "string"
+          },
+          "last-name": {
+            "type": "string"
+          },
+          "date-of-birth": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string"
+          },
+          "nationality": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "account-number": {
+            "type": "string"
+          },
+          "registry-number": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "email-1": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          },
+          "email-2": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          },
+          "email-3": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          },
+          "mobile-1": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string"
+              },
+              "cc": {
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              }
+            }
+          },
+          "mobile-2": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string"
+              },
+              "cc": {
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              }
+            }
+          },
+          "mobile-3": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string"
+              },
+              "cc": {
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              }
+            }
+          },
+          "home": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string"
+              },
+              "cc": {
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              }
+            }
+          },
+          "address": {
+            "type": "object",
+            "properties": {
+              "street": {
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              },
+              "box": {
+                "type": "string"
+              },
+              "postalCode": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "country": {
+                "type": "object",
+                "properties": {
+                  "EN": {
+                    "type": "string"
+                  },
+                  "NL": {
+                    "type": "string"
+                  },
+                  "FR": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "has-profile-image": {
+            "type": "boolean"
+          },
+          "extra-field-values": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "extra-field": {
+                  "$ref": "#/components/schemas/extra-field"
+                },
+                "value": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    },
+                    "attributes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "attribute-id": {
+                            "type": "integer"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "group-contact": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer"
+          },
+          "contactId": {
+            "type": "integer"
+          },
+          "contactFunctionId": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v2/api/authenticate": {
+      "post": {
+        "summary": "Authenticate and get JWT token",
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JWT token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "created-on": {
+                      "type": "integer"
+                    },
+                    "valid-till": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Monthly limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/seasons": {
+      "get": {
+        "summary": "Get seasons",
+        "description": "Retrieve season information for organizations",
+        "parameters": [
+          {
+            "name": "organization-ids[]",
+            "in": "query",
+            "description": "Array of organization IDs",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "season-ids[]",
+            "in": "query",
+            "description": "Filter by specific season IDs",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "is-current-season",
+            "in": "query",
+            "description": "Filter for current season only",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of seasons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/season"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/groups": {
+      "get": {
+        "summary": "Get groups (teams)",
+        "description": "Retrieve team/group information with pagination support",
+        "parameters": [
+          {
+            "name": "organization-ids[]",
+            "in": "query",
+            "description": "Array of organization IDs",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "group-ids[]",
+            "in": "query",
+            "description": "Filter by specific group IDs",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "season-id",
+            "in": "query",
+            "description": "Filter by season",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "group-type",
+            "in": "query",
+            "description": "Filter by group type",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "group-category-ids[]",
+            "in": "query",
+            "description": "Filter by group category",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "series-ids[]",
+            "in": "query",
+            "description": "Filter by series",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "club-ids[]",
+            "in": "query",
+            "description": "Filter by club",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The number of records to return. Default value is 10, maximum value is 250.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Used for pagination, this is the number of records from a collection to skip. Default value is 0.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/group"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/group-types": {
+      "get": {
+        "summary": "Get group types",
+        "description": "Retrieve available group type classifications",
+        "parameters": [
+          {
+            "name": "organization-ids[]",
+            "in": "query",
+            "description": "Array of organization IDs",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of group types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/group-type"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/group-categories": {
+      "get": {
+        "summary": "Get group categories",
+        "description": "Retrieve group category information (e.g., age divisions, skill levels)",
+        "parameters": [
+          {
+            "name": "organization-ids[]",
+            "in": "query",
+            "description": "Array of organization IDs",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "group-category-ids[]",
+            "in": "query",
+            "description": "Filter by specific category IDs",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "group-type",
+            "in": "query",
+            "description": "Filter by group type",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of group categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/group-category"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/event-types": {
+      "get": {
+        "summary": "Get event types",
+        "description": "Retrieve event type classifications",
+        "parameters": [
+          {
+            "name": "organization-ids[]",
+            "in": "query",
+            "description": "Array of organization IDs",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of event types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/event-type"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/event-sub-types": {
+      "get": {
+        "summary": "Get event sub types",
+        "description": "Retrieve detailed event sub-type information",
+        "parameters": [
+          {
+            "name": "organization-ids[]",
+            "in": "query",
+            "description": "Array of organization IDs",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "event-sub-type-ids[]",
+            "in": "query",
+            "description": "Filter by specific sub-type IDs",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of event sub types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/event-sub-type"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/organizations": {
+      "get": {
+        "summary": "Get organizations",
+        "description": "Retrieve list of organizations accessible to the authenticated user",
+        "responses": {
+          "200": {
+            "description": "List of organizations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/organization"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/contact-functions": {
+      "get": {
+        "summary": "Get contact functions",
+        "description": "Retrieve contact function/role types (e.g., player, coach, referee)",
+        "parameters": [
+          {
+            "name": "organization-ids[]",
+            "in": "query",
+            "description": "Array of organization IDs",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "contact-function-ids[]",
+            "in": "query",
+            "description": "Filter by specific function IDs",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "contact-function-type",
+            "in": "query",
+            "description": "Filter by function type",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of contact functions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/contact-function"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/contacts": {
+      "get": {
+        "summary": "Get contacts (members/players)",
+        "description": "Retrieve contact/member information with pagination. This is the primary endpoint for player data sync.",
+        "parameters": [
+          {
+            "name": "organization-ids[]",
+            "in": "query",
+            "description": "Array of organization IDs",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "contact-ids[]",
+            "in": "query",
+            "description": "Filter by specific contact IDs",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "membership-type-ids[]",
+            "in": "query",
+            "description": "Filter by membership type",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "membership-season-ids[]",
+            "in": "query",
+            "description": "Filter by membership season",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "current-membership",
+            "in": "query",
+            "description": "Filter for current members only",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The number of records to return. Default value is 50, maximum value is 100.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Used for pagination, this is the number of records from a collection to skip. Default value is 0.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of contacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/contact"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/group-contacts": {
+      "get": {
+        "summary": "Get group-contact relationships",
+        "description": "Retrieve relationships between groups (teams) and contacts (players/coaches). Essential for team roster sync.",
+        "parameters": [
+          {
+            "name": "organization-ids[]",
+            "in": "query",
+            "description": "Array of organization IDs",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "group-ids[]",
+            "in": "query",
+            "description": "Array of group IDs to get contacts for",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of group contacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/group-contact"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
