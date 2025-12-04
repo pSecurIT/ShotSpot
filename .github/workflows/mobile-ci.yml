@@ -132,9 +132,40 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Add iOS platform
+      - name: Add iOS platform (robust)
         working-directory: frontend
-        run: npx cap add ios
+        run: |
+          set -euo pipefail
+          echo "Working dir: $(pwd) -- node $(node -v) npm $(npm -v)"
+          
+          # Skip if ios directory already exists
+          if [ -d ios ]; then
+            echo "::notice::ios directory exists — skipping npx cap add ios"
+            exit 0
+          fi
+
+          # Ensure @capacitor/ios is installed in node_modules
+          if ! npm ls @capacitor/ios >/dev/null 2>&1; then
+            echo "::notice::@capacitor/ios not present — installing locally (no-save) for CI"
+            npm install @capacitor/ios --no-save --include=optional || {
+              echo "::error::Failed to install @capacitor/ios"
+              npm ls --depth=0 || true
+              exit 1
+            }
+          fi
+
+          # Run add with verbose output and retry once on failure
+          echo "::notice::Running npx cap add ios (verbose)"
+          if npx cap add ios --verbose --interactive=false; then
+            echo "::notice::npx cap add ios succeeded"
+          else
+            echo "::warning::npx cap add ios failed — retrying with diagnostics"
+            npx cap add ios --verbose --interactive=false || {
+              echo "::error::npx cap add ios failed on retry — dumping node_modules @capacitor/* versions"
+              npm ls @capacitor/cli @capacitor/core @capacitor/ios @capacitor/android --depth=0 || true
+              exit 1
+            }
+          fi
 
       - name: Sync Capacitor
         working-directory: frontend
