@@ -599,7 +599,7 @@ describe('UserManagement Component', () => {
       renderUserManagement();
       
       await waitFor(() => {
-        const deleteButtons = screen.getAllByTitle(/Delete user|Cannot delete yourself/);
+        const deleteButtons = await screen.findAllByRole('button', { name: /delete user|cannot delete yourself/i });
         expect(deleteButtons).toHaveLength(3);
       });
     });
@@ -608,7 +608,7 @@ describe('UserManagement Component', () => {
       renderUserManagement({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
       
       await waitFor(() => {
-        const deleteButtons = screen.getAllByTitle(/Delete user|Cannot delete yourself/);
+        const deleteButtons = await screen.findAllByRole('button', { name: /delete user|cannot delete yourself/i });
         const adminDeleteButton = deleteButtons[0];
         expect(adminDeleteButton).toBeDisabled();
       });
@@ -618,7 +618,7 @@ describe('UserManagement Component', () => {
       renderUserManagement({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
       
       await waitFor(() => {
-        const deleteButtons = screen.getAllByTitle(/Delete user|Cannot delete yourself/);
+        const deleteButtons = await screen.findAllByRole('button', { name: /delete user|cannot delete yourself/i });
         const coachDeleteButton = deleteButtons[1];
         const userDeleteButton = deleteButtons[2];
         
@@ -634,14 +634,14 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const deleteButtons = screen.getAllByTitle('Delete user');
+      const deleteButtons = await screen.findAllByRole('button', { name: /delete user/i });
       const user1DeleteButton = deleteButtons[deleteButtons.length - 1]; // Last user
       
       fireEvent.click(user1DeleteButton);
       
       await waitFor(() => {
-        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
-        expect(screen.getByTitle('Cancel')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: /cancel/i })).toBeInTheDocument();
       });
     });
 
@@ -652,14 +652,14 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const deleteButtons = screen.getAllByTitle('Delete user');
+      const deleteButtons = await screen.findAllByRole('button', { name: /delete user/i });
       fireEvent.click(deleteButtons[deleteButtons.length - 1]);
       
       await waitFor(() => {
-        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
       });
       
-      fireEvent.click(screen.getByTitle('Cancel'));
+      fireEvent.click(await screen.findByRole('button', { name: /cancel/i }));
       
       await waitFor(() => {
         expect(screen.queryByTitle('Confirm delete')).not.toBeInTheDocument();
@@ -677,14 +677,14 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const deleteButtons = screen.getAllByTitle('Delete user');
+      const deleteButtons = await screen.findAllByRole('button', { name: /delete user/i });
       fireEvent.click(deleteButtons[deleteButtons.length - 1]);
       
       await waitFor(() => {
-        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
       });
       
-      fireEvent.click(screen.getByTitle('Confirm delete'));
+      fireEvent.click(await screen.findByRole('button', { name: /confirm delete/i }));
       
       await waitFor(() => {
         expect(mockApi.delete).toHaveBeenCalledWith('/users/3');
@@ -700,14 +700,14 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const deleteButtons = screen.getAllByTitle('Delete user');
+      const deleteButtons = await screen.findAllByRole('button', { name: /delete user/i });
       fireEvent.click(deleteButtons[deleteButtons.length - 1]);
       
       await waitFor(() => {
-        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
       });
       
-      fireEvent.click(screen.getByTitle('Confirm delete'));
+      fireEvent.click(await screen.findByRole('button', { name: /confirm delete/i }));
       
       await waitFor(() => {
         expect(screen.getByText('User deactivated successfully')).toBeInTheDocument();
@@ -726,14 +726,14 @@ describe('UserManagement Component', () => {
       // Initial fetch on mount
       expect(mockApi.get).toHaveBeenCalledTimes(1);
       
-      const deleteButtons = screen.getAllByTitle('Delete user');
+      const deleteButtons = await screen.findAllByRole('button', { name: /delete user/i });
       fireEvent.click(deleteButtons[deleteButtons.length - 1]);
       
       await waitFor(() => {
-        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
       });
       
-      fireEvent.click(screen.getByTitle('Confirm delete'));
+      fireEvent.click(await screen.findByRole('button', { name: /confirm delete/i }));
       
       await waitFor(() => {
         // Refresh fetch after deletion
@@ -757,7 +757,7 @@ describe('UserManagement Component', () => {
         expect(usernameCells.length).toBeGreaterThan(0);
       });
       
-      const deleteButtons = screen.getAllByTitle(/Delete user|Cannot delete yourself/);
+      const deleteButtons = await screen.findAllByRole('button', { name: /delete user|cannot delete yourself/i });
       // Try to delete first enabled button
       const enabledButton = deleteButtons.find(btn => !btn.hasAttribute('disabled'));
       if (enabledButton) {
@@ -785,14 +785,14 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const deleteButtons = screen.getAllByTitle('Delete user');
+      const deleteButtons = await screen.findAllByRole('button', { name: /delete user/i });
       fireEvent.click(deleteButtons[deleteButtons.length - 1]);
       
       await waitFor(() => {
-        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
       });
       
-      fireEvent.click(screen.getByTitle('Confirm delete'));
+      fireEvent.click(await screen.findByRole('button', { name: /confirm delete/i }));
       
       await waitFor(() => {
         expect(screen.getByText('Failed to delete user')).toBeInTheDocument();
@@ -808,14 +808,14 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const deleteButtons = screen.getAllByTitle('Delete user');
+      const deleteButtons = await screen.findAllByRole('button', { name: /delete user/i });
       fireEvent.click(deleteButtons[deleteButtons.length - 1]);
       
       await waitFor(() => {
-        expect(screen.getByTitle('Confirm delete')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
       });
       
-      fireEvent.click(screen.getByTitle('Confirm delete'));
+      fireEvent.click(await screen.findByRole('button', { name: /confirm delete/i }));
       
       await waitFor(() => {
         expect(screen.queryByTitle('Confirm delete')).not.toBeInTheDocument();
@@ -936,7 +936,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('Actions')).toBeInTheDocument();
       });
       
-      const passwordButtons = screen.getAllByTitle('Reset password');
+      const passwordButtons = await screen.findAllByRole('button', { name: /reset password/i });
       expect(passwordButtons).toHaveLength(3); // One for each user
     });
 
@@ -944,11 +944,11 @@ describe('UserManagement Component', () => {
       renderUserManagement();
       
       await waitFor(() => {
-        const resetButtons = screen.getAllByTitle('Reset password');
+        const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
         expect(resetButtons.length).toBeGreaterThan(0);
       });
       
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       const user1ResetButton = resetButtons[2]; // user1's reset button
       
       fireEvent.click(user1ResetButton);
@@ -965,7 +965,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('coach1')).toBeInTheDocument();
       });
       
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       const coach1ResetButton = resetButtons[1]; // coach1's reset button
       
       fireEvent.click(coach1ResetButton);
@@ -983,7 +983,7 @@ describe('UserManagement Component', () => {
         expect(usernameCells.length).toBeGreaterThan(0);
       });
       
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       const adminResetButton = resetButtons[0]; // admin's reset button
       
       fireEvent.click(adminResetButton);
@@ -1001,7 +1001,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       const user1ResetButton = resetButtons[2]; // user1's reset button
       
       fireEvent.click(user1ResetButton);
@@ -1022,7 +1022,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open password dialog for user1
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -1058,7 +1058,7 @@ describe('UserManagement Component', () => {
       });
       
       // Click reset password for coach1
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       fireEvent.click(resetButtons[1]);
       
       await waitFor(() => {
@@ -1085,7 +1085,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -1110,7 +1110,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -1142,7 +1142,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog and submit
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -1170,7 +1170,7 @@ describe('UserManagement Component', () => {
       });
       
       // First password reset
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -1187,7 +1187,7 @@ describe('UserManagement Component', () => {
       
       // Open dialog for another user - should clear previous success message
       await act(async () => {
-        const newResetButtons = screen.getAllByTitle('Reset password');
+        const newResetButtons = await screen.findAllByRole('button', { name: /reset password/i });
         fireEvent.click(newResetButtons[1]); // coach1
       });
       
@@ -1204,7 +1204,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -1225,7 +1225,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog for user1
-      const resetButtons = screen.getAllByTitle('Reset password');
+      const resetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       fireEvent.click(resetButtons[2]);
       
       await waitFor(() => {
@@ -1240,7 +1240,7 @@ describe('UserManagement Component', () => {
       });
       
       // Open dialog for coach1 - should work correctly
-      const newResetButtons = screen.getAllByTitle('Reset password');
+      const newResetButtons = await screen.findAllByRole('button', { name: /reset password/i });
       fireEvent.click(newResetButtons[1]);
       
       await waitFor(() => {
