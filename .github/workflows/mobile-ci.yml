@@ -53,29 +53,32 @@ jobs:
         working-directory: frontend
         run: |
           set -euo pipefail
+          echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
           
-          # Skip if android directory already exists
-          if [ -d "android" ]; then
-            echo "✅ Android platform already exists, skipping cap add"
-          else
-            # Ensure @capacitor/android is installed
-            if ! npm list @capacitor/android > /dev/null 2>&1; then
-              echo "📦 Installing @capacitor/android..."
-              npm install @capacitor/android --no-save
-            fi
-            
-            # Try to add Android platform with retry
-            echo "🔧 Adding Android platform..."
-            if ! npx cap add android; then
-              echo "⚠️ First attempt failed, retrying after cache clean..."
-              npm cache clean --force
-              npx cap add android
-            fi
+          # If android dir exists, sync instead of add
+          if [ -d android ]; then
+            echo "::notice::android directory already exists — running 'npx cap sync android'"
+            npx cap sync android --interactive=false || { echo "::error::npx cap sync android failed"; exit 1; }
+            exit 0
           fi
 
-      - name: Sync Capacitor
-        working-directory: frontend
-        run: npx cap sync android
+          # Ensure @capacitor/android is installed in node_modules (non-persistent)
+          if ! npm ls @capacitor/android >/dev/null 2>&1; then
+            echo "::notice::@capacitor/android missing — installing locally (no-save)"
+            npm install @capacitor/android --no-save --include=optional || { echo "::error::Failed to install @capacitor/android"; npm ls --depth=0 || true; exit 1; }
+          fi
+
+          # Try to add platform, if add fails fall back to sync and show diagnostics
+          if npx cap add android --interactive=false; then
+            echo "::notice::npx cap add android succeeded"
+          else
+            echo "::warning::npx cap add android failed — trying npx cap sync android with diagnostics"
+            npx cap sync android --interactive=false || {
+              echo "::error::cap add/sync failed. Capacitor versions:"
+              npm ls @capacitor/cli @capacitor/core @capacitor/android --depth=0 || true
+              exit 1
+            }
+          fi
 
       - name: Build Android Debug APK
         working-directory: frontend/android
@@ -136,40 +139,32 @@ jobs:
         working-directory: frontend
         run: |
           set -euo pipefail
-          echo "Working dir: $(pwd) -- node $(node -v) npm $(npm -v)"
+          echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
           
-          # Skip if ios directory already exists
+          # If ios dir exists, sync instead of add
           if [ -d ios ]; then
-            echo "::notice::ios directory exists — skipping npx cap add ios"
+            echo "::notice::ios directory exists — running 'npx cap sync ios'"
+            npx cap sync ios --interactive=false || { echo "::error::npx cap sync ios failed"; exit 1; }
             exit 0
           fi
 
-          # Ensure @capacitor/ios is installed in node_modules
+          # Ensure @capacitor/ios is installed in node_modules (non-persistent)
           if ! npm ls @capacitor/ios >/dev/null 2>&1; then
-            echo "::notice::@capacitor/ios not present — installing locally (no-save) for CI"
-            npm install @capacitor/ios --no-save --include=optional || {
-              echo "::error::Failed to install @capacitor/ios"
-              npm ls --depth=0 || true
-              exit 1
-            }
+            echo "::notice::@capacitor/ios missing — installing locally (no-save)"
+            npm install @capacitor/ios --no-save --include=optional || { echo "::error::Failed to install @capacitor/ios"; npm ls --depth=0 || true; exit 1; }
           fi
 
-          # Run add with verbose output and retry once on failure
-          echo "::notice::Running npx cap add ios (verbose)"
-          if npx cap add ios --verbose --interactive=false; then
+          # Try to add platform, if add fails fall back to sync and show diagnostics
+          if npx cap add ios --interactive=false; then
             echo "::notice::npx cap add ios succeeded"
           else
-            echo "::warning::npx cap add ios failed — retrying with diagnostics"
-            npx cap add ios --verbose --interactive=false || {
-              echo "::error::npx cap add ios failed on retry — dumping node_modules @capacitor/* versions"
-              npm ls @capacitor/cli @capacitor/core @capacitor/ios @capacitor/android --depth=0 || true
+            echo "::warning::npx cap add ios failed — trying npx cap sync ios with diagnostics"
+            npx cap sync ios --interactive=false || {
+              echo "::error::cap add/sync failed. Capacitor versions:"
+              npm ls @capacitor/cli @capacitor/core @capacitor/ios --depth=0 || true
               exit 1
             }
           fi
-
-      - name: Sync Capacitor
-        working-directory: frontend
-        run: npx cap sync ios
 
       - name: Install iOS dependencies
         working-directory: frontend/ios/App
