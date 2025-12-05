@@ -1,5 +1,7 @@
 name: Build and Push Docker Image
 
+# This workflow only runs on release/tag events, not on PRs
+# Trivy scan warnings during PR reviews are expected and can be ignored
 on:
   release:
     types: [published]
