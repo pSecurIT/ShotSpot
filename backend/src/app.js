@@ -205,9 +205,9 @@ app.use(session({
   saveUninitialized: true, // Changed to true to create session for CSRF token
   name: 'sessionId', // Change from default 'connect.sid'
   cookie: {
-    // Allow SESSION_SECURE env var to override (useful for Docker/local testing on HTTP)
-    // In Docker without HTTPS, secure must be false
-    secure: process.env.SESSION_SECURE === 'true' ? true : false,
+    // Secure flag: always true in production, false only in development/test
+    // Note: Requires HTTPS in production - ensure reverse proxy (nginx) handles SSL termination
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     // Use 'lax' for Docker compatibility - allows cookies to be sent on initial navigation
     sameSite: process.env.SESSION_SAME_SITE || 'lax',
