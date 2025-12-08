@@ -25,7 +25,16 @@ const csrf = (req, res, next) => {
     
     // Check if session has a CSRF secret
     if (!req.session || !req.session.csrfSecret) {
-      console.error('CSRF validation failed: No CSRF secret in session');
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('CSRF validation failed: No CSRF secret in session', {
+          hasSession: !!req.session,
+          sessionId: req.sessionID,
+          hasSecret: !!(req.session && req.session.csrfSecret),
+          path: req.path,
+          cookies: Object.keys(req.cookies || {}),
+          method: req.method
+        });
+      }
       return res.status(403).json({ 
         error: 'Invalid CSRF token',
         details: 'Session not initialized. Please refresh and try again.'
