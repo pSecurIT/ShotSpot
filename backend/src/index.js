@@ -42,6 +42,22 @@ try {
   await db.healthCheck();
   console.log('✓ Database connection established');
   
+  // Ensure exports directory exists
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const { fileURLToPath } = await import('url');
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
+      const exportsDir = path.join(__dirname, '../exports');
+      await fs.access(exportsDir).catch(() => fs.mkdir(exportsDir, { recursive: true }));
+      console.log('✓ Exports directory ready');
+    } catch (dirErr) {
+      console.warn('⚠️  Could not create exports directory:', dirErr.message);
+    }
+  }
+  
   // Initialize default admin user if needed (only in non-test environments)
   if (process.env.NODE_ENV !== 'test') {
     try {

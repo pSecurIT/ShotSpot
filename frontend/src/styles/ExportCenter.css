@@ -20,6 +20,32 @@
   margin: 0;
 }
 
+/* Team Selector */
+.team-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--background-light);
+  border-radius: var(--border-radius-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.team-selector label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.team-selector select {
+  flex: 1;
+  max-width: 400px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  font-size: 1rem;
+  background: white;
+}
+
 /* Tabs */
 .export-tabs {
   display: flex;
@@ -144,7 +170,8 @@
   width: 100%;
 }
 
-.templates-header {
+.templates-header,
+.section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -154,7 +181,8 @@
   border-radius: var(--border-radius-md);
 }
 
-.templates-header p {
+.templates-header p,
+.section-header p {
   margin: 0;
   color: var(--text-secondary);
 }
@@ -199,6 +227,18 @@
   border-top: 1px solid var(--border-color);
   font-size: 0.9rem;
   color: var(--text-secondary);
+}
+
+.template-card-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.template-card-actions button {
+  flex: 1;
+  min-width: 80px;
 }
 
 /* Schedule Section */

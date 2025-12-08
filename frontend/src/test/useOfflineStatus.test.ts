@@ -11,6 +11,18 @@ import { clearStore, STORES } from '../utils/indexedDB';
 // Mock fetch
 global.fetch = vi.fn();
 
+// Mock the api module to avoid CSRF token fetching
+vi.mock('../utils/api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn()
+  },
+  getCsrfToken: vi.fn(() => Promise.resolve('mock-csrf-token')),
+  resetCsrfToken: vi.fn()
+}));
+
 // Mock localStorage
 const localStorageMock = {
   getItem: vi.fn(() => 'mock-token'),

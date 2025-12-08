@@ -9,6 +9,7 @@ import {
   markActionSynced,
   clearOldSyncedActions
 } from './indexedDB';
+import { getCsrfToken } from './api';
 
 /**
  * Queue an action for later sync when offline
@@ -67,6 +68,9 @@ export const processQueue = async (): Promise<{
         body = typeof action.data === 'string' ? action.data : JSON.stringify(action.data);
       }
 
+      // Get CSRF token for state-changing requests
+      const csrfToken = await getCsrfToken();
+
       const response = await fetch(action.endpoint, {
         method: action.type,
         headers: {
@@ -74,8 +78,11 @@ export const processQueue = async (): Promise<{
           // Include auth token if available
           ...(localStorage.getItem('token') && {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
-          })
+          }),
+          // Include CSRF token
+          'X-CSRF-Token': csrfToken
         },
+        credentials: 'include', // Important: include cookies for session
         body
       });
 

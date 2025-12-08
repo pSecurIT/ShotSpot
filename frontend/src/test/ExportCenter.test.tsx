@@ -5,7 +5,58 @@ import ExportCenter from '../components/ExportCenter';
 // Mock the api module
 vi.mock('../utils/api', () => ({
   default: {
-    get: vi.fn(),
+    get: vi.fn((url: string) => {
+      if (url === '/exports/recent') {
+        return Promise.resolve({
+          data: [
+            {
+              id: 1,
+              name: 'Game Report - Team A vs Team B',
+              format: 'pdf-detailed',
+              dataType: 'game',
+              createdAt: new Date(Date.now() - 3600000).toISOString(),
+              size: '2.3 MB',
+              status: 'completed',
+              downloadUrl: '/exports/1'
+            },
+            {
+              id: 2,
+              name: 'Player Stats - Season Summary',
+              format: 'csv',
+              dataType: 'player',
+              createdAt: new Date(Date.now() - 7200000).toISOString(),
+              size: '156 KB',
+              status: 'completed',
+              downloadUrl: '/exports/2'
+            }
+          ]
+        });
+      }
+      if (url === '/exports/templates') {
+        return Promise.resolve({
+          data: [
+            {
+              id: 1,
+              name: 'Match Summary',
+              description: 'Quick overview with key statistics',
+              format: 'pdf-summary',
+              options: { includeCharts: true, includePlayerStats: true }
+            },
+            {
+              id: 2,
+              name: 'Full Game Report',
+              description: 'Comprehensive analysis',
+              format: 'pdf-detailed',
+              options: { includeCharts: true, includeTimeline: true }
+            }
+          ]
+        });
+      }
+      if (url === '/teams') {
+        return Promise.resolve({ data: [{ id: 1, name: 'Test Team' }] });
+      }
+      return Promise.reject(new Error('Not found'));
+    }),
     post: vi.fn(),
     delete: vi.fn()
   }
