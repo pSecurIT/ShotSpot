@@ -1,3 +1,8 @@
+// Load environment variables first (in case app.js is imported before index.js dotenv config)
+import dotenv from 'dotenv';
+dotenv.config({ path: new URL('../../.env', import.meta.url) });
+dotenv.config({ override: true });
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -198,9 +203,16 @@ app.use((req, res, next) => {
 
 // Session configuration
 app.use(cookieParser());
+
+// Ensure session secret is available
+const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET;
+if (!sessionSecret) {
+  throw new Error('SESSION_SECRET or JWT_SECRET must be set in environment variables');
+}
+
 // Session configuration with security settings from environment
 app.use(session({
-  secret: process.env.SESSION_SECRET || process.env.JWT_SECRET,
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: true, // Changed to true to create session for CSRF token
   name: 'sessionId', // Change from default 'connect.sid'

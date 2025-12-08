@@ -7,8 +7,9 @@ const { Pool } = pkg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables from the correct path
-dotenv.config({ path: join(__dirname, '..', '.env') });
+// Load environment variables - root first, then backend overrides
+dotenv.config({ path: join(__dirname, '..', '..', '.env') });
+dotenv.config({ path: join(__dirname, '..', '.env'), override: true });
 
 async function verifyConnection() {
   const config = {

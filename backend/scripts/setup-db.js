@@ -6,18 +6,22 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { promisify } from 'util';
 
-// Set up proper paths for environment file
+// Set up proper paths for environment files
 const scriptPath = fileURLToPath(import.meta.url);
 const scriptDir = dirname(scriptPath);
-const envPath = path.join(scriptDir, '..', '.env');
+const rootEnvPath = path.join(scriptDir, '..', '..', '.env');
+const backendEnvPath = path.join(scriptDir, '..', '.env');
 
-// Load environment variables from the correct path
-dotenv.config({ path: envPath });
+// Load environment variables - root first, then backend overrides
+dotenv.config({ path: rootEnvPath });
+dotenv.config({ path: backendEnvPath, override: true });
 
 // Verify environment variables are loaded
 if (!process.env.DB_USER || !process.env.DB_NAME) {
-  console.error('Failed to load environment variables from:', envPath);
-  console.error('Please ensure the .env file exists and contains the required variables.');
+  console.error('Failed to load environment variables from:');
+  console.error('  Root:', rootEnvPath);
+  console.error('  Backend:', backendEnvPath);
+  console.error('Please ensure the .env files exist and contain the required variables.');
   process.exit(1);
 }
 const execPromise = promisify(exec);

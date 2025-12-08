@@ -14,14 +14,20 @@ const Login: React.FC = () => {
     setError(''); // Only clear on new submit
 
     try {
+      console.log('[Login] Attempting login...');
       const result = await login(username, password);
+      console.log('[Login] Login result:', result);
+      
       if (result.success) {
+        console.log('[Login] Success, navigating to /teams');
         navigate('/teams');
       } else {
+        console.log('[Login] Failed, setting error:', result.error);
         setError(result.error || 'An error occurred during login');
+        console.log('[Login] Error state set, waiting for render...');
       }
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('[Login] Exception during login:', err);
       setError('An unexpected error occurred during login');
     }
   };

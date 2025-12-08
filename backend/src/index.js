@@ -1,9 +1,20 @@
 import dotenv from 'dotenv';
+
+// Load and validate environment variables FIRST before any other imports
+// Load root .env first (shared configuration)
+dotenv.config({ path: '../.env' });
+// Then load backend/.env to override with local development settings (use override to ensure local settings take precedence)
+dotenv.config({ override: true });
+
+// Now import modules that depend on environment variables
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import validateEnv from './utils/validateEnv.js';
 import app from './app.js';
 import { verifyToken } from './middleware/auth.js';
+
+// Validate environment variables after loading
+validateEnv();
 
 // Critical: Handle unhandled promise rejections and exceptions to prevent silent crashes
 process.on('unhandledRejection', (reason, promise) => {
@@ -22,10 +33,6 @@ process.on('uncaughtException', (error) => {
     process.exit(1);
   }
 });
-
-// Load and validate environment variables
-dotenv.config();
-validateEnv();
 
 // Test database connection before starting server
 import db from './db.js';

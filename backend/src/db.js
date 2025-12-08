@@ -1,5 +1,4 @@
 import pkg from 'pg';
-import dotenv from 'dotenv';
 import {
   sanitizeDbError,
   createQueryLogMetadata,
@@ -7,31 +6,36 @@ import {
   isParameterizedQuery
 } from './utils/dbSanitizer.js';
 
-// Load environment variables
-dotenv.config();
-
 const { Pool } = pkg;
 
-// Construct connection string from individual variables if DATABASE_URL is not provided
-const connectionConfig = process.env.DATABASE_URL
-  ? { connectionString: process.env.DATABASE_URL }
-  : {
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT) || 5432,
-    database: process.env.DB_NAME,
-  };
+// Lazy initialization - pool is created on first use after environment variables are loaded
+let pool = null;
 
-const pool = new Pool({
-  ...connectionConfig,
-  max: Number(process.env.DB_MAX_CONNECTIONS) || Number(process.env.DB_MAX_CLIENTS) || 20,
-  idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
-  connectionTimeoutMillis: 2000,
-});
+function getPool() {
+  if (!pool) {
+    // Construct connection string from individual variables if DATABASE_URL is not provided
+    const connectionConfig = process.env.DATABASE_URL
+      ? { connectionString: process.env.DATABASE_URL }
+      : {
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        host: process.env.DB_HOST,
+        port: Number(process.env.DB_PORT) || 5432,
+        database: process.env.DB_NAME,
+      };
+
+    pool = new Pool({
+      ...connectionConfig,
+      max: Number(process.env.DB_MAX_CONNECTIONS) || Number(process.env.DB_MAX_CLIENTS) || 20,
+      idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
+      connectionTimeoutMillis: 2000,
+    });
+  }
+  return pool;
+}
 
 const query = async (text, params) => {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   const start = Date.now();
   try {
     // Validate that query uses parameterized format for security
@@ -66,7 +70,7 @@ const query = async (text, params) => {
 };
 
 export async function dbHealthCheck() {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     // Safe: hardcoded query with no user input
     await client.query('SELECT 1');
@@ -82,7 +86,9 @@ export async function dbHealthCheck() {
 
 export async function closePool() {
   try {
-    await pool.end();
+    if (pool) {
+      await pool.end();
+    }
   } catch (err) {
     const sanitizedError = sanitizeDbError(err);
     console.error('Error closing DB pool:', sanitizedError);

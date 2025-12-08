@@ -22,8 +22,8 @@ const Navigation: React.FC = () => {
     // Show success message
     alert('Password changed successfully!');
     
-    // Refresh the page to clear any errors and reset state
-    window.location.reload();
+    // Navigate to teams page to refresh the view without a full page reload
+    navigate('/teams');
   };
 
   return (
