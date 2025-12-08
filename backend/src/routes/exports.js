@@ -2,8 +2,15 @@ import express from 'express';
 import { param, query, body, validationResult } from 'express-validator';
 import PDFDocument from 'pdfkit';
 import { stringify } from 'csv-stringify';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
+import { enqueueExport, getQueueStatus } from '../utils/exportQueue.js';
+
+const exportsFilename = fileURLToPath(import.meta.url);
+const exportsDirname = path.dirname(exportsFilename);
 
 const router = express.Router();
 
@@ -793,6 +800,431 @@ router.get('/player-report/:playerId', [
       console.error('Error generating player report:', err);
     }
     res.status(500).json({ error: 'Failed to generate player report' });
+  }
+});
+
+/**
+ * GET /api/exports/recent
+ * Get recent export records for the current user
+ */
+router.get('/recent', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        re.id,
+        re.report_name as name,
+        re.format,
+        re.report_type as "dataType",
+        re.created_at as "createdAt",
+        re.file_size_bytes,
+        re.file_path,
+        CASE 
+          WHEN re.file_path IS NOT NULL THEN 'completed'
+          ELSE 'processing'
+        END as status
+      FROM report_exports re
+      WHERE re.generated_by = $1
+      ORDER BY re.created_at DESC
+      LIMIT 50
+    `, [req.user.userId]);
+
+    const exports = result.rows.map(exp => ({
+      ...exp,
+      size: exp.file_size_bytes ? `${(exp.file_size_bytes / 1024 / 1024).toFixed(2)} MB` : '-',
+      downloadUrl: exp.file_path ? `/api/exports/download/${exp.id}` : undefined
+    }));
+
+    res.json(exports);
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Error fetching recent exports:', err);
+    }
+    res.status(500).json({ error: 'Failed to fetch exports' });
+  }
+});
+
+/**
+ * GET /api/exports/templates
+ * Get all available templates (default + user's custom templates)
+ */
+router.get('/templates', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        id,
+        name,
+        description,
+        type as format,
+        sections as options
+      FROM report_templates
+      WHERE is_active = true 
+        AND (is_default = true OR created_by = $1)
+      ORDER BY is_default DESC, name ASC
+    `, [req.user.userId]);
+
+    res.json(result.rows);
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Error fetching templates:', err);
+    }
+    res.status(500).json({ error: 'Failed to fetch templates' });
+  }
+});
+
+/**
+ * POST /api/exports/templates
+ * Create a new custom template
+ */
+router.post('/templates', [
+  requireRole(['coach', 'admin']),
+  body('name').trim().notEmpty().withMessage('Template name is required'),
+  body('description').optional().trim(),
+  body('format').isIn(['pdf-summary', 'pdf-detailed', 'csv', 'xlsx', 'json']).withMessage('Invalid format'),
+  body('options').optional().isObject()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { name, description, format, options } = req.body;
+
+    const result = await db.query(`
+      INSERT INTO report_templates (name, description, type, sections, created_by, is_default)
+      VALUES ($1, $2, $3, $4, $5, false)
+      RETURNING id, name, description, type as format, sections as options
+    `, [name, description || '', format, JSON.stringify(options || {}), req.user.userId]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Error creating template:', err);
+    }
+    res.status(500).json({ error: 'Failed to create template' });
+  }
+});
+
+/**
+ * PUT /api/exports/templates/:id
+ * Update a custom template (only if owned by user)
+ */
+router.put('/templates/:id', [
+  requireRole(['coach', 'admin']),
+  param('id').isInt(),
+  body('name').optional().trim().notEmpty(),
+  body('description').optional().trim(),
+  body('format').optional().isIn(['pdf-summary', 'pdf-detailed', 'csv', 'xlsx', 'json']),
+  body('options').optional().isObject()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { id } = req.params;
+    const { name, description, format, options } = req.body;
+
+    // Check if template exists and is owned by user
+    const checkResult = await db.query(
+      'SELECT id FROM report_templates WHERE id = $1 AND created_by = $2 AND is_default = false',
+      [id, req.user.userId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Template not found or cannot be modified' });
+    }
+
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`);
+      values.push(name);
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramCount++}`);
+      values.push(description);
+    }
+    if (format !== undefined) {
+      updates.push(`type = $${paramCount++}`);
+      values.push(format);
+    }
+    if (options !== undefined) {
+      updates.push(`sections = $${paramCount++}`);
+      values.push(JSON.stringify(options));
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    values.push(id);
+    const result = await db.query(`
+      UPDATE report_templates
+      SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $${paramCount}
+      RETURNING id, name, description, type as format, sections as options
+    `, values);
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Error updating template:', err);
+    }
+    res.status(500).json({ error: 'Failed to update template' });
+  }
+});
+
+/**
+ * DELETE /api/exports/templates/:id
+ * Delete a custom template (only if owned by user)
+ */
+router.delete('/templates/:id', [
+  requireRole(['coach', 'admin']),
+  param('id').isInt()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      'DELETE FROM report_templates WHERE id = $1 AND created_by = $2 AND is_default = false RETURNING id',
+      [id, req.user.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Template not found or cannot be deleted' });
+    }
+
+    res.json({ message: 'Template deleted successfully' });
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Error deleting template:', err);
+    }
+    res.status(500).json({ error: 'Failed to delete template' });
+  }
+});
+
+/**
+ * POST /api/exports/from-template
+ * Create a new export from a template
+ */
+router.post('/from-template', [
+  requireRole(['coach', 'admin']),
+  body('templateId').isInt().withMessage('Template ID must be an integer'),
+  body('dataType').optional().isIn(['game', 'player', 'team', 'season']),
+  body('gameId').optional().isInt(),
+  body('teamId').isInt().withMessage('Team ID must be an integer'),
+  body('playerId').optional().isInt()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { templateId, dataType, gameId, teamId, playerId } = req.body;
+
+    // Verify team exists if teamId is provided
+    if (teamId) {
+      const teamCheck = await db.query('SELECT id FROM teams WHERE id = $1', [teamId]);
+      if (teamCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Team not found' });
+      }
+    }
+
+    // Get template
+    const templateResult = await db.query(
+      'SELECT * FROM report_templates WHERE id = $1 AND is_active = true',
+      [templateId]
+    );
+
+    if (templateResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    const template = templateResult.rows[0];
+
+    // Create export record
+    const result = await db.query(`
+      INSERT INTO report_exports 
+        (template_id, generated_by, report_name, report_type, format, game_id, team_id, player_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id, report_name as name, format, report_type as "dataType", created_at as "createdAt"
+    `, [
+      templateId,
+      req.user.userId,
+      `${template.name} - ${new Date().toLocaleDateString()}`,
+      dataType || 'game',
+      template.type,
+      gameId || null,
+      teamId || null,
+      playerId || null
+    ]);
+
+    const exportRecord = {
+      ...result.rows[0],
+      status: 'processing',
+      size: '-'
+    };
+
+    // Queue the export generation job
+    enqueueExport(
+      exportRecord.id,
+      templateId,
+      template.type,
+      gameId || null,
+      teamId || null,
+      playerId || null,
+      req.user.userId
+    );
+
+    res.status(201).json(exportRecord);
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Error creating export from template:', err);
+    }
+    res.status(500).json({ error: 'Failed to create export' });
+  }
+});
+
+/**
+ * GET /api/exports/download/:id
+ * Download a generated export file
+ */
+router.get('/download/:id', [
+  param('id').isInt()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { id } = req.params;
+
+    // Get export record
+    const result = await db.query(
+      'SELECT file_path, report_name, format FROM report_exports WHERE id = $1 AND generated_by = $2',
+      [id, req.user.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Export not found' });
+    }
+
+    const exportRecord = result.rows[0];
+
+    if (!exportRecord.file_path) {
+      return res.status(404).json({ error: 'Export file not yet generated' });
+    }
+
+    // Read and send file
+    const fullPath = path.join(exportsDirname, '../../', exportRecord.file_path);
+    const fileBuffer = await fs.readFile(fullPath);
+
+    // Set appropriate headers
+    const ext = exportRecord.format.includes('pdf') ? 'pdf' : 'csv';
+    const contentType = ext === 'pdf' ? 'application/pdf' : 'text/csv';
+    const fileName = `${exportRecord.report_name.replace(/[^a-z0-9]/gi, '_')}.${ext}`;
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', fileBuffer.length);
+
+    // Update access count
+    await db.query(
+      'UPDATE report_exports SET access_count = access_count + 1 WHERE id = $1',
+      [id]
+    );
+
+    res.send(fileBuffer);
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Error downloading export:', err);
+    }
+    res.status(500).json({ error: 'Failed to download export' });
+  }
+});
+
+/**
+ * GET /api/exports/queue-status
+ * Get current queue status
+ */
+router.get('/queue-status', async (req, res) => {
+  try {
+    const status = getQueueStatus();
+    res.json(status);
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Error getting queue status:', err);
+    }
+    res.status(500).json({ error: 'Failed to get queue status' });
+  }
+});
+
+/**
+ * DELETE /api/exports/:id
+ * Delete an export record
+ */
+router.delete('/:id', [
+  param('id').isInt()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { id } = req.params;
+
+    // Get file path before deleting record
+    const fileResult = await db.query(
+      'SELECT file_path FROM report_exports WHERE id = $1 AND generated_by = $2',
+      [id, req.user.userId]
+    );
+
+    if (fileResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Export not found' });
+    }
+
+    const filePath = fileResult.rows[0].file_path;
+
+    // Delete database record
+    await db.query(
+      'DELETE FROM report_exports WHERE id = $1 AND generated_by = $2',
+      [id, req.user.userId]
+    );
+
+    // Delete actual file from storage if it exists
+    if (filePath) {
+      try {
+        const fullPath = path.join(exportsDirname, '../../', filePath);
+        await fs.unlink(fullPath);
+        if (process.env.NODE_ENV !== 'test') {
+          console.log(`Deleted export file: ${filePath}`);
+        }
+      } catch (fileErr) {
+        // File might not exist or already deleted, log but don't fail
+        if (process.env.NODE_ENV !== 'test') {
+          console.warn(`Could not delete file ${filePath}:`, fileErr.message);
+        }
+      }
+    }
+
+    res.json({ message: 'Export deleted successfully' });
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Error deleting export:', err);
+    }
+    res.status(500).json({ error: 'Failed to delete export' });
   }
 });
 
