@@ -123,8 +123,12 @@ api.interceptors.response.use(
 
     // Handle authentication errors
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      if (typeof window !== 'undefined') {
+      // Don't redirect if this is a login/register attempt (let the component handle the error)
+      const isAuthEndpoint = originalRequest.url?.includes('/auth/login') || 
+                            originalRequest.url?.includes('/auth/register');
+      
+      if (!isAuthEndpoint && typeof window !== 'undefined') {
+        // Token expired or invalid - redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';

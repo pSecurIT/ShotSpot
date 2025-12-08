@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { AxiosError } from 'axios';
 import { User, AuthContextType, AuthProviderProps } from '../types/auth';
 import api, { getCsrfToken } from '../utils/api';
+import { registerServiceWorker } from '../utils/serviceWorker';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -16,6 +17,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setUser(JSON.parse(storedUser));
+        // User is already authenticated, register service worker (production only)
+        if (import.meta.env.PROD) {
+          registerServiceWorker();
+        }
       } catch (error) {
         console.error('Failed to parse stored user data:', error);
         localStorage.removeItem('user');
@@ -39,6 +44,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
+      
+      // Register service worker after successful login (production only)
+      if (import.meta.env.PROD) {
+        registerServiceWorker();
+      }
+      
       return { success: true };
     } catch (error) {
       const axiosError = error as AxiosError<{ error: string }>;
