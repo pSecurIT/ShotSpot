@@ -120,7 +120,8 @@ async function setupTestDb() {
       'add_seasons.sql',
       'seed_achievements.sql',
       'add_competition_management.sql',
-      'add_match_templates.sql'
+      'add_match_templates.sql',
+      'add_twizzit_integration.sql'
     ];
 
     for (const migrationFile of migrations) {

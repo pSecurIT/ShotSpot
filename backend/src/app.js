@@ -43,6 +43,7 @@ import exportRoutes from './routes/export.js';
 import competitionsRoutes from './routes/competitions.js';
 import teamAnalyticsRoutes from './routes/team-analytics.js';
 import matchTemplatesRoutes from './routes/match-templates.js';
+import twizzitRoutes from './routes/twizzit.js';
 
 
 const app = express();
@@ -314,6 +315,7 @@ app.use('/api/exports', exportsRoutes);
 app.use('/api/competitions', competitionsRoutes);
 app.use('/api/team-analytics', teamAnalyticsRoutes);
 app.use('/api/match-templates', matchTemplatesRoutes);
+app.use('/api/twizzit', twizzitRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {

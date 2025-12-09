@@ -1,0 +1,222 @@
+{
+  "api": {
+    "name": "Twizzit API",
+    "version": "v2",
+    "baseUrl": "https://app.twizzit.com",
+    "description": "Sports management platform API for organizations, groups (teams), contacts (players), and events",
+    "notes": "API requires organization-specific access. Service accounts have limited permissions."
+  },
+  "authentication": {
+    "type": "Bearer Token (JWT)",
+    "endpoint": "/v2/api/authenticate",
+    "method": "POST",
+    "contentType": "application/x-www-form-urlencoded",
+    "requestBody": {
+      "username": "string",
+      "password": "string"
+    },
+    "response": {
+      "token": "string (JWT)",
+      "expires_in": "number (seconds)"
+    },
+    "notes": "Token must be included in Authorization header as 'Bearer <token>'"
+  },
+  "endpoints": {
+    "organizations": {
+      "listOrganizations": {
+        "method": "GET",
+        "path": "/v2/api/organizations",
+        "description": "Retrieve all accessible organizations",
+        "queryParameters": {},
+        "response": {
+          "type": "array",
+          "items": {
+            "id": "number",
+            "name": "string",
+            "organization_name": "string"
+          }
+        },
+        "notes": "Returns direct array, not paginated object"
+      }
+    },
+    "groups": {
+      "listGroups": {
+        "method": "GET",
+        "path": "/v2/api/groups",
+        "description": "Retrieve all groups (teams) for an organization",
+        "queryParameters": {
+          "organization_id": "number (required)",
+          "limit": "number (optional)"
+        },
+        "response": {
+          "type": "array",
+          "items": {
+            "id": "number",
+            "name": "string",
+            "group_name": "string",
+            "group_id": "number"
+          }
+        },
+        "notes": "Groups are equivalent to teams. Requires organization_id parameter. Returns 403 if service account lacks permission."
+      },
+      "getGroup": {
+        "method": "GET",
+        "path": "/v2/api/groups",
+        "description": "Retrieve a specific group by ID",
+        "queryParameters": {
+          "id": "number (group ID)",
+          "organization_id": "number (may be required)"
+        },
+        "response": {
+          "type": "object",
+          "properties": {
+            "id": "number",
+            "name": "string",
+            "group_name": "string"
+          }
+        }
+      }
+    },
+    "contacts": {
+      "listContacts": {
+        "method": "GET",
+        "path": "/v2/api/contacts",
+        "description": "Retrieve all contacts (players)",
+        "authentication": "required",
+        "queryParameters": {
+          "organization_id": "number (may be required)",
+          "limit": "number (optional)"
+        },
+        "response": {
+          "type": "array (direct, not paginated)",
+          "items": {
+            "id": "number",
+            "contact_id": "number",
+            "firstName": "string",
+            "lastName": "string",
+            "first_name": "string",
+            "last_name": "string",
+            "dateOfBirth": "date (optional)",
+            "gender": "string (optional)",
+            "membershipNumber": "string (optional)"
+          }
+        },
+        "notes": "Contacts are equivalent to players in korfball context"
+      }
+    },
+    "groupContacts": {
+      "listGroupContacts": {
+        "method": "GET",
+        "path": "/v2/api/group-contacts",
+        "description": "Retrieve all contacts (players) for a specific group (team)",
+        "authentication": "required",
+        "queryParameters": {
+          "group_id": "number (required)",
+          "organization_id": "number (may be required)"
+        },
+        "response": {
+          "type": "array (direct, not paginated)",
+          "items": {
+            "id": "number",
+            "contact_id": "number",
+            "group_id": "number",
+            "firstName": "string",
+            "lastName": "string",
+            "first_name": "string",
+            "last_name": "string"
+          }
+        },
+        "notes": "Primary endpoint for getting players for a specific team"
+      }
+    },
+    "seasons": {
+      "listSeasons": {
+        "method": "GET",
+        "path": "/v2/api/seasons",
+        "description": "Retrieve all accessible seasons",
+        "authentication": "required",
+        "response": {
+          "type": "array (direct, not paginated)"
+        },
+        "notes": "May return 403 if service account lacks permission"
+      }
+    }
+  },
+  "permissionModel": {
+    "overview": "Service accounts have role-based permissions tied to specific organizations",
+    "organizationScope": "Most endpoints require organization_id parameter or automatically filter by accessible organizations",
+    "serviceAccountLimitations": "Service accounts typically have read-only access to specific organization data",
+    "permissionChecks": "API returns 403 Forbidden when attempting to access resources without proper permissions"
+  },
+  "commonErrors": {
+    "400": {
+      "description": "Bad Request - Invalid parameters or malformed request",
+      "commonCauses": ["Missing required query parameters", "Invalid parameter types or formats"]
+    },
+    "401": {
+      "description": "Unauthorized - Invalid or missing authentication",
+      "solution": "Re-authenticate using /v2/api/authenticate endpoint"
+    },
+    "403": {
+      "description": "Forbidden - Insufficient permissions",
+      "message": "no access for specified organizations",
+      "solution": "Verify service account has appropriate permissions for the organization"
+    },
+    "404": {
+      "description": "Not Found - Resource does not exist"
+    },
+    "429": {
+      "description": "Too Many Requests - Rate limit exceeded"
+    },
+    "500": {
+      "description": "Internal Server Error"
+    },
+    "503": {
+      "description": "Service Unavailable"
+    }
+  },
+  "bestPractices": {
+    "contentType": "Always use 'application/x-www-form-urlencoded' for authentication endpoint",
+    "tokenManagement": "Cache JWT tokens and reuse until expiry. Implement automatic token refresh.",
+    "errorHandling": "Parse error responses for detailed messages. Log 403 errors with organization context.",
+    "organizationContext": "Always include organization_id when fetching organization-specific data",
+    "arrayResponses": "API returns direct arrays (not paginated objects). No need to access .data property."
+  },
+  "implementationNotes": {
+    "terminology": {
+      "groups": "Equivalent to 'teams' in korfball context",
+      "contacts": "Equivalent to 'players' in korfball context"
+    },
+    "responseFormat": {
+      "directArrays": "Most endpoints return arrays directly, not wrapped in pagination objects",
+      "fieldNaming": "API uses both camelCase and snake_case"
+    }
+  },
+  "exampleWorkflow": {
+    "1_authenticate": {
+      "endpoint": "POST /v2/api/authenticate",
+      "contentType": "application/x-www-form-urlencoded",
+      "body": "username=svc_ShotSpot&password=YOUR_PASSWORD",
+      "response": { "token": "eyJ0eXAi...", "expires_in": 3600 }
+    },
+    "2_getOrganizations": {
+      "endpoint": "GET /v2/api/organizations",
+      "headers": { "Authorization": "Bearer eyJ0eXAi..." },
+      "response": [{ "id": 25537, "name": "KCOV v.z.w." }]
+    },
+    "3_getGroups": {
+      "endpoint": "GET /v2/api/groups?organization_id=25537",
+      "headers": { "Authorization": "Bearer eyJ0eXAi..." },
+      "note": "May return 403 if service account lacks permission"
+    },
+    "4_getGroupContacts": {
+      "endpoint": "GET /v2/api/group-contacts?group_id=123&organization_id=25537",
+      "headers": { "Authorization": "Bearer eyJ0eXAi..." }
+    }
+  },
+  "officialDocumentation": {
+    "url": "https://app.twizzit.com/v2/api/documentation/",
+    "access": "Requires authenticated Twizzit account",
+    "notes": "Official API documentation includes interactive testing interface"
+  }
+}
