@@ -148,7 +148,8 @@ async function setupParallelDatabases() {
           '../src/migrations/seed_achievements.sql',
           '../src/migrations/seed_default_report_templates.sql',
           '../src/migrations/add_competition_management.sql',
-          '../src/migrations/add_match_templates.sql'
+          '../src/migrations/add_match_templates.sql',
+          '../src/migrations/add_twizzit_integration.sql'
         ];
 
         console.log('📦 Applying migrations...');
