@@ -14,7 +14,17 @@ router.get('/csrf', (req, res) => {
     req.session.csrfSecret = tokens.secretSync();
   }
   const token = tokens.create(req.session.csrfSecret);
-  res.json({ csrfToken: token });
+  
+  // Explicitly save the session to ensure it's persisted
+  req.session.save((err) => {
+    if (err) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error saving session for CSRF:', err);
+      }
+      return res.status(500).json({ error: 'Failed to create CSRF token' });
+    }
+    res.json({ csrfToken: token });
+  });
 });
 
 // Validation middleware

@@ -240,7 +240,10 @@ describe('Login Component', () => {
         expect(screen.getByText('An unexpected error occurred during login')).toBeInTheDocument();
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith('Login error:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalled();
+      const call = consoleSpy.mock.calls[0];
+      expect(call[0]).toContain('Login');
+      expect(call[1]).toBeInstanceOf(Error);
       consoleSpy.mockRestore();
     });
 

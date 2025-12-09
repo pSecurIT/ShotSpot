@@ -377,7 +377,16 @@ describe('🛡️ CSRF Middleware Security', () => {
       
       csrf(req, res, next);
       
-      expect(consoleErrorSpy).toHaveBeenCalledWith('CSRF validation failed: No CSRF secret in session');
+      // Check that error was logged with context
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      const call = consoleErrorSpy.mock.calls[0];
+      expect(call[0]).toBe('CSRF validation failed: No CSRF secret in session');
+      expect(call[1]).toMatchObject({
+        hasSession: true,
+        hasSecret: false,
+        method: 'POST',
+        path: '/api/sensitive'
+      });
     });
 
     it('🔍 should log detailed error when CSRF token is invalid', () => {
