@@ -143,6 +143,10 @@ const ExportCenter: React.FC = () => {
       // This would be an actual API call in production
       // await api.post('/exports', { format, options, dataType: selectedExportType });
       
+      // Suppress unused variable warnings - parameters required by ExportDialog interface
+      void format;
+      void options;
+      
       setSuccess('Export started successfully! Check recent exports for progress.');
       setTimeout(() => {
         fetchRecentExports();
