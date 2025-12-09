@@ -143,9 +143,6 @@ const ExportCenter: React.FC = () => {
       // This would be an actual API call in production
       // await api.post('/exports', { format, options, dataType: selectedExportType });
       
-      // Log the export parameters for debugging
-      console.log('Export requested:', { format, options, dataType: selectedExportType });
-      
       setSuccess('Export started successfully! Check recent exports for progress.');
       setTimeout(() => {
         fetchRecentExports();
@@ -266,12 +263,6 @@ const ExportCenter: React.FC = () => {
         setError('Please select a team first');
         return;
       }
-      
-      console.log('Creating export with:', { 
-        templateId: template.id, 
-        dataType: selectedExportType, 
-        teamId: selectedTeamId 
-      });
       
       // Create new export using template settings
       const response = await api.post('/exports/from-template', { 
