@@ -5,10 +5,6 @@
 
 import nodemailer from 'nodemailer';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const emailServiceFilename = fileURLToPath(import.meta.url);
-const emailServiceDirname = path.dirname(emailServiceFilename);
 
 /**
  * Create email transporter based on environment configuration
@@ -181,9 +177,9 @@ function generateReportEmailText(options) {
     expiresAt
   } = options;
 
-  let text = `ShotSpot Report Ready\n\n`;
-  text += `Your scheduled report has been generated and is ready for download.\n\n`;
-  text += `Report Details:\n`;
+  let text = 'ShotSpot Report Ready\n\n';
+  text += 'Your scheduled report has been generated and is ready for download.\n\n';
+  text += 'Report Details:\n';
   text += `- Report Name: ${reportName}\n`;
   text += `- Report Type: ${reportType}\n`;
   if (teamName) text += `- Team: ${teamName}\n`;
@@ -196,11 +192,11 @@ function generateReportEmailText(options) {
   
   if (expiresAt) {
     text += `⚠️ Note: This report will be automatically deleted on ${new Date(expiresAt).toLocaleDateString()}.\n`;
-    text += `Please download it before then if you need to keep a copy.\n\n`;
+    text += 'Please download it before then if you need to keep a copy.\n\n';
   }
   
-  text += `---\n`;
-  text += `This is an automated message from ShotSpot - Korfball Statistics Platform\n`;
+  text += '---\n';
+  text += 'This is an automated message from ShotSpot - Korfball Statistics Platform\n';
   
   return text;
 }
