@@ -25,9 +25,13 @@
     "test:parallel:coverage": "cross-env NODE_ENV=test jest --config jest.config.parallel.js --coverage --no-cache",
     "test:unit": "cross-env NODE_ENV=test jest --config jest.config.unit.js --no-cache --runInBand",
     "test:core-api": "cross-env NODE_ENV=test jest --config jest.config.core-api.js --no-cache --runInBand",
-    "test:game-logic": "cross-env NODE_ENV=test jest --config jest.config.game-logic.js --no-cache --runInBand"
+    "test:game-logic": "cross-env NODE_ENV=test jest --config jest.config.game-logic.js --no-cache --runInBand",
+    "twizzit:store-credentials": "node scripts/store-twizzit-credentials.js",
+    "twizzit:test-connection": "node scripts/test-twizzit-connection.js",
+    "twizzit:diagnose": "node scripts/diagnose-twizzit.js"
   },
   "dependencies": {
+    "axios": "^1.7.9",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -41,7 +45,7 @@
     "express-validator": "^7.3.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.9.15",
+    "nodemailer": "^7.0.11",
     "pdfkit": "^0.17.2",
     "pg": "^8.11.3",
     "socket.io": "^4.8.1"
