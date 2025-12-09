@@ -98,6 +98,18 @@ async function processQueue() {
 }
 
 /**
+ * Sanitize a component to be safely used in filenames
+ * Only allows alphanumeric characters, hyphens, and underscores
+ */
+function sanitizeFilenameComponent(component) {
+  if (component === null || component === undefined) {
+    return '';
+  }
+  // Convert to string and remove any characters that aren't alphanumeric, hyphen, or underscore
+  return String(component).replace(/[^a-zA-Z0-9-_]/g, '');
+}
+
+/**
  * Process a single export job
  */
 async function processExportJob(job) {
@@ -113,22 +125,42 @@ async function processExportJob(job) {
   let fileName = '';
   let fileSize = 0;
 
+  // Sanitize all IDs to prevent path traversal attacks
+  const safeExportId = sanitizeFilenameComponent(exportId);
+  const safeGameId = sanitizeFilenameComponent(gameId);
+  const safePlayerId = sanitizeFilenameComponent(playerId);
+  const safeTeamId = sanitizeFilenameComponent(teamId);
+
+  // Validate that IDs are positive integers
+  if (gameId && (!Number.isInteger(gameId) || gameId <= 0)) {
+    throw new Error('Invalid gameId');
+  }
+  if (playerId && (!Number.isInteger(playerId) || playerId <= 0)) {
+    throw new Error('Invalid playerId');
+  }
+  if (teamId && (!Number.isInteger(teamId) || teamId <= 0)) {
+    throw new Error('Invalid teamId');
+  }
+  if (!Number.isInteger(exportId) || exportId <= 0) {
+    throw new Error('Invalid exportId');
+  }
+
   // Generate the export based on type
   if (gameId) {
     // Game export
-    fileName = `game-${gameId}-${exportId}.${format.includes('pdf') ? 'pdf' : 'csv'}`;
+    fileName = `game-${safeGameId}-${safeExportId}.${format.includes('pdf') ? 'pdf' : 'csv'}`;
     fileBuffer = await generateGameExport(gameId, format);
   } else if (playerId) {
     // Player export
-    fileName = `player-${playerId}-${exportId}.${format.includes('pdf') ? 'pdf' : 'csv'}`;
+    fileName = `player-${safePlayerId}-${safeExportId}.${format.includes('pdf') ? 'pdf' : 'csv'}`;
     fileBuffer = await generatePlayerExport(playerId, format);
   } else if (teamId) {
     // Team/Season export
-    fileName = `team-${teamId}-${exportId}.${format.includes('pdf') ? 'pdf' : 'csv'}`;
+    fileName = `team-${safeTeamId}-${safeExportId}.${format.includes('pdf') ? 'pdf' : 'csv'}`;
     fileBuffer = await generateTeamExport(teamId, format);
   } else {
     // Generate sample report
-    fileName = `sample-${exportId}.${format.includes('pdf') ? 'pdf' : 'csv'}`;
+    fileName = `sample-${safeExportId}.${format.includes('pdf') ? 'pdf' : 'csv'}`;
     fileBuffer = await generateSampleExport(format);
   }
 
