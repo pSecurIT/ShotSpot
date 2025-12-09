@@ -45,6 +45,7 @@ backend/*.log
 backend/*.txt
 backend/test-*.txt
 backend/tmp/
+backend/exports/
 
 # Frontend specific
 frontend/dist/
