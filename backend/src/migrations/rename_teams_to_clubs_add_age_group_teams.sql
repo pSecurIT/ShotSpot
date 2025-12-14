@@ -7,64 +7,208 @@
 -- - Teams belong to clubs
 
 -- Step 1: Rename teams table to clubs
-ALTER TABLE teams RENAME TO clubs;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'teams'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_name = 'clubs'
+        ) THEN
+            ALTER TABLE teams RENAME TO clubs;
+        END IF;
+    END IF;
+END $$;
 
 -- Step 2: Rename all foreign key columns and constraints
 -- Update players table
-ALTER TABLE players RENAME COLUMN team_id TO club_id;
-ALTER TABLE players RENAME CONSTRAINT players_team_id_fkey TO players_club_id_fkey;
-ALTER TABLE players DROP CONSTRAINT players_team_id_jersey_number_key;
--- We'll recreate this constraint later after adding team_id
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'players' AND column_name = 'team_id'
+    ) THEN
+        ALTER TABLE players RENAME COLUMN team_id TO club_id;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'players_team_id_fkey'
+    ) THEN
+        ALTER TABLE players RENAME CONSTRAINT players_team_id_fkey TO players_club_id_fkey;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'players_team_id_jersey_number_key'
+    ) THEN
+        ALTER TABLE players DROP CONSTRAINT players_team_id_jersey_number_key;
+    END IF;
+END $$;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'players_club_id_jersey_number_key'
+    ) THEN
+        ALTER TABLE players ADD CONSTRAINT players_club_id_jersey_number_key UNIQUE (club_id, jersey_number);
+    END IF;
+END $$;
 
 -- Step 3: Update games table
-ALTER TABLE games RENAME COLUMN home_team_id TO home_club_id;
-ALTER TABLE games RENAME COLUMN away_team_id TO away_club_id;
-ALTER TABLE games RENAME CONSTRAINT games_home_team_id_fkey TO games_home_club_id_fkey;
-ALTER TABLE games RENAME CONSTRAINT games_away_team_id_fkey TO games_away_club_id_fkey;
--- Drop the check constraint if it exists (it might have a generated name)
-DO $$ 
+DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'games_home_team_id_away_team_id_check') THEN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'games' AND column_name = 'home_team_id'
+    ) THEN
+        ALTER TABLE games RENAME COLUMN home_team_id TO home_club_id;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'games' AND column_name = 'away_team_id'
+    ) THEN
+        ALTER TABLE games RENAME COLUMN away_team_id TO away_club_id;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'games_home_team_id_fkey'
+    ) THEN
+        ALTER TABLE games RENAME CONSTRAINT games_home_team_id_fkey TO games_home_club_id_fkey;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'games_away_team_id_fkey'
+    ) THEN
+        ALTER TABLE games RENAME CONSTRAINT games_away_team_id_fkey TO games_away_club_id_fkey;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'games_home_team_id_away_team_id_check'
+    ) THEN
         ALTER TABLE games DROP CONSTRAINT games_home_team_id_away_team_id_check;
     END IF;
-    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'games_check') THEN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'games_check'
+    ) THEN
         ALTER TABLE games DROP CONSTRAINT games_check;
     END IF;
 END $$;
-ALTER TABLE games ADD CONSTRAINT games_home_club_id_away_club_id_check CHECK (home_club_id != away_club_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'games_home_club_id_away_club_id_check'
+    ) THEN
+        ALTER TABLE games ADD CONSTRAINT games_home_club_id_away_club_id_check CHECK (home_club_id != away_club_id);
+    END IF;
+END $$;
 
 -- Step 4: Update shots table
-ALTER TABLE shots RENAME COLUMN team_id TO club_id;
-ALTER TABLE shots RENAME CONSTRAINT shots_team_id_fkey TO shots_club_id_fkey;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'shots' AND column_name = 'team_id'
+    ) THEN
+        ALTER TABLE shots RENAME COLUMN team_id TO club_id;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'shots_team_id_fkey'
+    ) THEN
+        ALTER TABLE shots RENAME CONSTRAINT shots_team_id_fkey TO shots_club_id_fkey;
+    END IF;
+END $$;
 
 -- Step 5: Update game_events table
-ALTER TABLE game_events RENAME COLUMN team_id TO club_id;
-ALTER TABLE game_events RENAME CONSTRAINT game_events_team_id_fkey TO game_events_club_id_fkey;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'game_events' AND column_name = 'team_id'
+    ) THEN
+        ALTER TABLE game_events RENAME COLUMN team_id TO club_id;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'game_events_team_id_fkey'
+    ) THEN
+        ALTER TABLE game_events RENAME CONSTRAINT game_events_team_id_fkey TO game_events_club_id_fkey;
+    END IF;
+END $$;
 
 -- Step 6: Update ball_possessions table
-ALTER TABLE ball_possessions RENAME COLUMN team_id TO club_id;
-ALTER TABLE ball_possessions RENAME CONSTRAINT ball_possessions_team_id_fkey TO ball_possessions_club_id_fkey;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'ball_possessions' AND column_name = 'team_id'
+    ) THEN
+        ALTER TABLE ball_possessions RENAME COLUMN team_id TO club_id;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'ball_possessions_team_id_fkey'
+    ) THEN
+        ALTER TABLE ball_possessions RENAME CONSTRAINT ball_possessions_team_id_fkey TO ball_possessions_club_id_fkey;
+    END IF;
+END $$;
 DROP INDEX IF EXISTS idx_ball_possessions_team_id;
 CREATE INDEX IF NOT EXISTS idx_ball_possessions_club_id ON ball_possessions(club_id);
 
 -- Step 7: Update game_rosters table
-ALTER TABLE game_rosters RENAME COLUMN team_id TO club_id;
-ALTER TABLE game_rosters RENAME CONSTRAINT game_rosters_team_id_fkey TO game_rosters_club_id_fkey;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'game_rosters' AND column_name = 'team_id'
+    ) THEN
+        ALTER TABLE game_rosters RENAME COLUMN team_id TO club_id;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'game_rosters_team_id_fkey'
+    ) THEN
+        ALTER TABLE game_rosters RENAME CONSTRAINT game_rosters_team_id_fkey TO game_rosters_club_id_fkey;
+    END IF;
+END $$;
 DROP INDEX IF EXISTS idx_game_rosters_team_id;
 CREATE INDEX IF NOT EXISTS idx_game_rosters_club_id ON game_rosters(club_id);
 
 -- Step 8: Update substitutions table
-ALTER TABLE substitutions RENAME COLUMN team_id TO club_id;
-ALTER TABLE substitutions RENAME CONSTRAINT substitutions_team_id_fkey TO substitutions_club_id_fkey;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'substitutions' AND column_name = 'team_id'
+    ) THEN
+        ALTER TABLE substitutions RENAME COLUMN team_id TO club_id;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'substitutions_team_id_fkey'
+    ) THEN
+        ALTER TABLE substitutions RENAME CONSTRAINT substitutions_team_id_fkey TO substitutions_club_id_fkey;
+    END IF;
+END $$;
 DROP INDEX IF EXISTS idx_substitutions_team_id;
 CREATE INDEX IF NOT EXISTS idx_substitutions_club_id ON substitutions(club_id);
 
 -- Step 9: Update Twizzit integration tables
-ALTER TABLE twizzit_team_mappings RENAME COLUMN local_team_id TO local_club_id;
-ALTER TABLE twizzit_team_mappings RENAME CONSTRAINT twizzit_team_mappings_local_team_id_fkey TO twizzit_team_mappings_local_club_id_fkey;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'twizzit_team_mappings' AND column_name = 'local_team_id'
+    ) THEN
+        ALTER TABLE twizzit_team_mappings RENAME COLUMN local_team_id TO local_club_id;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'twizzit_team_mappings_local_team_id_fkey'
+    ) THEN
+        ALTER TABLE twizzit_team_mappings RENAME CONSTRAINT twizzit_team_mappings_local_team_id_fkey TO twizzit_team_mappings_local_club_id_fkey;
+    END IF;
+END $$;
 DROP INDEX IF EXISTS idx_twizzit_team_mappings_local_team;
 CREATE INDEX IF NOT EXISTS idx_twizzit_team_mappings_local_club ON twizzit_team_mappings(local_club_id);
-ALTER TABLE twizzit_team_mappings DROP CONSTRAINT twizzit_team_mappings_local_team_id_key;
+ALTER TABLE twizzit_team_mappings DROP CONSTRAINT IF EXISTS twizzit_team_mappings_local_team_id_key;
+DROP INDEX IF EXISTS twizzit_team_mappings_local_club_unique;
+CREATE UNIQUE INDEX twizzit_team_mappings_local_club_unique ON twizzit_team_mappings(local_club_id);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'twizzit_team_mappings_local_team_id_key') THEN
+        ALTER TABLE twizzit_team_mappings DROP CONSTRAINT twizzit_team_mappings_local_team_id_key;
+    END IF;
+END $$;
 ALTER TABLE twizzit_team_mappings ADD CONSTRAINT twizzit_team_mappings_local_club_id_key UNIQUE(local_club_id);
 
 -- Step 10: Rename triggers
@@ -98,7 +242,7 @@ COMMENT ON COLUMN teams.age_group IS 'Age group identifier (e.g., U17, U15, U13,
 COMMENT ON COLUMN teams.gender IS 'Team gender: male, female, or mixed for korfball';
 COMMENT ON COLUMN teams.season_id IS 'Optional season link for historical team tracking';
 
-CREATE TRIGGER update_teams_updated_at
+CREATE TRIGGER update_age_groups_updated_at
     BEFORE UPDATE ON teams
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
