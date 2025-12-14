@@ -157,7 +157,8 @@ async function setupParallelDatabases() {
     '../src/migrations/20251214_update_game_rosters_team_to_club.sql',
     '../src/migrations/20251214_update_games_team_to_club.sql',
     '../src/migrations/20251214_update_players_team_to_club.sql',
-    '../src/migrations/20251214_update_substitutions_team_to_club.sql'
+    '../src/migrations/20251214_update_substitutions_team_to_club.sql',
+    '../src/migrations/20251214_add_seasons_and_series.sql' // Added migration
   ];        console.log('📦 Applying migrations...');
         for (const migrationFile of migrations) {
           const migrationPath = join(__dirname, migrationFile);

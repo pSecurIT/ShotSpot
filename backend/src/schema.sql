@@ -79,13 +79,15 @@ COMMENT ON TABLE seasons IS 'Seasons for organizing games and tracking historica
 -- TEAMS & PLAYERS
 -- ==============================================================================
 
-CREATE TABLE IF NOT EXISTS teams (
+-- Replace 'teams' table with 'clubs'
+CREATE TABLE IF NOT EXISTS clubs (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) UNIQUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Update references in players table
 CREATE TABLE IF NOT EXISTS players (
     id SERIAL PRIMARY KEY,
     club_id INTEGER REFERENCES clubs(id) ON DELETE SET NULL,
@@ -103,47 +105,56 @@ CREATE TABLE IF NOT EXISTS players (
 COMMENT ON TABLE players IS 'Player information. Note: Captain role is game-specific and stored in game_rosters table.';
 COMMENT ON COLUMN players.gender IS 'Player gender: male or female. Required for korfball team composition (4 males + 4 females per team).';
 
+-- Teams table for age groups (U17, U15, etc.)
+CREATE TABLE IF NOT EXISTS teams (
+    id SERIAL PRIMARY KEY,
+    club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    age_group VARCHAR(20),
+    gender VARCHAR(10),
+    season_id INTEGER REFERENCES seasons(id) ON DELETE SET NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(club_id, name, season_id),
+    CHECK (gender IN ('male', 'female', 'mixed') OR gender IS NULL)
+);
+
+CREATE INDEX IF NOT EXISTS idx_teams_club_id ON teams(club_id);
+CREATE INDEX IF NOT EXISTS idx_teams_season_id ON teams(season_id);
+CREATE INDEX IF NOT EXISTS idx_teams_is_active ON teams(is_active);
+
+COMMENT ON TABLE teams IS 'Teams within clubs (e.g., U17, U15, U13 age groups). Players belong to teams.';
+COMMENT ON COLUMN teams.age_group IS 'Age group identifier (e.g., U17, U15, U13, U11, Senior)';
+COMMENT ON COLUMN teams.gender IS 'Team gender: male, female, or mixed for korfball';
+COMMENT ON COLUMN teams.season_id IS 'Optional season link for historical team tracking';
+
 -- ==============================================================================
 -- GAMES
 -- ==============================================================================
 
+-- Update references in games table
 CREATE TABLE IF NOT EXISTS games (
     id SERIAL PRIMARY KEY,
-    home_team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
-    away_team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
-    season_id INTEGER REFERENCES seasons(id) ON DELETE SET NULL,
-    date TIMESTAMP WITH TIME ZONE NOT NULL,
-    status VARCHAR(20) DEFAULT 'scheduled',
+    home_club_id INTEGER REFERENCES clubs(id) NOT NULL,
+    away_club_id INTEGER REFERENCES clubs(id) NOT NULL,
     home_score INTEGER DEFAULT 0,
     away_score INTEGER DEFAULT 0,
-    current_period INTEGER DEFAULT 1,
-    period_duration INTERVAL DEFAULT '10 minutes',
-    time_remaining INTERVAL,
-    timer_state VARCHAR(20) DEFAULT 'stopped',
-    timer_started_at TIMESTAMP WITH TIME ZONE,
-    timer_paused_at TIMESTAMP WITH TIME ZONE,
-    home_attacking_side VARCHAR(10),
-    number_of_periods INTEGER DEFAULT 4,
+    date TIMESTAMP WITH TIME ZONE NOT NULL,
+    status VARCHAR(20) DEFAULT 'scheduled',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CHECK (home_team_id != away_team_id),
-    CHECK (current_period >= 1 AND current_period <= 10),
-    CHECK (timer_state IN ('stopped', 'running', 'paused')),
-    CHECK (home_attacking_side IN ('left', 'right') OR home_attacking_side IS NULL),
-    CHECK (number_of_periods >= 1 AND number_of_periods <= 10)
+    CHECK (status IN ('scheduled', 'completed', 'cancelled'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_games_season_id ON games(season_id);
-
-COMMENT ON COLUMN games.home_attacking_side IS 'Indicates which korf the home team attacks throughout the match. Left = 13% x-coord, Right = 87% x-coord.';
-COMMENT ON COLUMN games.number_of_periods IS 'Number of periods in the game. Configurable from 1-10. Teams switch sides every period.';
+COMMENT ON TABLE games IS 'Tracks all matches between clubs, including scores and status.';
 
 -- Shots table
 CREATE TABLE IF NOT EXISTS shots (
     id SERIAL PRIMARY KEY,
     game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
     player_id INTEGER REFERENCES players(id) ON DELETE CASCADE NOT NULL,
-    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
+    club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE NOT NULL,
     x_coord DECIMAL NOT NULL,
     y_coord DECIMAL NOT NULL,
     result VARCHAR(20) NOT NULL, -- goal, miss, blocked
@@ -160,7 +171,7 @@ CREATE TABLE IF NOT EXISTS game_events (
     game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
     event_type VARCHAR(50) NOT NULL,
     player_id INTEGER REFERENCES players(id) ON DELETE CASCADE,
-    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
+    club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE NOT NULL,
     period INTEGER NOT NULL,
     time_remaining INTERVAL,
     details JSONB,
@@ -171,7 +182,7 @@ CREATE TABLE IF NOT EXISTS game_events (
 CREATE TABLE IF NOT EXISTS ball_possessions (
     id SERIAL PRIMARY KEY,
     game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
-    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
+    club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE NOT NULL,
     period INTEGER NOT NULL,
     started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ended_at TIMESTAMP WITH TIME ZONE,
@@ -183,13 +194,13 @@ CREATE TABLE IF NOT EXISTS ball_possessions (
 
 -- Indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_ball_possessions_game_id ON ball_possessions(game_id);
-CREATE INDEX IF NOT EXISTS idx_ball_possessions_team_id ON ball_possessions(team_id);
+CREATE INDEX IF NOT EXISTS idx_ball_possessions_club_id ON ball_possessions(club_id);
 
 -- Game rosters table (track which players are active for each game and captain)
 CREATE TABLE IF NOT EXISTS game_rosters (
     id SERIAL PRIMARY KEY,
     game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
-    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
+    club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE NOT NULL,
     player_id INTEGER REFERENCES players(id) ON DELETE CASCADE NOT NULL,
     is_captain BOOLEAN DEFAULT false,
     is_starting BOOLEAN DEFAULT true,
@@ -201,14 +212,14 @@ CREATE TABLE IF NOT EXISTS game_rosters (
 
 -- Indexes for game rosters
 CREATE INDEX IF NOT EXISTS idx_game_rosters_game_id ON game_rosters(game_id);
-CREATE INDEX IF NOT EXISTS idx_game_rosters_team_id ON game_rosters(team_id);
+CREATE INDEX IF NOT EXISTS idx_game_rosters_club_id ON game_rosters(club_id);
 CREATE INDEX IF NOT EXISTS idx_game_rosters_player_id ON game_rosters(player_id);
 
 -- Substitutions table (track player substitutions during live matches)
 CREATE TABLE IF NOT EXISTS substitutions (
     id SERIAL PRIMARY KEY,
     game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
-    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
+    club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE NOT NULL,
     player_in_id INTEGER REFERENCES players(id) ON DELETE CASCADE NOT NULL,
     player_out_id INTEGER REFERENCES players(id) ON DELETE CASCADE NOT NULL,
     period INTEGER NOT NULL,
@@ -225,7 +236,7 @@ COMMENT ON COLUMN substitutions.reason IS 'Reason for substitution: tactical, in
 
 -- Indexes for substitutions
 CREATE INDEX IF NOT EXISTS idx_substitutions_game_id ON substitutions(game_id);
-CREATE INDEX IF NOT EXISTS idx_substitutions_team_id ON substitutions(team_id);
+CREATE INDEX IF NOT EXISTS idx_substitutions_club_id ON substitutions(club_id);
 CREATE INDEX IF NOT EXISTS idx_substitutions_player_in_id ON substitutions(player_in_id);
 CREATE INDEX IF NOT EXISTS idx_substitutions_player_out_id ON substitutions(player_out_id);
 
