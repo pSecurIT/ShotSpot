@@ -17,6 +17,7 @@ import { fileURLToPath } from 'url';
 import csrf from './middleware/csrf.js';
 import { errorNotificationService } from './utils/errorNotification.js';
 import authRoutes from './routes/auth.js';
+import clubRoutes from './routes/clubs.js';
 import teamRoutes from './routes/teams.js';
 import playerRoutes from './routes/players.js';
 import matchEventsRoutes from './routes/match-events.js';
@@ -290,6 +291,7 @@ import healthRoutes from './routes/health.js';
 app.use('/api/health', healthRoutes); // Health check endpoint should be before other routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/clubs', clubRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/games', gamesRoutes);

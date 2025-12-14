@@ -30,21 +30,21 @@ describe('📄 Reports Routes', () => {
       // Clear test data in correct order (respecting foreign keys)
       await db.query('DELETE FROM report_exports');
       await db.query('DELETE FROM games');
-      await db.query('DELETE FROM teams');
+      await db.query('DELETE FROM clubs');
       
       // Setup test data
       const template = await db.query('SELECT id FROM report_templates WHERE is_default = true LIMIT 1');
       templateId = template.rows[0]?.id;
       
-      const team1 = await db.query('INSERT INTO teams (name) VALUES ($1) RETURNING id', ['Home Team']);
-      const team2 = await db.query('INSERT INTO teams (name) VALUES ($1) RETURNING id', ['Away Team']);
-      teamId = team1.rows[0].id;
+      const club1 = await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING id', ['Home Team']);
+      const club2 = await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING id', ['Away Team']);
+      teamId = club1.rows[0].id;
       
       const game = await db.query(`
-        INSERT INTO games (home_team_id, away_team_id, date, status)
+        INSERT INTO games (home_club_id, away_club_id, date, status)
         VALUES ($1, $2, NOW(), 'completed')
         RETURNING id
-      `, [team1.rows[0].id, team2.rows[0].id]);
+      `, [club1.rows[0].id, club2.rows[0].id]);
       gameId = game.rows[0].id;
     } catch (error) {
       global.testContext.logTestError(error, 'Database setup failed');
@@ -55,7 +55,7 @@ describe('📄 Reports Routes', () => {
   afterEach(async () => {
     try {
       await db.query('DELETE FROM games WHERE id = $1', [gameId]);
-      await db.query('DELETE FROM teams');
+      await db.query('DELETE FROM clubs');
     } catch (error) {
       global.testContext.logTestError(error, 'Database cleanup failed');
     }
@@ -128,7 +128,7 @@ describe('📄 Reports Routes', () => {
           template_id: templateId,
           report_type: 'team',
           format: 'json',
-          team_id: teamId,
+          club_id: teamId,
           report_name: 'Test Team Report'
         };
 
@@ -283,3 +283,5 @@ describe('📄 Reports Routes', () => {
     });
   });
 });
+
+

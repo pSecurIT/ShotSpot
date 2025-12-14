@@ -1067,3 +1067,4 @@ describe('🔐 Authentication API', () => {
     });
   });
 });
+

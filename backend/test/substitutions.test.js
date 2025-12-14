@@ -58,57 +58,57 @@ describe('🔄 Substitutions API', () => {
 
       // Create test teams with unique names
       const homeResult = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Sub Home Team ${uniqueId}`]
       );
       homeTeam = homeResult.rows[0];
 
       const awayResult = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Sub Away Team ${uniqueId}`]
       );
       awayTeam = awayResult.rows[0];
 
       // Create test players
       const hp1 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [homeTeam.id, 'Starting', 'Forward', 10, 'male']
       );
       homePlayer1 = hp1.rows[0];
 
       const hp2 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [homeTeam.id, 'Starting', 'Guard', 15, 'female']
       );
       homePlayer2 = hp2.rows[0];
 
       const hp3 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [homeTeam.id, 'Bench', 'Forward', 20, 'male']
       );
       homePlayer3 = hp3.rows[0];
 
       const hp4 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [homeTeam.id, 'Bench', 'Guard', 25, 'female']
       );
       homePlayer4 = hp4.rows[0];
 
       const ap1 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [awayTeam.id, 'Away', 'Player', 12, 'male']
       );
       awayPlayer1 = ap1.rows[0];
 
       const ap2 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [awayTeam.id, 'Away', 'Bench', 18, 'male']
       );
       awayPlayer2 = ap2.rows[0];
 
       // Create test game
       const gameResult = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status) 
+        `INSERT INTO games (home_club_id, away_club_id, date, status) 
          VALUES ($1, $2, $3, $4) RETURNING *`,
         [homeTeam.id, awayTeam.id, new Date(), 'in_progress']
       );
@@ -116,32 +116,32 @@ describe('🔄 Substitutions API', () => {
 
       // Create game roster (starting lineup)
       await db.query(
-        `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting) 
+        `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting) 
          VALUES ($1, $2, $3, $4, $5)`,
         [testGame.id, homeTeam.id, homePlayer1.id, true, true]
       );
       await db.query(
-        `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting) 
+        `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting) 
          VALUES ($1, $2, $3, $4, $5)`,
         [testGame.id, homeTeam.id, homePlayer2.id, false, true]
       );
       await db.query(
-        `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting) 
+        `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting) 
          VALUES ($1, $2, $3, $4, $5)`,
         [testGame.id, homeTeam.id, homePlayer3.id, false, false]
       );
       await db.query(
-        `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting) 
+        `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting) 
          VALUES ($1, $2, $3, $4, $5)`,
         [testGame.id, homeTeam.id, homePlayer4.id, false, false]
       );
       await db.query(
-        `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting) 
+        `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting) 
          VALUES ($1, $2, $3, $4, $5)`,
         [testGame.id, awayTeam.id, awayPlayer1.id, true, true]
       );
       await db.query(
-        `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting) 
+        `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting) 
          VALUES ($1, $2, $3, $4, $5)`,
         [testGame.id, awayTeam.id, awayPlayer2.id, false, false]
       );
@@ -158,8 +158,8 @@ describe('🔄 Substitutions API', () => {
       await db.query('DELETE FROM substitutions WHERE game_id = $1', [testGame.id]);
       await db.query('DELETE FROM game_rosters WHERE game_id = $1', [testGame.id]);
       await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
-      await db.query('DELETE FROM players WHERE team_id = ANY($1)', [[homeTeam.id, awayTeam.id]]);
-      await db.query('DELETE FROM teams WHERE id = ANY($1)', [[homeTeam.id, awayTeam.id]]);
+      await db.query('DELETE FROM players WHERE club_id = ANY($1)', [[homeTeam.id, awayTeam.id]]);
+      await db.query('DELETE FROM clubs WHERE id = ANY($1)', [[homeTeam.id, awayTeam.id]]);
       await db.query('DELETE FROM users WHERE id = ANY($1)', [[adminUser.id, coachUser.id, viewerUser.id]]);
     } catch (error) {
       console.error('⚠️ Substitutions API cleanup failed:', error.message);
@@ -178,7 +178,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id, // From bench
             player_out_id: homePlayer1.id, // From court
             period: 1,
@@ -189,7 +189,7 @@ describe('🔄 Substitutions API', () => {
         expect(response.status).toBe(201);
         expect(response.body).toMatchObject({
           game_id: testGame.id,
-          team_id: homeTeam.id,
+          club_id: homeTeam.id,
           player_in_id: homePlayer3.id,
           player_out_id: homePlayer1.id,
           period: 1,
@@ -209,7 +209,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${coachToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer1.id,
             period: 1,
@@ -231,7 +231,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${viewerToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer1.id,
             period: 1,
@@ -252,7 +252,7 @@ describe('🔄 Substitutions API', () => {
         const response = await request(app)
           .post(`/api/substitutions/${testGame.id}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer1.id,
             period: 1,
@@ -274,7 +274,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer1.id,
             player_out_id: homePlayer1.id,
             period: 1,
@@ -297,7 +297,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer1.id, // Already on court
             player_out_id: homePlayer2.id,
             period: 1,
@@ -320,7 +320,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer4.id, // Already on bench
             period: 1,
@@ -343,7 +343,7 @@ describe('🔄 Substitutions API', () => {
           .post('/api/substitutions/99999')
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer1.id,
             period: 1,
@@ -363,7 +363,7 @@ describe('🔄 Substitutions API', () => {
       try {
         // Create a completed game
         const completedGameResult = await db.query(
-          `INSERT INTO games (home_team_id, away_team_id, date, status) 
+          `INSERT INTO games (home_club_id, away_club_id, date, status) 
            VALUES ($1, $2, $3, $4) RETURNING *`,
           [homeTeam.id, awayTeam.id, new Date(), 'completed']
         );
@@ -373,7 +373,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${completedGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer1.id,
             period: 1,
@@ -399,7 +399,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer1.id,
             period: 1,
@@ -421,7 +421,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: awayPlayer2.id, // Away team player
             player_out_id: homePlayer1.id, // Home team player
             period: 1,
@@ -445,7 +445,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer1.id,
             period: 1,
@@ -459,7 +459,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer4.id,
             player_out_id: homePlayer2.id,
             period: 1,
@@ -473,7 +473,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer1.id,
             player_out_id: homePlayer3.id,
             period: 2,
@@ -524,7 +524,7 @@ describe('🔄 Substitutions API', () => {
         expect(response.body).toHaveLength(3);
         expect(response.body[0]).toHaveProperty('player_in_first_name');
         expect(response.body[0]).toHaveProperty('player_out_first_name');
-        expect(response.body[0]).toHaveProperty('team_name');
+        expect(response.body[0]).toHaveProperty('club_name');
         console.log('      ✅ All substitutions fetched successfully');
       } catch (error) {
         console.log('      ❌ Fetch all substitutions test failed:', error.message);
@@ -587,7 +587,7 @@ describe('🔄 Substitutions API', () => {
     test('✅ should return empty array for game with no substitutions', async () => {
       try {
         const newGameResult = await db.query(
-          `INSERT INTO games (home_team_id, away_team_id, date, status) 
+          `INSERT INTO games (home_club_id, away_club_id, date, status) 
            VALUES ($1, $2, $3, $4) RETURNING *`,
           [homeTeam.id, awayTeam.id, new Date(), 'in_progress']
         );
@@ -707,7 +707,7 @@ describe('🔄 Substitutions API', () => {
     test('❌ should return 404 for game with no roster', async () => {
       try {
         const newGameResult = await db.query(
-          `INSERT INTO games (home_team_id, away_team_id, date, status) 
+          `INSERT INTO games (home_club_id, away_club_id, date, status) 
            VALUES ($1, $2, $3, $4) RETURNING *`,
           [homeTeam.id, awayTeam.id, new Date(), 'scheduled']
         );
@@ -873,7 +873,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer1.id,
             period: 1,
@@ -909,7 +909,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_in_id: homePlayer3.id,
             player_out_id: homePlayer1.id,
             period: -1,
@@ -934,7 +934,7 @@ describe('🔄 Substitutions API', () => {
             .post(`/api/substitutions/${testGame.id}`)
             .set('Authorization', `Bearer ${authToken}`)
             .send({
-              team_id: homeTeam.id,
+              club_id: homeTeam.id,
               player_in_id: homePlayer3.id,
               player_out_id: homePlayer1.id,
               period: 1,
@@ -956,3 +956,5 @@ describe('🔄 Substitutions API', () => {
     });
   });
 });
+
+

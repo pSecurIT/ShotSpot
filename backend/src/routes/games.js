@@ -17,6 +17,10 @@ router.get('/', [
     .optional()
     .isIn(['scheduled', 'to_reschedule', 'in_progress', 'completed', 'cancelled'])
     .withMessage('Invalid status value'),
+  query('club_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Club ID must be a positive integer'),
   query('team_id')
     .optional()
     .isInt({ min: 1 })
@@ -36,17 +40,21 @@ router.get('/', [
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { status, team_id, date_from, date_to } = req.query;
+  const { status, club_id, team_id, date_from, date_to } = req.query;
   
   try {
     let query = `
       SELECT 
         g.*,
+        hc.name as home_club_name,
+        ac.name as away_club_name,
         ht.name as home_team_name,
         at.name as away_team_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      JOIN clubs hc ON g.home_club_id = hc.id
+      JOIN clubs ac ON g.away_club_id = ac.id
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE 1=1
     `;
     const params = [];
@@ -55,6 +63,12 @@ router.get('/', [
     if (status) {
       query += ` AND g.status = $${paramCount}`;
       params.push(status);
+      paramCount++;
+    }
+
+    if (club_id) {
+      query += ` AND (g.home_club_id = $${paramCount} OR g.away_club_id = $${paramCount})`;
+      params.push(club_id);
       paramCount++;
     }
 
@@ -96,11 +110,15 @@ router.get('/:id', async (req, res) => {
     const result = await db.query(`
       SELECT 
         g.*,
+        hc.name as home_club_name,
+        ac.name as away_club_name,
         ht.name as home_team_name,
         at.name as away_team_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      JOIN clubs hc ON g.home_club_id = hc.id
+      JOIN clubs ac ON g.away_club_id = ac.id
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.id = $1
     `, [id]);
 
@@ -120,10 +138,18 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', [
   requireRole(['admin', 'coach']),
+  body('home_club_id')
+    .isInt({ min: 1 })
+    .withMessage('Home club ID must be a positive integer'),
+  body('away_club_id')
+    .isInt({ min: 1 })
+    .withMessage('Away club ID must be a positive integer'),
   body('home_team_id')
+    .optional()
     .isInt({ min: 1 })
     .withMessage('Home team ID must be a positive integer'),
   body('away_team_id')
+    .optional()
     .isInt({ min: 1 })
     .withMessage('Away team ID must be a positive integer'),
   body('date')
@@ -140,40 +166,65 @@ router.post('/', [
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { home_team_id, away_team_id, date, status = 'scheduled' } = req.body;
+  const { home_club_id, away_club_id, home_team_id, away_team_id, date, status = 'scheduled' } = req.body;
 
-  // Validate that home and away teams are different
-  if (home_team_id === away_team_id) {
-    return res.status(400).json({ error: 'Home and away teams must be different' });
+  // Validate that home and away clubs are different
+  if (home_club_id === away_club_id && !home_team_id && !away_team_id) {
+    return res.status(400).json({ error: 'Home and away clubs must be different for club-level games' });
   }
 
   try {
-    // Verify both teams exist
-    const teamsCheck = await db.query(
-      'SELECT id FROM teams WHERE id = $1 OR id = $2',
-      [home_team_id, away_team_id]
+    // Verify both clubs exist
+    const clubsCheck = await db.query(
+      'SELECT id FROM clubs WHERE id = $1 OR id = $2',
+      [home_club_id, away_club_id]
     );
 
-    if (teamsCheck.rows.length !== 2) {
-      return res.status(404).json({ error: 'One or both teams not found' });
+    if (clubsCheck.rows.length !== 2) {
+      return res.status(404).json({ error: 'One or both clubs not found' });
+    }
+
+    // If team IDs provided, verify they exist and belong to the correct clubs
+    if (home_team_id) {
+      const homeTeamCheck = await db.query(
+        'SELECT id FROM teams WHERE id = $1 AND club_id = $2',
+        [home_team_id, home_club_id]
+      );
+      if (homeTeamCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Home team not found or does not belong to home club' });
+      }
+    }
+
+    if (away_team_id) {
+      const awayTeamCheck = await db.query(
+        'SELECT id FROM teams WHERE id = $1 AND club_id = $2',
+        [away_team_id, away_club_id]
+      );
+      if (awayTeamCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Away team not found or does not belong to away club' });
+      }
     }
 
     // Create the game
     const result = await db.query(`
-      INSERT INTO games (home_team_id, away_team_id, date, status)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status, game_type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
-    `, [home_team_id, away_team_id, date, status]);
+    `, [home_club_id, away_club_id, home_team_id || null, away_team_id || null, date, status, home_team_id || away_team_id ? 'team' : 'club']);
 
-    // Fetch the created game with team names
+    // Fetch the created game with club and team names
     const gameResult = await db.query(`
       SELECT 
         g.*,
+        hc.name as home_club_name,
+        ac.name as away_club_name,
         ht.name as home_team_name,
         at.name as away_team_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      JOIN clubs hc ON g.home_club_id = hc.id
+      JOIN clubs ac ON g.away_club_id = ac.id
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.id = $1
     `, [result.rows[0].id]);
 

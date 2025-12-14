@@ -54,7 +54,7 @@ describe('⏱️ Timer API', () => {
       // Create an in_progress game
       const gameResult = await db.query(
         'INSERT INTO games (home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team1.id, team2.id, new Date(), 'in_progress']
+        [club1.id, club2.id, new Date(), 'in_progress']
       );
       game = gameResult.rows[0];
 
@@ -231,7 +231,7 @@ describe('⏱️ Timer API', () => {
         // Create a scheduled game
         const scheduledGame = await db.query(
           'INSERT INTO games (home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
-          [team1.id, team2.id, new Date(), 'scheduled']
+          [club1.id, club2.id, new Date(), 'scheduled']
         );
 
         const response = await request(app)
@@ -617,3 +617,5 @@ describe('⏱️ Timer API', () => {
     });
   });
 });
+
+

@@ -284,3 +284,5 @@ describe('Twizzit API Routes', () => {
   // Note: CSRF protection is comprehensively tested in csrf.test.js
   // No need to duplicate those tests here
 });
+
+

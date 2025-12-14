@@ -179,11 +179,12 @@ router.post(
 );
 
 /**
- * POST /api/twizzit/sync/teams/:credentialId
- * Sync teams from Twizzit (admin/coach)
+ * POST /api/twizzit/sync/clubs/:credentialId
+ * Sync clubs from Twizzit (admin/coach)
+ * Note: Twizzit calls these "teams" but they represent clubs/organizations in ShotSpot
  */
 router.post(
-  '/sync/teams/:credentialId',
+  '/sync/clubs/:credentialId',
   requireRole(['admin', 'coach']),
   [
     param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID'),
@@ -197,12 +198,12 @@ router.post(
         includePlayers: req.body.includePlayers || false
       };
 
-      const result = await twizzitSync.syncTeamsFromTwizzit(credentialId, options);
+      const result = await twizzitSync.syncClubsFromTwizzit(credentialId, options);
       res.json(result);
     } catch (error) {
-      console.error('Failed to sync teams:', error);
+      console.error('Failed to sync clubs:', error);
       res.status(500).json({ 
-        error: 'Failed to sync teams',
+        error: 'Failed to sync clubs',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
       });
     }
@@ -345,15 +346,15 @@ router.get(
       const result = await db.query(
         `SELECT 
           tm.id,
-          tm.local_team_id,
-          t.name as local_team_name,
+          tm.local_club_id,
+          t.name as local_club_name,
           tm.twizzit_team_id,
           tm.twizzit_team_name,
           tm.last_synced_at,
           tm.sync_status,
           tm.sync_error
          FROM twizzit_team_mappings tm
-         JOIN teams t ON tm.local_team_id = t.id
+         JOIN clubs t ON tm.local_club_id = t.id
          ORDER BY tm.last_synced_at DESC`
       );
 
@@ -393,16 +394,16 @@ router.get(
           pm.last_synced_at,
           pm.sync_status,
           pm.sync_error,
-          tm.local_team_id,
-          t.name as team_name
+          tm.local_club_id,
+          t.name as club_name
         FROM twizzit_player_mappings pm
         JOIN players p ON pm.local_player_id = p.id
         JOIN twizzit_team_mappings tm ON pm.team_mapping_id = tm.id
-        JOIN teams t ON tm.local_team_id = t.id`;
+        JOIN clubs t ON tm.local_club_id = t.id`;
 
       const params = [];
       if (req.query.teamId) {
-        query += ' WHERE tm.local_team_id = $1';
+        query += ' WHERE tm.local_club_id = $1';
         params.push(parseInt(req.query.teamId));
       }
 
