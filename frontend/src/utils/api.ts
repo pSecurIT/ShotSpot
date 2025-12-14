@@ -139,4 +139,145 @@ api.interceptors.response.use(
   }
 );
 
+// ============================================
+// TWIZZIT INTEGRATION API
+// ============================================
+
+import type {
+  TwizzitCredential,
+  TwizzitSyncConfig,
+  TwizzitSyncHistory,
+  TeamMapping,
+  PlayerMapping,
+  SyncResult,
+  VerifyConnectionResult,
+} from '../types/twizzit';
+
+/**
+ * Get all Twizzit credentials for the authenticated user
+ */
+export const getTwizzitCredentials = async (): Promise<TwizzitCredential[]> => {
+  const response = await api.get('/twizzit/credentials');
+  return response.data.credentials;
+};
+
+/**
+ * Store new Twizzit credentials
+ */
+export const storeTwizzitCredentials = async (data: {
+  username: string;
+  password: string;
+  organizationName: string;
+}): Promise<TwizzitCredential> => {
+  const response = await api.post('/twizzit/credentials', data);
+  return response.data.credential;
+};
+
+/**
+ * Delete Twizzit credentials
+ */
+export const deleteTwizzitCredentials = async (credentialId: number): Promise<void> => {
+  await api.delete(`/twizzit/credentials/${credentialId}`);
+};
+
+/**
+ * Verify Twizzit connection
+ */
+export const verifyTwizzitConnection = async (
+  credentialId: number
+): Promise<VerifyConnectionResult> => {
+  const response = await api.post(`/twizzit/verify/${credentialId}`);
+  return response.data;
+};
+
+/**
+ * Sync teams from Twizzit
+ */
+export const syncTwizzitTeams = async (
+  credentialId: number,
+  options?: {
+    groupId?: string;
+    createMissing?: boolean;
+  }
+): Promise<SyncResult> => {
+  const response = await api.post(`/twizzit/sync/teams/${credentialId}`, options);
+  return response.data;
+};
+
+/**
+ * Sync players from Twizzit
+ */
+export const syncTwizzitPlayers = async (
+  credentialId: number,
+  options?: {
+    groupId?: string;
+    seasonId?: string;
+    createMissing?: boolean;
+  }
+): Promise<SyncResult> => {
+  const response = await api.post(`/twizzit/sync/players/${credentialId}`, options);
+  return response.data;
+};
+
+/**
+ * Get sync configuration for a credential
+ */
+export const getTwizzitSyncConfig = async (
+  credentialId: number
+): Promise<TwizzitSyncConfig> => {
+  const response = await api.get(`/twizzit/sync/config/${credentialId}`);
+  return response.data.config;
+};
+
+/**
+ * Update sync configuration
+ */
+export const updateTwizzitSyncConfig = async (
+  credentialId: number,
+  config: {
+    autoSyncEnabled: boolean;
+    syncIntervalHours: number;
+  }
+): Promise<TwizzitSyncConfig> => {
+  const response = await api.put(`/twizzit/sync/config/${credentialId}`, config);
+  return response.data.config;
+};
+
+/**
+ * Get sync history for a credential
+ */
+export const getTwizzitSyncHistory = async (
+  credentialId: number,
+  limit: number = 50
+): Promise<TwizzitSyncHistory[]> => {
+  const response = await api.get(`/twizzit/sync/history/${credentialId}?limit=${limit}`);
+  return response.data.history;
+};
+
+/**
+ * Get team mappings
+ */
+export const getTwizzitTeamMappings = async (
+  credentialId?: number
+): Promise<TeamMapping[]> => {
+  const url = credentialId 
+    ? `/twizzit/mappings/teams?credentialId=${credentialId}`
+    : '/twizzit/mappings/teams';
+  const response = await api.get(url);
+  return response.data.mappings;
+};
+
+/**
+ * Get player mappings
+ */
+export const getTwizzitPlayerMappings = async (
+  credentialId?: number
+): Promise<PlayerMapping[]> => {
+  const url = credentialId
+    ? `/twizzit/mappings/players?credentialId=${credentialId}`
+    : '/twizzit/mappings/players';
+  const response = await api.get(url);
+  return response.data.mappings;
+};
+
 export default api;

@@ -24,10 +24,10 @@ router.use(limiter);
  * Users see their own reports, admins see all
  */
 router.get('/', [
-  query('report_type').optional().isIn(['game', 'player', 'team', 'season']).withMessage('Invalid report type'),
+  query('report_type').optional().isIn(['game', 'player', 'club', 'season']).withMessage('Invalid report type'),
   query('format').optional().isIn(['pdf', 'csv', 'json']).withMessage('Invalid format'),
   query('game_id').optional().isInt().withMessage('Game ID must be an integer'),
-  query('team_id').optional().isInt().withMessage('Team ID must be an integer'),
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
   query('player_id').optional().isInt().withMessage('Player ID must be an integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
 ], async (req, res) => {
@@ -36,7 +36,7 @@ router.get('/', [
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { report_type, format, game_id, team_id, player_id, limit = 50 } = req.query;
+  const { report_type, format, game_id, club_id, player_id, limit = 50 } = req.query;
 
   try {
     let queryText = `
@@ -45,13 +45,13 @@ router.get('/', [
         rt.name as template_name,
         u.username as generated_by_username,
         g.date as game_date,
-        t.name as team_name,
+        c.name as club_name,
         CONCAT(p.first_name, ' ', p.last_name) as player_name
       FROM report_exports re
       LEFT JOIN report_templates rt ON re.template_id = rt.id
       LEFT JOIN users u ON re.generated_by = u.id
       LEFT JOIN games g ON re.game_id = g.id
-      LEFT JOIN teams t ON re.team_id = t.id
+      LEFT JOIN clubs c ON re.team_id = c.id
       LEFT JOIN players p ON re.player_id = p.id
       WHERE 1=1
     `;
@@ -83,9 +83,9 @@ router.get('/', [
       paramIndex++;
     }
 
-    if (team_id) {
+    if (club_id) {
       queryText += ` AND re.team_id = $${paramIndex}`;
-      queryParams.push(team_id);
+      queryParams.push(club_id);
       paramIndex++;
     }
 
@@ -175,10 +175,10 @@ router.post('/generate', [
     .optional()
     .isInt()
     .withMessage('Game ID must be an integer'),
-  body('team_id')
+  body('club_id')
     .optional()
     .isInt()
-    .withMessage('Team ID must be an integer'),
+    .withMessage('Club ID must be an integer'),
   body('player_id')
     .optional()
     .isInt()
@@ -204,7 +204,7 @@ router.post('/generate', [
     report_type,
     format,
     game_id,
-    team_id,
+    club_id,
     player_id,
     date_range,
     report_name
@@ -235,10 +235,10 @@ router.post('/generate', [
       }
     }
 
-    if (team_id) {
-      const teamCheck = await db.query('SELECT id FROM teams WHERE id = $1', [team_id]);
-      if (teamCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Team not found' });
+    if (club_id) {
+      const clubCheck = await db.query('SELECT id FROM clubs WHERE id = $1', [club_id]);
+      if (clubCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Club not found' });
       }
     }
 
@@ -275,12 +275,12 @@ router.post('/generate', [
     } else if (report_type === 'player' && player_id) {
       // Fetch player report data
       reportData = await generatePlayerReport(player_id, date_range, template, req.user);
-    } else if (report_type === 'team' && team_id) {
-      // Fetch team report data
-      reportData = await generateTeamReport(team_id, date_range, template, req.user);
+    } else if (report_type === 'club' && club_id) {
+      // Fetch club report data
+      reportData = await generateTeamReport(club_id, date_range, template, req.user);
     } else if (report_type === 'season') {
       // Fetch season report data
-      reportData = await generateSeasonReport(team_id, date_range, template, req.user);
+      reportData = await generateSeasonReport(club_id, date_range, template, req.user);
     }
 
     // Create report export record
@@ -297,7 +297,7 @@ router.post('/generate', [
       report_type,
       format,
       game_id || null,
-      team_id || null,
+      club_id || null,
       player_id || null,
       date_range ? JSON.stringify(date_range) : null,
       shareToken,
@@ -367,11 +367,11 @@ async function generateGameReport(gameId, template, _user) {
   const gameResult = await db.query(`
     SELECT 
       g.*,
-      ht.name as home_team_name,
-      at.name as away_team_name
+      hc.name as home_club_name,
+      ac.name as away_club_name
     FROM games g
-    JOIN teams ht ON g.home_team_id = ht.id
-    JOIN teams at ON g.away_team_id = at.id
+    JOIN clubs hc ON g.home_club_id = hc.id
+    JOIN clubs ac ON g.away_club_id = ac.id
     WHERE g.id = $1
   `, [gameId]);
 
@@ -388,10 +388,10 @@ async function generateGameReport(gameId, template, _user) {
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs c ON s.club_id = c.id
       WHERE s.game_id = $1
       ORDER BY s.created_at
     `, [gameId]);
@@ -419,9 +419,9 @@ async function generatePlayerReport(playerId, _dateRange, _template, _user) {
   const playerResult = await db.query(`
     SELECT 
       p.*,
-      t.name as team_name
+      c.name as club_name
     FROM players p
-    LEFT JOIN teams t ON p.team_id = t.id
+    LEFT JOIN clubs c ON p.club_id = c.id
     WHERE p.id = $1
   `, [playerId]);
 
@@ -433,21 +433,21 @@ async function generatePlayerReport(playerId, _dateRange, _template, _user) {
   return playerData;
 }
 
-async function generateTeamReport(teamId, _dateRange, _template, _user) {
-  const teamData = {};
+async function generateTeamReport(clubId, _dateRange, _template, _user) {
+  const clubData = {};
 
-  // Team info
-  const teamResult = await db.query(
-    'SELECT * FROM teams WHERE id = $1',
-    [teamId]
+  // Club info
+  const clubResult = await db.query(
+    'SELECT * FROM clubs WHERE id = $1',
+    [clubId]
   );
 
-  teamData.team_info = teamResult.rows[0];
+  clubData.club_info = clubResult.rows[0];
 
-  // Team statistics
-  teamData.statistics = { message: 'Team statistics across date range would be included here' };
+  // Club statistics
+  clubData.statistics = { message: 'Club statistics across date range would be included here' };
 
-  return teamData;
+  return clubData;
 }
 
 async function generateSeasonReport(_teamId, _dateRange, _template, _user) {

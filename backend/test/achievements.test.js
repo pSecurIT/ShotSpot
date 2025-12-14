@@ -29,14 +29,14 @@ describe('🏆 Achievements Routes', () => {
 
     // Create test teams
     const teamResult = await db.query(`
-      INSERT INTO teams (name) 
+      INSERT INTO clubs (name) 
       VALUES ('Achievement Team')
       RETURNING id
     `);
     testTeamId = teamResult.rows[0].id;
 
     const awayTeamResult = await db.query(`
-      INSERT INTO teams (name) 
+      INSERT INTO clubs (name) 
       VALUES ('Away Team')
       RETURNING id
     `);
@@ -44,7 +44,7 @@ describe('🏆 Achievements Routes', () => {
 
     // Create test player
     const playerResult = await db.query(`
-      INSERT INTO players (first_name, last_name, jersey_number, team_id, gender)
+      INSERT INTO players (first_name, last_name, jersey_number, club_id, gender)
       VALUES ('Test', 'Achiever', 99, $1, 'male')
       RETURNING id
     `, [testTeamId]);
@@ -52,7 +52,7 @@ describe('🏆 Achievements Routes', () => {
 
     // Create test game
     const gameResult = await db.query(`
-      INSERT INTO games (home_team_id, away_team_id, date, status)
+      INSERT INTO games (home_club_id, away_club_id, date, status)
       VALUES ($1, $2, CURRENT_DATE, 'completed')
       RETURNING id
     `, [testTeamId, awayTeamId]);
@@ -65,7 +65,7 @@ describe('🏆 Achievements Routes', () => {
     await db.query('DELETE FROM shots WHERE player_id = $1', [testPlayerId]);
     await db.query('DELETE FROM games WHERE id = $1', [testGameId]);
     await db.query('DELETE FROM players WHERE id = $1', [testPlayerId]);
-    await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
+    await db.query('DELETE FROM clubs WHERE id = $1', [testTeamId]);
     await db.query('DELETE FROM users WHERE id = $1', [testUserId]);
   });
 
@@ -183,7 +183,7 @@ describe('🏆 Achievements Routes', () => {
       }
       
       await db.query(`
-        INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period)
+        INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period)
         VALUES ${shots.join(', ')}
       `);
 
@@ -256,7 +256,7 @@ describe('🏆 Achievements Routes', () => {
         expect(player).toHaveProperty('rank');
         expect(player).toHaveProperty('first_name');
         expect(player).toHaveProperty('last_name');
-        expect(player).toHaveProperty('team_name');
+        expect(player).toHaveProperty('club_name');
         expect(player).toHaveProperty('total_shots');
         expect(player).toHaveProperty('total_goals');
         expect(player).toHaveProperty('fg_percentage');
@@ -303,9 +303,9 @@ describe('🏆 Achievements Routes', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('team_id');
+      expect(response.body).toHaveProperty('club_id');
       expect(response.body).toHaveProperty('leaderboard');
-      expect(response.body.team_id).toBe(testTeamId);
+      expect(response.body.club_id).toBe(testTeamId);
     });
 
     it('✅ should include achievement counts', async () => {
@@ -323,7 +323,7 @@ describe('🏆 Achievements Routes', () => {
     it('✅ should only include active players', async () => {
       // Create inactive player
       const inactivePlayer = await db.query(`
-        INSERT INTO players (first_name, last_name, jersey_number, team_id, gender, is_active)
+        INSERT INTO players (first_name, last_name, jersey_number, club_id, gender, is_active)
         VALUES ('Inactive', 'Player', 88, $1, 'male', false)
         RETURNING id
       `, [testTeamId]);
@@ -367,3 +367,5 @@ describe('🏆 Achievements Routes', () => {
     });
   });
 });
+
+

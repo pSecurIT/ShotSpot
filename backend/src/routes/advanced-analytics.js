@@ -436,7 +436,7 @@ router.get('/predictions/next-game/:playerId', [
           JOIN games g ON s.game_id = g.id
           WHERE s.player_id = $1
             AND (
-              (g.home_team_id = $2 OR g.away_team_id = $2)
+              (g.home_club_id = $2 OR g.away_club_id = $2)
             )
           GROUP BY g.id
         ) matchup_games
@@ -833,7 +833,7 @@ router.get('/benchmarks/historical/:entityType/:entityId', [
             ROUND(AVG(s.distance), 2) as avg_distance
           FROM shots s
           JOIN games g ON s.game_id = g.id
-          WHERE s.team_id = $1 ${dateFilter}
+          WHERE s.club_id = $1 ${dateFilter}
         `;
       }
       
@@ -1025,10 +1025,10 @@ router.get('/video/highlights/:gameId', [
           s.created_at,
           p.first_name,
           p.last_name,
-          t.name as team_name
+          c.name as club_name
         FROM shots s
         JOIN players p ON s.player_id = p.id
-        JOIN teams t ON s.team_id = t.id
+        JOIN clubs c ON s.club_id = c.id
         WHERE s.game_id = $1 AND s.result = 'goal'
         ORDER BY s.created_at
         LIMIT $2
@@ -1038,7 +1038,7 @@ router.get('/video/highlights/:gameId', [
         autoHighlights.push({
           event_id: goal.event_id,
           event_type: goal.event_type,
-          description: `Goal by ${goal.first_name} ${goal.last_name} (${goal.team_name})`,
+          description: `Goal by ${goal.first_name} ${goal.last_name} (${goal.club_name})`,
           suggested_duration: 10, // seconds
           priority: 'high'
         });
@@ -1084,14 +1084,14 @@ router.get('/video/report-data/:gameId', [
           WHEN ve.event_type = 'shot' OR ve.event_type = 'goal' THEN (
             SELECT json_build_object(
               'player_name', p.first_name || ' ' || p.last_name,
-              'team_name', t.name,
+              'club_name', c.name,
               'result', s.result,
               'x_coord', s.x_coord,
               'y_coord', s.y_coord
             )
             FROM shots s
             JOIN players p ON s.player_id = p.id
-            JOIN teams t ON s.team_id = t.id
+            JOIN clubs c ON s.club_id = c.id
             WHERE s.id = ve.event_id
           )
           ELSE NULL

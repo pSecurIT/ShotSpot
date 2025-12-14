@@ -23,10 +23,10 @@ router.get('/:gameId', [
       'match_commentary'
     ])
     .withMessage('Invalid event type'),
-  query('team_id')
+  query('club_id')
     .optional()
     .isInt({ min: 1 })
-    .withMessage('Team ID must be a positive integer'),
+    .withMessage('Club ID must be a positive integer'),
   query('player_id')
     .optional()
     .isInt({ min: 1 })
@@ -42,7 +42,7 @@ router.get('/:gameId', [
   }
 
   const { gameId } = req.params;
-  const { event_type, team_id, player_id, period } = req.query;
+  const { event_type, club_id, player_id, period } = req.query;
 
   try {
     let queryText = `
@@ -51,9 +51,9 @@ router.get('/:gameId', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM game_events e
-      JOIN teams t ON e.team_id = t.id
+      JOIN clubs c ON e.club_id = c.id
       LEFT JOIN players p ON e.player_id = p.id
       WHERE e.game_id = $1
     `;
@@ -66,9 +66,9 @@ router.get('/:gameId', [
       paramIndex++;
     }
 
-    if (team_id) {
-      queryText += ` AND e.team_id = $${paramIndex}`;
-      params.push(team_id);
+    if (club_id) {
+      queryText += ` AND e.club_id = $${paramIndex}`;
+      params.push(club_id);
       paramIndex++;
     }
 
@@ -110,10 +110,10 @@ router.post('/:gameId', [
       'match_commentary'
     ])
     .withMessage('Event type must be one of: foul, substitution, timeout, period_start, period_end, fault_offensive, fault_defensive, fault_out_of_bounds, free_shot, timeout_team, timeout_injury, timeout_official, match_commentary'),
-  body('team_id')
+  body('club_id')
     .notEmpty()
     .isInt({ min: 1 })
-    .withMessage('Team ID must be a positive integer'),
+    .withMessage('Club ID must be a positive integer'),
   body('player_id')
     .optional({ nullable: true })
     .isInt({ min: 1 })
@@ -137,7 +137,7 @@ router.post('/:gameId', [
   }
 
   const { gameId } = req.params;
-  const { event_type, player_id, team_id, period, time_remaining, details } = req.body;
+  const { event_type, player_id, club_id, period, time_remaining, details } = req.body;
 
   try {
     // Verify game exists and is in progress
@@ -154,16 +154,16 @@ router.post('/:gameId', [
       });
     }
 
-    // Verify team is participating in the game
-    if (team_id !== game.home_team_id && team_id !== game.away_team_id) {
+    // Verify club is participating in the game
+    if (club_id !== game.home_club_id && club_id !== game.away_club_id) {
       return res.status(400).json({ 
-        error: 'Team is not participating in this game',
-        gameTeams: { home: game.home_team_id, away: game.away_team_id },
-        providedTeam: team_id
+        error: 'Club is not participating in this game',
+        gameClubs: { home: game.home_club_id, away: game.away_club_id },
+        providedClub: club_id
       });
     }
 
-    // If player_id is provided, verify player belongs to the team
+    // If player_id is provided, verify player belongs to the club
     if (player_id) {
       const playerResult = await db.query(
         'SELECT * FROM players WHERE id = $1',
@@ -174,11 +174,11 @@ router.post('/:gameId', [
         return res.status(404).json({ error: 'Player not found' });
       }
 
-      if (playerResult.rows[0].team_id !== team_id) {
+      if (playerResult.rows[0].club_id !== club_id) {
         return res.status(400).json({ 
-          error: 'Player does not belong to the specified team',
-          playerTeam: playerResult.rows[0].team_id,
-          providedTeam: team_id
+          error: 'Player does not belong to the specified club',
+          playerClub: playerResult.rows[0].club_id,
+          providedClub: club_id
         });
       }
     }
@@ -202,7 +202,7 @@ router.post('/:gameId', [
 
     // Insert the event
     const insertQuery = `
-      INSERT INTO game_events (game_id, event_type, player_id, team_id, period, time_remaining, details)
+      INSERT INTO game_events (game_id, event_type, player_id, club_id, period, time_remaining, details)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `;
@@ -211,7 +211,7 @@ router.post('/:gameId', [
       gameId,
       event_type,
       player_id || null,
-      team_id,
+      club_id,
       period,
       time_remaining || null,
       details ? JSON.stringify(details) : null
@@ -224,9 +224,9 @@ router.post('/:gameId', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM game_events e
-      JOIN teams t ON e.team_id = t.id
+      JOIN clubs c ON e.club_id = c.id
       LEFT JOIN players p ON e.player_id = p.id
       WHERE e.id = $1
     `, [result.rows[0].id]);

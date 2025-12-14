@@ -10,8 +10,8 @@ describe('📊 Advanced Analytics Routes', () => {
   let adminUserId;
   let coachUserId;
   let regularUserId;
-  let team1;
-  let team2;
+  let club1;
+  let club2;
   let player1;
   let player2;
   let player3;
@@ -50,119 +50,119 @@ describe('📊 Advanced Analytics Routes', () => {
     userToken = jwt.sign({ id: regularUserId, role: 'user' }, process.env.JWT_SECRET);
 
     // Create test teams
-    const team1Result = await db.query(
-      'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+    const club1Result = await db.query(
+      'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
       [`Adv Analytics Team 1 ${uniqueId}`]
     );
-    team1 = team1Result.rows[0];
+    club1 = club1Result.rows[0];
 
-    const team2Result = await db.query(
-      'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+    const club2Result = await db.query(
+      'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
       [`Adv Analytics Team 2 ${uniqueId}`]
     );
-    team2 = team2Result.rows[0];
+    club2 = club2Result.rows[0];
 
     // Create test players
     const player1Result = await db.query(
-      `INSERT INTO players (team_id, first_name, last_name, jersey_number) 
+      `INSERT INTO players (club_id, first_name, last_name, jersey_number) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [team1.id, 'Alice', `AdvPlayer${uniqueId}`, 10]
+      [club1.id, 'Alice', `AdvPlayer${uniqueId}`, 10]
     );
     player1 = player1Result.rows[0];
 
     const player2Result = await db.query(
-      `INSERT INTO players (team_id, first_name, last_name, jersey_number) 
+      `INSERT INTO players (club_id, first_name, last_name, jersey_number) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [team1.id, 'Bob', `AdvPlayer${uniqueId}`, 11]
+      [club1.id, 'Bob', `AdvPlayer${uniqueId}`, 11]
     );
     player2 = player2Result.rows[0];
 
     const player3Result = await db.query(
-      `INSERT INTO players (team_id, first_name, last_name, jersey_number) 
+      `INSERT INTO players (club_id, first_name, last_name, jersey_number) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [team2.id, 'Charlie', `AdvPlayer${uniqueId}`, 20]
+      [club2.id, 'Charlie', `AdvPlayer${uniqueId}`, 20]
     );
     player3 = player3Result.rows[0];
 
     // Create games for analytics
     const game1Result = await db.query(
-      `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score, current_period)
+      `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score, current_period)
        VALUES ($1, $2, CURRENT_TIMESTAMP - INTERVAL '7 days', 'completed', 15, 12, 4) RETURNING *`,
-      [team1.id, team2.id]
+      [club1.id, club2.id]
     );
     game1 = game1Result.rows[0];
 
     const game2Result = await db.query(
-      `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score, current_period)
+      `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score, current_period)
        VALUES ($1, $2, CURRENT_TIMESTAMP - INTERVAL '3 days', 'completed', 18, 14, 4) RETURNING *`,
-      [team1.id, team2.id]
+      [club1.id, club2.id]
     );
     game2 = game2Result.rows[0];
 
     // Create a third game for form trends (needs 3+ games)
     const game3Result = await db.query(
-      `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score, current_period)
+      `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score, current_period)
        VALUES ($1, $2, CURRENT_TIMESTAMP - INTERVAL '1 day', 'completed', 20, 16, 4) RETURNING *`,
-      [team1.id, team2.id]
+      [club1.id, club2.id]
     );
     const game3 = game3Result.rows[0];
 
     // Create diverse shot data for player1 across games
     // Game 1: 8 shots, 5 goals (62.5% FG)
     const game1Shots = [
-      { x: 10, y: 50, result: 'goal', game: game1.id, player: player1.id, team: team1.id, distance: 5.5, period: 1 },
-      { x: 15, y: 45, result: 'goal', game: game1.id, player: player1.id, team: team1.id, distance: 6.0, period: 1 },
-      { x: 20, y: 55, result: 'miss', game: game1.id, player: player1.id, team: team1.id, distance: 7.0, period: 2 },
-      { x: 25, y: 50, result: 'goal', game: game1.id, player: player1.id, team: team1.id, distance: 5.0, period: 2 },
-      { x: 40, y: 50, result: 'goal', game: game1.id, player: player1.id, team: team1.id, distance: 4.0, period: 3 },
-      { x: 50, y: 50, result: 'miss', game: game1.id, player: player1.id, team: team1.id, distance: 3.5, period: 3 },
-      { x: 60, y: 50, result: 'goal', game: game1.id, player: player1.id, team: team1.id, distance: 4.5, period: 4 },
-      { x: 70, y: 50, result: 'miss', game: game1.id, player: player1.id, team: team1.id, distance: 6.5, period: 4 },
+      { x: 10, y: 50, result: 'goal', game: game1.id, player: player1.id, team: club1.id, distance: 5.5, period: 1 },
+      { x: 15, y: 45, result: 'goal', game: game1.id, player: player1.id, team: club1.id, distance: 6.0, period: 1 },
+      { x: 20, y: 55, result: 'miss', game: game1.id, player: player1.id, team: club1.id, distance: 7.0, period: 2 },
+      { x: 25, y: 50, result: 'goal', game: game1.id, player: player1.id, team: club1.id, distance: 5.0, period: 2 },
+      { x: 40, y: 50, result: 'goal', game: game1.id, player: player1.id, team: club1.id, distance: 4.0, period: 3 },
+      { x: 50, y: 50, result: 'miss', game: game1.id, player: player1.id, team: club1.id, distance: 3.5, period: 3 },
+      { x: 60, y: 50, result: 'goal', game: game1.id, player: player1.id, team: club1.id, distance: 4.5, period: 4 },
+      { x: 70, y: 50, result: 'miss', game: game1.id, player: player1.id, team: club1.id, distance: 6.5, period: 4 },
     ];
 
     // Game 2: 10 shots, 7 goals (70% FG) - showing improvement
     const game2Shots = [
-      { x: 10, y: 50, result: 'goal', game: game2.id, player: player1.id, team: team1.id, distance: 5.5, period: 1 },
-      { x: 15, y: 45, result: 'goal', game: game2.id, player: player1.id, team: team1.id, distance: 6.0, period: 1 },
-      { x: 20, y: 55, result: 'goal', game: game2.id, player: player1.id, team: team1.id, distance: 7.0, period: 1 },
-      { x: 25, y: 50, result: 'miss', game: game2.id, player: player1.id, team: team1.id, distance: 5.0, period: 2 },
-      { x: 40, y: 50, result: 'goal', game: game2.id, player: player1.id, team: team1.id, distance: 4.0, period: 2 },
-      { x: 50, y: 50, result: 'goal', game: game2.id, player: player1.id, team: team1.id, distance: 3.5, period: 3 },
-      { x: 60, y: 50, result: 'goal', game: game2.id, player: player1.id, team: team1.id, distance: 4.5, period: 3 },
-      { x: 70, y: 50, result: 'miss', game: game2.id, player: player1.id, team: team1.id, distance: 6.5, period: 4 },
-      { x: 80, y: 50, result: 'goal', game: game2.id, player: player1.id, team: team1.id, distance: 8.0, period: 4 },
-      { x: 90, y: 50, result: 'miss', game: game2.id, player: player1.id, team: team1.id, distance: 9.0, period: 4 },
+      { x: 10, y: 50, result: 'goal', game: game2.id, player: player1.id, team: club1.id, distance: 5.5, period: 1 },
+      { x: 15, y: 45, result: 'goal', game: game2.id, player: player1.id, team: club1.id, distance: 6.0, period: 1 },
+      { x: 20, y: 55, result: 'goal', game: game2.id, player: player1.id, team: club1.id, distance: 7.0, period: 1 },
+      { x: 25, y: 50, result: 'miss', game: game2.id, player: player1.id, team: club1.id, distance: 5.0, period: 2 },
+      { x: 40, y: 50, result: 'goal', game: game2.id, player: player1.id, team: club1.id, distance: 4.0, period: 2 },
+      { x: 50, y: 50, result: 'goal', game: game2.id, player: player1.id, team: club1.id, distance: 3.5, period: 3 },
+      { x: 60, y: 50, result: 'goal', game: game2.id, player: player1.id, team: club1.id, distance: 4.5, period: 3 },
+      { x: 70, y: 50, result: 'miss', game: game2.id, player: player1.id, team: club1.id, distance: 6.5, period: 4 },
+      { x: 80, y: 50, result: 'goal', game: game2.id, player: player1.id, team: club1.id, distance: 8.0, period: 4 },
+      { x: 90, y: 50, result: 'miss', game: game2.id, player: player1.id, team: club1.id, distance: 9.0, period: 4 },
     ];
 
     // Game 3: 12 shots, 9 goals (75% FG) - continuing improvement trend
     const game3Shots = [
-      { x: 10, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 5.5, period: 1 },
-      { x: 15, y: 45, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 6.0, period: 1 },
-      { x: 20, y: 55, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 7.0, period: 1 },
-      { x: 25, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 5.0, period: 1 },
-      { x: 30, y: 50, result: 'miss', game: game3.id, player: player1.id, team: team1.id, distance: 4.5, period: 2 },
-      { x: 40, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 4.0, period: 2 },
-      { x: 50, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 3.5, period: 2 },
-      { x: 60, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 4.5, period: 3 },
-      { x: 70, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 6.5, period: 3 },
-      { x: 80, y: 50, result: 'miss', game: game3.id, player: player1.id, team: team1.id, distance: 8.0, period: 4 },
-      { x: 85, y: 50, result: 'goal', game: game3.id, player: player1.id, team: team1.id, distance: 7.0, period: 4 },
-      { x: 90, y: 50, result: 'miss', game: game3.id, player: player1.id, team: team1.id, distance: 9.0, period: 4 },
+      { x: 10, y: 50, result: 'goal', game: game3.id, player: player1.id, team: club1.id, distance: 5.5, period: 1 },
+      { x: 15, y: 45, result: 'goal', game: game3.id, player: player1.id, team: club1.id, distance: 6.0, period: 1 },
+      { x: 20, y: 55, result: 'goal', game: game3.id, player: player1.id, team: club1.id, distance: 7.0, period: 1 },
+      { x: 25, y: 50, result: 'goal', game: game3.id, player: player1.id, team: club1.id, distance: 5.0, period: 1 },
+      { x: 30, y: 50, result: 'miss', game: game3.id, player: player1.id, team: club1.id, distance: 4.5, period: 2 },
+      { x: 40, y: 50, result: 'goal', game: game3.id, player: player1.id, team: club1.id, distance: 4.0, period: 2 },
+      { x: 50, y: 50, result: 'goal', game: game3.id, player: player1.id, team: club1.id, distance: 3.5, period: 2 },
+      { x: 60, y: 50, result: 'goal', game: game3.id, player: player1.id, team: club1.id, distance: 4.5, period: 3 },
+      { x: 70, y: 50, result: 'goal', game: game3.id, player: player1.id, team: club1.id, distance: 6.5, period: 3 },
+      { x: 80, y: 50, result: 'miss', game: game3.id, player: player1.id, team: club1.id, distance: 8.0, period: 4 },
+      { x: 85, y: 50, result: 'goal', game: game3.id, player: player1.id, team: club1.id, distance: 7.0, period: 4 },
+      { x: 90, y: 50, result: 'miss', game: game3.id, player: player1.id, team: club1.id, distance: 9.0, period: 4 },
     ];
 
     // Player 2 shots
     const player2Shots = [
-      { x: 30, y: 40, result: 'goal', game: game1.id, player: player2.id, team: team1.id, distance: 5.0, period: 1 },
-      { x: 45, y: 60, result: 'goal', game: game1.id, player: player2.id, team: team1.id, distance: 4.0, period: 2 },
-      { x: 55, y: 55, result: 'miss', game: game1.id, player: player2.id, team: team1.id, distance: 5.5, period: 3 },
-      { x: 65, y: 45, result: 'blocked', game: game1.id, player: player2.id, team: team1.id, distance: 6.0, period: 4 },
+      { x: 30, y: 40, result: 'goal', game: game1.id, player: player2.id, team: club1.id, distance: 5.0, period: 1 },
+      { x: 45, y: 60, result: 'goal', game: game1.id, player: player2.id, team: club1.id, distance: 4.0, period: 2 },
+      { x: 55, y: 55, result: 'miss', game: game1.id, player: player2.id, team: club1.id, distance: 5.5, period: 3 },
+      { x: 65, y: 45, result: 'blocked', game: game1.id, player: player2.id, team: club1.id, distance: 6.0, period: 4 },
     ];
 
     // Player 3 shots (opponent)
     const player3Shots = [
-      { x: 20, y: 30, result: 'goal', game: game1.id, player: player3.id, team: team2.id, distance: 5.5, period: 1 },
-      { x: 40, y: 40, result: 'miss', game: game1.id, player: player3.id, team: team2.id, distance: 6.0, period: 2 },
-      { x: 60, y: 50, result: 'goal', game: game1.id, player: player3.id, team: team2.id, distance: 4.5, period: 3 },
+      { x: 20, y: 30, result: 'goal', game: game1.id, player: player3.id, team: club2.id, distance: 5.5, period: 1 },
+      { x: 40, y: 40, result: 'miss', game: game1.id, player: player3.id, team: club2.id, distance: 6.0, period: 2 },
+      { x: 60, y: 50, result: 'goal', game: game1.id, player: player3.id, team: club2.id, distance: 4.5, period: 3 },
     ];
 
     const allShots = [...game1Shots, ...game2Shots, ...game3Shots, ...player2Shots, ...player3Shots];
@@ -178,21 +178,21 @@ describe('📊 Advanced Analytics Routes', () => {
 
     // Create game rosters for play time calculations
     await db.query(
-      `INSERT INTO game_rosters (game_id, team_id, player_id, is_starting, starting_position)
+      `INSERT INTO game_rosters (game_id, club_id, player_id, is_starting, starting_position)
        VALUES ($1, $2, $3, true, 'offense')`,
-      [game1.id, team1.id, player1.id]
+      [game1.id, club1.id, player1.id]
     );
 
     await db.query(
-      `INSERT INTO game_rosters (game_id, team_id, player_id, is_starting, starting_position)
+      `INSERT INTO game_rosters (game_id, club_id, player_id, is_starting, starting_position)
        VALUES ($1, $2, $3, true, 'offense')`,
-      [game2.id, team1.id, player1.id]
+      [game2.id, club1.id, player1.id]
     );
 
     await db.query(
-      `INSERT INTO game_rosters (game_id, team_id, player_id, is_starting, starting_position)
+      `INSERT INTO game_rosters (game_id, club_id, player_id, is_starting, starting_position)
        VALUES ($1, $2, $3, true, 'offense')`,
-      [game3.id, team1.id, player1.id]
+      [game3.id, club1.id, player1.id]
     );
 
     console.log('✅ Advanced Analytics test setup complete');
@@ -296,11 +296,11 @@ describe('📊 Advanced Analytics Routes', () => {
       it('✅ should adjust prediction based on opponent', async () => {
         const response = await request(app)
           .get(`/api/advanced-analytics/predictions/next-game/${player1.id}`)
-          .query({ opponent_id: team2.id })
+          .query({ opponent_id: club2.id })
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
-        expect(response.body).toHaveProperty('opponent_id', team2.id);
+        expect(response.body).toHaveProperty('opponent_id', club2.id);
         expect(response.body.adjustments).toHaveProperty('matchup_adjustment');
       });
     });
@@ -352,9 +352,9 @@ describe('📊 Advanced Analytics Routes', () => {
       it('❌ should handle player with no data', async () => {
         // Create player with no shots
         const noDataPlayer = await db.query(
-          `INSERT INTO players (team_id, first_name, last_name, jersey_number) 
+          `INSERT INTO players (club_id, first_name, last_name, jersey_number) 
            VALUES ($1, 'NoData', 'Player', 99) RETURNING *`,
-          [team1.id]
+          [club1.id]
         );
 
         const response = await request(app)
@@ -381,12 +381,12 @@ describe('📊 Advanced Analytics Routes', () => {
 
       it('✅ should fetch historical performance for team', async () => {
         const response = await request(app)
-          .get(`/api/advanced-analytics/benchmarks/historical/team/${team1.id}`)
+          .get(`/api/advanced-analytics/benchmarks/historical/team/${club1.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
         expect(response.body).toHaveProperty('entity_type', 'team');
-        expect(response.body).toHaveProperty('entity_id', team1.id);
+        expect(response.body).toHaveProperty('entity_id', club1.id);
       });
 
       it('❌ should validate entity type', async () => {
@@ -581,3 +581,5 @@ describe('📊 Advanced Analytics Routes', () => {
     });
   });
 });
+
+

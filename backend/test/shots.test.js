@@ -18,8 +18,8 @@ describe('🏀 Shot Routes', () => {
   let adminUser;
   let coachUser;
   let regularUser;
-  let team1;
-  let team2;
+  let club1;
+  let club2;
   let player1;
   let player2;
   let testGame;
@@ -61,36 +61,36 @@ describe('🏀 Shot Routes', () => {
       }
 
       // Create test teams with unique names
-      const team1Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club1Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Shot Test Team 1 ${uniqueId}`]
       );
-      team1 = team1Result.rows[0];
+      club1 = club1Result.rows[0];
 
-      const team2Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club2Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Shot Test Team 2 ${uniqueId}`]
       );
-      team2 = team2Result.rows[0];
+      club2 = club2Result.rows[0];
 
       // Create test players
       const player1Result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team1.id, 'John', 'Shooter', 10]
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club1.id, 'John', 'Shooter', 10]
       );
       player1 = player1Result.rows[0];
 
       const player2Result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team2.id, 'Jane', 'Scorer', 15]
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club2.id, 'Jane', 'Scorer', 15]
       );
       player2 = player2Result.rows[0];
 
       // Create a test game in progress
       const gameResult = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
        VALUES ($1, $2, $3, 'in_progress') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-11-01T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-11-01T14:00:00Z')]
       );
       testGame = gameResult.rows[0];
     } catch (error) {
@@ -106,7 +106,7 @@ describe('🏀 Shot Routes', () => {
       await db.query('DELETE FROM shots WHERE game_id = $1', [testGame.id]);
       await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
       await db.query('DELETE FROM players WHERE id IN ($1, $2)', [player1.id, player2.id]);
-      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [team1.id, team2.id]);
+      await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [club1.id, club2.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
     } catch (error) {
       console.error('⚠️ Shot Routes cleanup failed:', error.message);
@@ -118,7 +118,7 @@ describe('🏀 Shot Routes', () => {
       try {
         const shotData = {
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           x_coord: 45.5,
           y_coord: 30.2,
           result: 'goal',
@@ -137,7 +137,7 @@ describe('🏀 Shot Routes', () => {
         expect(response.status).toBe(201);
         expect(response.body).toHaveProperty('id');
         expect(response.body.player_id).toBe(player1.id);
-        expect(response.body.team_id).toBe(team1.id);
+        expect(response.body.club_id).toBe(club1.id);
         expect(response.body.result).toBe('goal');
         expect(parseFloat(response.body.x_coord)).toBeCloseTo(45.5);
         expect(parseFloat(response.body.y_coord)).toBeCloseTo(30.2);
@@ -157,7 +157,7 @@ describe('🏀 Shot Routes', () => {
       try {
         const shotData = {
           player_id: player2.id,
-          team_id: team2.id,
+          club_id: club2.id,
           x_coord: 50.0,
           y_coord: 40.0,
           result: 'miss',
@@ -187,7 +187,7 @@ describe('🏀 Shot Routes', () => {
       try {
         const shotData = {
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           x_coord: 45.5,
           y_coord: 30.2,
           result: 'goal',
@@ -211,7 +211,7 @@ describe('🏀 Shot Routes', () => {
       try {
         const shotData = {
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           x_coord: 45.5,
           y_coord: 30.2,
           result: 'goal',
@@ -236,14 +236,14 @@ describe('🏀 Shot Routes', () => {
       try {
         // Create a scheduled game
         const scheduledGame = await db.query(
-          `INSERT INTO games (home_team_id, away_team_id, date, status)
+          `INSERT INTO games (home_club_id, away_club_id, date, status)
            VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
-          [team1.id, team2.id, new Date('2025-12-01T14:00:00Z')]
+          [club1.id, club2.id, new Date('2025-12-01T14:00:00Z')]
         );
 
         const shotData = {
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           x_coord: 45.5,
           y_coord: 30.2,
           result: 'goal',
@@ -270,7 +270,7 @@ describe('🏀 Shot Routes', () => {
       try {
         const shotData = {
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           x_coord: 150, // Invalid: > 100
           y_coord: 30.2,
           result: 'goal',
@@ -294,7 +294,7 @@ describe('🏀 Shot Routes', () => {
       try {
         const shotData = {
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           x_coord: 45.5,
           y_coord: 30.2,
           result: 'invalid_result',
@@ -318,15 +318,15 @@ describe('🏀 Shot Routes', () => {
       try {
         // Create another team and player
         const uniqueOtherTeamName = generateUniqueTeamName('OtherTeamShots');
-        const otherTeam = await db.query('INSERT INTO teams (name) VALUES ($1) RETURNING *', [uniqueOtherTeamName]);
+        const otherTeam = await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING *', [uniqueOtherTeamName]);
         const otherPlayer = await db.query(
-          'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+          'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
           [otherTeam.rows[0].id, 'Other', 'Player', 99]
         );
 
         const shotData = {
           player_id: otherPlayer.rows[0].id,
-          team_id: otherTeam.rows[0].id,
+          club_id: otherTeam.rows[0].id,
           x_coord: 45.5,
           y_coord: 30.2,
           result: 'goal',
@@ -343,7 +343,7 @@ describe('🏀 Shot Routes', () => {
         expect(response.body.error).toContain('not participating');
 
         await db.query('DELETE FROM players WHERE id = $1', [otherPlayer.rows[0].id]);
-        await db.query('DELETE FROM teams WHERE id = $1', [otherTeam.rows[0].id]);
+        await db.query('DELETE FROM clubs WHERE id = $1', [otherTeam.rows[0].id]);
       } catch (error) {
         global.testContext.logTestError(error, 'POST non-participating team validation failed');
         throw error;
@@ -355,23 +355,23 @@ describe('🏀 Shot Routes', () => {
     beforeAll(async () => {
       // Create test shots
       const shot1Result = await db.query(
-        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period)
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [testGame.id, player1.id, team1.id, 40, 30, 'goal', 1]
+        [testGame.id, player1.id, club1.id, 40, 30, 'goal', 1]
       );
       shot1 = shot1Result.rows[0];
 
       const shot2Result = await db.query(
-        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period)
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [testGame.id, player2.id, team2.id, 60, 50, 'miss', 1]
+        [testGame.id, player2.id, club2.id, 60, 50, 'miss', 1]
       );
       shot2 = shot2Result.rows[0];
 
       const shot3Result = await db.query(
-        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period)
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [testGame.id, player1.id, team1.id, 45, 35, 'blocked', 2]
+        [testGame.id, player1.id, club1.id, 45, 35, 'blocked', 2]
       );
       shot3 = shot3Result.rows[0];
     });
@@ -390,7 +390,7 @@ describe('🏀 Shot Routes', () => {
         expect(Array.isArray(response.body)).toBe(true);
         expect(response.body.length).toBeGreaterThanOrEqual(3);
         expect(response.body[0]).toHaveProperty('first_name');
-        expect(response.body[0]).toHaveProperty('team_name');
+        expect(response.body[0]).toHaveProperty('club_name');
       } catch (error) {
         global.testContext.logTestError(error, 'GET all shots failed');
         throw error;
@@ -414,11 +414,11 @@ describe('🏀 Shot Routes', () => {
     it('✅ should filter shots by team', async () => {
       try {
         const response = await request(app)
-          .get(`/api/shots/${testGame.id}?team_id=${team1.id}`)
+          .get(`/api/shots/${testGame.id}?club_id=${club1.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
-        expect(response.body.every(shot => shot.team_id === team1.id)).toBe(true);
+        expect(response.body.every(shot => shot.club_id === club1.id)).toBe(true);
       } catch (error) {
         global.testContext.logTestError(error, 'GET shots by team filter failed');
         throw error;
@@ -462,9 +462,9 @@ describe('🏀 Shot Routes', () => {
 
       // Create a test shot
       const shotResult = await db.query(
-        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period)
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [testGame.id, player1.id, team1.id, 40, 30, 'miss', 1]
+        [testGame.id, player1.id, club1.id, 40, 30, 'miss', 1]
       );
       testShot = shotResult.rows[0];
     });
@@ -573,9 +573,9 @@ describe('🏀 Shot Routes', () => {
     beforeEach(async () => {
       // Create a goal shot
       const shotResult = await db.query(
-        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period)
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [testGame.id, player1.id, team1.id, 40, 30, 'goal', 1]
+        [testGame.id, player1.id, club1.id, 40, 30, 'goal', 1]
       );
       testShot = shotResult.rows[0];
 
@@ -651,3 +651,5 @@ describe('🏀 Shot Routes', () => {
     });
   });
 });
+
+

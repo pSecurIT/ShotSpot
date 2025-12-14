@@ -56,51 +56,51 @@ describe('📋 Game Rosters API', () => {
 
       // Create test teams with unique names
       const homeResult = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Roster Home Team ${uniqueId}`]
       );
       homeTeam = homeResult.rows[0];
 
       const awayResult = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Roster Away Team ${uniqueId}`]
       );
       awayTeam = awayResult.rows[0];
 
       // Create test players
       const hp1 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [homeTeam.id, 'John', 'Doe', 10, 'male']
       );
       homePlayer1 = hp1.rows[0];
 
       const hp2 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [homeTeam.id, 'Jane', 'Smith', 15, 'female']
       );
       homePlayer2 = hp2.rows[0];
 
       const hp3 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [homeTeam.id, 'Bob', 'Johnson', 20, 'male']
       );
       _homePlayer3 = hp3.rows[0];
 
       const ap1 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [awayTeam.id, 'Alice', 'Williams', 12, 'female']
       );
       _awayPlayer1 = ap1.rows[0];
 
       const ap2 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [awayTeam.id, 'Charlie', 'Brown', 18, 'male']
       );
       _awayPlayer2 = ap2.rows[0];
 
       // Create test game
       const gameResult = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status) 
+        `INSERT INTO games (home_club_id, away_club_id, date, status) 
          VALUES ($1, $2, $3, $4) RETURNING *`,
         [homeTeam.id, awayTeam.id, new Date(), 'scheduled']
       );
@@ -119,8 +119,8 @@ describe('📋 Game Rosters API', () => {
       // Clean up in reverse order of dependencies
       await db.query('DELETE FROM game_rosters WHERE game_id = $1', [testGame.id]);
       await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
-      await db.query('DELETE FROM players WHERE team_id IN ($1, $2)', [homeTeam.id, awayTeam.id]);
-      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [homeTeam.id, awayTeam.id]);
+      await db.query('DELETE FROM players WHERE club_id IN ($1, $2)', [homeTeam.id, awayTeam.id]);
+      await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [homeTeam.id, awayTeam.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, viewerUser.id]);
       await db.closePool();
       console.log('✅ Game Rosters API tests completed');
@@ -149,8 +149,8 @@ describe('📋 Game Rosters API', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             players: [
-              { team_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true },
-              { team_id: homeTeam.id, player_id: homePlayer2.id, is_captain: false, is_starting: true }
+              { club_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true },
+              { club_id: homeTeam.id, player_id: homePlayer2.id, is_captain: false, is_starting: true }
             ]
           });
 
@@ -173,8 +173,8 @@ describe('📋 Game Rosters API', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             players: [
-              { team_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true },
-              { team_id: homeTeam.id, player_id: homePlayer2.id, is_captain: true, is_starting: true }
+              { club_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true },
+              { club_id: homeTeam.id, player_id: homePlayer2.id, is_captain: true, is_starting: true }
             ]
           });
 
@@ -195,7 +195,7 @@ describe('📋 Game Rosters API', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             players: [
-              { team_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
+              { club_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
             ]
           });
 
@@ -215,7 +215,7 @@ describe('📋 Game Rosters API', () => {
           .post(`/api/game-rosters/${testGame.id}`)
           .send({
             players: [
-              { team_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
+              { club_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
             ]
           });
 
@@ -235,7 +235,7 @@ describe('📋 Game Rosters API', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             players: [
-              { team_id: homeTeam.id } // Missing player_id
+              { club_id: homeTeam.id } // Missing player_id
             ]
           });
 
@@ -256,7 +256,7 @@ describe('📋 Game Rosters API', () => {
           .set('Authorization', `Bearer ${coachToken}`)
           .send({
             players: [
-              { team_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
+              { club_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
             ]
           });
 
@@ -275,7 +275,7 @@ describe('📋 Game Rosters API', () => {
       try {
         // Add some roster entries
         await db.query(
-          `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting) 
+          `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting) 
            VALUES ($1, $2, $3, $4, $5), ($1, $2, $6, $7, $8)`,
           [testGame.id, homeTeam.id, homePlayer1.id, true, true, homePlayer2.id, false, true]
         );
@@ -307,14 +307,14 @@ describe('📋 Game Rosters API', () => {
       }
     });
 
-    it('✅ should filter by team_id', async () => {
+    it('✅ should filter by club_id', async () => {
       try {
         const response = await request(app)
-          .get(`/api/game-rosters/${testGame.id}?team_id=${homeTeam.id}`)
+          .get(`/api/game-rosters/${testGame.id}?club_id=${homeTeam.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
-        expect(response.body.every(p => p.team_id === homeTeam.id)).toBe(true);
+        expect(response.body.every(p => p.club_id === homeTeam.id)).toBe(true);
         console.log('      ✅ Team filtering working correctly');
       } catch (error) {
         console.log('      ❌ Team filtering test failed:', error.message);
@@ -364,7 +364,7 @@ describe('📋 Game Rosters API', () => {
       try {
         // Add a roster entry
         const result = await db.query(
-          `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting) 
+          `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting) 
            VALUES ($1, $2, $3, $4, $5) RETURNING id`,
           [testGame.id, homeTeam.id, homePlayer1.id, false, true]
         );
@@ -449,7 +449,7 @@ describe('📋 Game Rosters API', () => {
     beforeEach(async () => {
       try {
         const result = await db.query(
-          `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting) 
+          `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting) 
            VALUES ($1, $2, $3, $4, $5) RETURNING id`,
           [testGame.id, homeTeam.id, homePlayer1.id, false, true]
         );
@@ -519,7 +519,7 @@ describe('📋 Game Rosters API', () => {
           .set('Authorization', `Bearer ${viewerToken}`)
           .send({
             players: [
-              { team_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
+              { club_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
             ]
           });
 
@@ -540,11 +540,11 @@ describe('📋 Game Rosters API', () => {
         const players = [];
         for (let i = 0; i < 10; i++) {
           const player = await db.query(
-            'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
             [homeTeam.id, `Player${i}`, `Test${i}`, 30 + i, i % 2 === 0 ? 'male' : 'female']
           );
           players.push({
-            team_id: homeTeam.id,
+            club_id: homeTeam.id,
             player_id: player.rows[0].id,
             is_captain: i === 0, // First player is captain
             is_starting: i < 4 // First 4 are starting
@@ -591,7 +591,7 @@ describe('📋 Game Rosters API', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             players: [
-              { team_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
+              { club_id: homeTeam.id, player_id: homePlayer1.id, is_captain: true, is_starting: true }
             ]
           });
 
@@ -601,7 +601,7 @@ describe('📋 Game Rosters API', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             players: [
-              { team_id: homeTeam.id, player_id: homePlayer2.id, is_captain: true, is_starting: true }
+              { club_id: homeTeam.id, player_id: homePlayer2.id, is_captain: true, is_starting: true }
             ]
           });
 
@@ -624,3 +624,5 @@ describe('📋 Game Rosters API', () => {
     });
   });
 });
+
+

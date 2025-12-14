@@ -33,7 +33,7 @@ describe('📅 Scheduled Reports Routes', () => {
       const template = await db.query('SELECT id FROM report_templates WHERE is_default = true LIMIT 1');
       templateId = template.rows[0]?.id;
       
-      const teamResult = await db.query('INSERT INTO teams (name) VALUES ($1) RETURNING id', ['Test Team']);
+      const teamResult = await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING id', ['Test Club']);
       teamId = teamResult.rows[0].id;
     } catch (error) {
       global.testContext.logTestError(error, 'Database setup failed');
@@ -43,7 +43,7 @@ describe('📅 Scheduled Reports Routes', () => {
 
   afterEach(async () => {
     try {
-      await db.query('DELETE FROM teams WHERE id = $1', [teamId]);
+      await db.query('DELETE FROM clubs WHERE id = $1', [teamId]);
     } catch (error) {
       global.testContext.logTestError(error, 'Database cleanup failed');
     }
@@ -221,3 +221,5 @@ describe('📅 Scheduled Reports Routes', () => {
     });
   });
 });
+
+

@@ -13,11 +13,11 @@ router.use(auth);
 // ============================================================================
 
 /**
- * Get head-to-head record between two teams
+ * Get head-to-head record between two clubs
  */
-router.get('/head-to-head/:team1Id/:team2Id', [
-  param('team1Id').isInt({ min: 1 }).withMessage('Team 1 ID must be a positive integer'),
-  param('team2Id').isInt({ min: 1 }).withMessage('Team 2 ID must be a positive integer'),
+router.get('/head-to-head/:club1Id/:club2Id', [
+  param('club1Id').isInt({ min: 1 }).withMessage('Club 1 ID must be a positive integer'),
+  param('club2Id').isInt({ min: 1 }).withMessage('Club 2 ID must be a positive integer'),
   query('limit')
     .optional()
     .isInt({ min: 1, max: 50 })
@@ -28,37 +28,37 @@ router.get('/head-to-head/:team1Id/:team2Id', [
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  let { team1Id, team2Id } = req.params;
+  let { club1Id, club2Id } = req.params;
   const limit = parseInt(req.query.limit, 10) || 10;
 
-  // Ensure consistent ordering (team1 < team2)
-  team1Id = parseInt(team1Id, 10);
-  team2Id = parseInt(team2Id, 10);
-  if (isNaN(team1Id) || isNaN(team2Id)) {
-    return res.status(400).json({ error: 'Invalid team IDs' });
+  // Ensure consistent ordering (club1 < club2)
+  club1Id = parseInt(club1Id, 10);
+  club2Id = parseInt(club2Id, 10);
+  if (isNaN(club1Id) || isNaN(club2Id)) {
+    return res.status(400).json({ error: 'Invalid club IDs' });
   }
-  if (team1Id > team2Id) {
-    [team1Id, team2Id] = [team2Id, team1Id];
+  if (club1Id > club2Id) {
+    [club1Id, club2Id] = [club2Id, club1Id];
   }
 
   try {
-    // Get team names
-    const teamsResult = await db.query(
-      'SELECT id, name FROM teams WHERE id IN ($1, $2)',
-      [team1Id, team2Id]
+    // Get club names
+    const clubsResult = await db.query(
+      'SELECT id, name FROM clubs WHERE id IN ($1, $2)',
+      [club1Id, club2Id]
     );
 
-    if (teamsResult.rows.length !== 2) {
-      return res.status(404).json({ error: 'One or both teams not found' });
+    if (clubsResult.rows.length !== 2) {
+      return res.status(404).json({ error: 'One or both clubs not found' });
     }
 
-    const team1 = teamsResult.rows.find(t => t.id === team1Id);
-    const team2 = teamsResult.rows.find(t => t.id === team2Id);
+    const club1 = clubsResult.rows.find(c => c.id === club1Id);
+    const club2 = clubsResult.rows.find(c => c.id === club2Id);
 
     // Get head-to-head record from cache
     let h2hRecord = await db.query(
       'SELECT * FROM head_to_head WHERE team1_id = $1 AND team2_id = $2',
-      [team1Id, team2Id]
+      [club1Id, club2Id]
     );
 
     // If no cached record, calculate from games
@@ -67,40 +67,40 @@ router.get('/head-to-head/:team1Id/:team2Id', [
       const gamesResult = await db.query(`
         SELECT 
           id,
-          home_team_id,
-          away_team_id,
+          home_club_id,
+          away_club_id,
           home_score,
           away_score,
           date,
           status
         FROM games
         WHERE status = 'completed'
-          AND ((home_team_id = $1 AND away_team_id = $2)
-            OR (home_team_id = $2 AND away_team_id = $1))
+          AND ((home_club_id = $1 AND away_club_id = $2)
+            OR (home_club_id = $2 AND away_club_id = $1))
         ORDER BY date DESC
-      `, [team1Id, team2Id]);
+      `, [club1Id, club2Id]);
 
-      let team1Wins = 0, team2Wins = 0, draws = 0;
-      let team1Goals = 0, team2Goals = 0;
-      let streakTeamId = null;
+      let club1Wins = 0, club2Wins = 0, draws = 0;
+      let club1Goals = 0, club2Goals = 0;
+      let streakClubId = null;
       let streakCount = 0;
       let lastStreakWinner = null;
 
       gamesResult.rows.forEach(game => {
-        const isTeam1Home = game.home_team_id === team1Id;
-        const t1Score = isTeam1Home ? game.home_score : game.away_score;
-        const t2Score = isTeam1Home ? game.away_score : game.home_score;
+        const isClub1Home = game.home_club_id === club1Id;
+        const c1Score = isClub1Home ? game.home_score : game.away_score;
+        const c2Score = isClub1Home ? game.away_score : game.home_score;
 
-        team1Goals += t1Score;
-        team2Goals += t2Score;
+        club1Goals += c1Score;
+        club2Goals += c2Score;
 
         let currentWinner = null;
-        if (t1Score > t2Score) {
-          team1Wins++;
-          currentWinner = team1Id;
-        } else if (t2Score > t1Score) {
-          team2Wins++;
-          currentWinner = team2Id;
+        if (c1Score > c2Score) {
+          club1Wins++;
+          currentWinner = club1Id;
+        } else if (c2Score > c1Score) {
+          club2Wins++;
+          currentWinner = club2Id;
         } else {
           draws++;
         }
@@ -108,7 +108,7 @@ router.get('/head-to-head/:team1Id/:team2Id', [
         // Track streak (only if there's a winner)
         if (currentWinner) {
           if (lastStreakWinner === null) {
-            streakTeamId = currentWinner;
+            streakClubId = currentWinner;
             streakCount = 1;
           } else if (lastStreakWinner === currentWinner) {
             streakCount++;
@@ -140,63 +140,63 @@ router.get('/head-to-head/:team1Id/:team2Id', [
             streak_count = EXCLUDED.streak_count,
             updated_at = CURRENT_TIMESTAMP
         `, [
-          team1Id, team2Id, gamesResult.rows.length, team1Wins, team2Wins, draws,
-          team1Goals, team2Goals, lastGame?.id, lastGame?.date,
-          streakTeamId, streakCount
+          club1Id, club2Id, gamesResult.rows.length, club1Wins, club2Wins, draws,
+          club1Goals, club2Goals, lastGame?.id, lastGame?.date,
+          streakClubId, streakCount
         ]);
       }
 
       h2hRecord = {
         rows: [{
-          team1_id: team1Id,
-          team2_id: team2Id,
+          team1_id: club1Id,
+          team2_id: club2Id,
           total_games: gamesResult.rows.length,
-          team1_wins: team1Wins,
-          team2_wins: team2Wins,
+          team1_wins: club1Wins,
+          team2_wins: club2Wins,
           draws,
-          team1_goals: team1Goals,
-          team2_goals: team2Goals,
+          team1_goals: club1Goals,
+          team2_goals: club2Goals,
           last_game_id: lastGame?.id,
           last_game_date: lastGame?.date,
-          streak_team_id: streakTeamId,
+          streak_team_id: streakClubId,
           streak_count: streakCount
         }]
       };
     }
 
-    // Get recent games between teams
+    // Get recent games between clubs
     const recentGames = await db.query(`
       SELECT 
         g.id,
         g.date,
-        g.home_team_id,
-        g.away_team_id,
+        g.home_club_id,
+        g.away_club_id,
         g.home_score,
         g.away_score,
-        ht.name as home_team_name,
-        at.name as away_team_name
+        hc.name as home_club_name,
+        ac.name as away_club_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      JOIN clubs hc ON g.home_club_id = hc.id
+      JOIN clubs ac ON g.away_club_id = ac.id
       WHERE g.status = 'completed'
-        AND ((g.home_team_id = $1 AND g.away_team_id = $2)
-          OR (g.home_team_id = $2 AND g.away_team_id = $1))
+        AND ((g.home_club_id = $1 AND g.away_club_id = $2)
+          OR (g.home_club_id = $2 AND g.away_club_id = $1))
       ORDER BY g.date DESC
       LIMIT $3
-    `, [team1Id, team2Id, limit]);
+    `, [club1Id, club2Id, limit]);
 
     const record = h2hRecord.rows[0];
 
     res.json({
-      team1: {
-        id: team1Id,
-        name: team1.name,
+      club1: {
+        id: club1Id,
+        name: club1.name,
         wins: record.team1_wins,
         goals: record.team1_goals
       },
-      team2: {
-        id: team2Id,
-        name: team2.name,
+      club2: {
+        id: club2Id,
+        name: club2.name,
         wins: record.team2_wins,
         goals: record.team2_goals
       },
@@ -204,8 +204,8 @@ router.get('/head-to-head/:team1Id/:team2Id', [
       draws: record.draws,
       last_game_date: record.last_game_date,
       current_streak: record.streak_team_id ? {
-        team_id: record.streak_team_id,
-        team_name: record.streak_team_id === team1Id ? team1.name : team2.name,
+        club_id: record.streak_team_id,
+        club_name: record.streak_team_id === club1Id ? club1.name : club2.name,
         count: record.streak_count
       } : null,
       recent_games: recentGames.rows

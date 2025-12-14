@@ -121,7 +121,15 @@ async function setupTestDb() {
       'seed_achievements.sql',
       'add_competition_management.sql',
       'add_match_templates.sql',
-      'add_twizzit_integration.sql'
+      'add_twizzit_integration.sql',
+      'rename_teams_to_clubs_add_age_group_teams.sql',
+      'add_club_jersey_number_constraint.sql',
+      'update_timeouts_club_id.sql',
+      '20251214_update_ball_possessions_team_to_club.sql',
+      '20251214_update_game_rosters_team_to_club.sql',
+      '20251214_update_games_team_to_club.sql',
+      '20251214_update_players_team_to_club.sql',
+      '20251214_update_substitutions_team_to_club.sql'
     ];
 
     for (const migrationFile of migrations) {

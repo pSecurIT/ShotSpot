@@ -16,7 +16,7 @@ router.post(
   '/:gameId',
   requireRole(['admin', 'coach']),
   param('gameId').isInt(),
-  body('team_id').isInt(),
+  body('club_id').isInt(),
   body('period').isInt({ min: 1, max: 10 }),
   async (req, res) => {
     const errors = validationResult(req);
@@ -25,7 +25,7 @@ router.post(
     }
 
     const { gameId } = req.params;
-    const { team_id, period } = req.body;
+    const { club_id, period } = req.body;
 
     try {
       // Validate game exists
@@ -34,10 +34,10 @@ router.post(
         return res.status(404).json({ error: 'Game not found' });
       }
 
-      // Validate team exists
-      const teamRes = await pool.query('SELECT 1 FROM teams WHERE id = $1', [team_id]);
-      if (teamRes.rowCount === 0) {
-        return res.status(404).json({ error: 'Team not found' });
+      // Validate club exists
+      const clubRes = await pool.query('SELECT 1 FROM clubs WHERE id = $1', [club_id]);
+      if (clubRes.rowCount === 0) {
+        return res.status(404).json({ error: 'Club not found' });
       }
 
       // End any active possession for this game
@@ -50,31 +50,31 @@ router.post(
         [gameId]
       );
 
-      // Create new possession and include team name
+      // Create new possession and include club name
       const result = await pool.query(
-        `INSERT INTO ball_possessions (game_id, team_id, period)
+        `INSERT INTO ball_possessions (game_id, club_id, period)
          VALUES ($1, $2, $3)
          RETURNING *`,
-        [gameId, team_id, period]
+        [gameId, club_id, period]
       );
 
-      // Fetch the possession with team name to match GET /active response format
-      const possessionWithTeam = await pool.query(
-        `SELECT p.*, t.name as team_name
+      // Fetch the possession with club name to match GET /active response format
+      const possessionWithClub = await pool.query(
+        `SELECT p.*, c.name as club_name
          FROM ball_possessions p
-         JOIN teams t ON p.team_id = t.id
+         JOIN clubs c ON p.club_id = c.id
          WHERE p.id = $1`,
         [result.rows[0].id]
       );
 
-      return res.status(201).json(possessionWithTeam.rows[0]);
+      return res.status(201).json(possessionWithClub.rows[0]);
     } catch (error) {
       console.error('Error creating possession:', error);
       
       // Defensive mapping for FK errors if they still occur
       if (error && error.code === '23503') {
-        if (error.constraint && error.constraint.includes('team')) {
-          return res.status(404).json({ error: 'Team not found' });
+        if (error.constraint && error.constraint.includes('club')) {
+          return res.status(404).json({ error: 'Club not found' });
         }
         if (error.constraint && error.constraint.includes('game')) {
           return res.status(404).json({ error: 'Game not found' });
@@ -143,22 +143,22 @@ router.get(
     }
 
     const { gameId } = req.params;
-    const { team_id, period } = req.query;
+    const { club_id, period } = req.query;
 
     try {
       let query = `
-        SELECT p.*, t.name as team_name
+        SELECT p.*, c.name as club_name
         FROM ball_possessions p
-        JOIN teams t ON p.team_id = t.id
+        JOIN clubs c ON p.club_id = c.id
         WHERE p.game_id = $1
       `;
       const params = [gameId];
       let paramCount = 1;
 
-      if (team_id) {
+      if (club_id) {
         paramCount++;
-        query += ` AND p.team_id = $${paramCount}`;
-        params.push(team_id);
+        query += ` AND p.club_id = $${paramCount}`;
+        params.push(club_id);
       }
 
       if (period) {
@@ -195,10 +195,10 @@ router.get(
 
     try {
       const result = await pool.query(
-        `SELECT p.*, t.name as team_name,
+        `SELECT p.*, c.name as club_name,
                 EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - p.started_at))::INTEGER as current_duration_seconds
          FROM ball_possessions p
-         JOIN teams t ON p.team_id = t.id
+         JOIN clubs c ON p.club_id = c.id
          WHERE p.game_id = $1 AND p.ended_at IS NULL
          LIMIT 1`,
         [gameId]
@@ -234,17 +234,17 @@ router.get(
     try {
       const result = await pool.query(
         `SELECT 
-          p.team_id,
-          t.name as team_name,
+          p.club_id,
+          c.name as club_name,
           COUNT(*)::INTEGER as total_possessions,
           ROUND(AVG(p.duration_seconds), 1) as avg_duration_seconds,
           ROUND(AVG(p.shots_taken), 2) as avg_shots_per_possession,
           SUM(CASE WHEN p.result = 'goal' THEN 1 ELSE 0 END)::INTEGER as possessions_with_goal,
           SUM(CASE WHEN p.result = 'turnover' THEN 1 ELSE 0 END)::INTEGER as turnovers
          FROM ball_possessions p
-         JOIN teams t ON p.team_id = t.id
+         JOIN clubs c ON p.club_id = c.id
          WHERE p.game_id = $1 AND p.ended_at IS NOT NULL
-         GROUP BY p.team_id, t.name`,
+         GROUP BY p.club_id, c.name`,
         [gameId]
       );
 

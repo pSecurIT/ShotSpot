@@ -104,16 +104,16 @@ async function updateSyncHistory(syncId, updates) {
 }
 
 /**
- * Sync teams from Twizzit to ShotSpot
+ * Sync clubs from Twizzit to ShotSpot
  * @param {number} credentialId - Credential ID
  * @param {Object} options - Sync options
  * @returns {Promise<Object>} Sync results
  */
-export async function syncTeamsFromTwizzit(credentialId, options = {}) {
+export async function syncClubsFromTwizzit(credentialId, options = {}) {
   const startTime = new Date();
   const syncId = await logSyncHistory({
     credentialId,
-    syncType: 'teams',
+    syncType: 'clubs',
     syncDirection: 'import',
     status: 'in_progress',
     startedAt: startTime
@@ -135,7 +135,7 @@ export async function syncTeamsFromTwizzit(credentialId, options = {}) {
 
     await updateVerificationTimestamp(credentialId);
 
-    // Fetch all teams (handle pagination)
+    // Fetch all teams (clubs in Twizzit terminology)
     let hasMore = true;
     let page = 1;
     const allTeams = [];
@@ -147,28 +147,28 @@ export async function syncTeamsFromTwizzit(credentialId, options = {}) {
       page++;
     }
 
-    // Process each team
+    // Process each team (create as club in ShotSpot)
     for (const twizzitTeam of allTeams) {
       processed++;
 
       try {
-        // Check if team already exists in mapping
+        // Check if club already exists in mapping (using local_club_id)
         const existingMapping = await db.query(
           'SELECT * FROM twizzit_team_mappings WHERE twizzit_team_id = $1',
           [twizzitTeam.id]
         );
 
-        let localTeamId;
+        let localClubId;
 
         if (existingMapping.rows.length > 0) {
-          // Update existing team
-          localTeamId = existingMapping.rows[0].local_team_id;
+          // Update existing club
+          localClubId = existingMapping.rows[0].local_club_id;
           
           await db.query(
-            `UPDATE teams 
+            `UPDATE clubs 
              SET name = $1, updated_at = CURRENT_TIMESTAMP
              WHERE id = $2`,
-            [twizzitTeam.name, localTeamId]
+            [twizzitTeam.name, localClubId]
           );
 
           // Update mapping
@@ -182,34 +182,34 @@ export async function syncTeamsFromTwizzit(credentialId, options = {}) {
             [twizzitTeam.name, existingMapping.rows[0].id]
           );
         } else {
-          // Create new team
-          const teamResult = await db.query(
-            'INSERT INTO teams (name) VALUES ($1) RETURNING id',
+          // Create new club
+          const clubResult = await db.query(
+            'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
             [twizzitTeam.name]
           );
-          localTeamId = teamResult.rows[0].id;
+          localClubId = clubResult.rows[0].id;
 
           // Create mapping
           await db.query(
             `INSERT INTO twizzit_team_mappings 
-             (local_team_id, twizzit_team_id, twizzit_team_name, 
+             (local_club_id, twizzit_team_id, twizzit_team_name, 
               last_synced_at, sync_status)
              VALUES ($1, $2, $3, CURRENT_TIMESTAMP, 'success')`,
-            [localTeamId, twizzitTeam.id, twizzitTeam.name]
+            [localClubId, twizzitTeam.id, twizzitTeam.name]
           );
         }
 
         succeeded++;
 
-        // Optionally sync players for this team
+        // Optionally sync players for this club
         if (options.includePlayers) {
-          await syncTeamPlayers(credentialId, twizzitTeam.id, localTeamId);
+          await syncClubPlayers(credentialId, twizzitTeam.id, localClubId);
         }
       } catch (error) {
         failed++;
         errors.push({
-          teamId: twizzitTeam.id,
-          teamName: twizzitTeam.name,
+          clubId: twizzitTeam.id,
+          clubName: twizzitTeam.name,
           error: error.message
         });
 
@@ -259,28 +259,28 @@ export async function syncTeamsFromTwizzit(credentialId, options = {}) {
       completedAt: new Date()
     });
 
-    throw new Error(`Team sync failed: ${error.message}`);
+    throw new Error(`Club sync failed: ${error.message}`);
   }
 }
 
 /**
- * Sync players for a specific team
+ * Sync players for a specific club
  * @param {number} credentialId - Credential ID
- * @param {string} twizzitTeamId - Twizzit team ID
- * @param {number} localTeamId - Local team ID
+ * @param {string} twizzitTeamId - Twizzit team ID (clubs in Twizzit terminology)
+ * @param {number} localClubId - Local club ID
  * @returns {Promise<Object>} Sync results
  */
-async function syncTeamPlayers(credentialId, twizzitTeamId, localTeamId) {
+async function syncClubPlayers(credentialId, twizzitTeamId, localClubId) {
   const apiClient = await createApiClient(credentialId);
   
-  // Get team mapping
+  // Get club mapping (team_mappings stores club mappings after migration)
   const mappingResult = await db.query(
     'SELECT id FROM twizzit_team_mappings WHERE twizzit_team_id = $1',
     [twizzitTeamId]
   );
 
   if (mappingResult.rows.length === 0) {
-    throw new Error('Team mapping not found');
+    throw new Error('Club mapping not found');
   }
 
   const teamMappingId = mappingResult.rows[0].id;
@@ -344,14 +344,14 @@ async function syncTeamPlayers(credentialId, twizzitTeamId, localTeamId) {
           ]
         );
       } else {
-        // Create new player
+        // Create new player with club_id (team_id is optional)
         const playerResult = await db.query(
           `INSERT INTO players 
-           (team_id, first_name, last_name, jersey_number, is_active)
+           (club_id, first_name, last_name, jersey_number, is_active)
            VALUES ($1, $2, $3, $4, true)
            RETURNING id`,
           [
-            localTeamId,
+            localClubId,
             twizzitPlayer.first_name || twizzitPlayer.firstName,
             twizzitPlayer.last_name || twizzitPlayer.lastName,
             twizzitPlayer.jersey_number || twizzitPlayer.jerseyNumber
@@ -405,25 +405,25 @@ export async function syncPlayersFromTwizzit(credentialId, _options = {}) {
   let failed = 0;
 
   try {
-    // Get all team mappings
-    const teamMappingsResult = await db.query(
-      'SELECT twizzit_team_id, local_team_id FROM twizzit_team_mappings'
+    // Get all club mappings (team_mappings table stores club mappings after migration)
+    const clubMappingsResult = await db.query(
+      'SELECT twizzit_team_id, local_club_id FROM twizzit_team_mappings'
     );
 
-    // Sync players for each team
-    for (const mapping of teamMappingsResult.rows) {
+    // Sync players for each club
+    for (const mapping of clubMappingsResult.rows) {
       try {
-        const result = await syncTeamPlayers(
+        const result = await syncClubPlayers(
           credentialId,
           mapping.twizzit_team_id,
-          mapping.local_team_id
+          mapping.local_club_id
         );
         
         processed += result.total;
         succeeded += result.succeeded;
         failed += result.failed;
       } catch (error) {
-        console.error(`Failed to sync players for team ${mapping.twizzit_team_id}:`, error);
+        console.error(`Failed to sync players for club ${mapping.twizzit_team_id}:`, error);
       }
     }
 
@@ -555,7 +555,7 @@ export async function getSyncHistory(credentialId, options = {}) {
 }
 
 export default {
-  syncTeamsFromTwizzit,
+  syncClubsFromTwizzit,
   syncPlayersFromTwizzit,
   getSyncConfig,
   updateSyncConfig,

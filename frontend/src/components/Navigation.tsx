@@ -35,6 +35,7 @@ const Navigation: React.FC = () => {
           <Link to="/players">Players</Link>
           <Link to="/templates">Templates</Link>
           <Link to="/exports">Exports</Link>
+          {(user.role === 'admin' || user.role === 'coach') && <Link to="/twizzit">Twizzit</Link>}
           {user.role === 'admin' && <Link to="/users">Users</Link>}
           <span className="user-info">
             Welcome, {user.username} ({user.role})!

@@ -10,8 +10,8 @@ describe('🎮 Games API', () => {
   let adminUser;
   let coachUser;
   let regularUser;
-  let team1;
-  let team2;
+  let club1;
+  let club2;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Games API tests...');
@@ -49,18 +49,18 @@ describe('🎮 Games API', () => {
         throw new Error('Failed to create one or more JWT tokens for test users');
       }
 
-      // Create test teams with unique names
-      const team1Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-        [`Test Team Alpha ${uniqueId}`]
+      // Create test clubs with unique names
+      const club1Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+        [`Test Club Alpha ${uniqueId}`]
       );
-      team1 = team1Result.rows[0];
+      club1 = club1Result.rows[0];
 
-      const team2Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-        [`Test Team Beta ${uniqueId}`]
+      const club2Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+        [`Test Club Beta ${uniqueId}`]
       );
-      team2 = team2Result.rows[0];
+      club2 = club2Result.rows[0];
     } catch (error) {
       global.testContext.logTestError(error, 'Games API setup failed');
       throw error;
@@ -71,8 +71,8 @@ describe('🎮 Games API', () => {
     console.log('✅ Games API tests completed');
     try {
       // Clean up test data
-      await db.query('DELETE FROM games WHERE home_team_id IN ($1, $2) OR away_team_id IN ($1, $2)', [team1.id, team2.id]);
-      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [team1.id, team2.id]);
+      await db.query('DELETE FROM games WHERE home_club_id IN ($1, $2) OR away_club_id IN ($1, $2)', [club1.id, club2.id]);
+      await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [club1.id, club2.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
     } catch (error) {
       console.error('⚠️ Games API cleanup failed:', error.message);
@@ -84,8 +84,8 @@ describe('🎮 Games API', () => {
     it('✅ should create a new game with admin token', async () => {
       try {
         const gameData = {
-          home_team_id: team1.id,
-          away_team_id: team2.id,
+          home_club_id: club1.id,
+          away_club_id: club2.id,
           date: new Date('2025-11-01T14:00:00Z').toISOString()
         };
 
@@ -96,10 +96,10 @@ describe('🎮 Games API', () => {
 
         expect(response.status).toBe(201);
         expect(response.body).toHaveProperty('id');
-        expect(response.body.home_team_id).toBe(team1.id);
-        expect(response.body.away_team_id).toBe(team2.id);
-        expect(response.body.home_team_name).toBe(team1.name);
-        expect(response.body.away_team_name).toBe(team2.name);
+        expect(response.body.home_club_id).toBe(club1.id);
+        expect(response.body.away_club_id).toBe(club2.id);
+        expect(response.body.home_club_name).toBe(club1.name);
+        expect(response.body.away_club_name).toBe(club2.name);
         expect(response.body.status).toBe('scheduled');
         expect(response.body.home_score).toBe(0);
         expect(response.body.away_score).toBe(0);
@@ -112,8 +112,8 @@ describe('🎮 Games API', () => {
     it('✅ should create a new game with coach token', async () => {
       try {
         const gameData = {
-          home_team_id: team1.id,
-          away_team_id: team2.id,
+          home_club_id: club1.id,
+          away_club_id: club2.id,
           date: new Date('2025-11-02T14:00:00Z').toISOString()
         };
 
@@ -133,8 +133,8 @@ describe('🎮 Games API', () => {
     it('❌ should reject creation with regular user token', async () => {
       try {
         const gameData = {
-          home_team_id: team1.id,
-          away_team_id: team2.id,
+          home_club_id: club1.id,
+          away_club_id: club2.id,
           date: new Date('2025-11-03T14:00:00Z').toISOString()
         };
 
@@ -153,8 +153,8 @@ describe('🎮 Games API', () => {
     it('❌ should reject creation without authentication', async () => {
       try {
         const gameData = {
-          home_team_id: team1.id,
-          away_team_id: team2.id,
+          home_club_id: club1.id,
+          away_club_id: club2.id,
           date: new Date('2025-11-04T14:00:00Z').toISOString()
         };
 
@@ -172,8 +172,8 @@ describe('🎮 Games API', () => {
     it('❌ should reject when home and away teams are the same', async () => {
       try {
         const gameData = {
-          home_team_id: team1.id,
-          away_team_id: team1.id,
+          home_club_id: club1.id,
+          away_club_id: club1.id,
           date: new Date('2025-11-05T14:00:00Z').toISOString()
         };
 
@@ -193,8 +193,8 @@ describe('🎮 Games API', () => {
     it('❌ should reject when teams do not exist', async () => {
       try {
         const gameData = {
-          home_team_id: 99999,
-          away_team_id: 99998,
+          home_club_id: 99999,
+          away_club_id: 99998,
           date: new Date('2025-11-06T14:00:00Z').toISOString()
         };
 
@@ -214,8 +214,8 @@ describe('🎮 Games API', () => {
     it('❌ should reject invalid date format', async () => {
       try {
         const gameData = {
-          home_team_id: team1.id,
-          away_team_id: team2.id,
+          home_club_id: club1.id,
+          away_club_id: club2.id,
           date: 'invalid-date'
         };
 
@@ -240,23 +240,23 @@ describe('🎮 Games API', () => {
     beforeAll(async () => {
       // Create games with different statuses
       const scheduled = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
          VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-01T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-12-01T14:00:00Z')]
       );
       _scheduledGame = scheduled.rows[0];
 
       const inProgress = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
          VALUES ($1, $2, $3, 'in_progress') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-02T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-12-02T14:00:00Z')]
       );
       _inProgressGame = inProgress.rows[0];
 
       const completed = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score)
+        `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score)
          VALUES ($1, $2, $3, 'completed', 15, 12) RETURNING *`,
-        [team1.id, team2.id, new Date('2025-11-30T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-11-30T14:00:00Z')]
       );
       _completedGame = completed.rows[0];
     });
@@ -273,8 +273,8 @@ describe('🎮 Games API', () => {
         
         // Check that games include team names
         const game = response.body[0];
-        expect(game).toHaveProperty('home_team_name');
-        expect(game).toHaveProperty('away_team_name');
+        expect(game).toHaveProperty('home_club_name');
+        expect(game).toHaveProperty('away_club_name');
       } catch (error) {
         global.testContext.logTestError(error, 'GET all games failed');
         throw error;
@@ -301,14 +301,14 @@ describe('🎮 Games API', () => {
     it('✅ should filter games by team', async () => {
       try {
         const response = await request(app)
-          .get(`/api/games?team_id=${team1.id}`)
+          .get(`/api/games?club_id=${club1.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
         expect(Array.isArray(response.body)).toBe(true);
         response.body.forEach(game => {
           expect(
-            game.home_team_id === team1.id || game.away_team_id === team1.id
+            game.home_club_id === club1.id || game.away_club_id === club1.id
           ).toBe(true);
         });
       } catch (error) {
@@ -336,9 +336,9 @@ describe('🎮 Games API', () => {
 
     beforeAll(async () => {
       const result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
          VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-10T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-12-10T14:00:00Z')]
       );
       testGame = result.rows[0];
     });
@@ -351,8 +351,8 @@ describe('🎮 Games API', () => {
 
         expect(response.status).toBe(200);
         expect(response.body.id).toBe(testGame.id);
-        expect(response.body).toHaveProperty('home_team_name');
-        expect(response.body).toHaveProperty('away_team_name');
+        expect(response.body).toHaveProperty('home_club_name');
+        expect(response.body).toHaveProperty('away_club_name');
       } catch (error) {
         global.testContext.logTestError(error, 'GET game by ID failed');
         throw error;
@@ -378,9 +378,9 @@ describe('🎮 Games API', () => {
 
     beforeEach(async () => {
       const result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
          VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-15T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-12-15T14:00:00Z')]
       );
       testGame = result.rows[0];
     });
@@ -442,9 +442,9 @@ describe('🎮 Games API', () => {
 
     beforeEach(async () => {
       const result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
          VALUES ($1, $2, $3, 'in_progress') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-16T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-12-16T14:00:00Z')]
       );
       testGame = result.rows[0];
     });
@@ -492,9 +492,9 @@ describe('🎮 Games API', () => {
 
     beforeEach(async () => {
       const result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
          VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-17T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-12-17T14:00:00Z')]
       );
       testGame = result.rows[0];
     });
@@ -541,9 +541,9 @@ describe('🎮 Games API', () => {
 
     beforeEach(async () => {
       const result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
          VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-18T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-12-18T14:00:00Z')]
       );
       testGame = result.rows[0];
     });
@@ -606,9 +606,9 @@ describe('🎮 Games API', () => {
 
     beforeEach(async () => {
       const result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
          VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-19T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-12-19T14:00:00Z')]
       );
       testGame = result.rows[0];
     });
@@ -672,9 +672,9 @@ describe('🎮 Games API', () => {
 
     beforeEach(async () => {
       const result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status)
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
          VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
-        [team1.id, team2.id, new Date('2025-12-20T14:00:00Z')]
+        [club1.id, club2.id, new Date('2025-12-20T14:00:00Z')]
       );
       testGame = result.rows[0];
     });
@@ -803,3 +803,5 @@ describe('🎮 Games API', () => {
     });
   });
 });
+
+

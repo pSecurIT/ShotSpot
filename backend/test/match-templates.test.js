@@ -320,20 +320,20 @@ describe('Match Templates API', () => {
     beforeAll(async () => {
       // Create teams with unique names
       const homeTeamRes = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING id',
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
         [`Template Test Home_${applyTestSuffix}`]
       );
       homeTeamId = homeTeamRes.rows[0].id;
 
       const awayTeamRes = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING id',
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
         [`Template Test Away_${applyTestSuffix}`]
       );
       awayTeamId = awayTeamRes.rows[0].id;
 
       // Create a game
       const gameRes = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status) 
+        `INSERT INTO games (home_club_id, away_club_id, date, status) 
          VALUES ($1, $2, $3, $4) RETURNING id`,
         [homeTeamId, awayTeamId, new Date().toISOString(), 'scheduled']
       );
@@ -357,7 +357,7 @@ describe('Match Templates API', () => {
         await db.query('DELETE FROM games WHERE id = $1', [gameId]);
       }
       if (homeTeamId && awayTeamId) {
-        await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [homeTeamId, awayTeamId]);
+        await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [homeTeamId, awayTeamId]);
       }
       if (templateId) {
         await db.query('DELETE FROM match_templates WHERE id = $1', [templateId]);
@@ -373,6 +373,9 @@ describe('Match Templates API', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.message).toBe('Template applied successfully');
       expect(res.body.game.number_of_periods).toBe(2);
+      expect(res.body).toHaveProperty('game');
+      expect(res.body.game).toHaveProperty('id');
+      expect(res.body.game).toHaveProperty('status');
     });
 
     it('should not apply template to game in progress', async () => {
@@ -410,3 +413,5 @@ describe('Match Templates API', () => {
     });
   });
 });
+
+
