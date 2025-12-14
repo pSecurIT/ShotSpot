@@ -129,7 +129,8 @@ async function setupTestDb() {
       '20251214_update_game_rosters_team_to_club.sql',
       '20251214_update_games_team_to_club.sql',
       '20251214_update_players_team_to_club.sql',
-      '20251214_update_substitutions_team_to_club.sql'
+      '20251214_update_substitutions_team_to_club.sql',
+      '20251214_add_seasons_and_series.sql' // Added migration
     ];
 
     for (const migrationFile of migrations) {

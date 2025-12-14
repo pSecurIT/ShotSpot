@@ -19,58 +19,104 @@
 -- 8. match_commentary - Timestamped match notes
 
 -- Create a dedicated table for free shots to track more detailed information
-CREATE TABLE IF NOT EXISTS free_shots (
-    id SERIAL PRIMARY KEY,
-    game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
-    player_id INTEGER REFERENCES players(id) ON DELETE CASCADE NOT NULL,
-    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
-    period INTEGER NOT NULL,
-    time_remaining INTERVAL,
-    free_shot_type VARCHAR(50) NOT NULL, -- free_shot, penalty
-    reason VARCHAR(100), -- What caused the free shot
-    x_coord DECIMAL, -- Shot location (optional for penalties)
-    y_coord DECIMAL, -- Shot location (optional for penalties)
-    result VARCHAR(20) NOT NULL, -- goal, miss, blocked
-    distance DECIMAL, -- Distance to korf
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CHECK (free_shot_type IN ('free_shot', 'penalty')),
-    CHECK (result IN ('goal', 'miss', 'blocked'))
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'free_shots'
+    ) THEN
+        CREATE TABLE free_shots (
+            id SERIAL PRIMARY KEY,
+            game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
+            player_id INTEGER REFERENCES players(id) ON DELETE CASCADE NOT NULL,
+            club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE NOT NULL,
+            period INTEGER NOT NULL,
+            time_remaining INTERVAL,
+            free_shot_type VARCHAR(50) NOT NULL, -- free_shot, penalty
+            reason VARCHAR(100), -- What caused the free shot
+            x_coord DECIMAL, -- Shot location (optional for penalties)
+            y_coord DECIMAL, -- Shot location (optional for penalties)
+            result VARCHAR(20) NOT NULL, -- goal, miss, blocked
+            distance DECIMAL, -- Distance to korf
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            CHECK (free_shot_type IN ('free_shot', 'penalty')),
+            CHECK (result IN ('goal', 'miss', 'blocked'))
+        );
+    END IF;
+END $$;
 
 COMMENT ON TABLE free_shots IS 'Detailed tracking of free shots and penalty shots in korfball';
 COMMENT ON COLUMN free_shots.free_shot_type IS 'Type of shot: free_shot (awarded for rule violations) or penalty (serious infractions, closer to post)';
 COMMENT ON COLUMN free_shots.reason IS 'What caused the free shot/penalty to be awarded';
 
 -- Create indexes for free shots
-CREATE INDEX IF NOT EXISTS idx_free_shots_game_id ON free_shots(game_id);
-CREATE INDEX IF NOT EXISTS idx_free_shots_team_id ON free_shots(team_id);
-CREATE INDEX IF NOT EXISTS idx_free_shots_player_id ON free_shots(player_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE indexname = 'idx_free_shots_game_id'
+    ) THEN
+        CREATE INDEX idx_free_shots_game_id ON free_shots(game_id);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE indexname = 'idx_free_shots_club_id'
+    ) THEN
+        CREATE INDEX idx_free_shots_club_id ON free_shots(club_id);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE indexname = 'idx_free_shots_player_id'
+    ) THEN
+        CREATE INDEX idx_free_shots_player_id ON free_shots(player_id);
+    END IF;
+END $$;
 
 -- Create a dedicated table for timeout management with more detailed tracking
-CREATE TABLE IF NOT EXISTS timeouts (
-    id SERIAL PRIMARY KEY,
-    game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
-    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE, -- NULL for official timeouts
-    timeout_type VARCHAR(50) NOT NULL, -- team, injury, official, tv
-    period INTEGER NOT NULL,
-    time_remaining INTERVAL,
-    duration INTERVAL DEFAULT '1 minute', -- How long the timeout lasted
-    reason VARCHAR(200), -- Optional reason/notes
-    called_by VARCHAR(100), -- Who called the timeout (coach name, referee, etc.)
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    ended_at TIMESTAMP WITH TIME ZONE, -- When timeout ended
-    CHECK (timeout_type IN ('team', 'injury', 'official', 'tv'))
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'timeouts'
+    ) THEN
+        CREATE TABLE timeouts (
+            id SERIAL PRIMARY KEY,
+            game_id INTEGER REFERENCES games(id) ON DELETE CASCADE NOT NULL,
+            club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE, -- NULL for official timeouts
+            timeout_type VARCHAR(50) NOT NULL, -- team, injury, official, tv
+            period INTEGER NOT NULL,
+            time_remaining INTERVAL,
+            duration INTERVAL DEFAULT '1 minute', -- How long the timeout lasted
+            reason VARCHAR(200), -- Optional reason/notes
+            called_by VARCHAR(100), -- Who called the timeout (coach name, referee, etc.)
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP WITH TIME ZONE, -- When timeout ended
+            CHECK (timeout_type IN ('team', 'injury', 'official', 'tv'))
+        );
+    END IF;
+END $$;
 
 COMMENT ON TABLE timeouts IS 'Detailed timeout tracking including team, injury, and official timeouts';
 COMMENT ON COLUMN timeouts.timeout_type IS 'Type of timeout: team (tactical), injury, official (referee), tv (television)';
-COMMENT ON COLUMN timeouts.team_id IS 'Team that called timeout (NULL for official/tv timeouts)';
+COMMENT ON COLUMN timeouts.club_id IS 'Club that called timeout (NULL for official/tv timeouts)';
 COMMENT ON COLUMN timeouts.called_by IS 'Person who called the timeout (coach name, referee, etc.)';
 
 -- Create indexes for timeouts
-CREATE INDEX IF NOT EXISTS idx_timeouts_game_id ON timeouts(game_id);
-CREATE INDEX IF NOT EXISTS idx_timeouts_team_id ON timeouts(team_id);
-CREATE INDEX IF NOT EXISTS idx_timeouts_type ON timeouts(timeout_type);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE indexname = 'idx_timeouts_game_id'
+    ) THEN
+        CREATE INDEX idx_timeouts_game_id ON timeouts(game_id);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE indexname = 'idx_timeouts_club_id'
+    ) THEN
+        CREATE INDEX idx_timeouts_club_id ON timeouts(club_id);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE indexname = 'idx_timeouts_type'
+    ) THEN
+        CREATE INDEX idx_timeouts_type ON timeouts(timeout_type);
+    END IF;
+END $$;
 
 -- Create a dedicated table for match commentary and notes
 CREATE TABLE IF NOT EXISTS match_commentary (
@@ -108,7 +154,7 @@ SELECT
     ge.id,
     ge.game_id,
     ge.event_type as type,
-    ge.team_id,
+    ge.club_id,
     ge.player_id,
     ge.period,
     ge.time_remaining,
@@ -120,7 +166,7 @@ SELECT
     p.jersey_number,
     NULL::jsonb as specific_details
 FROM game_events ge
-JOIN teams t ON ge.team_id = t.id
+JOIN teams t ON ge.club_id = t.id
 LEFT JOIN players p ON ge.player_id = p.id
 
 UNION ALL
@@ -130,7 +176,7 @@ SELECT
     fs.id,
     fs.game_id,
     CONCAT('free_shot_', fs.free_shot_type) as type,
-    fs.team_id,
+    fs.club_id,
     fs.player_id,
     fs.period,
     fs.time_remaining,
@@ -152,7 +198,7 @@ SELECT
         'distance', fs.distance
     ) as specific_details
 FROM free_shots fs
-JOIN teams t ON fs.team_id = t.id
+JOIN teams t ON fs.club_id = t.id
 JOIN players p ON fs.player_id = p.id
 
 UNION ALL
@@ -162,7 +208,7 @@ SELECT
     to1.id,
     to1.game_id,
     CONCAT('timeout_', to1.timeout_type) as type,
-    to1.team_id,
+    to1.club_id,
     NULL as player_id,
     to1.period,
     to1.time_remaining,
@@ -183,7 +229,7 @@ SELECT
         'called_by', to1.called_by
     ) as specific_details
 FROM timeouts to1
-LEFT JOIN teams t ON to1.team_id = t.id
+LEFT JOIN teams t ON to1.club_id = t.id
 
 UNION ALL
 
@@ -192,7 +238,7 @@ SELECT
     mc.id,
     mc.game_id,
     CONCAT('commentary_', mc.commentary_type) as type,
-    NULL as team_id,
+    NULL as club_id,
     NULL as player_id,
     mc.period,
     mc.time_remaining,
@@ -216,3 +262,42 @@ FROM match_commentary mc
 ORDER BY created_at DESC;
 
 COMMENT ON VIEW comprehensive_match_events IS 'Unified view of all match events from different tables for easy querying and timeline display';
+
+-- Migration: Add enhanced events
+-- This migration adds additional columns to the events table for advanced analytics
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'events'
+    ) THEN
+        CREATE TABLE events (
+            id SERIAL PRIMARY KEY,
+            game_id INT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+            event_type VARCHAR(255) NOT NULL,
+            timestamp TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        );
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'events' AND column_name = 'club_id'
+    ) THEN
+        ALTER TABLE events ADD COLUMN club_id INT REFERENCES clubs(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'events' AND column_name = 'team_id'
+    ) THEN
+        ALTER TABLE events DROP COLUMN team_id;
+    END IF;
+END $$;
