@@ -4,7 +4,7 @@ import db from '../src/db.js';
 import { generateTestToken } from './helpers/testHelpers.js';
 
 // Helper function to generate truly unique names
-const generateUniqueTeamName = (prefix = 'Team') => {
+const generateUniqueClubName = (prefix = 'Club') => {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 15);
   const processId = process.pid;
@@ -12,6 +12,7 @@ const generateUniqueTeamName = (prefix = 'Team') => {
 };
 
 describe('👤 Player Routes', () => {
+  let testClubId;
   let testTeamId;
   let authToken;
 
@@ -30,12 +31,20 @@ describe('👤 Player Routes', () => {
       await db.query('DELETE FROM games');
       await db.query('DELETE FROM players');
       await db.query('DELETE FROM teams');
+      await db.query('DELETE FROM clubs');
 
-      // Create a test team to use for player tests
-      const uniqueTeamName = generateUniqueTeamName('TestTeamPlayers');
+      // Create a test club to use for player tests
+      const uniqueClubName = generateUniqueClubName('TestClubPlayers');
+      const clubRes = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+        [uniqueClubName]
+      );
+      testClubId = clubRes.rows[0].id;
+
+      // Create a test age group team (optional for some tests)
       const teamRes = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING id',
-        [uniqueTeamName]
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+        [testClubId, 'U17 Team', 'U17']
       );
       testTeamId = teamRes.rows[0].id;
     } catch (error) {
@@ -46,8 +55,8 @@ describe('👤 Player Routes', () => {
 
   beforeEach(async () => {
     try {
-      // Clear only players table before each test (team persists)
-      await db.query('DELETE FROM players WHERE team_id = $1', [testTeamId]);
+      // Clear only players table before each test
+      await db.query('DELETE FROM players WHERE club_id = $1', [testClubId]);
     } catch (error) {
       global.testContext.logTestError(error, 'Player database cleanup failed');
       throw error;
@@ -58,8 +67,9 @@ describe('👤 Player Routes', () => {
     console.log('✅ Player Routes tests completed');
     try {
       // Clean up test data in correct order
-      await db.query('DELETE FROM players WHERE team_id = $1', [testTeamId]);
+      await db.query('DELETE FROM players WHERE club_id = $1', [testClubId]);
       await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
+      await db.query('DELETE FROM clubs WHERE id = $1', [testClubId]);
     } catch (error) {
       console.error('⚠️ Player Routes cleanup failed:', error.message);
     }
@@ -86,12 +96,12 @@ describe('👤 Player Routes', () => {
       try {
         // Insert test players
         await db.query(
-          'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
-          [testTeamId, 'John', 'Doe', 10]
+          'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+          [testClubId, 'John', 'Doe', 10]
         );
         await db.query(
-          'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
-          [testTeamId, 'Jane', 'Smith', 20]
+          'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+          [testClubId, 'Jane', 'Smith', 20]
         );
 
         const response = await request(app)
@@ -109,28 +119,28 @@ describe('👤 Player Routes', () => {
       }
     });
 
-    it('✅ should filter players by team_id', async () => {
+    it('✅ should filter players by club_id', async () => {
       try {
-        // Insert players for different teams
+        // Insert players for different clubs
         await db.query(
-          'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
-          [testTeamId, 'John', 'Doe', 10]
+          'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+          [testClubId, 'John', 'Doe', 10]
         );
 
-        const uniqueOtherTeamName = generateUniqueTeamName('OtherTeamPlayers');
-        const otherTeamRes = await db.query(
-          'INSERT INTO teams (name) VALUES ($1) RETURNING id',
-          [uniqueOtherTeamName]
+        const uniqueOtherClubName = generateUniqueClubName('OtherClubPlayers');
+        const otherClubRes = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+          [uniqueOtherClubName]
         );
-        const otherTeamId = otherTeamRes.rows[0].id;
+        const otherClubId = otherClubRes.rows[0].id;
 
         await db.query(
-          'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
-          [otherTeamId, 'Jane', 'Smith', 20]
+          'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4)',
+          [otherClubId, 'Jane', 'Smith', 20]
         );
 
         const response = await request(app)
-          .get(`/api/players?team_id=${testTeamId}`)
+          .get(`/api/players?club_id=${testClubId}`)
           .set('Authorization', `Bearer ${authToken}`)
           .expect('Content-Type', /json/)
           .expect(200);
@@ -139,19 +149,19 @@ describe('👤 Player Routes', () => {
         expect(response.body[0].first_name).toBe('John');
 
         // Clean up
-        await db.query('DELETE FROM teams WHERE id = $1', [otherTeamId]);
+        await db.query('DELETE FROM clubs WHERE id = $1', [otherClubId]);
       } catch (error) {
-        global.testContext.logTestError(error, 'GET players by team_id filter failed');
+        global.testContext.logTestError(error, 'GET players by club_id filter failed');
         throw error;
       }
     });
   });
 
   describe('📝 POST /api/players', () => {
-    it('✅ should create a new player', async () => {
+    it('✅ should create a new player with club_id only', async () => {
       try {
         const newPlayer = {
-          team_id: testTeamId,
+          club_id: testClubId,
           first_name: 'Test',
           last_name: 'Player',
           jersey_number: 30
@@ -168,7 +178,7 @@ describe('👤 Player Routes', () => {
         expect(response.body.first_name).toBe('Test');
         expect(response.body.last_name).toBe('Player');
         expect(response.body.jersey_number).toBe(30);
-        expect(response.body.team_id).toBe(testTeamId);
+        expect(response.body.club_id).toBe(testClubId);
 
         // Verify player was created in database
         const dbResponse = await db.query('SELECT * FROM players WHERE id = $1', [response.body.id]);
@@ -179,12 +189,39 @@ describe('👤 Player Routes', () => {
       }
     });
 
+    it('✅ should create a new player with club_id and team_id', async () => {
+      try {
+        const newPlayer = {
+          club_id: testClubId,
+          team_id: testTeamId,
+          first_name: 'Team',
+          last_name: 'Player',
+          jersey_number: 25
+        };
+
+        const response = await request(app)
+          .post('/api/players')
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(newPlayer)
+          .expect('Content-Type', /json/)
+          .expect(201);
+
+        expect(response.body.club_id).toBe(testClubId);
+        expect(response.body.team_id).toBe(testTeamId);
+        expect(response.body.first_name).toBe('Team');
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST create player with team failed');
+        throw error;
+      }
+    });
+
     it('❌ should validate required fields', async () => {
       try {
         const response = await request(app)
           .post('/api/players')
           .send({
-            team_id: testTeamId,
+            club_id: testClubId,
             // Missing first_name and last_name
             jersey_number: 30
           })
@@ -200,13 +237,13 @@ describe('👤 Player Routes', () => {
       }
     });
 
-    it('❌ should validate jersey number uniqueness within team', async () => {
+    it('❌ should validate jersey number uniqueness within club', async () => {
       try {
         // Create first player
         await request(app)
           .post('/api/players')
           .send({
-            team_id: testTeamId,
+            club_id: testClubId,
             first_name: 'First',
             last_name: 'Player',
             jersey_number: 30
@@ -215,11 +252,11 @@ describe('👤 Player Routes', () => {
           .set('Content-Type', 'application/json')
           .expect(201);
 
-        // Try to create second player with same jersey number in same team
+        // Try to create second player with same jersey number in same club
         const response = await request(app)
           .post('/api/players')
           .send({
-            team_id: testTeamId,
+            club_id: testClubId,
             first_name: 'Second',
             last_name: 'Player',
             jersey_number: 30
@@ -243,7 +280,7 @@ describe('👤 Player Routes', () => {
         const createRes = await request(app)
           .post('/api/players')
           .send({
-            team_id: testTeamId,
+            club_id: testClubId,
             first_name: 'Old',
             last_name: 'Name',
             jersey_number: 30
@@ -260,7 +297,7 @@ describe('👤 Player Routes', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .set('Content-Type', 'application/json')
           .send({
-            team_id: testTeamId,
+            club_id: testClubId,
             first_name: 'New',
             last_name: 'Name',
             jersey_number: 31
@@ -288,7 +325,7 @@ describe('👤 Player Routes', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .set('Content-Type', 'application/json')
           .send({
-            team_id: testTeamId,
+            club_id: testClubId,
             first_name: 'New',
             last_name: 'Name',
             jersey_number: 31
@@ -311,7 +348,7 @@ describe('👤 Player Routes', () => {
         const createRes = await request(app)
           .post('/api/players')
           .send({
-            team_id: testTeamId,
+            club_id: testClubId,
             first_name: 'To',
             last_name: 'Delete',
             jersey_number: 99
@@ -355,3 +392,4 @@ describe('👤 Player Routes', () => {
     });
   });
 });
+

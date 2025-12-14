@@ -7,9 +7,13 @@ const router = express.Router();
 
 // Validation middleware
 const validatePlayer = [
-  body('team_id')
+  body('club_id')
     .notEmpty()
-    .withMessage('Team ID is required')
+    .withMessage('Club ID is required')
+    .isInt()
+    .withMessage('Club ID must be an integer'),
+  body('team_id')
+    .optional()
     .isInt()
     .withMessage('Team ID must be an integer'),
   body('first_name')
@@ -58,38 +62,40 @@ router.use((req, res, next) => {
 // Get all players with basic stats
 router.get('/', async (req, res) => {
   try {
-    // Add optional team_id filter
-    const { team_id } = req.query;
-    const query = team_id
-      ? `
-        SELECT 
-          p.*,
-          t.name as team_name,
-          COALESCE(COUNT(DISTINCT s.game_id), 0) as games_played,
-          COALESCE(COUNT(CASE WHEN s.result = 'goal' THEN 1 END), 0) as goals,
-          COALESCE(COUNT(s.id), 0) as total_shots
-        FROM players p
-        LEFT JOIN teams t ON p.team_id = t.id
-        LEFT JOIN shots s ON p.id = s.player_id
-        WHERE p.team_id = $1
-        GROUP BY p.id, t.name
-        ORDER BY p.team_id, p.last_name, p.first_name
-      `
-      : `
-        SELECT 
-          p.*,
-          t.name as team_name,
-          COALESCE(COUNT(DISTINCT s.game_id), 0) as games_played,
-          COALESCE(COUNT(CASE WHEN s.result = 'goal' THEN 1 END), 0) as goals,
-          COALESCE(COUNT(s.id), 0) as total_shots
-        FROM players p
-        LEFT JOIN teams t ON p.team_id = t.id
-        LEFT JOIN shots s ON p.id = s.player_id
-        GROUP BY p.id, t.name
-        ORDER BY p.team_id, p.last_name, p.first_name
-      `;
+    // Add optional club_id and team_id filters
+    const { club_id, team_id } = req.query;
+    let query = `
+      SELECT 
+        p.*,
+        c.name as club_name,
+        t.name as team_name,
+        COALESCE(COUNT(DISTINCT s.game_id), 0) as games_played,
+        COALESCE(COUNT(CASE WHEN s.result = 'goal' THEN 1 END), 0) as goals,
+        COALESCE(COUNT(s.id), 0) as total_shots
+      FROM players p
+      LEFT JOIN clubs c ON p.club_id = c.id
+      LEFT JOIN teams t ON p.team_id = t.id
+      LEFT JOIN shots s ON p.id = s.player_id
+      WHERE 1=1
+    `;
+    const params = [];
     
-    const result = await db.query(query, team_id ? [team_id] : []);
+    if (club_id) {
+      params.push(club_id);
+      query += ` AND p.club_id = $${params.length}`;
+    }
+    
+    if (team_id) {
+      params.push(team_id);
+      query += ` AND p.team_id = $${params.length}`;
+    }
+    
+    query += `
+      GROUP BY p.id, c.name, t.name
+      ORDER BY c.name, t.name, p.last_name, p.first_name
+    `;
+    
+    const result = await db.query(query, params);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: 'Database error', details: err.message });
@@ -141,7 +147,12 @@ router.get('/team/:teamId', async (req, res) => {
   const { teamId } = req.params;
   try {
     const result = await db.query(
-      'SELECT * FROM players WHERE team_id = $1 ORDER BY last_name, first_name',
+      `SELECT p.*, c.name as club_name, t.name as team_name
+       FROM players p
+       LEFT JOIN clubs c ON p.club_id = c.id
+       LEFT JOIN teams t ON p.team_id = t.id
+       WHERE p.team_id = $1 
+       ORDER BY p.last_name, p.first_name`,
       [teamId]
     );
     res.json(result.rows);
@@ -166,6 +177,7 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
 
   // Handle both camelCase and snake_case property names
   const {
+    club_id = req.body.clubId,
     team_id = req.body.teamId,
     first_name = req.body.firstName,
     last_name = req.body.lastName,
@@ -174,27 +186,35 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
   } = req.body;
   
   try {
-    // Check for duplicate jersey number in the same team
-    const existingPlayer = await db.query(
-      'SELECT id FROM players WHERE team_id = $1 AND jersey_number = $2',
-      [team_id, jersey_number]
-    );
-
-    if (existingPlayer.rows.length > 0) {
-      return res.status(409).json({
-        error: 'Jersey number already in use for this team'
-      });
+    // Verify club exists
+    const clubExists = await db.query('SELECT id FROM clubs WHERE id = $1', [club_id]);
+    if (clubExists.rows.length === 0) {
+      return res.status(400).json({ error: 'Club does not exist' });
     }
 
-    // Verify team exists
-    const teamExists = await db.query('SELECT id FROM teams WHERE id = $1', [team_id]);
-    if (teamExists.rows.length === 0) {
-      return res.status(400).json({ error: 'Team does not exist' });
+    // If team_id provided, verify it exists and belongs to the club
+    if (team_id) {
+      const teamExists = await db.query('SELECT id FROM teams WHERE id = $1 AND club_id = $2', [team_id, club_id]);
+      if (teamExists.rows.length === 0) {
+        return res.status(400).json({ error: 'Team does not exist or does not belong to this club' });
+      }
+
+      // Check for duplicate jersey number in the same team
+      const existingPlayer = await db.query(
+        'SELECT id FROM players WHERE team_id = $1 AND jersey_number = $2',
+        [team_id, jersey_number]
+      );
+
+      if (existingPlayer.rows.length > 0) {
+        return res.status(409).json({
+          error: 'Jersey number already in use for this team'
+        });
+      }
     }
 
     const result = await db.query(
-      'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [team_id, first_name, last_name, jersey_number, gender || null]
+      'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [club_id, team_id || null, first_name, last_name, jersey_number, gender || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -222,6 +242,7 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
   const { id } = req.params;
   // Handle both camelCase and snake_case property names
   const {
+    club_id = req.body.clubId,
     team_id = req.body.teamId,
     first_name = req.body.firstName,
     last_name = req.body.lastName,
@@ -231,25 +252,39 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
   } = req.body;
   
   try {
-    // Check for duplicate jersey number in the same team, excluding current player
-    const existingPlayer = await db.query(
-      'SELECT id FROM players WHERE team_id = $1 AND jersey_number = $2 AND id != $3',
-      [team_id, jersey_number, id]
-    );
+    // Verify club exists
+    const clubExists = await db.query('SELECT id FROM clubs WHERE id = $1', [club_id]);
+    if (clubExists.rows.length === 0) {
+      return res.status(400).json({ error: 'Club does not exist' });
+    }
 
-    if (existingPlayer.rows.length > 0) {
-      return res.status(409).json({
-        error: 'Jersey number already in use for this team'
-      });
+    // If team_id provided, verify it exists and belongs to the club
+    if (team_id) {
+      const teamExists = await db.query('SELECT id FROM teams WHERE id = $1 AND club_id = $2', [team_id, club_id]);
+      if (teamExists.rows.length === 0) {
+        return res.status(400).json({ error: 'Team does not exist or does not belong to this club' });
+      }
+
+      // Check for duplicate jersey number in the same team, excluding current player
+      const existingPlayer = await db.query(
+        'SELECT id FROM players WHERE team_id = $1 AND jersey_number = $2 AND id != $3',
+        [team_id, jersey_number, id]
+      );
+
+      if (existingPlayer.rows.length > 0) {
+        return res.status(409).json({
+          error: 'Jersey number already in use for this team'
+        });
+      }
     }
 
     const result = await db.query(
       `UPDATE players 
-       SET team_id = $1, first_name = $2, last_name = $3, 
-           jersey_number = $4, is_active = $5, gender = $6,
+       SET club_id = $1, team_id = $2, first_name = $3, last_name = $4, 
+           jersey_number = $5, is_active = $6, gender = $7,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7 RETURNING *`,
-      [team_id, first_name, last_name, jersey_number, is_active, gender || null, id]
+       WHERE id = $8 RETURNING *`,
+      [club_id, team_id || null, first_name, last_name, jersey_number, is_active, gender || null, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Player not found' });

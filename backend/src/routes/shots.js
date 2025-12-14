@@ -14,7 +14,7 @@ router.use(auth);
 router.get('/:gameId', [
   param('gameId').isInt().withMessage('Game ID must be an integer'),
   query('period').optional().isInt({ min: 1 }).withMessage('Period must be a positive integer'),
-  query('team_id').optional().isInt().withMessage('Team ID must be an integer'),
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
   query('player_id').optional().isInt().withMessage('Player ID must be an integer'),
   query('result').optional().isIn(['goal', 'miss', 'blocked']).withMessage('Invalid result value')
 ], async (req, res) => {
@@ -24,7 +24,7 @@ router.get('/:gameId', [
   }
 
   const { gameId } = req.params;
-  const { period, team_id, player_id, result } = req.query;
+  const { period, club_id, player_id, result } = req.query;
 
   try {
     // Build dynamic query with filters
@@ -34,10 +34,10 @@ router.get('/:gameId', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs c ON s.club_id = c.id
       WHERE s.game_id = $1
     `;
     const queryParams = [gameId];
@@ -49,9 +49,9 @@ router.get('/:gameId', [
       paramIndex++;
     }
 
-    if (team_id) {
-      queryText += ` AND s.team_id = $${paramIndex}`;
-      queryParams.push(team_id);
+    if (club_id) {
+      queryText += ` AND s.club_id = $${paramIndex}`;
+      queryParams.push(club_id);
       paramIndex++;
     }
 
@@ -85,7 +85,7 @@ router.post('/:gameId', [
   requireRole(['admin', 'coach']),
   param('gameId').isInt().withMessage('Game ID must be an integer'),
   body('player_id').isInt().withMessage('Player ID is required and must be an integer'),
-  body('team_id').isInt().withMessage('Team ID is required and must be an integer'),
+  body('club_id').isInt().withMessage('Club ID is required and must be an integer'),
   body('x_coord').isFloat({ min: 0, max: 100 }).withMessage('X coordinate must be between 0 and 100'),
   body('y_coord').isFloat({ min: 0, max: 100 }).withMessage('Y coordinate must be between 0 and 100'),
   body('result').isIn(['goal', 'miss', 'blocked']).withMessage('Result must be goal, miss, or blocked'),
@@ -100,7 +100,7 @@ router.post('/:gameId', [
   }
 
   const { gameId } = req.params;
-  const { player_id, team_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance } = req.body;
+  const { player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance } = req.body;
 
   try {
     // Verify game exists and is in progress
@@ -114,34 +114,34 @@ router.post('/:gameId', [
       return res.status(400).json({ error: 'Can only record shots for games in progress' });
     }
 
-    // Verify player exists and belongs to one of the teams
+    // Verify player exists and belongs to the specified club
     const playerCheck = await db.query('SELECT * FROM players WHERE id = $1', [player_id]);
     if (playerCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Player not found' });
     }
 
     const player = playerCheck.rows[0];
-    if (player.team_id !== team_id) {
-      return res.status(400).json({ error: 'Player does not belong to the specified team' });
+    if (player.club_id !== club_id) {
+      return res.status(400).json({ error: 'Player does not belong to the specified club' });
     }
 
-    // Verify team is participating in this game
-    if (team_id !== game.home_team_id && team_id !== game.away_team_id) {
-      return res.status(400).json({ error: 'Team is not participating in this game' });
+    // Verify club is participating in this game
+    if (club_id !== game.home_club_id && club_id !== game.away_club_id) {
+      return res.status(400).json({ error: 'Club is not participating in this game' });
     }
 
     // Insert shot
     const shotResult = await db.query(`
-      INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance)
+      INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
-    `, [gameId, player_id, team_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance]);
+    `, [gameId, player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance]);
 
     const shot = shotResult.rows[0];
 
     // If it's a goal, update the game score
     if (result === 'goal') {
-      const scoreField = team_id === game.home_team_id ? 'home_score' : 'away_score';
+      const scoreField = club_id === game.home_club_id ? 'home_score' : 'away_score';
       await db.query(`
         UPDATE games 
         SET ${scoreField} = ${scoreField} + 1, updated_at = CURRENT_TIMESTAMP
@@ -149,17 +149,17 @@ router.post('/:gameId', [
       `, [gameId]);
     }
 
-    // Fetch complete shot data with player and team info
+    // Fetch complete shot data with player and club info
     const completeShotResult = await db.query(`
       SELECT 
         s.*,
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs c ON s.club_id = c.id
       WHERE s.id = $1
     `, [shot.id]);
 
@@ -245,7 +245,7 @@ router.put('/:gameId/:shotId', [
     if (updates.result && oldResult !== newResult) {
       const game = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
       const gameData = game.rows[0];
-      const scoreField = oldShot.team_id === gameData.home_team_id ? 'home_score' : 'away_score';
+      const scoreField = oldShot.club_id === gameData.home_club_id ? 'home_score' : 'away_score';
 
       let scoreChange = 0;
       if (oldResult === 'goal' && newResult !== 'goal') {
@@ -270,10 +270,10 @@ router.put('/:gameId/:shotId', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs c ON s.club_id = c.id
       WHERE s.id = $1
     `, [shotId]);
 
@@ -307,7 +307,7 @@ router.delete('/:gameId/:shotId', [
     if (shot.result === 'goal') {
       const game = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
       const gameData = game.rows[0];
-      const scoreField = shot.team_id === gameData.home_team_id ? 'home_score' : 'away_score';
+      const scoreField = shot.club_id === gameData.home_club_id ? 'home_score' : 'away_score';
 
       await db.query(`
         UPDATE games 

@@ -30,13 +30,13 @@ describe('📊 Export API Tests', () => {
 
     // Create test teams directly in DB
     const team1Result = await db.query(
-      'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
       [`Export Test Team 1 ${uniqueId}`]
     );
     testTeam1 = team1Result.rows[0];
 
     const team2Result = await db.query(
-      'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
       [`Export Test Team 2 ${uniqueId}`]
     );
     testTeam2 = team2Result.rows[0];
@@ -67,7 +67,7 @@ describe('📊 Export API Tests', () => {
     // Create a test game directly in DB
     testGameDate = new Date().toISOString();
     const gameResult = await db.query(`
-      INSERT INTO games (home_team_id, away_team_id, date, status)
+      INSERT INTO games (home_club_id, away_club_id, date, status)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `, [testTeam1.id, testTeam2.id, testGameDate, 'in_progress']);
@@ -75,12 +75,12 @@ describe('📊 Export API Tests', () => {
 
     // Add game roster entries
     await db.query(`
-      INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position)
+      INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting, starting_position)
       VALUES ($1, $2, $3, true, true, 'offense')
     `, [testGame.id, testTeam1.id, testPlayer1.id]);
     
     await db.query(`
-      INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position)
+      INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting, starting_position)
       VALUES ($1, $2, $3, false, true, 'defense')
     `, [testGame.id, testTeam2.id, testPlayer2.id]);
 
@@ -118,7 +118,7 @@ describe('📊 Export API Tests', () => {
       await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
     }
     if (testTeam1 && testTeam2) {
-      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [testTeam1.id, testTeam2.id]);
+      await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [testTeam1.id, testTeam2.id]);
     }
     if (testUser) {
       await db.query('DELETE FROM users WHERE id = $1', [testUser.id]);
@@ -493,3 +493,5 @@ describe('📊 Export API Tests', () => {
     });
   });
 });
+
+

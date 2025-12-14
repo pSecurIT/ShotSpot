@@ -19,9 +19,9 @@ router.get('/:gameId', async (req, res) => {
     const result = await db.query(`
       SELECT 
         t.*,
-        tm.name as team_name
+        c.name as club_name
       FROM timeouts t
-      LEFT JOIN teams tm ON t.team_id = tm.id
+      LEFT JOIN clubs c ON t.club_id = c.id
       WHERE t.game_id = $1
       ORDER BY t.created_at DESC
     `, [gameId]);
@@ -36,7 +36,7 @@ router.get('/:gameId', async (req, res) => {
 /**
  * Create a new timeout
  * POST /api/timeouts
- * Body: { game_id, team_id?, timeout_type, period, time_remaining?, duration?, reason?, called_by? }
+ * Body: { game_id, club_id?, timeout_type, period, time_remaining?, duration?, reason?, called_by? }
  */
 router.post('/', [
   requireRole(['admin', 'coach']),
@@ -44,10 +44,10 @@ router.post('/', [
     .notEmpty()
     .isInt({ min: 1 })
     .withMessage('Game ID must be a positive integer'),
-  body('team_id')
+  body('club_id')
     .optional({ nullable: true })
     .isInt({ min: 1 })
-    .withMessage('Team ID must be a positive integer'),
+    .withMessage('Club ID must be a positive integer'),
   body('timeout_type')
     .notEmpty()
     .isIn(['team', 'injury', 'official', 'tv'])
@@ -81,7 +81,7 @@ router.post('/', [
   }
 
   const {
-    game_id: gameId, team_id, timeout_type, period, time_remaining,
+    game_id: gameId, club_id, timeout_type, period, time_remaining,
     duration, reason, called_by
   } = req.body;
 
@@ -100,35 +100,35 @@ router.post('/', [
       });
     }
 
-    // For team timeouts, verify team is participating in the game
-    if (team_id && timeout_type === 'team') {
-      if (team_id !== game.home_team_id && team_id !== game.away_team_id) {
+    // For team timeouts, verify club is participating in the game
+    if (club_id && timeout_type === 'team') {
+      if (club_id !== game.home_club_id && club_id !== game.away_club_id) {
         return res.status(400).json({ 
-          error: 'Team is not participating in this game',
-          gameTeams: { home: game.home_team_id, away: game.away_team_id },
-          providedTeam: team_id
+          error: 'Club is not participating in this game',
+          gameClubs: { home: game.home_club_id, away: game.away_club_id },
+          providedClub: club_id
         });
       }
     }
 
-    // Official and TV timeouts shouldn't have a team_id
-    if ((timeout_type === 'official' || timeout_type === 'tv') && team_id) {
+    // Official and TV timeouts shouldn't have a club_id
+    if ((timeout_type === 'official' || timeout_type === 'tv') && club_id) {
       return res.status(400).json({ 
-        error: `${timeout_type} timeouts should not have a team_id`
+        error: `${timeout_type} timeouts should not have a club_id`
       });
     }
 
-    // Team timeouts must have a team_id
-    if (timeout_type === 'team' && !team_id) {
+    // Team timeouts must have a club_id
+    if (timeout_type === 'team' && !club_id) {
       return res.status(400).json({ 
-        error: 'team_id is required for team timeouts'
+        error: 'club_id is required for team timeouts'
       });
     }
 
     // Insert the timeout
     const insertQuery = `
       INSERT INTO timeouts (
-        game_id, team_id, timeout_type, period, time_remaining,
+        game_id, club_id, timeout_type, period, time_remaining,
         duration, reason, called_by
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -136,7 +136,7 @@ router.post('/', [
     `;
 
     const result = await db.query(insertQuery, [
-      gameId, team_id || null, timeout_type, period, time_remaining || null,
+      gameId, club_id || null, timeout_type, period, time_remaining || null,
       duration || '1 minute', reason || null, called_by || null
     ]);
 
@@ -144,9 +144,9 @@ router.post('/', [
     const timeoutResult = await db.query(`
       SELECT 
         t.*,
-        tm.name as team_name
+        c.name as club_name
       FROM timeouts t
-      LEFT JOIN teams tm ON t.team_id = tm.id
+      LEFT JOIN clubs c ON t.club_id = c.id
       WHERE t.id = $1
     `, [result.rows[0].id]);
 
@@ -210,9 +210,9 @@ router.put('/:timeoutId/end', [
     const updatedResult = await db.query(`
       SELECT 
         t.*,
-        tm.name as team_name
+        c.name as club_name
       FROM timeouts t
-      LEFT JOIN teams tm ON t.team_id = tm.id
+      LEFT JOIN clubs c ON t.club_id = c.id
       WHERE t.id = $1
     `, [timeoutId]);
 
@@ -237,10 +237,10 @@ router.put('/:timeoutId', [
     .optional()
     .isInt({ min: 1 })
     .withMessage('Game ID must be a positive integer'),
-  body('team_id')
+  body('club_id')
     .optional({ nullable: true })
     .isInt({ min: 1 })
-    .withMessage('Team ID must be a positive integer'),
+    .withMessage('Club ID must be a positive integer'),
   body('timeout_type')
     .optional()
     .isIn(['team', 'injury', 'official', 'tv'])
@@ -319,9 +319,9 @@ router.put('/:timeoutId', [
     const updatedResult = await db.query(`
       SELECT 
         t.*,
-        tm.name as team_name
+        c.name as club_name
       FROM timeouts t
-      LEFT JOIN teams tm ON t.team_id = tm.id
+      LEFT JOIN clubs c ON t.club_id = c.id
       WHERE t.id = $1
     `, [timeoutId]);
 
