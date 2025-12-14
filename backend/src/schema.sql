@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS teams (
 
 CREATE TABLE IF NOT EXISTS players (
     id SERIAL PRIMARY KEY,
-    team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+    club_id INTEGER REFERENCES clubs(id) ON DELETE SET NULL,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     jersey_number INTEGER,
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS players (
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(team_id, jersey_number),
+    UNIQUE(club_id, jersey_number),
     CHECK (gender IN ('male', 'female') OR gender IS NULL)
 );
 

@@ -52,19 +52,19 @@ describe('⏱️ Timeouts API', () => {
 
     // Create test teams
     const homeTeam = await db.query(
-      'INSERT INTO teams (name) VALUES (\'Timeout Home Team\') RETURNING id'
+      'INSERT INTO clubs (name) VALUES (\'Timeout Home Team\') RETURNING id'
     );
     homeTeamId = homeTeam.rows[0].id;
 
     const awayTeam = await db.query(
-      'INSERT INTO teams (name) VALUES (\'Timeout Away Team\') RETURNING id'
+      'INSERT INTO clubs (name) VALUES (\'Timeout Away Team\') RETURNING id'
     );
     awayTeamId = awayTeam.rows[0].id;
 
     // Create test game
     const game = await db.query(
       `INSERT INTO games (
-        home_team_id, away_team_id, date, status, current_period,
+        home_club_id, away_club_id, date, status, current_period,
         period_duration, time_remaining, number_of_periods
       ) VALUES ($1, $2, CURRENT_TIMESTAMP, 'in_progress', 1, '25 minutes', '24 minutes', 4) 
       RETURNING id`,
@@ -79,7 +79,7 @@ describe('⏱️ Timeouts API', () => {
     console.log('🧹 Cleaning up Timeouts API tests...');
     await db.query('DELETE FROM timeouts WHERE game_id = $1', [gameId]);
     await db.query('DELETE FROM games WHERE id = $1', [gameId]);
-    await db.query('DELETE FROM teams WHERE id = ANY($1)', [[homeTeamId, awayTeamId]]);
+    await db.query('DELETE FROM clubs WHERE id = ANY($1)', [[homeTeamId, awayTeamId]]);
     await db.query('DELETE FROM users WHERE id = ANY($1)', [[adminUserId, coachUserId, userUserId]]);
     console.log('✅ Timeouts API tests cleanup completed');
   });
@@ -89,7 +89,7 @@ describe('⏱️ Timeouts API', () => {
       it('✅ should get all timeouts for a game', async () => {
         // Create test timeout
         await db.query(
-          `INSERT INTO timeouts (game_id, team_id, timeout_type, period, time_remaining, duration)
+          `INSERT INTO timeouts (game_id, club_id, timeout_type, period, time_remaining, duration)
            VALUES ($1, $2, 'team', 1, '15 minutes', '1 minute')`,
           [gameId, homeTeamId]
         );
@@ -102,7 +102,7 @@ describe('⏱️ Timeouts API', () => {
         expect(Array.isArray(res.body)).toBe(true);
         expect(res.body.length).toBeGreaterThan(0);
         expect(res.body[0]).toHaveProperty('timeout_type', 'team');
-        expect(res.body[0]).toHaveProperty('team_name');
+        expect(res.body[0]).toHaveProperty('club_name');
       });
 
       it('✅ should return empty array for game with no timeouts', async () => {
@@ -154,7 +154,7 @@ describe('⏱️ Timeouts API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             game_id: gameId,
-            team_id: homeTeamId,
+            club_id: homeTeamId,
             timeout_type: 'team',
             period: 1,
             time_remaining: '15 minutes',
@@ -165,7 +165,7 @@ describe('⏱️ Timeouts API', () => {
         expect(res.status).toBe(201);
         expect(res.body).toHaveProperty('id');
         expect(res.body).toHaveProperty('timeout_type', 'team');
-        expect(res.body).toHaveProperty('team_name', 'Timeout Home Team');
+        expect(res.body).toHaveProperty('club_name', 'Timeout Home Team');
         expect(res.body).toHaveProperty('reason', 'Strategic timeout');
         expect(res.body).toHaveProperty('called_by', 'Head Coach');
       });
@@ -176,7 +176,7 @@ describe('⏱️ Timeouts API', () => {
           .set('Authorization', `Bearer ${coachToken}`)
           .send({
             game_id: gameId,
-            team_id: awayTeamId,
+            club_id: awayTeamId,
             timeout_type: 'team',
             period: 1,
             time_remaining: '10 minutes'
@@ -184,7 +184,7 @@ describe('⏱️ Timeouts API', () => {
 
         expect(res.status).toBe(201);
         expect(res.body).toHaveProperty('timeout_type', 'team');
-        expect(res.body).toHaveProperty('team_id', awayTeamId);
+        expect(res.body).toHaveProperty('club_id', awayTeamId);
       });
 
       it('✅ should create injury timeout without team_id', async () => {
@@ -241,7 +241,7 @@ describe('⏱️ Timeouts API', () => {
           .post('/api/timeouts')
           .send({
             game_id: gameId,
-            team_id: homeTeamId,
+            club_id: homeTeamId,
             timeout_type: 'team',
             period: 1
           });
@@ -255,7 +255,7 @@ describe('⏱️ Timeouts API', () => {
           .set('Authorization', `Bearer ${userToken}`)
           .send({
             game_id: gameId,
-            team_id: homeTeamId,
+            club_id: homeTeamId,
             timeout_type: 'team',
             period: 1
           });
@@ -343,7 +343,7 @@ describe('⏱️ Timeouts API', () => {
 
       it('❌ should reject team timeout for non-participating team', async () => {
         const otherTeam = await db.query(
-          'INSERT INTO teams (name) VALUES (\'Other Team\') RETURNING id'
+          'INSERT INTO clubs (name) VALUES (\'Other Team\') RETURNING id'
         );
         const otherTeamId = otherTeam.rows[0].id;
 
@@ -352,7 +352,7 @@ describe('⏱️ Timeouts API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             game_id: gameId,
-            team_id: otherTeamId,
+            club_id: otherTeamId,
             timeout_type: 'team',
             period: 1
           });
@@ -360,7 +360,7 @@ describe('⏱️ Timeouts API', () => {
         expect(res.status).toBe(400);
         expect(res.body).toHaveProperty('error', 'Team is not participating in this game');
 
-        await db.query('DELETE FROM teams WHERE id = $1', [otherTeamId]);
+        await db.query('DELETE FROM clubs WHERE id = $1', [otherTeamId]);
       });
 
       it('❌ should reject official timeout with team_id', async () => {
@@ -369,7 +369,7 @@ describe('⏱️ Timeouts API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             game_id: gameId,
-            team_id: homeTeamId,
+            club_id: homeTeamId,
             timeout_type: 'official',
             period: 1
           });
@@ -384,7 +384,7 @@ describe('⏱️ Timeouts API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             game_id: gameId,
-            team_id: homeTeamId,
+            club_id: homeTeamId,
             timeout_type: 'tv',
             period: 1
           });
@@ -414,7 +414,7 @@ describe('⏱️ Timeouts API', () => {
 
     beforeEach(async () => {
       const timeout = await db.query(
-        `INSERT INTO timeouts (game_id, team_id, timeout_type, period)
+        `INSERT INTO timeouts (game_id, club_id, timeout_type, period)
          VALUES ($1, $2, 'team', 1) RETURNING id`,
         [gameId, homeTeamId]
       );
@@ -436,7 +436,7 @@ describe('⏱️ Timeouts API', () => {
 
       it('✅ should end timeout as coach', async () => {
         const newTimeout = await db.query(
-          `INSERT INTO timeouts (game_id, team_id, timeout_type, period)
+          `INSERT INTO timeouts (game_id, club_id, timeout_type, period)
            VALUES ($1, $2, 'team', 1) RETURNING id`,
           [gameId, homeTeamId]
         );
@@ -511,7 +511,7 @@ describe('⏱️ Timeouts API', () => {
 
     beforeEach(async () => {
       const timeout = await db.query(
-        `INSERT INTO timeouts (game_id, team_id, timeout_type, period, reason)
+        `INSERT INTO timeouts (game_id, club_id, timeout_type, period, reason)
          VALUES ($1, $2, 'team', 1, 'Original reason') RETURNING id`,
         [gameId, homeTeamId]
       );
@@ -604,7 +604,7 @@ describe('⏱️ Timeouts API', () => {
 
     beforeEach(async () => {
       const timeout = await db.query(
-        `INSERT INTO timeouts (game_id, team_id, timeout_type, period)
+        `INSERT INTO timeouts (game_id, club_id, timeout_type, period)
          VALUES ($1, $2, 'team', 1) RETURNING id`,
         [gameId, homeTeamId]
       );
@@ -628,7 +628,7 @@ describe('⏱️ Timeouts API', () => {
 
       it('✅ should delete timeout as coach', async () => {
         const newTimeout = await db.query(
-          `INSERT INTO timeouts (game_id, team_id, timeout_type, period)
+          `INSERT INTO timeouts (game_id, club_id, timeout_type, period)
            VALUES ($1, $2, 'team', 1) RETURNING id`,
           [gameId, homeTeamId]
         );
@@ -740,7 +740,7 @@ describe('⏱️ Timeouts API', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           game_id: gameId,
-          team_id: homeTeamId,
+          club_id: homeTeamId,
           timeout_type: 'team',
           period: 2,
           time_remaining: '20 minutes'
@@ -752,7 +752,7 @@ describe('⏱️ Timeouts API', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           game_id: gameId,
-          team_id: awayTeamId,
+          club_id: awayTeamId,
           timeout_type: 'team',
           period: 2,
           time_remaining: '15 minutes'
@@ -771,3 +771,6 @@ describe('⏱️ Timeouts API', () => {
     });
   });
 });
+
+
+

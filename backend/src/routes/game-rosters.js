@@ -22,7 +22,7 @@ router.get(
     }
 
     const { gameId } = req.params;
-    const { team_id } = req.query;
+    const { club_id } = req.query;
 
     try {
       let query = `
@@ -32,20 +32,20 @@ router.get(
           p.last_name,
           p.jersey_number,
           p.gender,
-          t.name as team_name
+          c.name as club_name
         FROM game_rosters gr
         JOIN players p ON gr.player_id = p.id
-        JOIN teams t ON gr.team_id = t.id
+        JOIN clubs c ON gr.club_id = c.id
         WHERE gr.game_id = $1
       `;
       const params = [gameId];
 
-      if (team_id) {
-        query += ' AND gr.team_id = $2';
-        params.push(team_id);
+      if (club_id) {
+        query += ' AND gr.club_id = $2';
+        params.push(club_id);
       }
 
-      query += ' ORDER BY gr.team_id, p.last_name, p.first_name';
+      query += ' ORDER BY gr.club_id, p.last_name, p.first_name';
 
       const result = await pool.query(query, params);
       res.json(result.rows);
@@ -67,7 +67,7 @@ router.post(
     requireRole(['admin', 'coach']),
     param('gameId').isInt(),
     body('players').isArray().withMessage('Players must be an array'),
-    body('players.*.team_id').isInt().withMessage('Team ID must be an integer'),
+    body('players.*.club_id').isInt().withMessage('Club ID must be an integer'),
     body('players.*.player_id').isInt().withMessage('Player ID must be an integer'),
     body('players.*.is_captain').optional().isBoolean(),
     body('players.*.is_starting').optional().isBoolean(),
@@ -95,17 +95,17 @@ router.post(
       // Clear existing roster for this game
       await pool.query('DELETE FROM game_rosters WHERE game_id = $1', [gameId]);
 
-      // Validate that only one captain per team
-      const captainsByTeam = {};
+      // Validate that only one captain per club
+      const captainsByClub = {};
       for (const player of players) {
         if (player.is_captain) {
-          if (captainsByTeam[player.team_id]) {
+          if (captainsByClub[player.club_id]) {
             await pool.query('ROLLBACK');
             return res.status(400).json({ 
-              error: 'Only one captain allowed per team' 
+              error: 'Only one captain allowed per club' 
             });
           }
-          captainsByTeam[player.team_id] = true;
+          captainsByClub[player.club_id] = true;
         }
       }
 
@@ -113,12 +113,12 @@ router.post(
       const insertedPlayers = [];
       for (const player of players) {
         const result = await pool.query(
-          `INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position)
+          `INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting, starting_position)
            VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING *`,
           [
             gameId,
-            player.team_id,
+            player.club_id,
             player.player_id,
             player.is_captain || false,
             player.is_starting !== undefined ? player.is_starting : true,
@@ -135,7 +135,7 @@ router.post(
       console.error('Error adding players to roster:', error);
       
       if (error.code === '23503') {
-        return res.status(400).json({ error: 'Invalid game, team, or player ID' });
+        return res.status(400).json({ error: 'Invalid game, club, or player ID' });
       }
       if (error.code === '23505') {
         return res.status(409).json({ error: 'Player already in roster for this game' });
@@ -184,11 +184,11 @@ router.put(
 
       const entry = currentEntry.rows[0];
 
-      // If setting as captain, ensure no other captain for this team
+      // If setting as captain, ensure no other captain for this club
       if (is_captain === true) {
         await pool.query(
-          'UPDATE game_rosters SET is_captain = false WHERE game_id = $1 AND team_id = $2 AND id != $3',
-          [gameId, entry.team_id, rosterId]
+          'UPDATE game_rosters SET is_captain = false WHERE game_id = $1 AND club_id = $2 AND id != $3',
+          [gameId, entry.club_id, rosterId]
         );
       }
 

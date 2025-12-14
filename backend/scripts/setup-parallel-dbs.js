@@ -147,12 +147,18 @@ async function setupParallelDatabases() {
           '../src/migrations/add_seasons.sql',
           '../src/migrations/seed_achievements.sql',
           '../src/migrations/seed_default_report_templates.sql',
-          '../src/migrations/add_competition_management.sql',
-          '../src/migrations/add_match_templates.sql',
-          '../src/migrations/add_twizzit_integration.sql'
-        ];
-
-        console.log('📦 Applying migrations...');
+    '../src/migrations/add_competition_management.sql',
+    '../src/migrations/add_match_templates.sql',
+    '../src/migrations/add_twizzit_integration.sql',
+    '../src/migrations/rename_teams_to_clubs_add_age_group_teams.sql',
+    '../src/migrations/add_club_jersey_number_constraint.sql',
+    '../src/migrations/update_timeouts_club_id.sql',
+    '../src/migrations/20251214_update_ball_possessions_team_to_club.sql',
+    '../src/migrations/20251214_update_game_rosters_team_to_club.sql',
+    '../src/migrations/20251214_update_games_team_to_club.sql',
+    '../src/migrations/20251214_update_players_team_to_club.sql',
+    '../src/migrations/20251214_update_substitutions_team_to_club.sql'
+  ];        console.log('📦 Applying migrations...');
         for (const migrationFile of migrations) {
           const migrationPath = join(__dirname, migrationFile);
           try {
