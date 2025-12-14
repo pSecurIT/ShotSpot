@@ -14,7 +14,7 @@ router.use(auth);
  */
 router.get('/shots/:gameId/heatmap', [
   param('gameId').isInt().withMessage('Game ID must be an integer'),
-  query('team_id').optional().isInt().withMessage('Team ID must be an integer'),
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
   query('period').optional().isInt({ min: 1 }).withMessage('Period must be a positive integer'),
   query('grid_size').optional().isInt({ min: 5, max: 20 }).withMessage('Grid size must be between 5 and 20')
 ], async (req, res) => {
@@ -24,7 +24,7 @@ router.get('/shots/:gameId/heatmap', [
   }
 
   const { gameId } = req.params;
-  const { team_id, period, grid_size = 10 } = req.query;
+  const { club_id, period, grid_size = 10 } = req.query;
 
   try {
     // Build query with optional filters
@@ -43,9 +43,9 @@ router.get('/shots/:gameId/heatmap', [
     const queryParams = [100.0 / grid_size, gameId];
     let paramIndex = 3;
 
-    if (team_id) {
-      queryText += ` AND team_id = $${paramIndex}`;
-      queryParams.push(team_id);
+    if (club_id) {
+      queryText += ` AND club_id = $${paramIndex}`;
+      queryParams.push(club_id);
       paramIndex++;
     }
 
@@ -83,7 +83,7 @@ router.get('/shots/:gameId/heatmap', [
  */
 router.get('/shots/:gameId/shot-chart', [
   param('gameId').isInt().withMessage('Game ID must be an integer'),
-  query('team_id').optional().isInt().withMessage('Team ID must be an integer'),
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
   query('period').optional().isInt({ min: 1 }).withMessage('Period must be a positive integer'),
   query('player_id').optional().isInt().withMessage('Player ID must be an integer')
 ], async (req, res) => {
@@ -93,7 +93,7 @@ router.get('/shots/:gameId/shot-chart', [
   }
 
   const { gameId } = req.params;
-  const { team_id, period, player_id } = req.query;
+  const { club_id, period, player_id } = req.query;
 
   try {
     let queryText = `
@@ -109,19 +109,19 @@ router.get('/shots/:gameId/shot-chart', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name,
-        s.team_id
+        c.name as club_name,
+        s.club_id
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs c ON s.club_id = c.id
       WHERE s.game_id = $1
     `;
     const queryParams = [gameId];
     let paramIndex = 2;
 
-    if (team_id) {
-      queryText += ` AND s.team_id = $${paramIndex}`;
-      queryParams.push(team_id);
+    if (club_id) {
+      queryText += ` AND s.club_id = $${paramIndex}`;
+      queryParams.push(club_id);
       paramIndex++;
     }
 
@@ -154,7 +154,7 @@ router.get('/shots/:gameId/shot-chart', [
  */
 router.get('/shots/:gameId/players', [
   param('gameId').isInt().withMessage('Game ID must be an integer'),
-  query('team_id').optional().isInt().withMessage('Team ID must be an integer')
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -162,7 +162,7 @@ router.get('/shots/:gameId/players', [
   }
 
   const { gameId } = req.params;
-  const { team_id } = req.query;
+  const { club_id } = req.query;
 
   try {
     // First get all players who participated in the game (from game_rosters or shots)
@@ -172,11 +172,11 @@ router.get('/shots/:gameId/players', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name,
-        t.id as team_id,
+        c.name as club_name,
+        c.id as club_id,
         gr.is_starting
       FROM players p
-      JOIN teams t ON p.team_id = t.id
+      JOIN clubs c ON p.club_id = c.id
       LEFT JOIN game_rosters gr ON gr.player_id = p.id AND gr.game_id = $1
       WHERE (
         EXISTS (
@@ -186,9 +186,9 @@ router.get('/shots/:gameId/players', [
     `;
     const playersParams = [gameId];
     
-    if (team_id) {
-      playersQuery += ' AND t.id = $2';
-      playersParams.push(team_id);
+    if (club_id) {
+      playersQuery += ' AND c.id = $2';
+      playersParams.push(club_id);
     }
     
     const playersResult = await db.query(playersQuery, playersParams);
@@ -455,8 +455,8 @@ router.get('/shots/:gameId/summary', [
 
     const teamStats = await db.query(`
       SELECT 
-        t.id as team_id,
-        t.name as team_name,
+        c.id as club_id,
+        c.name as club_name,
         COUNT(*) as total_shots,
         COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as goals,
         ROUND(
@@ -465,9 +465,9 @@ router.get('/shots/:gameId/summary', [
           2
         ) as fg_percentage
       FROM shots s
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs c ON s.club_id = c.id
       WHERE s.game_id = $1
-      GROUP BY t.id, t.name
+      GROUP BY c.id, c.name
     `, [gameId]);
 
     res.json({
@@ -479,9 +479,9 @@ router.get('/shots/:gameId/summary', [
         overall_fg_percentage: parseFloat(result.rows[0].overall_fg_percentage) || 0,
         avg_shot_distance: parseFloat(result.rows[0].avg_shot_distance) || 0
       },
-      by_team: teamStats.rows.map(row => ({
-        team_id: row.team_id,
-        team_name: row.team_name,
+      by_club: teamStats.rows.map(row => ({
+        club_id: row.club_id,
+        club_name: row.club_name,
         total_shots: parseInt(row.total_shots),
         goals: parseInt(row.goals),
         fg_percentage: parseFloat(row.fg_percentage) || 0
@@ -499,7 +499,7 @@ router.get('/shots/:gameId/summary', [
  */
 router.get('/shots/:gameId/streaks', [
   param('gameId').isInt().withMessage('Game ID must be an integer'),
-  query('team_id').optional().isInt().withMessage('Team ID must be an integer')
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -507,7 +507,7 @@ router.get('/shots/:gameId/streaks', [
   }
 
   const { gameId } = req.params;
-  const { team_id } = req.query;
+  const { club_id } = req.query;
 
   try {
     let queryText = `
@@ -516,20 +516,20 @@ router.get('/shots/:gameId/streaks', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name,
+        c.name as club_name,
         s.result,
         s.created_at,
         ROW_NUMBER() OVER (PARTITION BY s.player_id ORDER BY s.created_at) as shot_number
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs c ON s.club_id = c.id
       WHERE s.game_id = $1
     `;
     const queryParams = [gameId];
 
-    if (team_id) {
-      queryText += ' AND s.team_id = $2';
-      queryParams.push(team_id);
+    if (club_id) {
+      queryText += ' AND s.club_id = $2';
+      queryParams.push(club_id);
     }
 
     queryText += ' ORDER BY s.player_id, s.created_at';
@@ -546,7 +546,7 @@ router.get('/shots/:gameId/streaks', [
           first_name: shot.first_name,
           last_name: shot.last_name,
           jersey_number: shot.jersey_number,
-          team_name: shot.team_name,
+          club_name: shot.club_name,
           current_streak: 0,
           current_streak_type: null,
           longest_make_streak: 0,
@@ -616,7 +616,7 @@ router.get('/shots/:gameId/streaks', [
  */
 router.get('/shots/:gameId/zones', [
   param('gameId').isInt().withMessage('Game ID must be an integer'),
-  query('team_id').optional().isInt().withMessage('Team ID must be an integer')
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -624,7 +624,7 @@ router.get('/shots/:gameId/zones', [
   }
 
   const { gameId } = req.params;
-  const { team_id } = req.query;
+  const { club_id } = req.query;
 
   try {
     // Get overall FG% for comparison
@@ -640,9 +640,9 @@ router.get('/shots/:gameId/zones', [
     `;
     const overallParams = [gameId];
 
-    if (team_id) {
-      overallQuery += ' AND team_id = $2';
-      overallParams.push(team_id);
+    if (club_id) {
+      overallQuery += ' AND club_id = $2';
+      overallParams.push(club_id);
     }
 
     const overallResult = await db.query(overallQuery, overallParams);
@@ -681,9 +681,9 @@ router.get('/shots/:gameId/zones', [
       `;
       const zoneParams = [gameId, zone.min_x, zone.max_x, zone.min_y, zone.max_y];
 
-      if (team_id) {
-        zoneQuery += ' AND team_id = $6';
-        zoneParams.push(team_id);
+      if (club_id) {
+        zoneQuery += ' AND club_id = $6';
+        zoneParams.push(club_id);
       }
 
       const result = await db.query(zoneQuery, zoneParams);
@@ -724,7 +724,7 @@ router.get('/shots/:gameId/zones', [
  */
 router.get('/shots/:gameId/trends', [
   param('gameId').isInt().withMessage('Game ID must be an integer'),
-  query('team_id').optional().isInt().withMessage('Team ID must be an integer')
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -732,7 +732,7 @@ router.get('/shots/:gameId/trends', [
   }
 
   const { gameId } = req.params;
-  const { team_id } = req.query;
+  const { club_id } = req.query;
 
   try {
     let queryText = `
@@ -754,9 +754,9 @@ router.get('/shots/:gameId/trends', [
     `;
     const queryParams = [gameId];
 
-    if (team_id) {
-      queryText += ' AND team_id = $2';
-      queryParams.push(team_id);
+    if (club_id) {
+      queryText += ' AND club_id = $2';
+      queryParams.push(club_id);
     }
 
     queryText += ' GROUP BY period ORDER BY period';
@@ -807,7 +807,7 @@ router.get('/shots/:gameId/trends', [
  */
 router.get('/players/:playerId/development', [
   param('playerId').isInt().withMessage('Player ID must be an integer'),
-  query('team_id').optional().isInt().withMessage('Team ID must be an integer'),
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50')
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -816,7 +816,7 @@ router.get('/players/:playerId/development', [
   }
 
   const { playerId } = req.params;
-  const { team_id, limit = 10 } = req.query;
+  const { club_id, limit = 10 } = req.query;
 
   try {
     let queryText = `
@@ -881,10 +881,10 @@ router.get('/players/:playerId/development', [
 
 /**
  * Phase 4: Get opponent shooting tendencies
- * Returns aggregated shooting patterns for a team across multiple games
+ * Returns aggregated shooting patterns for a club across multiple games
  */
-router.get('/teams/:teamId/tendencies', [
-  param('teamId').isInt().withMessage('Team ID must be an integer'),
+router.get('/clubs/:clubId/tendencies', [
+  param('clubId').isInt().withMessage('Club ID must be an integer'),
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50')
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -892,11 +892,11 @@ router.get('/teams/:teamId/tendencies', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { teamId } = req.params;
+  const { clubId } = req.params;
   const { limit = 10 } = req.query;
 
   try {
-    // Get overall team statistics across recent games
+    // Get overall club statistics across recent games
     const overallStats = await db.query(`
       SELECT 
         COUNT(DISTINCT s.game_id) as games_played,
@@ -911,16 +911,16 @@ router.get('/teams/:teamId/tendencies', [
         ROUND(AVG(s.x_coord), 2) as avg_x_coord,
         ROUND(AVG(s.y_coord), 2) as avg_y_coord
       FROM shots s
-      WHERE s.team_id = $1
+      WHERE s.club_id = $1
         AND s.game_id IN (
           SELECT g.id FROM games g
           JOIN shots s2 ON g.id = s2.game_id
-          WHERE s2.team_id = $1
+          WHERE s2.club_id = $1
           GROUP BY g.id
           ORDER BY g.date DESC
           LIMIT $2
         )
-    `, [teamId, limit]);
+    `, [clubId, limit]);
 
     // Get favorite zones (hot zones across all games)
     const zoneStats = await db.query(`
@@ -938,18 +938,18 @@ router.get('/teams/:teamId/tendencies', [
           2
         ) as fg_percentage
       FROM shots s
-      WHERE s.team_id = $1
+      WHERE s.club_id = $1
         AND s.game_id IN (
           SELECT g.id FROM games g
           JOIN shots s2 ON g.id = s2.game_id
-          WHERE s2.team_id = $1
+          WHERE s2.club_id = $1
           GROUP BY g.id
           ORDER BY g.date DESC
           LIMIT $2
         )
       GROUP BY zone
       ORDER BY shots DESC
-    `, [teamId, limit]);
+    `, [clubId, limit]);
 
     // Get top shooters
     const topShooters = await db.query(`
@@ -967,11 +967,11 @@ router.get('/teams/:teamId/tendencies', [
         ) as fg_percentage
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      WHERE s.team_id = $1
+      WHERE s.club_id = $1
         AND s.game_id IN (
           SELECT g.id FROM games g
           JOIN shots s2 ON g.id = s2.game_id
-          WHERE s2.team_id = $1
+          WHERE s2.club_id = $1
           GROUP BY g.id
           ORDER BY g.date DESC
           LIMIT $2
@@ -979,7 +979,7 @@ router.get('/teams/:teamId/tendencies', [
       GROUP BY p.id, p.first_name, p.last_name, p.jersey_number
       ORDER BY shots DESC
       LIMIT 5
-    `, [teamId, limit]);
+    `, [clubId, limit]);
 
     res.json({
       overall: {
@@ -1017,10 +1017,10 @@ router.get('/teams/:teamId/tendencies', [
 
 /**
  * Phase 4: Get matchup analysis
- * Compare team performance against specific opponents
+ * Compare club performance against specific opponents
  */
-router.get('/teams/:teamId/matchup/:opponentId', [
-  param('teamId').isInt().withMessage('Team ID must be an integer'),
+router.get('/clubs/:clubId/matchup/:opponentId', [
+  param('clubId').isInt().withMessage('Club ID must be an integer'),
   param('opponentId').isInt().withMessage('Opponent ID must be an integer'),
   query('limit').optional().isInt({ min: 1, max: 20 }).withMessage('Limit must be between 1 and 20')
 ], async (req, res) => {
@@ -1029,33 +1029,33 @@ router.get('/teams/:teamId/matchup/:opponentId', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { teamId, opponentId } = req.params;
+  const { clubId, opponentId } = req.params;
   const { limit = 5 } = req.query;
 
   try {
-    // Find games between these two teams
+    // Find games between these two clubs
     const games = await db.query(`
       SELECT DISTINCT g.id, g.date
       FROM games g
-      WHERE (g.home_team_id = $1 AND g.away_team_id = $2)
-         OR (g.home_team_id = $2 AND g.away_team_id = $1)
+      WHERE (g.home_club_id = $1 AND g.away_club_id = $2)
+         OR (g.home_club_id = $2 AND g.away_club_id = $1)
       ORDER BY g.date DESC
       LIMIT $3
-    `, [teamId, opponentId, limit]);
+    `, [clubId, opponentId, limit]);
 
     const gameIds = games.rows.map(g => g.id);
 
     if (gameIds.length === 0) {
       return res.json({
         games_played: 0,
-        message: 'No games found between these teams',
-        team_stats: null,
+        message: 'No games found between these clubs',
+        club_stats: null,
         opponent_stats: null
       });
     }
 
-    // Get team stats in these matchups
-    const teamStats = await db.query(`
+    // Get club stats in these matchups
+    const clubStats = await db.query(`
       SELECT 
         COUNT(*) as total_shots,
         COUNT(CASE WHEN result = 'goal' THEN 1 END) as total_goals,
@@ -1066,8 +1066,8 @@ router.get('/teams/:teamId/matchup/:opponentId', [
         ) as avg_fg_percentage,
         ROUND(AVG(distance), 2) as avg_distance
       FROM shots
-      WHERE team_id = $1 AND game_id = ANY($2)
-    `, [teamId, gameIds]);
+      WHERE club_id = $1 AND game_id = ANY($2)
+    `, [clubId, gameIds]);
 
     // Get opponent stats in these matchups
     const opponentStats = await db.query(`
@@ -1081,17 +1081,17 @@ router.get('/teams/:teamId/matchup/:opponentId', [
         ) as avg_fg_percentage,
         ROUND(AVG(distance), 2) as avg_distance
       FROM shots
-      WHERE team_id = $1 AND game_id = ANY($2)
+      WHERE club_id = $1 AND game_id = ANY($2)
     `, [opponentId, gameIds]);
 
     res.json({
       games_played: games.rows.length,
       game_dates: games.rows.map(g => g.date),
-      team_stats: {
-        total_shots: parseInt(teamStats.rows[0].total_shots),
-        total_goals: parseInt(teamStats.rows[0].total_goals),
-        avg_fg_percentage: parseFloat(teamStats.rows[0].avg_fg_percentage) || 0,
-        avg_distance: parseFloat(teamStats.rows[0].avg_distance) || 0
+      club_stats: {
+        total_shots: parseInt(clubStats.rows[0].total_shots),
+        total_goals: parseInt(clubStats.rows[0].total_goals),
+        avg_fg_percentage: parseFloat(clubStats.rows[0].avg_fg_percentage) || 0,
+        avg_distance: parseFloat(clubStats.rows[0].avg_distance) || 0
       },
       opponent_stats: {
         total_shots: parseInt(opponentStats.rows[0].total_shots),

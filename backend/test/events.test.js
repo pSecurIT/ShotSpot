@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 describe('🎯 Events API', () => {
   let adminToken, coachToken, userToken;
   let adminUser, coachUser, regularUser;
-  let team1, team2, player1, player2, game;
+  let club1, club2, player1, player2, game;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Events API tests...');
@@ -40,35 +40,35 @@ describe('🎯 Events API', () => {
       userToken = jwt.sign({ id: regularUser.id, role: regularUser.role }, jwtSecret, { expiresIn: '1h' });
 
       // Create teams with unique names
-      const team1Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club1Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Test Team Events 1 ${uniqueId}`]
       );
-      team1 = team1Result.rows[0];
+      club1 = club1Result.rows[0];
 
-      const team2Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club2Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Test Team Events 2 ${uniqueId}`]
       );
-      team2 = team2Result.rows[0];
+      club2 = club2Result.rows[0];
 
       // Create players
       const player1Result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team1.id, 'Event', 'Player1', 10]
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club1.id, 'Event', 'Player1', 10]
       );
       player1 = player1Result.rows[0];
 
       const player2Result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team2.id, 'Event', 'Player2', 20]
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club2.id, 'Event', 'Player2', 20]
       );
       player2 = player2Result.rows[0];
 
       // Create an in_progress game
       const gameResult = await db.query(
-        'INSERT INTO games (home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team1.id, team2.id, new Date(), 'in_progress']
+        'INSERT INTO games (home_club_id, away_club_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club1.id, club2.id, new Date(), 'in_progress']
       );
       game = gameResult.rows[0];
     } catch (error) {
@@ -87,7 +87,7 @@ describe('🎯 Events API', () => {
       await db.query('DELETE FROM game_events WHERE game_id = $1', [game.id]);
       await db.query('DELETE FROM games WHERE id = $1', [game.id]);
       await db.query('DELETE FROM players WHERE id IN ($1, $2)', [player1.id, player2.id]);
-      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [team1.id, team2.id]);
+      await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [club1.id, club2.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
     } catch (error) {
       console.error('⚠️ Events API cleanup failed:', error.message);
@@ -108,7 +108,7 @@ describe('🎯 Events API', () => {
           .send({
             event_type: 'foul',
             player_id: player1.id,
-            team_id: team1.id,
+            club_id: club1.id,
             period: 1,
             time_remaining: '00:08:30',
             details: { foul_type: 'offensive', description: 'Pushing opponent' }
@@ -118,11 +118,11 @@ describe('🎯 Events API', () => {
         expect(response.body).toMatchObject({
           event_type: 'foul',
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1,
           first_name: 'Event',
           last_name: 'Player1',
-          team_name: team1.name
+          club_name: club1.name
         });
         expect(response.body.details).toMatchObject({
           foul_type: 'offensive',
@@ -142,14 +142,14 @@ describe('🎯 Events API', () => {
           .send({
             event_type: 'substitution',
             player_id: player1.id,
-            team_id: team1.id,
+            club_id: club1.id,
             period: 2,
             details: { player_in: player2.id, player_out: player1.id }
           });
 
         expect(response.status).toBe(201);
         expect(response.body.event_type).toBe('substitution');
-        expect(response.body.team_id).toBe(team1.id);
+        expect(response.body.club_id).toBe(club1.id);
       } catch (error) {
         global.testContext.logTestError(error, 'POST create substitution event failed');
         throw error;
@@ -163,7 +163,7 @@ describe('🎯 Events API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             event_type: 'timeout',
-            team_id: team1.id,
+            club_id: club1.id,
             period: 3,
             time_remaining: '00:05:00'
           });
@@ -184,7 +184,7 @@ describe('🎯 Events API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             event_type: 'period_start',
-            team_id: team1.id,
+            club_id: club1.id,
             period: 1,
             details: { period_number: 1 }
           });
@@ -205,7 +205,7 @@ describe('🎯 Events API', () => {
           .send({
             event_type: 'foul',
             player_id: player1.id,
-            team_id: team1.id,
+            club_id: club1.id,
             period: 1
           });
 
@@ -223,7 +223,7 @@ describe('🎯 Events API', () => {
         .send({
           event_type: 'foul',
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1
         });
 
@@ -234,8 +234,8 @@ describe('🎯 Events API', () => {
     it('should reject event for game not in progress', async () => {
       // Create a scheduled game
       const scheduledGame = await db.query(
-        'INSERT INTO games (home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team1.id, team2.id, new Date(), 'scheduled']
+        'INSERT INTO games (home_club_id, away_club_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club1.id, club2.id, new Date(), 'scheduled']
       );
 
       const response = await request(app)
@@ -244,7 +244,7 @@ describe('🎯 Events API', () => {
         .send({
           event_type: 'foul',
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1
         });
 
@@ -261,7 +261,7 @@ describe('🎯 Events API', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           event_type: 'invalid_type',
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1
         });
 
@@ -274,7 +274,7 @@ describe('🎯 Events API', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           event_type: 'foul',
-          team_id: team1.id,
+          club_id: club1.id,
           period: 5 // Invalid, max is 4
         });
 
@@ -284,11 +284,11 @@ describe('🎯 Events API', () => {
     it('should reject player from non-participating team', async () => {
       // Create a third team not in the game
       const team3 = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         ['Test Team Events 3']
       );
       const player3 = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
         [team3.rows[0].id, 'Other', 'Player', 99]
       );
 
@@ -298,7 +298,7 @@ describe('🎯 Events API', () => {
         .send({
           event_type: 'foul',
           player_id: player3.rows[0].id,
-          team_id: team3.rows[0].id,
+          club_id: team3.rows[0].id,
           period: 1
         });
 
@@ -307,7 +307,7 @@ describe('🎯 Events API', () => {
 
       // Cleanup
       await db.query('DELETE FROM players WHERE id = $1', [player3.rows[0].id]);
-      await db.query('DELETE FROM teams WHERE id = $1', [team3.rows[0].id]);
+      await db.query('DELETE FROM clubs WHERE id = $1', [team3.rows[0].id]);
     });
 
     it('should reject player from different team', async () => {
@@ -317,7 +317,7 @@ describe('🎯 Events API', () => {
         .send({
           event_type: 'foul',
           player_id: player2.id, // Player from team2
-          team_id: team1.id,      // But claiming team1
+          club_id: club1.id,      // But claiming team1
           period: 1
         });
 
@@ -333,16 +333,16 @@ describe('🎯 Events API', () => {
       
       // Create multiple events
       await db.query(
-        'INSERT INTO game_events (game_id, event_type, player_id, team_id, period) VALUES ($1, $2, $3, $4, $5)',
-        [game.id, 'foul', player1.id, team1.id, 1]
+        'INSERT INTO game_events (game_id, event_type, player_id, club_id, period) VALUES ($1, $2, $3, $4, $5)',
+        [game.id, 'foul', player1.id, club1.id, 1]
       );
       await db.query(
-        'INSERT INTO game_events (game_id, event_type, player_id, team_id, period) VALUES ($1, $2, $3, $4, $5)',
-        [game.id, 'substitution', player2.id, team2.id, 2]
+        'INSERT INTO game_events (game_id, event_type, player_id, club_id, period) VALUES ($1, $2, $3, $4, $5)',
+        [game.id, 'substitution', player2.id, club2.id, 2]
       );
       await db.query(
-        'INSERT INTO game_events (game_id, event_type, team_id, period) VALUES ($1, $2, $3, $4)',
-        [game.id, 'timeout', team1.id, 3]
+        'INSERT INTO game_events (game_id, event_type, club_id, period) VALUES ($1, $2, $3, $4)',
+        [game.id, 'timeout', club1.id, 3]
       );
     });
 
@@ -355,7 +355,7 @@ describe('🎯 Events API', () => {
         expect(response.status).toBe(200);
         expect(response.body.length).toBe(3);
         expect(response.body[0]).toHaveProperty('event_type');
-        expect(response.body[0]).toHaveProperty('team_name');
+        expect(response.body[0]).toHaveProperty('club_name');
       } catch (error) {
         global.testContext.logTestError(error, 'GET all events failed');
         throw error;
@@ -377,17 +377,17 @@ describe('🎯 Events API', () => {
       }
     });
 
-    it('✅ should filter events by team_id', async () => {
+    it('✅ should filter events by club_id', async () => {
       try {
         const response = await request(app)
-          .get(`/api/events/${game.id}?team_id=${team1.id}`)
+          .get(`/api/events/${game.id}?club_id=${club1.id}`)
           .set('Authorization', `Bearer ${userToken}`);
 
         expect(response.status).toBe(200);
         expect(response.body.length).toBe(2); // foul and timeout
-        expect(response.body.every(e => e.team_id === team1.id)).toBe(true);
+        expect(response.body.every(e => e.club_id === club1.id)).toBe(true);
       } catch (error) {
-        global.testContext.logTestError(error, 'GET events by team_id filter failed');
+        global.testContext.logTestError(error, 'GET events by club_id filter failed');
         throw error;
       }
     });
@@ -444,8 +444,8 @@ describe('🎯 Events API', () => {
       await db.query('DELETE FROM game_events WHERE game_id = $1', [game.id]);
       
       const result = await db.query(
-        'INSERT INTO game_events (game_id, event_type, player_id, team_id, period) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [game.id, 'foul', player1.id, team1.id, 1]
+        'INSERT INTO game_events (game_id, event_type, player_id, club_id, period) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [game.id, 'foul', player1.id, club1.id, 1]
       );
       testEvent = result.rows[0];
     });
@@ -555,8 +555,8 @@ describe('🎯 Events API', () => {
       await db.query('DELETE FROM game_events WHERE game_id = $1', [game.id]);
       
       const result = await db.query(
-        'INSERT INTO game_events (game_id, event_type, player_id, team_id, period) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [game.id, 'foul', player1.id, team1.id, 1]
+        'INSERT INTO game_events (game_id, event_type, player_id, club_id, period) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [game.id, 'foul', player1.id, club1.id, 1]
       );
       testEvent = result.rows[0];
     });
@@ -621,7 +621,7 @@ describe('🎯 Events API', () => {
           .send({
             event_type: 'fault_offensive',
             player_id: player1.id,
-            team_id: team1.id,
+            club_id: club1.id,
             period: 1,
             time_remaining: '00:08:30',
             details: { 
@@ -652,7 +652,7 @@ describe('🎯 Events API', () => {
           .send({
             event_type: 'fault_defensive',
             player_id: player2.id,
-            team_id: team2.id,
+            club_id: club2.id,
             period: 2,
             details: { 
               reason: 'hindering_shot',
@@ -676,7 +676,7 @@ describe('🎯 Events API', () => {
           .send({
             event_type: 'fault_out_of_bounds',
             player_id: player1.id,
-            team_id: team1.id,
+            club_id: club1.id,
             period: 1,
             details: { 
               reason: 'ball_out',
@@ -700,7 +700,7 @@ describe('🎯 Events API', () => {
           .send({
             event_type: 'fault_offensive',
             player_id: player1.id,
-            team_id: team1.id,
+            club_id: club1.id,
             period: 1,
             details: { reason: 'invalid_reason' }
           });
@@ -726,7 +726,7 @@ describe('🎯 Events API', () => {
         .send({
           game_id: game.id,
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1,
           time_remaining: '00:05:30',
           free_shot_type: 'free_shot',
@@ -753,7 +753,7 @@ describe('🎯 Events API', () => {
         .send({
           game_id: game.id,
           player_id: player2.id,
-          team_id: team2.id,
+          club_id: club2.id,
           period: 2,
           free_shot_type: 'penalty',
           reason: 'Serious foul',
@@ -773,7 +773,7 @@ describe('🎯 Events API', () => {
         .send({
           game_id: game.id,
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1,
           free_shot_type: 'free_shot',
           result: 'goal'
@@ -785,7 +785,7 @@ describe('🎯 Events API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.length).toBe(1);
-      expect(response.body[0]).toHaveProperty('team_name');
+      expect(response.body[0]).toHaveProperty('club_name');
       expect(response.body[0]).toHaveProperty('first_name');
     });
 
@@ -796,7 +796,7 @@ describe('🎯 Events API', () => {
         .send({
           game_id: game.id,
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1,
           free_shot_type: 'invalid_type',
           result: 'goal'
@@ -812,7 +812,7 @@ describe('🎯 Events API', () => {
         .send({
           game_id: game.id,
           player_id: player1.id,
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1,
           free_shot_type: 'free_shot',
           result: 'invalid_result'
@@ -833,7 +833,7 @@ describe('🎯 Events API', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           game_id: game.id,
-          team_id: team1.id,
+          club_id: club1.id,
           timeout_type: 'team',
           period: 1,
           time_remaining: '00:05:00',
@@ -856,7 +856,7 @@ describe('🎯 Events API', () => {
         .set('Authorization', `Bearer ${coachToken}`)
         .send({
           game_id: game.id,
-          team_id: team2.id,
+          club_id: club2.id,
           timeout_type: 'injury',
           period: 2,
           duration: '00:03:00',
@@ -883,7 +883,7 @@ describe('🎯 Events API', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.timeout_type).toBe('official');
-      expect(response.body.team_id).toBeNull();
+      expect(response.body.club_id).toBeNull();
     });
 
     it('should get all timeouts for a game', async () => {
@@ -893,7 +893,7 @@ describe('🎯 Events API', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           game_id: game.id,
-          team_id: team1.id,
+          club_id: club1.id,
           timeout_type: 'team',
           period: 1
         });
@@ -920,7 +920,7 @@ describe('🎯 Events API', () => {
       expect(response.status).toBe(400);
     });
 
-    it('should require team_id for team timeouts', async () => {
+    it('should require club_id for team timeouts', async () => {
       const response = await request(app)
         .post('/api/timeouts')
         .set('Authorization', `Bearer ${adminToken}`)
@@ -931,7 +931,7 @@ describe('🎯 Events API', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('team_id is required for team timeouts');
+      expect(response.body.error).toContain('club_id is required for team timeouts');
     });
   });
 
@@ -1099,7 +1099,7 @@ describe('🎯 Events API', () => {
           .send({
             event_type: 'fault_offensive',
             player_id: player1.id,
-            team_id: team1.id,
+            club_id: club1.id,
             period: 1
           }),
 
@@ -1109,7 +1109,7 @@ describe('🎯 Events API', () => {
           .send({
             game_id: game.id,
             player_id: player2.id,
-            team_id: team2.id,
+            club_id: club2.id,
             period: 1,
             free_shot_type: 'free_shot',
             result: 'goal'
@@ -1120,7 +1120,7 @@ describe('🎯 Events API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             game_id: game.id,
-            team_id: team1.id,
+            club_id: club1.id,
             timeout_type: 'team',
             period: 2
           }),
@@ -1162,7 +1162,7 @@ describe('🎯 Events API', () => {
           .send({
             game_id: game.id,
             player_id: player1.id,
-            team_id: team1.id,
+            club_id: club1.id,
             period: 1,
             free_shot_type: 'free_shot',
             result: 'goal'
@@ -1173,7 +1173,7 @@ describe('🎯 Events API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             game_id: game.id,
-            team_id: team1.id,
+            club_id: club1.id,
             timeout_type: 'team',
             period: 1
           })
@@ -1196,7 +1196,7 @@ describe('🎯 Events API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             game_id: game.id,
-            team_id: team1.id,
+            club_id: club1.id,
             timeout_type: 'team',
             period: 1
           }),
@@ -1206,7 +1206,7 @@ describe('🎯 Events API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             game_id: game.id,
-            team_id: team2.id,
+            club_id: club2.id,
             timeout_type: 'team',
             period: 2
           })
@@ -1222,3 +1222,5 @@ describe('🎯 Events API', () => {
     }, 30000);
   });
 });
+
+

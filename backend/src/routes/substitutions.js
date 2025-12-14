@@ -17,7 +17,7 @@ router.get(
   '/:gameId',
   [
     param('gameId').isInt().withMessage('Game ID must be an integer'),
-    query('team_id').optional().isInt().withMessage('Team ID must be an integer'),
+    query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
     query('period').optional().isInt({ min: 1 }).withMessage('Period must be a positive integer'),
     query('player_id').optional().isInt().withMessage('Player ID must be an integer')
   ],
@@ -28,7 +28,7 @@ router.get(
     }
 
     const { gameId } = req.params;
-    const { team_id, period, player_id } = req.query;
+    const { club_id, period, player_id } = req.query;
 
     try {
       let query = `
@@ -40,19 +40,19 @@ router.get(
           pout.first_name as player_out_first_name,
           pout.last_name as player_out_last_name,
           pout.jersey_number as player_out_jersey_number,
-          t.name as team_name
+          c.name as club_name
         FROM substitutions s
         JOIN players pin ON s.player_in_id = pin.id
         JOIN players pout ON s.player_out_id = pout.id
-        JOIN teams t ON s.team_id = t.id
+        JOIN clubs c ON s.club_id = c.id
         WHERE s.game_id = $1
       `;
       const params = [gameId];
       let paramIndex = 2;
 
-      if (team_id) {
-        query += ` AND s.team_id = $${paramIndex}`;
-        params.push(team_id);
+      if (club_id) {
+        query += ` AND s.club_id = $${paramIndex}`;
+        params.push(club_id);
         paramIndex++;
       }
 
@@ -100,18 +100,18 @@ router.get(
       const rosterResult = await pool.query(
         `SELECT 
           gr.player_id,
-          gr.team_id,
+          gr.club_id,
           gr.is_starting,
           p.first_name,
           p.last_name,
           p.jersey_number,
           p.gender,
-          t.name as team_name
+          c.name as club_name
          FROM game_rosters gr
          JOIN players p ON gr.player_id = p.id
-         JOIN teams t ON gr.team_id = t.id
+         JOIN clubs c ON gr.club_id = c.id
          WHERE gr.game_id = $1
-         ORDER BY gr.team_id, p.jersey_number`,
+         ORDER BY gr.club_id, p.jersey_number`,
         [gameId]
       );
 
@@ -121,7 +121,7 @@ router.get(
 
       // Get all substitutions for this game
       const subsResult = await pool.query(
-        `SELECT player_in_id, player_out_id, team_id, created_at
+        `SELECT player_in_id, player_out_id, club_id, created_at
          FROM substitutions
          WHERE game_id = $1
          ORDER BY created_at ASC`,
@@ -152,21 +152,21 @@ router.get(
         const isActive = activePlayers.get(player.player_id);
         const playerData = {
           id: player.player_id,
-          team_id: player.team_id,
+          club_id: player.club_id,
           first_name: player.first_name,
           last_name: player.last_name,
           jersey_number: player.jersey_number,
           gender: player.gender,
-          team_name: player.team_name
+          club_name: player.club_name
         };
 
-        // Determine which team (we'll use first player's team as reference)
-        const teamKey = player.team_id === rosterResult.rows[0].team_id ? 'home_team' : 'away_team';
+        // Determine which club (we'll use first player's club as reference)
+        const clubKey = player.club_id === rosterResult.rows[0].club_id ? 'home_club' : 'away_club';
         
         if (isActive) {
-          response[teamKey].active.push(playerData);
+          response[clubKey].active.push(playerData);
         } else {
-          response[teamKey].bench.push(playerData);
+          response[clubKey].bench.push(playerData);
         }
       });
 
@@ -188,7 +188,7 @@ router.post(
   [
     requireRole(['admin', 'coach']),
     param('gameId').isInt().withMessage('Game ID must be an integer'),
-    body('team_id').isInt({ min: 1 }).withMessage('Team ID must be a positive integer'),
+    body('club_id').isInt({ min: 1 }).withMessage('Club ID must be a positive integer'),
     body('player_in_id').isInt({ min: 1 }).withMessage('Player in ID must be a positive integer'),
     body('player_out_id').isInt({ min: 1 }).withMessage('Player out ID must be a positive integer'),
     body('period').isInt({ min: 1 }).withMessage('Period must be a positive integer'),
@@ -205,7 +205,7 @@ router.post(
     }
 
     const { gameId } = req.params;
-    const { team_id, player_in_id, player_out_id, period, time_remaining, reason } = req.body;
+    const { club_id, player_in_id, player_out_id, period, time_remaining, reason } = req.body;
 
     try {
       // Validate: player_in and player_out must be different
@@ -217,7 +217,7 @@ router.post(
 
       // Verify game exists and is in progress
       const gameResult = await pool.query(
-        'SELECT id, status, home_team_id, away_team_id FROM games WHERE id = $1',
+        'SELECT id, status, home_club_id, away_club_id FROM games WHERE id = $1',
         [gameId]
       );
 
@@ -235,15 +235,15 @@ router.post(
         });
       }
 
-      // Verify team is participating in the game
-      if (team_id !== game.home_team_id && team_id !== game.away_team_id) {
+      // Verify club is participating in the game
+      if (club_id !== game.home_club_id && club_id !== game.away_club_id) {
         await pool.query('ROLLBACK');
-        return res.status(400).json({ error: 'Team is not participating in this game' });
+        return res.status(400).json({ error: 'Club is not participating in this game' });
       }
 
-      // Verify both players exist and belong to the team
+      // Verify both players exist and belong to the club
       const playersResult = await pool.query(
-        'SELECT id, team_id, first_name, last_name, jersey_number FROM players WHERE id = ANY($1)',
+        'SELECT id, club_id, first_name, last_name, jersey_number FROM players WHERE id = ANY($1)',
         [[player_in_id, player_out_id]]
       );
 
@@ -255,9 +255,9 @@ router.post(
       const playerIn = playersResult.rows.find(p => p.id === player_in_id);
       const playerOut = playersResult.rows.find(p => p.id === player_out_id);
 
-      if (playerIn.team_id !== team_id || playerOut.team_id !== team_id) {
+      if (playerIn.club_id !== club_id || playerOut.club_id !== club_id) {
         await pool.query('ROLLBACK');
-        return res.status(400).json({ error: 'Both players must belong to the specified team' });
+        return res.status(400).json({ error: 'Both players must belong to the specified club' });
       }
 
       // Verify both players are in the game roster
@@ -333,10 +333,10 @@ router.post(
 
       // Insert the substitution
       const insertResult = await pool.query(
-        `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, time_remaining, reason)
+        `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, time_remaining, reason)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [gameId, team_id, player_in_id, player_out_id, period, time_remaining || null, reason || 'tactical']
+        [gameId, club_id, player_in_id, player_out_id, period, time_remaining || null, reason || 'tactical']
       );
 
       await pool.query('COMMIT');
@@ -351,11 +351,11 @@ router.post(
           pout.first_name as player_out_first_name,
           pout.last_name as player_out_last_name,
           pout.jersey_number as player_out_jersey_number,
-          t.name as team_name
+          c.name as club_name
         FROM substitutions s
         JOIN players pin ON s.player_in_id = pin.id
         JOIN players pout ON s.player_out_id = pout.id
-        JOIN teams t ON s.team_id = t.id
+        JOIN clubs c ON s.club_id = c.id
         WHERE s.id = $1`,
         [insertResult.rows[0].id]
       );
