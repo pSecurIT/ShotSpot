@@ -10,8 +10,8 @@ describe('📤 Exports API', () => {
   let adminUser;
   let coachUser;
   let regularUser;
-  let team1;
-  let team2;
+  let club1;
+  let club2;
   let player1;
   let player2;
   let game1;
@@ -48,82 +48,82 @@ describe('📤 Exports API', () => {
       userToken = jwt.sign({ id: regularUser.id, role: 'user' }, process.env.JWT_SECRET);
 
       // Create test teams
-      const team1Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club1Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Export Team Alpha ${uniqueId}`]
       );
-      team1 = team1Result.rows[0];
+      club1 = club1Result.rows[0];
 
-      const team2Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club2Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Export Team Beta ${uniqueId}`]
       );
-      team2 = team2Result.rows[0];
+      club2 = club2Result.rows[0];
 
       // Create test players
       const player1Result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [team1.id, 'John', 'Doe', 10, 'male']
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [club1.id, 'John', 'Doe', 10, 'male']
       );
       player1 = player1Result.rows[0];
 
       const player2Result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [team2.id, 'Jane', 'Smith', 20, 'female']
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [club2.id, 'Jane', 'Smith', 20, 'female']
       );
       player2 = player2Result.rows[0];
 
       // Create test games
       const game1Result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score, current_period) 
+        `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score, current_period) 
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [team1.id, team2.id, new Date('2025-11-01'), 'completed', 15, 12, 4]
+        [club1.id, club2.id, new Date('2025-11-01'), 'completed', 15, 12, 4]
       );
       game1 = game1Result.rows[0];
 
       const game2Result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score, current_period) 
+        `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score, current_period) 
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [team2.id, team1.id, new Date('2025-11-08'), 'completed', 18, 16, 4]
+        [club2.id, club1.id, new Date('2025-11-08'), 'completed', 18, 16, 4]
       );
       game2 = game2Result.rows[0];
 
       // Add players to game rosters
       await db.query(
-        'INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position) VALUES ($1, $2, $3, $4, $5, $6)',
-        [game1.id, team1.id, player1.id, true, true, 'offense']
+        'INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting, starting_position) VALUES ($1, $2, $3, $4, $5, $6)',
+        [game1.id, club1.id, player1.id, true, true, 'offense']
       );
       await db.query(
-        'INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position) VALUES ($1, $2, $3, $4, $5, $6)',
-        [game1.id, team2.id, player2.id, false, true, 'defense']
+        'INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting, starting_position) VALUES ($1, $2, $3, $4, $5, $6)',
+        [game1.id, club2.id, player2.id, false, true, 'defense']
       );
       await db.query(
-        'INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position) VALUES ($1, $2, $3, $4, $5, $6)',
-        [game2.id, team1.id, player1.id, true, true, 'offense']
+        'INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting, starting_position) VALUES ($1, $2, $3, $4, $5, $6)',
+        [game2.id, club1.id, player1.id, true, true, 'offense']
       );
       await db.query(
-        'INSERT INTO game_rosters (game_id, team_id, player_id, is_captain, is_starting, starting_position) VALUES ($1, $2, $3, $4, $5, $6)',
-        [game2.id, team2.id, player2.id, false, true, 'defense']
+        'INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting, starting_position) VALUES ($1, $2, $3, $4, $5, $6)',
+        [game2.id, club2.id, player2.id, false, true, 'defense']
       );
 
       // Add test shots
       await db.query(
-        'INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, shot_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-        [game1.id, player1.id, team1.id, 10.5, 5.3, 'goal', 1, 'standard']
+        'INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, shot_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+        [game1.id, player1.id, club1.id, 10.5, 5.3, 'goal', 1, 'standard']
       );
       await db.query(
-        'INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, shot_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-        [game1.id, player1.id, team1.id, 12.0, 6.0, 'miss', 2, 'standard']
+        'INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, shot_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+        [game1.id, player1.id, club1.id, 12.0, 6.0, 'miss', 2, 'standard']
       );
       await db.query(
-        'INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, shot_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-        [game1.id, player2.id, team2.id, 8.5, 4.2, 'goal', 1, 'standard']
+        'INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, shot_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+        [game1.id, player2.id, club2.id, 8.5, 4.2, 'goal', 1, 'standard']
       );
 
       // Add test events
       await db.query(
-        'INSERT INTO game_events (game_id, event_type, player_id, team_id, period) VALUES ($1, $2, $3, $4, $5)',
-        [game1.id, 'foul', player1.id, team1.id, 2]
+        'INSERT INTO game_events (game_id, event_type, player_id, club_id, period) VALUES ($1, $2, $3, $4, $5)',
+        [game1.id, 'foul', player1.id, club1.id, 2]
       );
     } catch (error) {
       console.error('⚠️ Exports API setup failed:', error.message);
@@ -140,7 +140,7 @@ describe('📤 Exports API', () => {
       await db.query('DELETE FROM game_rosters WHERE game_id IN ($1, $2)', [game1.id, game2.id]);
       await db.query('DELETE FROM games WHERE id IN ($1, $2)', [game1.id, game2.id]);
       await db.query('DELETE FROM players WHERE id IN ($1, $2)', [player1.id, player2.id]);
-      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [team1.id, team2.id]);
+      await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [club1.id, club2.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
     } catch (error) {
       console.error('⚠️ Exports API cleanup failed:', error.message);
@@ -267,7 +267,7 @@ describe('📤 Exports API', () => {
       const response = await request(app)
         .post('/api/exports/season-pdf')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ team_id: team1.id });
+        .send({ team_id: club1.id });
 
       expect(response.status).toBe(200);
       expect(response.headers['content-type']).toBe('application/pdf');
@@ -326,7 +326,7 @@ describe('📤 Exports API', () => {
       const response = await request(app)
         .get('/api/exports/season-csv')
         .set('Authorization', `Bearer ${authToken}`)
-        .query({ team_id: team1.id });
+        .query({ team_id: club1.id });
 
       expect(response.status).toBe(200);
       expect(response.headers['content-type']).toBe('text/csv; charset=utf-8');
@@ -503,3 +503,6 @@ describe('📤 Exports API', () => {
     });
   });
 });
+
+
+

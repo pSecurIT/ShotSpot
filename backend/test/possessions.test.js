@@ -6,13 +6,13 @@ import jwt from 'jsonwebtoken';
 describe('🏃 Ball Possessions API', () => {
   let adminToken, coachToken, userToken;
   let adminUser, coachUser, regularUser;
-  let team1, team2, player1, player2, game;
+  let club1, club2, player1, player2, game;
   let testUsers = [], testTeams = [], testPlayers = [], testGames = [];
 
   // Helper function to create test games
   async function createTestGame(gameData) {
     const gameResult = await db.query(
-      'INSERT INTO games (home_team_id, away_team_id, date, status, created_at) VALUES ($1, $2, COALESCE($3, CURRENT_TIMESTAMP), $4, CURRENT_TIMESTAMP) RETURNING *',
+      'INSERT INTO games (home_club_id, away_club_id, date, status, created_at) VALUES ($1, $2, COALESCE($3, CURRENT_TIMESTAMP), $4, CURRENT_TIMESTAMP) RETURNING *',
       [gameData.homeTeamId, gameData.awayTeamId, gameData.date, gameData.status || 'in_progress']
     );
     const newGame = gameResult.rows[0];
@@ -87,39 +87,39 @@ describe('🏃 Ball Possessions API', () => {
       );
 
       // Create test teams
-      const team1Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club1Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Team One Possessions ${uniqueId}`]
       );
-      team1 = team1Result.rows[0];
-      testTeams.push(team1.id);
+      club1 = club1Result.rows[0];
+      testTeams.push(club1.id);
 
-      const team2Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club2Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Team Two Possessions ${uniqueId}`]
       );
-      team2 = team2Result.rows[0];
-      testTeams.push(team2.id);
+      club2 = club2Result.rows[0];
+      testTeams.push(club2.id);
 
       // Create test players
       const player1Result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team1.id, 'John', 'Doe', 1]
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club1.id, 'John', 'Doe', 1]
       );
       player1 = player1Result.rows[0];
       testPlayers.push(player1.id);
 
       const player2Result = await db.query(
-        'INSERT INTO players (team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team2.id, 'Jane', 'Smith', 2]
+        'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club2.id, 'Jane', 'Smith', 2]
       );
       player2 = player2Result.rows[0];
       testPlayers.push(player2.id);
 
       // Create test game in progress
       const gameResult = await db.query(
-        'INSERT INTO games (home_team_id, away_team_id, status, date) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team1.id, team2.id, 'in_progress', new Date()]
+        'INSERT INTO games (home_club_id, away_club_id, status, date) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club1.id, club2.id, 'in_progress', new Date()]
       );
       game = gameResult.rows[0];
       testGames.push(game.id);
@@ -147,7 +147,7 @@ describe('🏃 Ball Possessions API', () => {
       }
       
       if (testTeams.length > 0) {
-        await db.query('DELETE FROM teams WHERE id = ANY($1)', [testTeams]);
+        await db.query('DELETE FROM clubs WHERE id = ANY($1)', [testTeams]);
       }
       
       if (testUsers.length > 0) {
@@ -164,7 +164,7 @@ describe('🏃 Ball Possessions API', () => {
     describe('✅ Successful Operations', () => {
       it('✅ should start new possession as admin', async () => {
         const possessionData = {
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1
         };
 
@@ -176,7 +176,7 @@ describe('🏃 Ball Possessions API', () => {
 
         expect(response.body).toHaveProperty('id');
         expect(response.body).toHaveProperty('game_id', game.id);
-        expect(response.body).toHaveProperty('team_id', team1.id);
+        expect(response.body).toHaveProperty('club_id', club1.id);
         expect(response.body).toHaveProperty('period', 1);
         expect(response.body).toHaveProperty('started_at');
         expect(response.body).toHaveProperty('ended_at', null);
@@ -185,7 +185,7 @@ describe('🏃 Ball Possessions API', () => {
 
       it('✅ should start new possession as coach', async () => {
         const possessionData = {
-          team_id: team2.id,
+          club_id: club2.id,
           period: 2
         };
 
@@ -195,14 +195,14 @@ describe('🏃 Ball Possessions API', () => {
           .send(possessionData)
           .expect(201);
 
-        expect(response.body).toHaveProperty('team_id', team2.id);
+        expect(response.body).toHaveProperty('club_id', club2.id);
         expect(response.body).toHaveProperty('period', 2);
       });
 
       it('✅ should end previous possession when starting new one', async () => {
         // Start first possession
         const firstPossession = {
-          team_id: team1.id,
+          club_id: club1.id,
           period: 1
         };
 
@@ -216,7 +216,7 @@ describe('🏃 Ball Possessions API', () => {
 
         // Start second possession (should auto-end first)
         const secondPossession = {
-          team_id: team2.id,
+          club_id: club2.id,
           period: 1
         };
 
@@ -243,7 +243,7 @@ describe('🏃 Ball Possessions API', () => {
       it('❌ should require authentication', async () => {
         await request(app)
           .post(`/api/possessions/${game.id}`)
-          .send({ team_id: team1.id, period: 1 })
+          .send({ club_id: club1.id, period: 1 })
           .expect(401);
       });
 
@@ -251,7 +251,7 @@ describe('🏃 Ball Possessions API', () => {
         await request(app)
           .post(`/api/possessions/${game.id}`)
           .set('Authorization', `Bearer ${userToken}`)
-          .send({ team_id: team1.id, period: 1 })
+          .send({ club_id: club1.id, period: 1 })
           .expect(403);
       });
 
@@ -267,13 +267,13 @@ describe('🏃 Ball Possessions API', () => {
         await request(app)
           .post(`/api/possessions/${game.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
-          .send({ team_id: team1.id, period: 0 })
+          .send({ club_id: club1.id, period: 0 })
           .expect(400);
 
         await request(app)
           .post(`/api/possessions/${game.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
-          .send({ team_id: team1.id, period: 11 })
+          .send({ club_id: club1.id, period: 11 })
           .expect(400);
       });
 
@@ -281,7 +281,7 @@ describe('🏃 Ball Possessions API', () => {
         await request(app)
           .post('/api/possessions/invalid')
           .set('Authorization', `Bearer ${adminToken}`)
-          .send({ team_id: team1.id, period: 1 })
+          .send({ club_id: club1.id, period: 1 })
           .expect(400);
       });
     });
@@ -295,7 +295,7 @@ describe('🏃 Ball Possessions API', () => {
       const response = await request(app)
         .post(`/api/possessions/${game.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ team_id: team1.id, period: 1 });
+        .send({ club_id: club1.id, period: 1 });
       
       possessionId = response.body.id;
     });
@@ -333,7 +333,7 @@ describe('🏃 Ball Possessions API', () => {
           const createResponse = await request(app)
             .post(`/api/possessions/${game.id}`)
             .set('Authorization', `Bearer ${adminToken}`)
-            .send({ team_id: team1.id, period: 1 });
+            .send({ club_id: club1.id, period: 1 });
 
           const testPossessionId = createResponse.body.id;
 
@@ -402,10 +402,10 @@ describe('🏃 Ball Possessions API', () => {
     beforeAll(async () => {
       // Create multiple test possessions
       const possessions = [
-        { team_id: team1.id, period: 1 },
-        { team_id: team2.id, period: 1 },
-        { team_id: team1.id, period: 2 },
-        { team_id: team2.id, period: 2 }
+        { club_id: club1.id, period: 1 },
+        { club_id: club2.id, period: 1 },
+        { club_id: club1.id, period: 2 },
+        { club_id: club2.id, period: 2 }
       ];
 
       for (const possession of possessions) {
@@ -438,20 +438,20 @@ describe('🏃 Ball Possessions API', () => {
         const possession = response.body[0];
         expect(possession).toHaveProperty('id');
         expect(possession).toHaveProperty('game_id', game.id);
-        expect(possession).toHaveProperty('team_id');
+        expect(possession).toHaveProperty('club_id');
         expect(possession).toHaveProperty('period');
-        expect(possession).toHaveProperty('team_name');
+        expect(possession).toHaveProperty('club_name');
       });
 
       it('✅ should filter possessions by team_id', async () => {
         const response = await request(app)
-          .get(`/api/possessions/${game.id}?team_id=${team1.id}`)
+          .get(`/api/possessions/${game.id}?team_id=${club1.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .expect(200);
 
         expect(Array.isArray(response.body)).toBe(true);
         response.body.forEach(possession => {
-          expect(possession.team_id).toBe(team1.id);
+          expect(possession.club_id).toBe(club1.id);
         });
       });
 
@@ -469,13 +469,13 @@ describe('🏃 Ball Possessions API', () => {
 
       it('✅ should filter by both team_id and period', async () => {
         const response = await request(app)
-          .get(`/api/possessions/${game.id}?team_id=${team2.id}&period=2`)
+          .get(`/api/possessions/${game.id}?team_id=${club2.id}&period=2`)
           .set('Authorization', `Bearer ${adminToken}`)
           .expect(200);
 
         expect(Array.isArray(response.body)).toBe(true);
         response.body.forEach(possession => {
-          expect(possession.team_id).toBe(team2.id);
+          expect(possession.club_id).toBe(club2.id);
           expect(possession.period).toBe(2);
         });
       });
@@ -525,7 +525,7 @@ describe('🏃 Ball Possessions API', () => {
         const createResponse = await request(app)
           .post(`/api/possessions/${game.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
-          .send({ team_id: team1.id, period: 1 });
+          .send({ club_id: club1.id, period: 1 });
 
         const response = await request(app)
           .get(`/api/possessions/${game.id}/active`)
@@ -533,7 +533,7 @@ describe('🏃 Ball Possessions API', () => {
           .expect(200);
 
         expect(response.body).toHaveProperty('id', createResponse.body.id);
-        expect(response.body).toHaveProperty('team_name');
+        expect(response.body).toHaveProperty('club_name');
         expect(response.body).toHaveProperty('current_duration_seconds');
         expect(response.body.current_duration_seconds).toBeGreaterThanOrEqual(0);
         expect(response.body.ended_at).toBeNull();
@@ -544,7 +544,7 @@ describe('🏃 Ball Possessions API', () => {
         await request(app)
           .post(`/api/possessions/${game.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
-          .send({ team_id: team1.id, period: 1 });
+          .send({ club_id: club1.id, period: 1 });
 
         // Test different user roles
         for (const token of [adminToken, coachToken, userToken]) {
@@ -590,15 +590,15 @@ describe('🏃 Ball Possessions API', () => {
     beforeAll(async () => {
       // Create a separate game for stats tests to avoid interference
       statsTestGame = await createTestGame({
-        homeTeamId: team1.id,
-        awayTeamId: team2.id,
+        homeTeamId: club1.id,
+        awayTeamId: club2.id,
         status: 'in_progress'
       });
       
       // Create minimal test data directly via database to avoid rate limiting
       const scenarios = [
-        { team_id: team1.id, period: 1, result: 'goal', shots: 3 },
-        { team_id: team2.id, period: 1, result: 'turnover', shots: 2 }
+        { club_id: club1.id, period: 1, result: 'goal', shots: 3 },
+        { club_id: club2.id, period: 1, result: 'turnover', shots: 2 }
       ];
 
       for (const scenario of scenarios) {
@@ -623,11 +623,11 @@ describe('🏃 Ball Possessions API', () => {
         expect(Array.isArray(response.body)).toBe(true);
         expect(response.body.length).toBe(2); // Two teams
 
-        const team1Stats = response.body.find(stat => stat.team_id === team1.id);
-        const team2Stats = response.body.find(stat => stat.team_id === team2.id);
+        const team1Stats = response.body.find(stat => stat.club_id === club1.id);
+        const team2Stats = response.body.find(stat => stat.club_id === club2.id);
 
         expect(team1Stats).toBeDefined();
-        expect(team1Stats).toHaveProperty('team_name');
+        expect(team1Stats).toHaveProperty('club_name');
         expect(team1Stats).toHaveProperty('total_possessions', 1);
         expect(team1Stats).toHaveProperty('avg_duration_seconds');
         expect(team1Stats).toHaveProperty('avg_shots_per_possession', '3.00');
@@ -642,8 +642,8 @@ describe('🏃 Ball Possessions API', () => {
       it('✅ should return empty array when no completed possessions', async () => {
         // Create new game with no possessions
         const newGameData = await createTestGame({
-          homeTeamId: team1.id,
-          awayTeamId: team2.id,
+          homeTeamId: club1.id,
+          awayTeamId: club2.id,
           status: 'in_progress'
         });
 
@@ -691,7 +691,7 @@ describe('🏃 Ball Possessions API', () => {
       const response = await request(app)
         .post(`/api/possessions/${game.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ team_id: team1.id, period: 1 });
+        .send({ club_id: club1.id, period: 1 });
       
       possessionId = response.body.id;
     });
@@ -823,8 +823,8 @@ describe('🏃 Ball Possessions API', () => {
     it('🔧 should handle possession flow in complete game scenario', async () => {
       // Create a separate game for this test to avoid contamination
       const testGame = await createTestGame({
-        homeTeamId: team1.id,
-        awayTeamId: team2.id,
+        homeTeamId: club1.id,
+        awayTeamId: club2.id,
         status: 'in_progress'
       });
       
@@ -835,7 +835,7 @@ describe('🏃 Ball Possessions API', () => {
       const possession1 = await request(app)
         .post(`/api/possessions/${testGame.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ team_id: team1.id, period: 1 });
+        .send({ club_id: club1.id, period: 1 });
       
       currentPossessionId = possession1.body.id;
 
@@ -860,7 +860,7 @@ describe('🏃 Ball Possessions API', () => {
       const possession2 = await request(app)
         .post(`/api/possessions/${testGame.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ team_id: team2.id, period: 1 });
+        .send({ club_id: club2.id, period: 1 });
 
       // End with turnover
       await request(app)
@@ -879,11 +879,11 @@ describe('🏃 Ball Possessions API', () => {
       if (statsResponse.status === 200) {
         expect(statsResponse.body.length).toBe(2);
         
-        const team1Stats = statsResponse.body.find(stat => stat.team_id === team1.id);
+        const team1Stats = statsResponse.body.find(stat => stat.club_id === club1.id);
         expect(team1Stats.possessions_with_goal).toBe(1);
         expect(team1Stats.avg_shots_per_possession).toBe('2.00');
 
-        const team2Stats = statsResponse.body.find(stat => stat.team_id === team2.id);
+        const team2Stats = statsResponse.body.find(stat => stat.club_id === club2.id);
         expect(team2Stats.turnovers).toBe(1);
       } else if (statsResponse.status === 429) {
         // Rate limited - this is acceptable in this integration test
@@ -903,7 +903,7 @@ describe('🏃 Ball Possessions API', () => {
             .post(`/api/possessions/${game.id}`)
             .set('Authorization', `Bearer ${adminToken}`)
             .send({ 
-              team_id: i % 2 === 0 ? team1.id : team2.id, 
+              team_id: i % 2 === 0 ? club1.id : club2.id, 
               period: 1 
             })
         );
@@ -925,3 +925,6 @@ describe('🏃 Ball Possessions API', () => {
     }, 30000);
   });
 });
+
+
+

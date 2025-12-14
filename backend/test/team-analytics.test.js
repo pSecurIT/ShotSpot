@@ -6,9 +6,9 @@ import jwt from 'jsonwebtoken';
 describe('📊 Team Analytics API', () => {
   let authToken;
   let adminUser;
-  let team1;
-  let team2;
-  let team3;
+  let club1;
+  let club2;
+  let club3;
   let game1;
   let game2;
   let game3;
@@ -29,63 +29,63 @@ describe('📊 Team Analytics API', () => {
       authToken = jwt.sign({ id: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
 
       // Create test teams
-      const team1Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club1Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Analytics Team 1 ${uniqueId}`]
       );
-      team1 = team1Result.rows[0];
+      club1 = club1Result.rows[0];
 
-      const team2Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club2Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Analytics Team 2 ${uniqueId}`]
       );
-      team2 = team2Result.rows[0];
+      club2 = club2Result.rows[0];
 
-      const team3Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club3Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Analytics Team 3 ${uniqueId}`]
       );
-      team3 = team3Result.rows[0];
+      club3 = club3Result.rows[0];
 
       // Create test player
       const playerResult = await db.query(
-        'INSERT INTO players (first_name, last_name, jersey_number, team_id) VALUES ($1, $2, $3, $4) RETURNING *',
-        ['Analytics', 'Player', 99, team1.id]
+        'INSERT INTO players (first_name, last_name, jersey_number, club_id) VALUES ($1, $2, $3, $4) RETURNING *',
+        ['Analytics', 'Player', 99, club1.id]
       );
       player1 = playerResult.rows[0];
 
       // Create completed games between teams for head-to-head and rankings
       const game1Result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score) 
+        `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score) 
          VALUES ($1, $2, '2024-01-15', 'completed', 5, 3) RETURNING *`,
-        [team1.id, team2.id]
+        [club1.id, club2.id]
       );
       game1 = game1Result.rows[0];
 
       const game2Result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score) 
+        `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score) 
          VALUES ($1, $2, '2024-02-15', 'completed', 4, 4) RETURNING *`,
-        [team2.id, team1.id]
+        [club2.id, club1.id]
       );
       game2 = game2Result.rows[0];
 
       const game3Result = await db.query(
-        `INSERT INTO games (home_team_id, away_team_id, date, status, home_score, away_score) 
+        `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score) 
          VALUES ($1, $2, '2024-03-15', 'completed', 6, 2) RETURNING *`,
-        [team1.id, team2.id]
+        [club1.id, club2.id]
       );
       game3 = game3Result.rows[0];
 
       // Create shots for statistics
       await db.query(
-        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, distance) 
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance) 
          VALUES ($1, $2, $3, 50, 50, 'goal', 1, 5.0)`,
-        [game1.id, player1.id, team1.id]
+        [game1.id, player1.id, club1.id]
       );
       await db.query(
-        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, distance) 
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance) 
          VALUES ($1, $2, $3, 55, 45, 'miss', 1, 6.0)`,
-        [game1.id, player1.id, team1.id]
+        [game1.id, player1.id, club1.id]
       );
 
     } catch (error) {
@@ -97,12 +97,12 @@ describe('📊 Team Analytics API', () => {
   afterAll(async () => {
     console.log('✅ Team Analytics API tests completed');
     try {
-      await db.query('DELETE FROM team_rankings WHERE team_id IN ($1, $2, $3)', [team1.id, team2.id, team3.id]);
-      await db.query('DELETE FROM head_to_head WHERE team1_id = $1 OR team2_id = $1 OR team1_id = $2 OR team2_id = $2', [team1.id, team2.id]);
+      await db.query('DELETE FROM team_rankings WHERE club_id IN ($1, $2, $3)', [club1.id, club2.id, club3.id]);
+      await db.query('DELETE FROM head_to_head WHERE team1_id = $1 OR team2_id = $1 OR team1_id = $2 OR team2_id = $2', [club1.id, club2.id]);
       await db.query('DELETE FROM shots WHERE game_id IN ($1, $2, $3)', [game1.id, game2.id, game3.id]);
       await db.query('DELETE FROM games WHERE id IN ($1, $2, $3)', [game1.id, game2.id, game3.id]);
       await db.query('DELETE FROM players WHERE id = $1', [player1.id]);
-      await db.query('DELETE FROM teams WHERE id IN ($1, $2, $3)', [team1.id, team2.id, team3.id]);
+      await db.query('DELETE FROM clubs WHERE id IN ($1, $2, $3)', [club1.id, club2.id, club3.id]);
       await db.query('DELETE FROM users WHERE id = $1', [adminUser.id]);
     } catch (error) {
       console.error('⚠️ Team Analytics API cleanup failed:', error.message);
@@ -113,12 +113,12 @@ describe('📊 Team Analytics API', () => {
     it('✅ should get head-to-head record between two teams', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/head-to-head/${team1.id}/${team2.id}`)
+          .get(`/api/team-analytics/head-to-head/${club1.id}/${club2.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
-        expect(response.body).toHaveProperty('team1');
-        expect(response.body).toHaveProperty('team2');
+        expect(response.body).toHaveProperty('club1');
+        expect(response.body).toHaveProperty('club2');
         expect(response.body).toHaveProperty('total_games');
         expect(response.body).toHaveProperty('draws');
         expect(response.body).toHaveProperty('recent_games');
@@ -126,8 +126,8 @@ describe('📊 Team Analytics API', () => {
         expect(response.body.total_games).toBe(3);
         expect(response.body.draws).toBe(1);
         
-        // Team 1 won 2 games (5-3, 6-2), Team 2 won 0 games
-        expect(response.body.team1.wins + response.body.team2.wins + response.body.draws).toBe(3);
+        // Club 1 won 2 games (5-3, 6-2), Club 2 won 0 games
+        expect(response.body.club1.wins + response.body.club2.wins + response.body.draws).toBe(3);
       } catch (error) {
         global.testContext.logTestError(error, 'GET head-to-head failed');
         throw error;
@@ -137,13 +137,13 @@ describe('📊 Team Analytics API', () => {
     it('✅ should return streak information', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/head-to-head/${team1.id}/${team2.id}`)
+          .get(`/api/team-analytics/head-to-head/${club1.id}/${club2.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
         if (response.body.current_streak) {
-          expect(response.body.current_streak).toHaveProperty('team_id');
-          expect(response.body.current_streak).toHaveProperty('team_name');
+          expect(response.body.current_streak).toHaveProperty('club_id');
+          expect(response.body.current_streak).toHaveProperty('club_name');
           expect(response.body.current_streak).toHaveProperty('count');
         }
       } catch (error) {
@@ -155,7 +155,7 @@ describe('📊 Team Analytics API', () => {
     it('✅ should return recent games', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/head-to-head/${team1.id}/${team2.id}?limit=5`)
+          .get(`/api/team-analytics/head-to-head/${club1.id}/${club2.id}?limit=5`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
@@ -178,7 +178,7 @@ describe('📊 Team Analytics API', () => {
     it('✅ should handle teams with no games between them', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/head-to-head/${team1.id}/${team3.id}`)
+          .get(`/api/team-analytics/head-to-head/${club1.id}/${club3.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
@@ -193,7 +193,7 @@ describe('📊 Team Analytics API', () => {
     it('❌ should return 404 for non-existent team', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/head-to-head/${team1.id}/99999`)
+          .get(`/api/team-analytics/head-to-head/${club1.id}/99999`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(404);
@@ -206,7 +206,7 @@ describe('📊 Team Analytics API', () => {
     it('❌ should require authentication', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/head-to-head/${team1.id}/${team2.id}`);
+          .get(`/api/team-analytics/head-to-head/${club1.id}/${club2.id}`);
 
         expect(response.status).toBe(401);
       } catch (error) {
@@ -234,19 +234,19 @@ describe('📊 Team Analytics API', () => {
     it('✅ should get ranking for specific team', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/rankings/team/${team1.id}`)
+          .get(`/api/team-analytics/rankings/team/${club1.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
-        expect(response.body).toHaveProperty('team_id');
-        expect(response.body).toHaveProperty('team_name');
+        expect(response.body).toHaveProperty('club_id');
+        expect(response.body).toHaveProperty('club_name');
         expect(response.body).toHaveProperty('games_played');
         expect(response.body).toHaveProperty('wins');
         expect(response.body).toHaveProperty('losses');
         expect(response.body).toHaveProperty('draws');
         expect(response.body).toHaveProperty('rating');
         
-        expect(response.body.team_id).toBe(team1.id);
+        expect(response.body.team_id).toBe(club1.id);
       } catch (error) {
         global.testContext.logTestError(error, 'GET team ranking failed');
         throw error;
@@ -256,7 +256,7 @@ describe('📊 Team Analytics API', () => {
     it('✅ should include calculated statistics', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/rankings/team/${team1.id}`)
+          .get(`/api/team-analytics/rankings/team/${club1.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
@@ -307,7 +307,7 @@ describe('📊 Team Analytics API', () => {
     it('✅ should compare multiple teams', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/compare?team_ids=${team1.id},${team2.id}`)
+          .get(`/api/team-analytics/compare?team_ids=${club1.id},${club2.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
@@ -323,14 +323,14 @@ describe('📊 Team Analytics API', () => {
     it('✅ should include comprehensive metrics', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/compare?team_ids=${team1.id},${team2.id}`)
+          .get(`/api/team-analytics/compare?team_ids=${club1.id},${club2.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
         
         const team = response.body.teams[0];
-        expect(team).toHaveProperty('team_id');
-        expect(team).toHaveProperty('team_name');
+        expect(team).toHaveProperty('club_id');
+        expect(team).toHaveProperty('club_name');
         expect(team).toHaveProperty('games_played');
         expect(team).toHaveProperty('wins');
         expect(team).toHaveProperty('losses');
@@ -349,7 +349,7 @@ describe('📊 Team Analytics API', () => {
     it('✅ should compare three or more teams', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/compare?team_ids=${team1.id},${team2.id},${team3.id}`)
+          .get(`/api/team-analytics/compare?team_ids=${club1.id},${club2.id},${club3.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
@@ -363,7 +363,7 @@ describe('📊 Team Analytics API', () => {
     it('❌ should reject comparison with less than 2 teams', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/compare?team_ids=${team1.id}`)
+          .get(`/api/team-analytics/compare?team_ids=${club1.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(400);
@@ -389,7 +389,7 @@ describe('📊 Team Analytics API', () => {
     it('❌ should return 404 for non-existent teams', async () => {
       try {
         const response = await request(app)
-          .get(`/api/team-analytics/compare?team_ids=${team1.id},99999`)
+          .get(`/api/team-analytics/compare?team_ids=${club1.id},99999`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(404);
@@ -400,3 +400,5 @@ describe('📊 Team Analytics API', () => {
     });
   });
 });
+
+

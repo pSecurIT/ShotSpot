@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 describe('🎮 Match Events API', () => {
   let adminToken, coachToken, userToken;
   let adminUser, coachUser, regularUser;
-  let team1, team2, player1, player2, game;
+  let club1, club2, player1, player2, game;
   let testUsers = [];
 
   beforeAll(async () => {
@@ -74,35 +74,35 @@ describe('🎮 Match Events API', () => {
       );
 
       // Create teams
-      const team1Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club1Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Team Match Events 1 ${uniqueId}`]
       );
-      team1 = team1Result.rows[0];
+      club1 = club1Result.rows[0];
 
-      const team2Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
+      const club2Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
         [`Team Match Events 2 ${uniqueId}`]
       );
-      team2 = team2Result.rows[0];
+      club2 = club2Result.rows[0];
 
       // Create players
       const player1Result = await db.query(
         'INSERT INTO players (first_name, last_name, team_id, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [`Player1_${uniqueId}`, 'LastName1', team1.id, 10]
+        [`Player1_${uniqueId}`, 'LastName1', club1.id, 10]
       );
       player1 = player1Result.rows[0];
 
       const player2Result = await db.query(
         'INSERT INTO players (first_name, last_name, team_id, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [`Player2_${uniqueId}`, 'LastName2', team2.id, 20]
+        [`Player2_${uniqueId}`, 'LastName2', club2.id, 20]
       );
       player2 = player2Result.rows[0];
 
       // Create game
       const gameResult = await db.query(
-        'INSERT INTO games (home_team_id, away_team_id, status, date) VALUES ($1, $2, $3, $4) RETURNING *',
-        [team1.id, team2.id, 'in_progress', new Date()]
+        'INSERT INTO games (home_club_id, away_club_id, status, date) VALUES ($1, $2, $3, $4) RETURNING *',
+        [club1.id, club2.id, 'in_progress', new Date()]
       );
       game = gameResult.rows[0];
 
@@ -127,7 +127,7 @@ describe('🎮 Match Events API', () => {
         await db.query('DELETE FROM players WHERE id = ANY($1)', [[player1.id, player2.id]]);
       }
       if (team1?.id && team2?.id) {
-        await db.query('DELETE FROM teams WHERE id = ANY($1)', [[team1.id, team2.id]]);
+        await db.query('DELETE FROM clubs WHERE id = ANY($1)', [[club1.id, club2.id]]);
       }
       if (testUsers.length > 0) {
         await db.query('DELETE FROM users WHERE id = ANY($1)', [testUsers]);
@@ -153,7 +153,7 @@ describe('🎮 Match Events API', () => {
           await db.query(
             `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, time_remaining) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [game.id, player1.id, team1.id, 10.5, 15.2, 'goal', 1, '00:10:30']
+            [game.id, player1.id, club1.id, 10.5, 15.2, 'goal', 1, '00:10:30']
           );
 
           const response = await request(app)
@@ -165,12 +165,12 @@ describe('🎮 Match Events API', () => {
           expect(response.body[0]).toMatchObject({
             game_id: game.id,
             player_id: player1.id,
-            team_id: team1.id,
+            team_id: club1.id,
             result: 'goal',
             period: 1
           });
           expect(response.body[0]).toHaveProperty('player_name');
-          expect(response.body[0]).toHaveProperty('team_name');
+          expect(response.body[0]).toHaveProperty('club_name');
         } catch (error) {
           global.testContext?.logTestError(error, 'GET shots for game failed');
           throw error;
@@ -225,7 +225,7 @@ describe('🎮 Match Events API', () => {
             ...validShotData,
             game_id: game.id,
             player_id: player1.id,
-            team_id: team1.id
+            team_id: club1.id
           };
 
           const response = await request(app)
@@ -237,7 +237,7 @@ describe('🎮 Match Events API', () => {
           expect(response.body).toMatchObject({
             game_id: game.id,
             player_id: player1.id,
-            team_id: team1.id,
+            team_id: club1.id,
             result: 'goal',
             period: 1,
             x_coord: '12.5', // Database returns as string
@@ -257,7 +257,7 @@ describe('🎮 Match Events API', () => {
             ...validShotData,
             game_id: game.id,
             player_id: player2.id,
-            team_id: team2.id,
+            team_id: club2.id,
             result: 'miss'
           };
 
@@ -280,7 +280,7 @@ describe('🎮 Match Events API', () => {
             ...validShotData,
             game_id: game.id,
             player_id: player1.id,
-            team_id: team1.id,
+            team_id: club1.id,
             result: 'goal'
           };
 
@@ -310,7 +310,7 @@ describe('🎮 Match Events API', () => {
             ...validShotData,
             game_id: game.id,
             player_id: player1.id,
-            team_id: team1.id
+            team_id: club1.id
           };
 
           const response = await request(app)
@@ -331,7 +331,7 @@ describe('🎮 Match Events API', () => {
             ...validShotData,
             game_id: game.id,
             player_id: player1.id,
-            team_id: team1.id,
+            team_id: club1.id,
             result: 'invalid_result'
           };
 
@@ -355,7 +355,7 @@ describe('🎮 Match Events API', () => {
             ...validShotData,
             game_id: 99999,
             player_id: player1.id,
-            team_id: team1.id
+            team_id: club1.id
           };
 
           const response = await request(app)
@@ -375,15 +375,15 @@ describe('🎮 Match Events API', () => {
         try {
           // Create a finished game
           const finishedGameResult = await db.query(
-            'INSERT INTO games (home_team_id, away_team_id, status, date) VALUES ($1, $2, $3, $4) RETURNING *',
-            [team1.id, team2.id, 'finished', new Date()]
+            'INSERT INTO games (home_club_id, away_club_id, status, date) VALUES ($1, $2, $3, $4) RETURNING *',
+            [club1.id, club2.id, 'finished', new Date()]
           );
 
           const shotData = {
             ...validShotData,
             game_id: finishedGameResult.rows[0].id,
             player_id: player1.id,
-            team_id: team1.id
+            team_id: club1.id
           };
 
           const response = await request(app)
@@ -409,7 +409,7 @@ describe('🎮 Match Events API', () => {
             ...validShotData,
             game_id: game.id,
             player_id: player1.id, // Player1 belongs to team1
-            team_id: team2.id      // But we're saying they're in team2
+            team_id: club2.id      // But we're saying they're in team2
           };
 
           const response = await request(app)
@@ -431,7 +431,7 @@ describe('🎮 Match Events API', () => {
             ...validShotData,
             game_id: game.id,
             player_id: 99999,
-            team_id: team1.id
+            team_id: club1.id
           };
 
           const response = await request(app)
@@ -457,7 +457,7 @@ describe('🎮 Match Events API', () => {
           await db.query(
             `INSERT INTO game_events (game_id, event_type, team_id, player_id, period, time_remaining, details) 
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [game.id, 'foul', team1.id, player1.id, 1, '00:12:45', { reason: 'offensive_foul' }]
+            [game.id, 'foul', club1.id, player1.id, 1, '00:12:45', { reason: 'offensive_foul' }]
           );
 
           const response = await request(app)
@@ -469,12 +469,12 @@ describe('🎮 Match Events API', () => {
           expect(response.body[0]).toMatchObject({
             game_id: game.id,
             event_type: 'foul',
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: player1.id,
             period: 1
           });
           expect(response.body[0]).toHaveProperty('player_name');
-          expect(response.body[0]).toHaveProperty('team_name');
+          expect(response.body[0]).toHaveProperty('club_name');
         } catch (error) {
           global.testContext?.logTestError(error, 'GET events for game failed');
           throw error;
@@ -487,7 +487,7 @@ describe('🎮 Match Events API', () => {
           await db.query(
             `INSERT INTO game_events (game_id, event_type, team_id, period, time_remaining) 
              VALUES ($1, $2, $3, $4, $5)`,
-            [game.id, 'timeout', team1.id, 2, '00:05:15']
+            [game.id, 'timeout', club1.id, 2, '00:05:15']
           );
 
           const response = await request(app)
@@ -498,11 +498,11 @@ describe('🎮 Match Events API', () => {
           expect(response.body).toHaveLength(1);
           expect(response.body[0]).toMatchObject({
             event_type: 'timeout',
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: null
           });
           expect(response.body[0].player_name).toBeNull();
-          expect(response.body[0]).toHaveProperty('team_name');
+          expect(response.body[0]).toHaveProperty('club_name');
         } catch (error) {
           global.testContext?.logTestError(error, 'Team-level event handling failed');
           throw error;
@@ -540,7 +540,7 @@ describe('🎮 Match Events API', () => {
           const eventData = {
             ...validEventData,
             game_id: game.id,
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: player1.id
           };
 
@@ -553,7 +553,7 @@ describe('🎮 Match Events API', () => {
           expect(response.body).toMatchObject({
             game_id: game.id,
             event_type: 'foul',
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: player1.id,
             period: 1
           });
@@ -570,7 +570,7 @@ describe('🎮 Match Events API', () => {
           const eventData = {
             ...validEventData,
             game_id: game.id,
-            team_id: team2.id,
+            team_id: club2.id,
             player_id: player2.id,
             event_type: 'substitution'
           };
@@ -593,7 +593,7 @@ describe('🎮 Match Events API', () => {
           const eventData = {
             ...validEventData,
             game_id: game.id,
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: undefined, // No player for timeout
             event_type: 'timeout'
           };
@@ -607,7 +607,7 @@ describe('🎮 Match Events API', () => {
           expect(response.status).toBe(201);
           expect(response.body).toMatchObject({
             event_type: 'timeout',
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: null
           });
         } catch (error) {
@@ -621,7 +621,7 @@ describe('🎮 Match Events API', () => {
           const eventData = {
             ...validEventData,
             game_id: game.id,
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: player1.id
           };
 
@@ -642,7 +642,7 @@ describe('🎮 Match Events API', () => {
           const eventData = {
             ...validEventData,
             game_id: game.id,
-            team_id: team1.id,
+            team_id: club1.id,
             event_type: 'invalid_event'
           };
 
@@ -665,7 +665,7 @@ describe('🎮 Match Events API', () => {
           const eventData = {
             ...validEventData,
             game_id: 99999,
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: player1.id
           };
 
@@ -686,14 +686,14 @@ describe('🎮 Match Events API', () => {
         try {
           // Create a scheduled game
           const scheduledGameResult = await db.query(
-            'INSERT INTO games (home_team_id, away_team_id, status, date) VALUES ($1, $2, $3, $4) RETURNING *',
-            [team1.id, team2.id, 'scheduled', new Date()]
+            'INSERT INTO games (home_club_id, away_club_id, status, date) VALUES ($1, $2, $3, $4) RETURNING *',
+            [club1.id, club2.id, 'scheduled', new Date()]
           );
 
           const eventData = {
             ...validEventData,
             game_id: scheduledGameResult.rows[0].id,
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: player1.id
           };
 
@@ -719,7 +719,7 @@ describe('🎮 Match Events API', () => {
           const eventData = {
             ...validEventData,
             game_id: game.id,
-            team_id: team2.id, // team2
+            team_id: club2.id, // team2
             player_id: player1.id // but player1 belongs to team1
           };
 
@@ -741,7 +741,7 @@ describe('🎮 Match Events API', () => {
           const eventData = {
             ...validEventData,
             game_id: game.id,
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: 99999
           };
 
@@ -763,7 +763,7 @@ describe('🎮 Match Events API', () => {
           const eventData = {
             ...validEventData,
             game_id: game.id,
-            team_id: team1.id,
+            team_id: club1.id,
             player_id: player1.id
           };
 
@@ -787,7 +787,7 @@ describe('🎮 Match Events API', () => {
         const invalidShotData = {
           game_id: game.id,
           player_id: player1.id,
-          team_id: team1.id,
+          team_id: club1.id,
           x_coord: 'invalid_coord', // This should cause a database error
           y_coord: 8.3,
           result: 'goal',
@@ -826,7 +826,7 @@ describe('🎮 Match Events API', () => {
         const minimalShotData = {
           game_id: game.id,
           player_id: player1.id,
-          team_id: team1.id,
+          team_id: club1.id,
           x_coord: 10.0,
           y_coord: 15.0,
           result: 'miss',
@@ -854,7 +854,7 @@ describe('🎮 Match Events API', () => {
         const minimalEventData = {
           game_id: game.id,
           event_type: 'timeout',
-          team_id: team1.id,
+          team_id: club1.id,
           period: 2,
           time_remaining: '00:03:45'
           // player_id and details are optional
@@ -877,3 +877,5 @@ describe('🎮 Match Events API', () => {
 
   console.log('✅ Match Events API tests completed');
 });
+
+

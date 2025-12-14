@@ -9,6 +9,7 @@ import LiveMatch from './components/LiveMatch';
 import ShotAnalytics from './components/ShotAnalytics';
 import ExportCenter from './components/ExportCenter';
 import MatchTemplates from './components/MatchTemplates';
+import TwizzitIntegration from './components/TwizzitIntegration';
 import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -99,6 +100,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <MatchTemplates />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/twizzit" 
+                element={
+                  <ProtectedRoute>
+                    <TwizzitIntegration />
                   </ProtectedRoute>
                 } 
               />
