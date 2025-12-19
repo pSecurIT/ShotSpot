@@ -54,30 +54,55 @@ describe('🏆 Competitions API', () => {
       );
       season = seasonResult.rows[0];
 
-      // Create test teams
+      // Create test clubs and teams
       const club1Result = await db.query(
         'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
-        [`Competition Team 1 ${uniqueId}`]
+        [`Competition Club 1 ${uniqueId}`]
       );
       club1 = club1Result.rows[0];
 
       const club2Result = await db.query(
         'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
-        [`Competition Team 2 ${uniqueId}`]
+        [`Competition Club 2 ${uniqueId}`]
       );
       club2 = club2Result.rows[0];
 
       const club3Result = await db.query(
         'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
-        [`Competition Team 3 ${uniqueId}`]
+        [`Competition Club 3 ${uniqueId}`]
       );
       club3 = club3Result.rows[0];
 
       const club4Result = await db.query(
         'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
-        [`Competition Team 4 ${uniqueId}`]
+        [`Competition Club 4 ${uniqueId}`]
       );
       club4 = club4Result.rows[0];
+
+      // Create teams for each club (needed for competition_teams table)
+      const team1Result = await db.query(
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING *',
+        [club1.id, `Team 1 ${uniqueId}`, 'U14']
+      );
+      club1.team_id = team1Result.rows[0].id;
+
+      const team2Result = await db.query(
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING *',
+        [club2.id, `Team 2 ${uniqueId}`, 'U14']
+      );
+      club2.team_id = team2Result.rows[0].id;
+
+      const team3Result = await db.query(
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING *',
+        [club3.id, `Team 3 ${uniqueId}`, 'U14']
+      );
+      club3.team_id = team3Result.rows[0].id;
+
+      const team4Result = await db.query(
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING *',
+        [club4.id, `Team 4 ${uniqueId}`, 'U14']
+      );
+      club4.team_id = team4Result.rows[0].id;
 
     } catch (error) {
       global.testContext.logTestError(error, 'Competitions API setup failed');
@@ -93,8 +118,9 @@ describe('🏆 Competitions API', () => {
       await db.query('DELETE FROM competition_standings WHERE competition_id IN (SELECT id FROM competitions WHERE name LIKE $1)', ['%Competition%']);
       await db.query('DELETE FROM competition_teams WHERE competition_id IN (SELECT id FROM competitions WHERE name LIKE $1)', ['%Competition%']);
       await db.query('DELETE FROM competitions WHERE name LIKE $1', ['%Competition%']);
-      await db.query('DELETE FROM games WHERE home_club_id IN ($1, $2, $3, $4) OR away_club_id IN ($1, $2, $3, $4)', [club1.id, club2.id, club3.id, team4.id]);
-      await db.query('DELETE FROM clubs WHERE id IN ($1, $2, $3, $4)', [club1.id, club2.id, club3.id, team4.id]);
+      await db.query('DELETE FROM games WHERE home_club_id IN ($1, $2, $3, $4) OR away_club_id IN ($1, $2, $3, $4)', [club1.id, club2.id, club3.id, club4.id]);
+      await db.query('DELETE FROM teams WHERE id IN ($1, $2, $3, $4)', [club1.team_id, club2.team_id, club3.team_id, club4.team_id]);
+      await db.query('DELETE FROM clubs WHERE id IN ($1, $2, $3, $4)', [club1.id, club2.id, club3.id, club4.id]);
       await db.query('DELETE FROM seasons WHERE id = $1', [season.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
     } catch (error) {
@@ -303,14 +329,14 @@ describe('🏆 Competitions API', () => {
           .post(`/api/competitions/${testCompetition.id}/teams`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: club1.id,
+            team_id: club1.team_id,
             seed: 1
           });
 
         expect(response.status).toBe(201);
-        expect(response.body.team_id).toBe(club1.id);
+        expect(response.body.team_id).toBe(club1.team_id);
         expect(response.body.seed).toBe(1);
-        expect(response.body).toHaveProperty('club_name');
+        expect(response.body).toHaveProperty('team_name');
       } catch (error) {
         global.testContext.logTestError(error, 'POST add team to competition failed');
         throw error;
@@ -322,17 +348,17 @@ describe('🏆 Competitions API', () => {
         await request(app)
           .post(`/api/competitions/${testCompetition.id}/teams`)
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ team_id: club2.id, seed: 2 });
+          .send({ team_id: club2.team_id, seed: 2 });
 
         await request(app)
           .post(`/api/competitions/${testCompetition.id}/teams`)
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ team_id: club3.id, seed: 3 });
+          .send({ team_id: club3.team_id, seed: 3 });
 
         await request(app)
           .post(`/api/competitions/${testCompetition.id}/teams`)
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ team_id: team4.id, seed: 4 });
+          .send({ team_id: club4.team_id, seed: 4 });
 
         const response = await request(app)
           .get(`/api/competitions/${testCompetition.id}/teams`)
@@ -352,7 +378,7 @@ describe('🏆 Competitions API', () => {
         const response = await request(app)
           .post(`/api/competitions/${testCompetition.id}/teams`)
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ team_id: club1.id });
+          .send({ team_id: club1.team_id });
 
         expect(response.status).toBe(409);
         expect(response.body.error).toContain('already');
@@ -380,7 +406,7 @@ describe('🏆 Competitions API', () => {
     it('✅ should remove team from competition', async () => {
       try {
         const response = await request(app)
-          .delete(`/api/competitions/${testCompetition.id}/teams/${team4.id}`)
+          .delete(`/api/competitions/${testCompetition.id}/teams/${club4.team_id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(204);
@@ -389,7 +415,7 @@ describe('🏆 Competitions API', () => {
         await request(app)
           .post(`/api/competitions/${testCompetition.id}/teams`)
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ team_id: team4.id, seed: 4 });
+          .send({ team_id: club4.team_id, seed: 4 });
       } catch (error) {
         global.testContext.logTestError(error, 'DELETE team from competition failed');
         throw error;
@@ -411,19 +437,19 @@ describe('🏆 Competitions API', () => {
       // Add 4 teams
       await db.query(
         'INSERT INTO competition_teams (competition_id, team_id, seed) VALUES ($1, $2, $3)',
-        [bracketCompetition.id, club1.id, 1]
+        [bracketCompetition.id, club1.team_id, 1]
       );
       await db.query(
         'INSERT INTO competition_teams (competition_id, team_id, seed) VALUES ($1, $2, $3)',
-        [bracketCompetition.id, club2.id, 2]
+        [bracketCompetition.id, club2.team_id, 2]
       );
       await db.query(
         'INSERT INTO competition_teams (competition_id, team_id, seed) VALUES ($1, $2, $3)',
-        [bracketCompetition.id, club3.id, 3]
+        [bracketCompetition.id, club3.team_id, 3]
       );
       await db.query(
         'INSERT INTO competition_teams (competition_id, team_id, seed) VALUES ($1, $2, $3)',
-        [bracketCompetition.id, team4.id, 4]
+        [bracketCompetition.id, club4.team_id, 4]
       );
     });
 
@@ -464,9 +490,9 @@ describe('🏆 Competitions API', () => {
 
     it('✅ should update bracket with winner', async () => {
       try {
-        // Get bracket matches
+        // Get a first-round bracket match and use team IDs
         const bracketResult = await db.query(
-          'SELECT id, home_club_id FROM tournament_brackets WHERE competition_id = $1 AND round_number = 1 ORDER BY match_number LIMIT 1',
+          'SELECT id, home_team_id FROM tournament_brackets WHERE competition_id = $1 AND round_number = 1 ORDER BY match_number LIMIT 1',
           [bracketCompetition.id]
         );
         const bracketMatch = bracketResult.rows[0];
@@ -475,11 +501,11 @@ describe('🏆 Competitions API', () => {
           .put(`/api/competitions/${bracketCompetition.id}/bracket/${bracketMatch.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            winner_club_id: bracketMatch.home_team_id
+            winner_team_id: bracketMatch.home_team_id
           });
 
         expect(response.status).toBe(200);
-        expect(response.body.winner_club_id).toBe(bracketMatch.home_club_id);
+        expect(response.body.winner_team_id).toBe(bracketMatch.home_team_id);
         expect(response.body.status).toBe('completed');
       } catch (error) {
         global.testContext.logTestError(error, 'PUT update bracket winner failed');
@@ -524,11 +550,11 @@ describe('🏆 Competitions API', () => {
       // Add teams
       await db.query(
         'INSERT INTO competition_teams (competition_id, team_id) VALUES ($1, $2)',
-        [standingsCompetition.id, club1.id]
+        [standingsCompetition.id, club1.team_id]
       );
       await db.query(
         'INSERT INTO competition_teams (competition_id, team_id) VALUES ($1, $2)',
-        [standingsCompetition.id, club2.id]
+        [standingsCompetition.id, club2.team_id]
       );
     });
 
@@ -564,13 +590,13 @@ describe('🏆 Competitions API', () => {
       }
     });
 
-    it('✅ should update standings after game', async () => {
+    it('✅ should update standings after game (win = 2 points)', async () => {
       try {
-        // Create a completed game
+        // Create a completed game with team IDs
         const gameResult = await db.query(
-          `INSERT INTO games (home_club_id, away_club_id, date, status, home_score, away_score) 
-           VALUES ($1, $2, CURRENT_TIMESTAMP, 'completed', 3, 1) RETURNING *`,
-          [club1.id, club2.id]
+          `INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status, home_score, away_score) 
+           VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, 'completed', 3, 1) RETURNING *`,
+          [club1.id, club2.id, club1.team_id, club2.team_id]
         );
 
         const response = await request(app)
@@ -580,15 +606,44 @@ describe('🏆 Competitions API', () => {
 
         expect(response.status).toBe(200);
         
-        const team1Standing = response.body.find(s => s.team_id === club1.id);
-        const team2Standing = response.body.find(s => s.team_id === club2.id);
+        const team1Standing = response.body.find(s => s.team_id === club1.team_id);
+        const team2Standing = response.body.find(s => s.team_id === club2.team_id);
         
         expect(team1Standing.wins).toBe(1);
-        expect(team1Standing.points).toBe(3);
+        expect(team1Standing.points).toBe(2); // korfball win = 2 points
         expect(team2Standing.losses).toBe(1);
         expect(team2Standing.points).toBe(0);
       } catch (error) {
         global.testContext.logTestError(error, 'POST update standings failed');
+        throw error;
+      }
+    });
+
+    it('✅ should award 1 point each on draw', async () => {
+      try {
+        // Create a completed draw game with team IDs
+        const gameResult = await db.query(
+          `INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status, home_score, away_score) 
+           VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, 'completed', 2, 2) RETURNING *`,
+          [club1.id, club2.id, club1.team_id, club2.team_id]
+        );
+
+        const response = await request(app)
+          .post(`/api/competitions/${standingsCompetition.id}/standings/update`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ game_id: gameResult.rows[0].id });
+
+        expect(response.status).toBe(200);
+
+        const team1Standing = response.body.find(s => s.team_id === club1.team_id);
+        const team2Standing = response.body.find(s => s.team_id === club2.team_id);
+
+        expect(team1Standing.draws).toBeGreaterThanOrEqual(1);
+        expect(team2Standing.draws).toBeGreaterThanOrEqual(1);
+        expect(team1Standing.points).toBeGreaterThanOrEqual(1);
+        expect(team2Standing.points).toBeGreaterThanOrEqual(1);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST update standings draw failed');
         throw error;
       }
     });

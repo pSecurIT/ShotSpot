@@ -380,7 +380,7 @@ describe('📊 Analytics Routes', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toHaveProperty('overall');
-        expect(response.body).toHaveProperty('by_team');
+        expect(response.body).toHaveProperty('by_club');
 
         const overall = response.body.overall;
         expect(overall.total_shots).toBe(14);
@@ -389,8 +389,8 @@ describe('📊 Analytics Routes', () => {
         expect(overall.total_blocked).toBe(2);
         expect(overall.overall_fg_percentage).toBeCloseTo(50, 0);
 
-        expect(Array.isArray(response.body.by_team)).toBe(true);
-        expect(response.body.by_team.length).toBe(2);
+        expect(Array.isArray(response.body.by_club)).toBe(true);
+        expect(response.body.by_club.length).toBe(2);
       } catch (error) {
         global.testContext.logTestError(error, 'Summary statistics failed');
         throw error;
@@ -405,12 +405,12 @@ describe('📊 Analytics Routes', () => {
 
         expect(response.status).toBe(200);
         
-        const team1Stats = response.body.by_team.find(t => t.club_id === club1.id);
+        const team1Stats = response.body.by_club.find(t => t.club_id === club1.id);
         expect(team1Stats.total_shots).toBe(10);
         expect(team1Stats.goals).toBe(5);
         expect(team1Stats.fg_percentage).toBe(50);
 
-        const team2Stats = response.body.by_team.find(t => t.club_id === club2.id);
+        const team2Stats = response.body.by_club.find(t => t.club_id === club2.id);
         expect(team2Stats.total_shots).toBe(4);
         expect(team2Stats.goals).toBe(2);
         expect(team2Stats.fg_percentage).toBe(50);

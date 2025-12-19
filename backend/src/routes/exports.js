@@ -25,11 +25,11 @@ async function fetchGameData(gameId) {
   const gameResult = await db.query(`
     SELECT 
       g.*,
-      ht.name as home_team_name,
-      at.name as away_team_name
+      hc.name as home_team_name,
+      ac.name as away_team_name
     FROM games g
-    JOIN teams ht ON g.home_team_id = ht.id
-    JOIN teams at ON g.away_team_id = at.id
+    LEFT JOIN clubs hc ON g.home_club_id = hc.id
+    LEFT JOIN clubs ac ON g.away_club_id = ac.id
     WHERE g.id = $1
   `, [gameId]);
 
@@ -46,10 +46,10 @@ async function fetchGameData(gameId) {
       p.first_name,
       p.last_name,
       p.jersey_number,
-      t.name as team_name
+      c.name as team_name
     FROM shots s
     JOIN players p ON s.player_id = p.id
-    JOIN teams t ON s.team_id = t.id
+    JOIN clubs c ON s.club_id = c.id
     WHERE s.game_id = $1
     ORDER BY s.period, s.created_at
   `, [gameId]);
@@ -61,10 +61,10 @@ async function fetchGameData(gameId) {
       p.first_name,
       p.last_name,
       p.jersey_number,
-      t.name as team_name
+      c.name as team_name
     FROM game_events ge
     LEFT JOIN players p ON ge.player_id = p.id
-    JOIN teams t ON ge.team_id = t.id
+    JOIN clubs c ON ge.club_id = c.id
     WHERE ge.game_id = $1
     ORDER BY ge.period, ge.created_at
   `, [gameId]);
@@ -76,7 +76,7 @@ async function fetchGameData(gameId) {
       p.first_name,
       p.last_name,
       p.jersey_number,
-      t.name as team_name,
+      c.name as team_name,
       gr.is_captain,
       gr.is_starting,
       gr.starting_position,
@@ -84,11 +84,11 @@ async function fetchGameData(gameId) {
       COUNT(DISTINCT s.id) as total_shots
     FROM game_rosters gr
     JOIN players p ON gr.player_id = p.id
-    JOIN teams t ON gr.team_id = t.id
+    JOIN clubs c ON gr.club_id = c.id
     LEFT JOIN shots s ON s.player_id = p.id AND s.game_id = gr.game_id
     WHERE gr.game_id = $1
-    GROUP BY p.id, p.first_name, p.last_name, p.jersey_number, t.name, gr.is_captain, gr.is_starting, gr.starting_position
-    ORDER BY t.name, p.jersey_number
+    GROUP BY p.id, p.first_name, p.last_name, p.jersey_number, c.name, gr.is_captain, gr.is_starting, gr.starting_position
+    ORDER BY c.name, p.jersey_number
   `, [gameId]);
 
   return {
@@ -102,14 +102,14 @@ async function fetchGameData(gameId) {
 /**
  * Helper function to fetch season data
  */
-async function fetchSeasonData(teamId, startDate, endDate) {
+async function fetchSeasonData(clubId, startDate, endDate) {
   const params = [];
   let whereConditions = [];
   let paramIndex = 1;
 
-  if (teamId) {
-    whereConditions.push(`(g.home_team_id = $${paramIndex} OR g.away_team_id = $${paramIndex})`);
-    params.push(teamId);
+  if (clubId) {
+    whereConditions.push(`(g.home_club_id = $${paramIndex} OR g.away_club_id = $${paramIndex})`);
+    params.push(clubId);
     paramIndex++;
   }
 
@@ -130,11 +130,11 @@ async function fetchSeasonData(teamId, startDate, endDate) {
   const gamesResult = await db.query(`
     SELECT 
       g.*,
-      ht.name as home_team_name,
-      at.name as away_team_name
+      hc.name as home_team_name,
+      ac.name as away_team_name
     FROM games g
-    JOIN teams ht ON g.home_team_id = ht.id
-    JOIN teams at ON g.away_team_id = at.id
+    LEFT JOIN clubs hc ON g.home_club_id = hc.id
+    LEFT JOIN clubs ac ON g.away_club_id = ac.id
     ${whereClause}
     ORDER BY g.date DESC
   `, params);
@@ -446,10 +446,10 @@ router.post('/season-pdf', [
     // Filter info
     doc.fontSize(10);
     if (team_id) {
-      // Fetch the team name directly from the database to ensure accuracy
-      const teamResult = await db.query('SELECT name FROM teams WHERE id = $1', [team_id]);
-      const teamName = teamResult.rows.length > 0 ? teamResult.rows[0].name : 'Unknown Team';
-      doc.text(`Team: ${teamName}`);
+      // Fetch the club name directly from the database to ensure accuracy
+      const clubResult = await db.query('SELECT name FROM clubs WHERE id = $1', [team_id]);
+      const clubName = clubResult.rows.length > 0 ? clubResult.rows[0].name : 'Unknown Club';
+      doc.text(`Club: ${clubName}`);
     }
     if (start_date) doc.text(`From: ${new Date(start_date).toLocaleDateString()}`);
     if (end_date) doc.text(`To: ${new Date(end_date).toLocaleDateString()}`);
@@ -690,9 +690,9 @@ router.get('/player-report/:playerId', [
   try {
     // Fetch player info
     const playerResult = await db.query(`
-      SELECT p.*, t.name as team_name
+      SELECT p.*, c.name as team_name
       FROM players p
-      LEFT JOIN teams t ON p.team_id = t.id
+      LEFT JOIN clubs c ON p.club_id = c.id
       WHERE p.id = $1
     `, [playerId]);
 
@@ -707,19 +707,19 @@ router.get('/player-report/:playerId', [
       SELECT 
         g.id as game_id,
         g.date,
-        ht.name as home_team_name,
-        at.name as away_team_name,
+        hc.name as home_team_name,
+        ac.name as away_team_name,
         g.home_score,
         g.away_score,
         COUNT(s.id) FILTER (WHERE s.result = 'goal') as goals,
         COUNT(s.id) as total_shots
       FROM game_rosters gr
       JOIN games g ON gr.game_id = g.id
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN clubs hc ON g.home_club_id = hc.id
+      LEFT JOIN clubs ac ON g.away_club_id = ac.id
       LEFT JOIN shots s ON s.player_id = gr.player_id AND s.game_id = g.id
       WHERE gr.player_id = $1 AND g.status = 'completed'
-      GROUP BY g.id, g.date, ht.name, at.name, g.home_score, g.away_score
+      GROUP BY g.id, g.date, hc.name, ac.name, g.home_score, g.away_score
       ORDER BY g.date DESC
     `, [playerId]);
 
