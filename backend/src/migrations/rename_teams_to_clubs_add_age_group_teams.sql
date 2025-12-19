@@ -26,17 +26,26 @@ END $$;
 -- Update players table
 DO $$
 BEGIN
+    -- Only rename if team_id exists and club_id doesn't exist
     IF EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'players' AND column_name = 'team_id'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'players' AND column_name = 'club_id'
     ) THEN
         ALTER TABLE players RENAME COLUMN team_id TO club_id;
     END IF;
+    
+    -- Rename constraint only if old one exists and new one doesn't
     IF EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'players_team_id_fkey'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'players_club_id_fkey'
     ) THEN
         ALTER TABLE players RENAME CONSTRAINT players_team_id_fkey TO players_club_id_fkey;
     END IF;
+    
     IF EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'players_team_id_jersey_number_key'
     ) THEN
@@ -55,28 +64,44 @@ END $$;
 -- Step 3: Update games table
 DO $$
 BEGIN
+    -- Only rename columns if old exists and new doesn't
     IF EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'games' AND column_name = 'home_team_id'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'games' AND column_name = 'home_club_id'
     ) THEN
         ALTER TABLE games RENAME COLUMN home_team_id TO home_club_id;
     END IF;
+    
     IF EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'games' AND column_name = 'away_team_id'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'games' AND column_name = 'away_club_id'
     ) THEN
         ALTER TABLE games RENAME COLUMN away_team_id TO away_club_id;
     END IF;
+    
+    -- Rename constraints only if old exists and new doesn't
     IF EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'games_home_team_id_fkey'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'games_home_club_id_fkey'
     ) THEN
         ALTER TABLE games RENAME CONSTRAINT games_home_team_id_fkey TO games_home_club_id_fkey;
     END IF;
+    
     IF EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'games_away_team_id_fkey'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'games_away_club_id_fkey'
     ) THEN
         ALTER TABLE games RENAME CONSTRAINT games_away_team_id_fkey TO games_away_club_id_fkey;
     END IF;
+    
     IF EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'games_home_team_id_away_team_id_check'
     ) THEN
@@ -248,7 +273,15 @@ CREATE TRIGGER update_age_groups_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- Step 12: Add team_id to players table (age group team)
-ALTER TABLE players ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'players' AND column_name = 'team_id'
+    ) THEN
+        ALTER TABLE players ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_players_team_id ON players(team_id);
 
 -- Step 13: Recreate unique constraint for players with both club_id and team_id
@@ -259,20 +292,56 @@ COMMENT ON COLUMN players.club_id IS 'Club/organization the player belongs to';
 COMMENT ON COLUMN players.team_id IS 'Specific team (age group) the player plays in';
 
 -- Step 14: Update game_rosters to include team information
-ALTER TABLE game_rosters ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'game_rosters' AND column_name = 'team_id'
+    ) THEN
+        ALTER TABLE game_rosters ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_game_rosters_team_id ON game_rosters(team_id);
 
 COMMENT ON COLUMN game_rosters.team_id IS 'Specific team (age group) that played in this game';
 
 -- Step 15: Add game type to differentiate between club games and team games
-ALTER TABLE games ADD COLUMN game_type VARCHAR(20) DEFAULT 'club';
-ALTER TABLE games ADD CONSTRAINT games_game_type_check CHECK (game_type IN ('club', 'team'));
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'games' AND column_name = 'game_type'
+    ) THEN
+        ALTER TABLE games ADD COLUMN game_type VARCHAR(20) DEFAULT 'club';
+    END IF;
+END $$;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'games_game_type_check'
+    ) THEN
+        ALTER TABLE games ADD CONSTRAINT games_game_type_check CHECK (game_type IN ('club', 'team'));
+    END IF;
+END $$;
 
 COMMENT ON COLUMN games.game_type IS 'Type of game: club (senior level) or team (age group specific)';
 
 -- Step 16: Add optional team references to games for age group matches
-ALTER TABLE games ADD COLUMN home_team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
-ALTER TABLE games ADD COLUMN away_team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'games' AND column_name = 'home_team_id'
+    ) THEN
+        ALTER TABLE games ADD COLUMN home_team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'games' AND column_name = 'away_team_id'
+    ) THEN
+        ALTER TABLE games ADD COLUMN away_team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_games_home_team ON games(home_team_id);
 CREATE INDEX IF NOT EXISTS idx_games_away_team ON games(away_team_id);
 

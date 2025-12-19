@@ -362,11 +362,11 @@ router.post('/:id/apply-to-game/:gameId', [
     const gameResponse = await pool.query(`
       SELECT 
         g.*,
-        ht.name as home_team_name,
-        at.name as away_team_name
+        hc.name as home_team_name,
+        ac.name as away_team_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      JOIN clubs hc ON g.home_club_id = hc.id
+      JOIN clubs ac ON g.away_club_id = ac.id
       WHERE g.id = $1
     `, [gameId]);
 

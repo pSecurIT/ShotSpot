@@ -260,7 +260,7 @@ router.get('/team/:teamId/leaderboard', [
       LEFT JOIN shots s ON p.id = s.player_id
       LEFT JOIN player_achievements pa ON p.id = pa.player_id
       LEFT JOIN achievements a ON pa.achievement_id = a.id
-      WHERE p.team_id = $1 AND p.is_active = true
+      WHERE p.club_id = $1 AND p.is_active = true
       GROUP BY p.id, p.first_name, p.last_name, p.jersey_number
       HAVING COUNT(s.id) >= 5
       ORDER BY fg_percentage DESC, total_goals DESC
@@ -268,7 +268,7 @@ router.get('/team/:teamId/leaderboard', [
     `, [teamId, limit]);
 
     res.json({
-      team_id: parseInt(teamId),
+      club_id: parseInt(teamId),
       leaderboard: result.rows.map((row, index) => ({
         rank: index + 1,
         ...row,

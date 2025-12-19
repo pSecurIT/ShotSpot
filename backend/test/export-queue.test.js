@@ -22,10 +22,17 @@ describe('Export Queue', () => {
     `, ['exporttest', 'hashedpass', 'export@test.com', 'coach']);
     testUserId = userResult.rows[0].id;
 
-    // Create test team
+    // Create test club
+    const clubResult = await db.query(
+      'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+      ['Test Export Club']
+    );
+    const testClubId = clubResult.rows[0].id;
+
+    // Create test team with club_id
     const teamResult = await db.query(
-      'INSERT INTO teams (name) VALUES ($1) RETURNING id',
-      ['Test Export Team']
+      'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+      [testClubId, 'Test Export Team', 'U14']
     );
     testTeamId = teamResult.rows[0].id;
 
@@ -41,7 +48,12 @@ describe('Export Queue', () => {
   afterAll(async () => {
     // Clean up test data
     await db.query('DELETE FROM report_exports WHERE generated_by = $1', [testUserId]);
-    await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
+    const clubResult = await db.query('SELECT club_id FROM teams WHERE id = $1', [testTeamId]);
+    if (clubResult.rows.length > 0) {
+      const clubId = clubResult.rows[0].club_id;
+      await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
+      await db.query('DELETE FROM clubs WHERE id = $1', [clubId]);
+    }
     await db.query('DELETE FROM users WHERE id = $1', [testUserId]);
 
     // Clean up generated file if it exists

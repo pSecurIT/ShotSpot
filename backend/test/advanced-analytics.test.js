@@ -169,7 +169,7 @@ describe('📊 Advanced Analytics Routes', () => {
 
     for (const shot of allShots) {
       const result = await db.query(
-        `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, distance, period, time_remaining, created_at)
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, distance, period, time_remaining, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '00:05:00', CURRENT_TIMESTAMP) RETURNING *`,
         [shot.game, shot.player, shot.team, shot.x, shot.y, shot.result, shot.distance, shot.period]
       );

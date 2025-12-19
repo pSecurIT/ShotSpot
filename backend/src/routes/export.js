@@ -64,12 +64,16 @@ router.get('/match/:gameId/csv', [
     const gameResult = await db.query(`
       SELECT 
         g.*,
+        hc.name as home_club_name,
+        ac.name as away_club_name,
         ht.name as home_team_name,
         at.name as away_team_name,
         EXTRACT(EPOCH FROM g.period_duration) as period_duration_seconds
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN clubs hc ON g.home_club_id = hc.id
+      LEFT JOIN clubs ac ON g.away_club_id = ac.id
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.id = $1
     `, [gameId]);
 
@@ -78,6 +82,8 @@ router.get('/match/:gameId/csv', [
     }
 
     const game = gameResult.rows[0];
+    const homeName = game.home_club_name || game.home_team_name;
+    const awayName = game.away_club_name || game.away_team_name;
 
     // Get all shots
     const shotsResult = await db.query(`
@@ -92,11 +98,11 @@ router.get('/match/:gameId/csv', [
         s.distance,
         p.first_name || ' ' || p.last_name as player_name,
         p.jersey_number,
-        t.name as team_name,
+        c.name as team_name,
         s.created_at
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs c ON s.club_id = c.id
       WHERE s.game_id = $1
       ORDER BY s.created_at
     `, [gameId]);
@@ -111,13 +117,13 @@ router.get('/match/:gameId/csv', [
         pin.jersey_number as player_in_jersey,
         pout.first_name || ' ' || pout.last_name as player_out,
         pout.jersey_number as player_out_jersey,
-        t.name as team_name,
+        c.name as team_name,
         s.reason,
         s.created_at
       FROM substitutions s
       JOIN players pin ON s.player_in_id = pin.id
       JOIN players pout ON s.player_out_id = pout.id
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs c ON s.club_id = c.id
       WHERE s.game_id = $1
       ORDER BY s.created_at
     `, [gameId]);
@@ -128,14 +134,14 @@ router.get('/match/:gameId/csv', [
         t.id,
         t.period,
         EXTRACT(EPOCH FROM t.time_remaining) as time_remaining_seconds,
-        tm.name as team_name,
+        c.name as team_name,
         t.timeout_type,
         EXTRACT(EPOCH FROM t.duration) as duration_seconds,
         t.reason,
         t.called_by,
         t.created_at
       FROM timeouts t
-      LEFT JOIN teams tm ON t.team_id = tm.id
+      LEFT JOIN clubs c ON t.club_id = c.id
       WHERE t.game_id = $1
       ORDER BY t.created_at
     `, [gameId]);
@@ -149,12 +155,12 @@ router.get('/match/:gameId/csv', [
         EXTRACT(EPOCH FROM ge.time_remaining) as time_remaining_seconds,
         p.first_name || ' ' || p.last_name as player_name,
         p.jersey_number,
-        t.name as team_name,
+        c.name as team_name,
         ge.details,
         ge.created_at
       FROM game_events ge
       LEFT JOIN players p ON ge.player_id = p.id
-      JOIN teams t ON ge.team_id = t.id
+      JOIN clubs c ON ge.club_id = c.id
       WHERE ge.game_id = $1 AND ge.event_type = 'foul'
       ORDER BY ge.created_at
     `, [gameId]);
@@ -164,7 +170,7 @@ router.get('/match/:gameId/csv', [
       SELECT 
         p.first_name || ' ' || p.last_name as player_name,
         p.jersey_number,
-        t.name as team_name,
+        c.name as team_name,
         gr.is_captain,
         gr.is_starting,
         gr.starting_position,
@@ -178,9 +184,9 @@ router.get('/match/:gameId/csv', [
         ) as goals
       FROM game_rosters gr
       JOIN players p ON gr.player_id = p.id
-      JOIN teams t ON gr.team_id = t.id
+      JOIN clubs c ON gr.club_id = c.id
       WHERE gr.game_id = $1
-      ORDER BY t.name, p.jersey_number
+      ORDER BY c.name, p.jersey_number
     `, [gameId]);
 
     // Build CSV content with multiple sections
@@ -191,8 +197,8 @@ router.get('/match/:gameId/csv', [
     csvContent += 'Field,Value\n';
     csvContent += `Game ID,${game.id}\n`;
     csvContent += `Date,${game.date}\n`;
-    csvContent += `Home Team,${game.home_team_name}\n`;
-    csvContent += `Away Team,${game.away_team_name}\n`;
+    csvContent += `Home Team,${homeName}\n`;
+    csvContent += `Away Team,${awayName}\n`;
     csvContent += `Home Score,${game.home_score}\n`;
     csvContent += `Away Score,${game.away_score}\n`;
     csvContent += `Status,${game.status}\n`;
@@ -239,7 +245,7 @@ router.get('/match/:gameId/csv', [
     csvContent += arrayToCSV(participationResult.rows, participationHeaders);
 
     // Set response headers for CSV download
-    const filename = `match_${gameId}_${game.home_team_name}_vs_${game.away_team_name}_${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `match_${gameId}_${homeName}_vs_${awayName}_${new Date().toISOString().split('T')[0]}.csv`;
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csvContent);
@@ -290,7 +296,7 @@ router.get('/season/csv', [
       paramIndex++;
     }
     if (team_id) {
-      gameFilter += ` AND (g.home_team_id = $${paramIndex} OR g.away_team_id = $${paramIndex})`;
+      gameFilter += ` AND (g.home_team_id = $${paramIndex} OR g.away_team_id = $${paramIndex} OR g.home_club_id = $${paramIndex} OR g.away_club_id = $${paramIndex})`;
       gameParams.push(team_id);
       paramIndex++;
     }
@@ -378,38 +384,38 @@ router.get('/season/csv', [
       
       const teamStatsQuery = `
         SELECT 
-          t.id as team_id,
-          t.name as team_name,
+          c.id as team_id,
+          c.name as team_name,
           COUNT(DISTINCT g.id) as games_played,
-          SUM(CASE WHEN g.home_team_id = t.id THEN g.home_score ELSE g.away_score END) as total_goals_for,
-          SUM(CASE WHEN g.home_team_id = t.id THEN g.away_score ELSE g.home_score END) as total_goals_against,
+          SUM(CASE WHEN g.home_club_id = c.id THEN g.home_score ELSE g.away_score END) as total_goals_for,
+          SUM(CASE WHEN g.home_club_id = c.id THEN g.away_score ELSE g.home_score END) as total_goals_against,
           COUNT(CASE 
-            WHEN (g.home_team_id = t.id AND g.home_score > g.away_score) 
-              OR (g.away_team_id = t.id AND g.away_score > g.home_score) 
+            WHEN (g.home_club_id = c.id AND g.home_score > g.away_score) 
+              OR (g.away_club_id = c.id AND g.away_score > g.home_score) 
             THEN 1 
           END) as wins,
           COUNT(CASE 
-            WHEN (g.home_team_id = t.id AND g.home_score < g.away_score) 
-              OR (g.away_team_id = t.id AND g.away_score < g.home_score) 
+            WHEN (g.home_club_id = c.id AND g.home_score < g.away_score) 
+              OR (g.away_club_id = c.id AND g.away_score < g.home_score) 
             THEN 1 
           END) as losses,
           COUNT(CASE WHEN g.home_score = g.away_score THEN 1 END) as draws,
           COALESCE(
             (SELECT COUNT(*) FROM shots s 
              JOIN games g2 ON s.game_id = g2.id 
-             WHERE s.team_id = t.id AND g2.status = 'completed'${shotFilterClause}),
+             WHERE s.club_id = c.id AND g2.status = 'completed'${shotFilterClause}),
             0
           ) as total_shots,
           COALESCE(
             (SELECT COUNT(*) FROM shots s 
              JOIN games g2 ON s.game_id = g2.id 
-             WHERE s.team_id = t.id AND s.result = 'goal' AND g2.status = 'completed'${shotFilterClause2}),
+             WHERE s.club_id = c.id AND s.result = 'goal' AND g2.status = 'completed'${shotFilterClause2}),
             0
           ) as shot_goals
-        FROM teams t
-        LEFT JOIN games g ON (g.home_team_id = t.id OR g.away_team_id = t.id)
-        ${gameFilter}
-        GROUP BY t.id, t.name
+        FROM clubs c
+        LEFT JOIN games g ON (g.home_club_id = c.id OR g.away_club_id = c.id)
+        ${gameFilter.replace('g.home_team_id', 'g.home_club_id').replace('g.away_team_id', 'g.away_club_id')}
+        GROUP BY c.id, c.name
         HAVING COUNT(DISTINCT g.id) > 0
         ORDER BY wins DESC, total_goals_for DESC
       `;
@@ -428,8 +434,8 @@ router.get('/season/csv', [
     if (includeOptions.includes('head_to_head')) {
       const headToHeadQuery = `
         SELECT 
-          ht.name as home_team,
-          at.name as away_team,
+          hc.name as home_team,
+          ac.name as away_team,
           COUNT(*) as games_played,
           SUM(CASE WHEN g.home_score > g.away_score THEN 1 ELSE 0 END) as home_wins,
           SUM(CASE WHEN g.away_score > g.home_score THEN 1 ELSE 0 END) as away_wins,
@@ -437,12 +443,12 @@ router.get('/season/csv', [
           SUM(g.home_score) as total_home_goals,
           SUM(g.away_score) as total_away_goals
         FROM games g
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
-        ${gameFilter}
-        GROUP BY ht.id, ht.name, at.id, at.name
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
+        ${gameFilter.replace('g.home_team_id', 'g.home_club_id').replace('g.away_team_id', 'g.away_club_id')}
+        GROUP BY hc.id, hc.name, ac.id, ac.name
         HAVING COUNT(*) > 0
-        ORDER BY ht.name, at.name
+        ORDER BY hc.name, ac.name
       `;
 
       const headToHeadResult = await db.query(headToHeadQuery, gameParams);
@@ -498,81 +504,81 @@ router.get('/season/csv', [
         SELECT 
           'Shot' as event_type,
           g.date as game_date,
-          ht.name || ' vs ' || at.name as matchup,
+          hc.name || ' vs ' || ac.name as matchup,
           s.period,
           EXTRACT(EPOCH FROM s.time_remaining) as time_remaining_seconds,
           p.first_name || ' ' || p.last_name as player_name,
-          t.name as team_name,
+          c.name as team_name,
           s.result as event_details,
           s.created_at as timestamp
         FROM shots s
         JOIN games g ON s.game_id = g.id
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
         JOIN players p ON s.player_id = p.id
-        JOIN teams t ON s.team_id = t.id
-        ${gameFilter}
+        JOIN clubs c ON s.club_id = c.id
+        ${gameFilter.replace('g.home_team_id', 'g.home_club_id').replace('g.away_team_id', 'g.away_club_id')}
         
         UNION ALL
         
         SELECT 
           'Substitution' as event_type,
           g.date as game_date,
-          ht.name || ' vs ' || at.name as matchup,
+          hc.name || ' vs ' || ac.name as matchup,
           sub.period,
           EXTRACT(EPOCH FROM sub.time_remaining) as time_remaining_seconds,
           pin.first_name || ' ' || pin.last_name || ' in for ' || 
           pout.first_name || ' ' || pout.last_name as player_name,
-          t.name as team_name,
+          c.name as team_name,
           COALESCE(sub.reason, 'N/A') as event_details,
           sub.created_at as timestamp
         FROM substitutions sub
         JOIN games g ON sub.game_id = g.id
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
         JOIN players pin ON sub.player_in_id = pin.id
         JOIN players pout ON sub.player_out_id = pout.id
-        JOIN teams t ON sub.team_id = t.id
-        ${gameFilter}
+        JOIN clubs c ON sub.club_id = c.id
+        ${gameFilter.replace('g.home_team_id', 'g.home_club_id').replace('g.away_team_id', 'g.away_club_id')}
         
         UNION ALL
         
         SELECT 
           'Timeout' as event_type,
           g.date as game_date,
-          ht.name || ' vs ' || at.name as matchup,
+          hc.name || ' vs ' || ac.name as matchup,
           timeout.period,
           EXTRACT(EPOCH FROM timeout.time_remaining) as time_remaining_seconds,
           COALESCE(timeout.called_by, 'N/A') as player_name,
-          COALESCE(tm.name, 'N/A') as team_name,
+          COALESCE(c.name, 'N/A') as team_name,
           timeout.timeout_type as event_details,
           timeout.created_at as timestamp
         FROM timeouts timeout
         JOIN games g ON timeout.game_id = g.id
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
-        LEFT JOIN teams tm ON timeout.team_id = tm.id
-        ${gameFilter}
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
+        LEFT JOIN clubs c ON timeout.club_id = c.id
+        ${gameFilter.replace('g.home_team_id', 'g.home_club_id').replace('g.away_team_id', 'g.away_club_id')}
         
         UNION ALL
         
         SELECT 
           'Foul' as event_type,
           g.date as game_date,
-          ht.name || ' vs ' || at.name as matchup,
+          hc.name || ' vs ' || ac.name as matchup,
           ge.period,
           EXTRACT(EPOCH FROM ge.time_remaining) as time_remaining_seconds,
           COALESCE(p.first_name || ' ' || p.last_name, 'N/A') as player_name,
-          t.name as team_name,
+          c.name as team_name,
           COALESCE(ge.details::text, 'N/A') as event_details,
           ge.created_at as timestamp
         FROM game_events ge
         JOIN games g ON ge.game_id = g.id
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
         LEFT JOIN players p ON ge.player_id = p.id
-        JOIN teams t ON ge.team_id = t.id
-        WHERE ge.event_type = 'foul' ${gameFilter.replace('WHERE g.', 'AND g.')}
+        JOIN clubs c ON ge.club_id = c.id
+        WHERE ge.event_type = 'foul' ${gameFilter.replace('WHERE g.', 'AND g.').replace('g.home_team_id', 'g.home_club_id').replace('g.away_team_id', 'g.away_club_id')}
         
         ORDER BY timestamp DESC
         LIMIT 1000
@@ -609,6 +615,7 @@ router.get('/games/csv', [
   query('date_from').optional().isISO8601().withMessage('Invalid date_from format'),
   query('date_to').optional().isISO8601().withMessage('Invalid date_to format'),
   query('team_id').optional().isInt().withMessage('Team ID must be an integer'),
+  query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
   query('columns').optional().isString().withMessage('Columns must be comma-separated string')
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -616,7 +623,7 @@ router.get('/games/csv', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { game_ids, date_from, date_to, team_id, columns } = req.query;
+  const { game_ids, date_from, date_to, team_id, club_id, columns } = req.query;
   const includeColumns = columns ? columns.split(',').map(s => s.trim()) : 
     ['shots', 'substitutions', 'timeouts', 'fouls', 'participation'];
 
@@ -653,19 +660,25 @@ router.get('/games/csv', [
       paramIndex++;
     }
 
+    if (club_id) {
+      gameFilter += ` AND (g.home_club_id = $${paramIndex} OR g.away_club_id = $${paramIndex})`;
+      gameParams.push(club_id);
+      paramIndex++;
+    }
+
     // Get matching games
     const gamesQuery = `
       SELECT 
         g.id,
         g.date,
-        ht.name as home_team_name,
-        at.name as away_team_name,
+        hc.name as home_team_name,
+        ac.name as away_team_name,
         g.home_score,
         g.away_score,
         g.status
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN clubs hc ON g.home_club_id = hc.id
+      LEFT JOIN clubs ac ON g.away_club_id = ac.id
       ${gameFilter}
       ORDER BY g.date DESC
     `;
@@ -685,7 +698,8 @@ router.get('/games/csv', [
     csvContent += `Total Games,${gamesResult.rows.length}\n`;
     csvContent += `Date From,${date_from || 'All time'}\n`;
     csvContent += `Date To,${date_to || 'Present'}\n`;
-    csvContent += `Team Filter,${team_id || 'All teams'}\n`;
+    const filterLabel = club_id ? `Club ${club_id}` : team_id ? `Team ${team_id}` : 'All teams';
+    csvContent += `Team Filter,${filterLabel}\n`;
     csvContent += '\n\n';
 
     // Games List
@@ -702,7 +716,7 @@ router.get('/games/csv', [
         SELECT 
           s.game_id,
           g.date as game_date,
-          ht.name || ' vs ' || at.name as matchup,
+          hc.name || ' vs ' || ac.name as matchup,
           s.period,
           EXTRACT(EPOCH FROM s.time_remaining) as time_remaining_seconds,
           s.x_coord,
@@ -712,13 +726,13 @@ router.get('/games/csv', [
           s.distance,
           p.first_name || ' ' || p.last_name as player_name,
           p.jersey_number,
-          t.name as team_name
+          c.name as team_name
         FROM shots s
         JOIN games g ON s.game_id = g.id
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
         JOIN players p ON s.player_id = p.id
-        JOIN teams t ON s.team_id = t.id
+        JOIN clubs c ON s.club_id = c.id
         WHERE s.game_id = ANY($1::int[])
         ORDER BY g.date, s.created_at
       `;
@@ -738,22 +752,22 @@ router.get('/games/csv', [
         SELECT 
           s.game_id,
           g.date as game_date,
-          ht.name || ' vs ' || at.name as matchup,
+          hc.name || ' vs ' || ac.name as matchup,
           s.period,
           EXTRACT(EPOCH FROM s.time_remaining) as time_remaining_seconds,
           pin.first_name || ' ' || pin.last_name as player_in,
           pin.jersey_number as player_in_jersey,
           pout.first_name || ' ' || pout.last_name as player_out,
           pout.jersey_number as player_out_jersey,
-          t.name as team_name,
+          c.name as team_name,
           s.reason
         FROM substitutions s
         JOIN games g ON s.game_id = g.id
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
         JOIN players pin ON s.player_in_id = pin.id
         JOIN players pout ON s.player_out_id = pout.id
-        JOIN teams t ON s.team_id = t.id
+        JOIN clubs c ON s.club_id = c.id
         WHERE s.game_id = ANY($1::int[])
         ORDER BY g.date, s.created_at
       `;
@@ -773,19 +787,19 @@ router.get('/games/csv', [
         SELECT 
           t.game_id,
           g.date as game_date,
-          ht.name || ' vs ' || at.name as matchup,
+          hc.name || ' vs ' || ac.name as matchup,
           t.period,
           EXTRACT(EPOCH FROM t.time_remaining) as time_remaining_seconds,
-          COALESCE(tm.name, 'N/A') as team_name,
+          COALESCE(c.name, 'N/A') as team_name,
           t.timeout_type,
           EXTRACT(EPOCH FROM t.duration) as duration_seconds,
           t.reason,
           t.called_by
         FROM timeouts t
         JOIN games g ON t.game_id = g.id
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
-        LEFT JOIN teams tm ON t.team_id = tm.id
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
+        LEFT JOIN clubs c ON t.club_id = c.id
         WHERE t.game_id = ANY($1::int[])
         ORDER BY g.date, t.created_at
       `;
@@ -804,19 +818,19 @@ router.get('/games/csv', [
         SELECT 
           ge.game_id,
           g.date as game_date,
-          ht.name || ' vs ' || at.name as matchup,
+          hc.name || ' vs ' || ac.name as matchup,
           ge.period,
           EXTRACT(EPOCH FROM ge.time_remaining) as time_remaining_seconds,
           COALESCE(p.first_name || ' ' || p.last_name, 'N/A') as player_name,
           COALESCE(p.jersey_number::text, 'N/A') as jersey_number,
-          t.name as team_name,
+          c.name as team_name,
           COALESCE(ge.details::text, 'N/A') as details
         FROM game_events ge
         JOIN games g ON ge.game_id = g.id
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
         LEFT JOIN players p ON ge.player_id = p.id
-        JOIN teams t ON ge.team_id = t.id
+        JOIN clubs c ON ge.club_id = c.id
         WHERE ge.game_id = ANY($1::int[]) AND ge.event_type = 'foul'
         ORDER BY g.date, ge.created_at
       `;
@@ -835,10 +849,10 @@ router.get('/games/csv', [
         SELECT 
           gr.game_id,
           g.date as game_date,
-          ht.name || ' vs ' || at.name as matchup,
+          hc.name || ' vs ' || ac.name as matchup,
           p.first_name || ' ' || p.last_name as player_name,
           p.jersey_number,
-          t.name as team_name,
+          c.name as team_name,
           gr.is_captain,
           gr.is_starting,
           gr.starting_position,
@@ -852,12 +866,12 @@ router.get('/games/csv', [
           ) as goals
         FROM game_rosters gr
         JOIN games g ON gr.game_id = g.id
-        JOIN teams ht ON g.home_team_id = ht.id
-        JOIN teams at ON g.away_team_id = at.id
+        JOIN clubs hc ON g.home_club_id = hc.id
+        JOIN clubs ac ON g.away_club_id = ac.id
         JOIN players p ON gr.player_id = p.id
-        JOIN teams t ON gr.team_id = t.id
+        JOIN clubs c ON gr.club_id = c.id
         WHERE gr.game_id = ANY($1::int[])
-        ORDER BY g.date, t.name, p.jersey_number
+        ORDER BY g.date, c.name, p.jersey_number
       `;
       const participationResult = await db.query(participationQuery, [gameIds]);
 

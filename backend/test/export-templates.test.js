@@ -37,11 +37,18 @@ describe('📋 Export Templates CRUD', () => {
     regularUser = userResult.rows[0];
     userToken = jwt.sign({ userId: regularUser.id, role: 'user' }, process.env.JWT_SECRET);
 
-    // Create test team
-    const teamResult = await db.query(`
-      INSERT INTO teams (name)
+    // Create test club
+    const clubResult = await db.query(`
+      INSERT INTO clubs (name)
       VALUES ($1) RETURNING id
-    `, [`TestTeam_${uniqueId}`]);
+    `, [`TestClub_${uniqueId}`]);
+    const testClubId = clubResult.rows[0].id;
+
+    // Create test team with club_id
+    const teamResult = await db.query(`
+      INSERT INTO teams (club_id, name, age_group)
+      VALUES ($1, $2, $3) RETURNING id
+    `, [testClubId, `TestTeam_${uniqueId}`, 'U14']);
     testTeamId = teamResult.rows[0].id;
   });
 
@@ -51,7 +58,12 @@ describe('📋 Export Templates CRUD', () => {
       [adminUser.id, coachUser.id, regularUser.id]);
     await db.query('DELETE FROM report_templates WHERE created_by IN ($1, $2, $3)', 
       [adminUser.id, coachUser.id, regularUser.id]);
-    await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
+    const clubResult = await db.query('SELECT club_id FROM teams WHERE id = $1', [testTeamId]);
+    if (clubResult.rows.length > 0) {
+      const clubId = clubResult.rows[0].club_id;
+      await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
+      await db.query('DELETE FROM clubs WHERE id = $1', [clubId]);
+    }
     await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', 
       [adminUser.id, coachUser.id, regularUser.id]);
   });

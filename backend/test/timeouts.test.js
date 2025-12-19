@@ -108,7 +108,7 @@ describe('⏱️ Timeouts API', () => {
       it('✅ should return empty array for game with no timeouts', async () => {
         const newGame = await db.query(
           `INSERT INTO games (
-            home_team_id, away_team_id, date, status, current_period
+            home_club_id, away_club_id, date, status, current_period
           ) VALUES ($1, $2, CURRENT_TIMESTAMP, 'in_progress', 1) 
           RETURNING id`,
           [homeTeamId, awayTeamId]
@@ -187,7 +187,7 @@ describe('⏱️ Timeouts API', () => {
         expect(res.body).toHaveProperty('club_id', awayTeamId);
       });
 
-      it('✅ should create injury timeout without team_id', async () => {
+      it('✅ should create injury timeout without club_id', async () => {
         const res = await request(app)
           .post('/api/timeouts')
           .set('Authorization', `Bearer ${adminToken}`)
@@ -200,7 +200,7 @@ describe('⏱️ Timeouts API', () => {
 
         expect(res.status).toBe(201);
         expect(res.body).toHaveProperty('timeout_type', 'injury');
-        expect(res.body.team_id).toBeNull();
+        expect(res.body.club_id).toBeNull();
       });
 
       it('✅ should create official timeout', async () => {
@@ -320,7 +320,7 @@ describe('⏱️ Timeouts API', () => {
 
       it('❌ should reject timeout for game not in progress', async () => {
         const scheduledGame = await db.query(
-          `INSERT INTO games (home_team_id, away_team_id, date, status, current_period)
+          `INSERT INTO games (home_club_id, away_club_id, date, status, current_period)
            VALUES ($1, $2, CURRENT_TIMESTAMP, 'scheduled', 1) RETURNING id`,
           [homeTeamId, awayTeamId]
         );
@@ -341,7 +341,7 @@ describe('⏱️ Timeouts API', () => {
         await db.query('DELETE FROM games WHERE id = $1', [scheduledGameId]);
       });
 
-      it('❌ should reject team timeout for non-participating team', async () => {
+      it('❌ should reject team timeout for non-participating club', async () => {
         const otherTeam = await db.query(
           'INSERT INTO clubs (name) VALUES (\'Other Team\') RETURNING id'
         );
@@ -358,12 +358,12 @@ describe('⏱️ Timeouts API', () => {
           });
 
         expect(res.status).toBe(400);
-        expect(res.body).toHaveProperty('error', 'Team is not participating in this game');
+        expect(res.body).toHaveProperty('error', 'Club is not participating in this game');
 
         await db.query('DELETE FROM clubs WHERE id = $1', [otherTeamId]);
       });
 
-      it('❌ should reject official timeout with team_id', async () => {
+      it('❌ should reject official timeout with club_id', async () => {
         const res = await request(app)
           .post('/api/timeouts')
           .set('Authorization', `Bearer ${adminToken}`)
@@ -375,10 +375,10 @@ describe('⏱️ Timeouts API', () => {
           });
 
         expect(res.status).toBe(400);
-        expect(res.body.error).toContain('official timeouts should not have a team_id');
+        expect(res.body.error).toContain('official timeouts should not have a club_id');
       });
 
-      it('❌ should reject TV timeout with team_id', async () => {
+      it('❌ should reject TV timeout with club_id', async () => {
         const res = await request(app)
           .post('/api/timeouts')
           .set('Authorization', `Bearer ${adminToken}`)
@@ -390,10 +390,10 @@ describe('⏱️ Timeouts API', () => {
           });
 
         expect(res.status).toBe(400);
-        expect(res.body.error).toContain('tv timeouts should not have a team_id');
+        expect(res.body.error).toContain('tv timeouts should not have a club_id');
       });
 
-      it('❌ should reject team timeout without team_id', async () => {
+      it('❌ should reject team timeout without club_id', async () => {
         const res = await request(app)
           .post('/api/timeouts')
           .set('Authorization', `Bearer ${adminToken}`)
@@ -404,7 +404,7 @@ describe('⏱️ Timeouts API', () => {
           });
 
         expect(res.status).toBe(400);
-        expect(res.body).toHaveProperty('error', 'team_id is required for team timeouts');
+        expect(res.body).toHaveProperty('error', 'club_id is required for team timeouts');
       });
     });
   });

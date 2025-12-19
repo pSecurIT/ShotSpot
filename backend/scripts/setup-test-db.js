@@ -130,7 +130,14 @@ async function setupTestDb() {
       '20251214_update_games_team_to_club.sql',
       '20251214_update_players_team_to_club.sql',
       '20251214_update_substitutions_team_to_club.sql',
-      '20251214_add_seasons_and_series.sql' // Added migration
+      '20251214_add_seasons_and_series.sql',
+      '20251216_add_trainer_assignments.sql',
+      '20251217_add_player_team_link.sql',
+      '20251218_add_game_team_links.sql',
+      '20251219_add_twizzit_player_registration.sql',
+      '20251220_add_game_competition_link.sql',
+      '20251221_drop_matches_add_series_to_competitions.sql',
+      '20251222_fix_games_status_constraint.sql'
     ];
 
     for (const migrationFile of migrations) {
@@ -148,6 +155,43 @@ async function setupTestDb() {
         console.warn(`Migration file not found: ${migrationFile}`);
       }
     }
+
+    // Safety net: ensure trainer_assignments exists even if a migration was skipped
+    await testPool.query(`
+      CREATE TABLE IF NOT EXISTS trainer_assignments (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE NOT NULL,
+        team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+        active_from DATE DEFAULT CURRENT_DATE,
+        active_to DATE,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT trainer_assignments_active_dates CHECK (active_to IS NULL OR active_to >= active_from)
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_trainer_assignment_active
+        ON trainer_assignments (user_id, club_id, COALESCE(team_id, -1))
+        WHERE is_active = true AND active_to IS NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_trainer_assignments_user ON trainer_assignments(user_id);
+      CREATE INDEX IF NOT EXISTS idx_trainer_assignments_club ON trainer_assignments(club_id);
+      CREATE INDEX IF NOT EXISTS idx_trainer_assignments_team ON trainer_assignments(team_id);
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_trigger WHERE tgname = 'update_trainer_assignments_updated_at'
+        ) THEN
+          CREATE TRIGGER update_trainer_assignments_updated_at
+            BEFORE UPDATE ON trainer_assignments
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+        END IF;
+      END
+      $$;
+    `);
 
     // Grant permissions to test user on all tables (if different from admin)
     if (dbUser !== adminUser) {
