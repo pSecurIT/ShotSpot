@@ -155,9 +155,9 @@ describe('📋 Game Rosters API', () => {
           });
 
         expect(response.status).toBe(201);
-        expect(response.body).toHaveLength(2);
-        expect(response.body[0].is_captain).toBe(true);
-        expect(response.body[1].is_captain).toBe(false);
+        expect(response.body.roster).toHaveLength(2);
+        expect(response.body.roster[0].is_captain).toBe(true);
+        expect(response.body.roster[1].is_captain).toBe(false);
         console.log('      ✅ Players added to roster with captain successfully');
       } catch (error) {
         console.log('      ❌ Add players with captain test failed:', error.message);
@@ -557,7 +557,7 @@ describe('📋 Game Rosters API', () => {
           .send({ players });
 
         expect(response.status).toBe(201);
-        expect(response.body).toHaveLength(10);
+        expect(response.body.roster).toHaveLength(10);
         console.log('      ✅ Large roster (10 players) handled successfully');
       } catch (error) {
         console.log('      ❌ Large roster test failed:', error.message);
@@ -574,7 +574,7 @@ describe('📋 Game Rosters API', () => {
           .send({ players: [] });
 
         expect(response.status).toBe(201);
-        expect(response.body).toEqual([]);
+        expect(response.body.roster).toEqual([]);
         console.log('      ✅ Empty roster handled successfully');
       } catch (error) {
         console.log('      ❌ Empty roster test failed:', error.message);
@@ -606,8 +606,8 @@ describe('📋 Game Rosters API', () => {
           });
 
         expect(response.status).toBe(201);
-        expect(response.body).toHaveLength(1);
-        expect(response.body[0].player_id).toBe(homePlayer2.id);
+        expect(response.body.roster).toHaveLength(1);
+        expect(response.body.roster[0].player_id).toBe(homePlayer2.id);
         
         // Verify old roster is gone
         const check = await db.query(

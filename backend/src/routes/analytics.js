@@ -834,15 +834,15 @@ router.get('/players/:playerId/development', [
         ROUND(AVG(s.distance), 2) as avg_distance
       FROM shots s
       JOIN games g ON s.game_id = g.id
-      JOIN teams t ON s.team_id = t.id
+      JOIN clubs t ON s.club_id = t.id
       WHERE s.player_id = $1
     `;
     const queryParams = [playerId];
     let paramIndex = 2;
 
-    if (team_id) {
-      queryText += ` AND s.team_id = $${paramIndex}`;
-      queryParams.push(team_id);
+    if (club_id) {
+      queryText += ` AND s.club_id = $${paramIndex}`;
+      queryParams.push(club_id);
       paramIndex++;
     }
 

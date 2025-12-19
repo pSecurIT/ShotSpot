@@ -87,24 +87,6 @@ CREATE TABLE IF NOT EXISTS clubs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Update references in players table
-CREATE TABLE IF NOT EXISTS players (
-    id SERIAL PRIMARY KEY,
-    club_id INTEGER REFERENCES clubs(id) ON DELETE SET NULL,
-    first_name VARCHAR(50) NOT NULL,
-    last_name VARCHAR(50) NOT NULL,
-    jersey_number INTEGER,
-    gender VARCHAR(10),
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(club_id, jersey_number),
-    CHECK (gender IN ('male', 'female') OR gender IS NULL)
-);
-
-COMMENT ON TABLE players IS 'Player information. Note: Captain role is game-specific and stored in game_rosters table.';
-COMMENT ON COLUMN players.gender IS 'Player gender: male or female. Required for korfball team composition (4 males + 4 females per team).';
-
 -- Teams table for age groups (U17, U15, etc.)
 CREATE TABLE IF NOT EXISTS teams (
     id SERIAL PRIMARY KEY,
@@ -129,6 +111,50 @@ COMMENT ON COLUMN teams.age_group IS 'Age group identifier (e.g., U17, U15, U13,
 COMMENT ON COLUMN teams.gender IS 'Team gender: male, female, or mixed for korfball';
 COMMENT ON COLUMN teams.season_id IS 'Optional season link for historical team tracking';
 
+-- Player roster linked to clubs and optional teams
+CREATE TABLE IF NOT EXISTS players (
+    id SERIAL PRIMARY KEY,
+    club_id INTEGER REFERENCES clubs(id) ON DELETE SET NULL,
+    team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    jersey_number INTEGER,
+    gender VARCHAR(10),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(club_id, jersey_number),
+    CHECK (gender IN ('male', 'female') OR gender IS NULL)
+);
+
+COMMENT ON TABLE players IS 'Player information. Note: Captain role is game-specific and stored in game_rosters table.';
+COMMENT ON COLUMN players.gender IS 'Player gender: male or female. Required for korfball team composition (4 males + 4 females per team).';
+
+CREATE INDEX IF NOT EXISTS idx_players_club_id ON players(club_id);
+CREATE INDEX IF NOT EXISTS idx_players_team_id ON players(team_id);
+
+-- Trainer assignments map coaches to clubs/teams with active windows
+CREATE TABLE IF NOT EXISTS trainer_assignments (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        club_id INTEGER REFERENCES clubs(id) ON DELETE CASCADE NOT NULL,
+        team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+        active_from DATE DEFAULT CURRENT_DATE,
+        active_to DATE,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT trainer_assignments_active_dates CHECK (active_to IS NULL OR active_to >= active_from)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_trainer_assignment_active
+    ON trainer_assignments (user_id, club_id, COALESCE(team_id, -1))
+    WHERE is_active = true AND active_to IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_trainer_assignments_user ON trainer_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_trainer_assignments_club ON trainer_assignments(club_id);
+CREATE INDEX IF NOT EXISTS idx_trainer_assignments_team ON trainer_assignments(team_id);
+
 -- ==============================================================================
 -- GAMES
 -- ==============================================================================
@@ -138,13 +164,17 @@ CREATE TABLE IF NOT EXISTS games (
     id SERIAL PRIMARY KEY,
     home_club_id INTEGER REFERENCES clubs(id) NOT NULL,
     away_club_id INTEGER REFERENCES clubs(id) NOT NULL,
+    home_team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+    away_team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
     home_score INTEGER DEFAULT 0,
     away_score INTEGER DEFAULT 0,
     date TIMESTAMP WITH TIME ZONE NOT NULL,
     status VARCHAR(20) DEFAULT 'scheduled',
+    game_type VARCHAR(10) DEFAULT 'club',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CHECK (status IN ('scheduled', 'completed', 'cancelled'))
+    CHECK (status IN ('scheduled', 'to_reschedule', 'in_progress', 'completed', 'cancelled')),
+    CHECK (game_type IN ('club', 'team'))
 );
 
 COMMENT ON TABLE games IS 'Tracks all matches between clubs, including scores and status.';
@@ -266,5 +296,10 @@ CREATE TRIGGER update_players_updated_at
 
 CREATE TRIGGER update_games_updated_at
     BEFORE UPDATE ON games
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_trainer_assignments_updated_at
+    BEFORE UPDATE ON trainer_assignments
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

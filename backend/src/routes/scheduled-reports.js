@@ -32,7 +32,7 @@ router.get('/', [
         u.username as created_by_username
       FROM scheduled_reports sr
       JOIN report_templates rt ON sr.template_id = rt.id
-      LEFT JOIN clubs t ON sr.team_id = t.id
+      LEFT JOIN teams t ON sr.team_id = t.id
       LEFT JOIN users u ON sr.created_by = u.id
       WHERE 1=1
     `;
@@ -90,7 +90,7 @@ router.get('/:id', [
         u.username as created_by_username
       FROM scheduled_reports sr
       JOIN report_templates rt ON sr.template_id = rt.id
-      LEFT JOIN clubs t ON sr.team_id = t.id
+      LEFT JOIN teams t ON sr.team_id = t.id
       LEFT JOIN users u ON sr.created_by = u.id
       WHERE sr.id = $1
     `, [id]);
@@ -198,9 +198,9 @@ router.post('/', [
 
     // Verify team exists if team_id provided
     if (team_id) {
-      const teamCheck = await db.query('SELECT id FROM clubs WHERE id = $1', [team_id]);
+      const teamCheck = await db.query('SELECT id FROM teams WHERE id = $1', [team_id]);
       if (teamCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Club not found' });
+        return res.status(404).json({ error: 'Team not found' });
       }
     }
 

@@ -956,14 +956,15 @@ router.post('/:id/standings/update', [
     let homePoints = 0, awayPoints = 0;
     let homeWin = 0, awayWin = 0, draw = 0;
 
+    // Korfball points: win = 2, draw = 1, loss = 0
     if (home_score > away_score) {
-      homePoints = 3; // Win
+      homePoints = 2;
       homeWin = 1;
     } else if (away_score > home_score) {
-      awayPoints = 3; // Win
+      awayPoints = 2;
       awayWin = 1;
     } else {
-      homePoints = 1; // Draw
+      homePoints = 1;
       awayPoints = 1;
       draw = 1;
     }

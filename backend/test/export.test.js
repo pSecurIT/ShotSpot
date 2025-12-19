@@ -6,6 +6,8 @@ import jwt from 'jsonwebtoken';
 describe('📊 Export API Tests', () => {
   let authToken;
   let testGame;
+  let testClub1;
+  let testClub2;
   let testTeam1;
   let testTeam2;
   let testPlayer1;
@@ -29,87 +31,100 @@ describe('📊 Export API Tests', () => {
     authToken = jwt.sign({ id: testUser.id, role: 'coach' }, process.env.JWT_SECRET);
 
     // Create test teams directly in DB
-    const team1Result = await db.query(
+    const club1Result = await db.query(
       'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
-      [`Export Test Team 1 ${uniqueId}`]
+      [`Export Test Club 1 ${uniqueId}`]
+    );
+    testClub1 = club1Result.rows[0];
+
+    const club2Result = await db.query(
+      'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+      [`Export Test Club 2 ${uniqueId}`]
+    );
+    testClub2 = club2Result.rows[0];
+
+    // Create teams for each club (age-group teams)
+    const team1Result = await db.query(
+      'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING *',
+      [testClub1.id, `Export Team 1 ${uniqueId}`, 'U17']
     );
     testTeam1 = team1Result.rows[0];
 
     const team2Result = await db.query(
-      'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
-      [`Export Test Team 2 ${uniqueId}`]
+      'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING *',
+      [testClub2.id, `Export Team 2 ${uniqueId}`, 'U17']
     );
     testTeam2 = team2Result.rows[0];
 
     // Create test players directly in DB
     const player1Result = await db.query(`
-      INSERT INTO players (team_id, first_name, last_name, jersey_number, gender)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [testTeam1.id, 'Export', 'Player1', 10, 'male']);
+    `, [testClub1.id, testTeam1.id, 'Export', 'Player1', 10, 'male']);
     testPlayer1 = player1Result.rows[0];
 
     const player2Result = await db.query(`
-      INSERT INTO players (team_id, first_name, last_name, jersey_number, gender)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [testTeam2.id, 'Export', 'Player2', 20, 'female']);
+    `, [testClub2.id, testTeam2.id, 'Export', 'Player2', 20, 'female']);
     testPlayer2 = player2Result.rows[0];
     
     // Create a third player for substitution
     const player3Result = await db.query(`
-      INSERT INTO players (team_id, first_name, last_name, jersey_number, gender)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [testTeam1.id, 'Export', 'Player3', 11, 'male']);
+    `, [testClub1.id, testTeam1.id, 'Export', 'Player3', 11, 'male']);
     const testPlayer3 = player3Result.rows[0];
 
     // Create a test game directly in DB
     testGameDate = new Date().toISOString();
     const gameResult = await db.query(`
-      INSERT INTO games (home_club_id, away_club_id, date, status)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [testTeam1.id, testTeam2.id, testGameDate, 'in_progress']);
+    `, [testClub1.id, testClub2.id, testTeam1.id, testTeam2.id, testGameDate, 'in_progress']);
     testGame = gameResult.rows[0];
 
     // Add game roster entries
     await db.query(`
       INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting, starting_position)
       VALUES ($1, $2, $3, true, true, 'offense')
-    `, [testGame.id, testTeam1.id, testPlayer1.id]);
+    `, [testGame.id, testClub1.id, testPlayer1.id]);
     
     await db.query(`
       INSERT INTO game_rosters (game_id, club_id, player_id, is_captain, is_starting, starting_position)
       VALUES ($1, $2, $3, false, true, 'defense')
-    `, [testGame.id, testTeam2.id, testPlayer2.id]);
+    `, [testGame.id, testClub2.id, testPlayer2.id]);
 
     // Add some test shots
     await db.query(`
-      INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance)
+      INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance)
       VALUES 
         ($1, $2, $3, 50.0, 50.0, 'goal', 1, '09:00:00', 'jump shot', 5.5),
         ($1, $4, $5, 30.0, 40.0, 'miss', 1, '08:30:00', 'running shot', 6.2),
         ($1, $2, $3, 60.0, 55.0, 'goal', 2, '09:45:00', 'penalty', 3.0)
-    `, [testGame.id, testPlayer1.id, testTeam1.id, testPlayer2.id, testTeam2.id]);
+    `, [testGame.id, testPlayer1.id, testClub1.id, testPlayer2.id, testClub2.id]);
 
     // Add a substitution (player3 in, player1 out)
     await db.query(`
-      INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, time_remaining, reason)
+      INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, time_remaining, reason)
       VALUES ($1, $2, $3, $4, 1, '07:00:00', 'tactical')
-    `, [testGame.id, testTeam1.id, testPlayer3.id, testPlayer1.id]);
+    `, [testGame.id, testClub1.id, testPlayer3.id, testPlayer1.id]);
 
     // Add a timeout
     await db.query(`
-      INSERT INTO timeouts (game_id, team_id, timeout_type, period, time_remaining, duration, reason, called_by)
+      INSERT INTO timeouts (game_id, club_id, timeout_type, period, time_remaining, duration, reason, called_by)
       VALUES ($1, $2, 'team', 1, '05:00:00', '01:00:00', 'Strategy discussion', 'Coach Smith')
-    `, [testGame.id, testTeam1.id]);
+    `, [testGame.id, testClub1.id]);
 
     // Add a foul event
     await db.query(`
-      INSERT INTO game_events (game_id, event_type, player_id, team_id, period, time_remaining, details)
+      INSERT INTO game_events (game_id, event_type, player_id, club_id, period, time_remaining, details)
       VALUES ($1, 'foul', $2, $3, 1, '06:00:00', '{"type": "personal", "severity": "minor"}')
-    `, [testGame.id, testPlayer2.id, testTeam2.id]);
+    `, [testGame.id, testPlayer2.id, testClub2.id]);
   });
 
   afterAll(async () => {
@@ -117,8 +132,14 @@ describe('📊 Export API Tests', () => {
     if (testGame) {
       await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
     }
+    if (testPlayer1 || testPlayer2) {
+      await db.query('DELETE FROM players WHERE club_id IN ($1, $2)', [testClub1.id, testClub2.id]);
+    }
     if (testTeam1 && testTeam2) {
-      await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [testTeam1.id, testTeam2.id]);
+      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [testTeam1.id, testTeam2.id]);
+    }
+    if (testClub1 && testClub2) {
+      await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [testClub1.id, testClub2.id]);
     }
     if (testUser) {
       await db.query('DELETE FROM users WHERE id = $1', [testUser.id]);
@@ -140,8 +161,8 @@ describe('📊 Export API Tests', () => {
       expect(response.text).toContain('=== TIMEOUTS ===');
       expect(response.text).toContain('=== FOULS ===');
       expect(response.text).toContain('=== PLAYER PARTICIPATION ===');
-      expect(response.text).toContain('Export Test Team 1');
-      expect(response.text).toContain('Export Test Team 2');
+      expect(response.text).toContain('Export Test Club 1');
+      expect(response.text).toContain('Export Test Club 2');
     });
 
     it('✅ should include shot data in CSV', async () => {
@@ -163,8 +184,8 @@ describe('📊 Export API Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.text).toContain('Home Team,Export Test Team 1');
-      expect(response.text).toContain('Away Team,Export Test Team 2');
+      expect(response.text).toContain('Home Team,Export Test Club 1');
+      expect(response.text).toContain('Away Team,Export Test Club 2');
       expect(response.text).toContain('Status,in_progress');
     });
 
@@ -326,7 +347,7 @@ describe('📊 Export API Tests', () => {
       expect(response.headers['content-disposition']).toContain('attachment');
       expect(response.text).toContain('=== BULK GAMES EXPORT ===');
       expect(response.text).toContain('=== GAMES LIST ===');
-      expect(response.text).toContain('Export Test Team 1');
+      expect(response.text).toContain('Export Test Club 1');
     });
 
     it('✅ should include shots in bulk export', async () => {
@@ -411,11 +432,11 @@ describe('📊 Export API Tests', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
         
-        expect(widerResponse.text).toContain('Export Test Team 1');
+        expect(widerResponse.text).toContain('Export Test Club 1');
       } else {
         expect(response.status).toBe(200);
         expect(response.text).toContain(`Date From,${gameDate}`);
-        expect(response.text).toContain('Export Test Team 1');
+        expect(response.text).toContain('Export Test Club 1');
       }
     });
 
@@ -425,7 +446,7 @@ describe('📊 Export API Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.text).toContain('Export Test Team 1');
+      expect(response.text).toContain('Export Test Club 1');
     });
 
     it('❌ should return 404 when no games match filters', async () => {
@@ -448,9 +469,9 @@ describe('📊 Export API Tests', () => {
     it('✅ should properly escape CSV values with commas', async () => {
       // Add a shot with comma in shot type
       await db.query(`
-        INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance)
+        INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance)
         VALUES ($1, $2, $3, 45.0, 55.0, 'goal', 1, '08:00:00', 'long-range, high-arc shot', 7.5)
-      `, [testGame.id, testPlayer1.id, testTeam1.id]);
+      `, [testGame.id, testPlayer1.id, testClub1.id]);
 
       const response = await request(app)
         .get(`/api/export/match/${testGame.id}/csv`)
@@ -464,9 +485,9 @@ describe('📊 Export API Tests', () => {
     it('✅ should properly escape CSV values with quotes', async () => {
       // Add a timeout with quotes in reason
       await db.query(`
-        INSERT INTO timeouts (game_id, team_id, timeout_type, period, time_remaining, duration, reason, called_by)
+        INSERT INTO timeouts (game_id, club_id, timeout_type, period, time_remaining, duration, reason, called_by)
         VALUES ($1, $2, 'team', 1, '04:00:00', '01:00:00', 'Coach said "take a breath"', 'Coach')
-      `, [testGame.id, testTeam1.id]);
+      `, [testGame.id, testClub1.id]);
 
       const response = await request(app)
         .get(`/api/export/match/${testGame.id}/csv`)
