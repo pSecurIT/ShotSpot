@@ -207,30 +207,20 @@ jobs:
             fi
           fi
 
-      - name: Ensure Podfile exists (auto-resync if missing)
-        working-directory: frontend
-        run: |
-          set -euo pipefail
-          if [ -f ios/App/Podfile ]; then
-            echo "::notice::Podfile already present"
-            exit 0
-          fi
-          echo "::warning::Podfile missing; attempting 'npx cap sync ios' to regenerate"
-          npx cap sync ios || { echo "::error::npx cap sync ios failed while regenerating Podfile"; exit 1; }
-          if [ ! -f ios/App/Podfile ]; then
-            echo "::error::Podfile still missing after cap sync. Check prior steps/logs."
-            exit 1
-          fi
-          echo "::notice::Podfile regenerated successfully"
-
       - name: Install iOS dependencies
         working-directory: frontend/ios/App
         run: |
-          if [ ! -f Podfile ]; then
-            echo "::error::Podfile not found in frontend/ios/App"
+          set -euo pipefail
+          if [ -f Podfile ]; then
+            echo "::notice::Podfile detected — running CocoaPods install"
+            pod install
+          elif [ -f Package.swift ]; then
+            echo "::notice::No Podfile; using Swift Package Manager (Capacitor 6 default). Skipping pod install."
+          else
+            echo "::error::Neither Podfile nor Package.swift found in frontend/ios/App."
+            ls -la
             exit 1
           fi
-          pod install
 
       - name: Build iOS app
         working-directory: frontend/ios/App
