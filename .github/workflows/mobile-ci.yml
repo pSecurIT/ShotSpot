@@ -259,6 +259,37 @@ jobs:
               echo "::warning::Podfile not found; skipping CocoaPods installation"
           fi
 
+      - name: Debug CocoaPods Installation
+        working-directory: frontend/ios/App
+        run: |
+          set -euo pipefail
+          echo "Checking CocoaPods installation..."
+          if ! command -v pod &> /dev/null; then
+              echo "::error::CocoaPods is not installed. Ensure 'sudo gem install cocoapods' ran successfully."
+              exit 1
+          fi
+          echo "CocoaPods version: $(pod --version)"
+
+          echo "Checking for Podfile..."
+          if [ ! -f Podfile ]; then
+              echo "::error::Podfile not found in frontend/ios/App. Cannot run pod install."
+              exit 1
+          fi
+          echo "Podfile contents:" && cat Podfile
+
+          echo "Running pod install..."
+          pod install || {
+              echo "::error::pod install failed. Check the Podfile and CocoaPods setup."
+              exit 1
+          }
+
+          echo "Verifying App.xcworkspace..."
+          if [ ! -f App.xcworkspace ]; then
+              echo "::error::App.xcworkspace not found after pod install."
+              exit 1
+          fi
+          echo "App.xcworkspace successfully generated."
+
       - name: Build iOS Debug App
         working-directory: frontend/ios
         run: |
