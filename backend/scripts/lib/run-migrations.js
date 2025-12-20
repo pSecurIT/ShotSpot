@@ -1,8 +1,18 @@
-/* Shared migration runner for ShotSpot
-   - Applies baseline (v0.1.0) automatically
-   - Applies post-baseline migrations in sorted order
-   - Compatible with existing migration discovery pattern
-*/
+/**
+ * Shared Migration Runner for ShotSpot
+ * 
+ * Purpose: Shared migration runner used by all setup scripts
+ * 
+ * What it does:
+ * - Applies baseline schema (migrations/baseline/v0.1.0.sql)
+ * - Reads baseline manifest to skip already-included migrations
+ * - Applies post-baseline migrations in sorted order
+ * - Provides consistent migration behavior across all environments
+ * 
+ * Note: This is a library module, not run directly
+ * Used by: setup-db.js, setup-test-db.js, setup-parallel-dbs.js
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client } from 'pg';

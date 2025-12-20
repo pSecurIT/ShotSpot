@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
-# Generate a schema-only baseline after applying all current migrations on a clean DB.
-# Usage: ./backend/scripts/baseline-generate.sh
+# Schema Baseline Generator
+# 
+# Purpose: Regenerate schema baseline from a fully migrated database
+# Usage: DATABASE_URL=postgres://... ./scripts/baseline-generate.sh
+# 
+# What it does:
+# - Exports schema-only dump from a clean, fully migrated DB
+# - Saves to migrations/baseline/v0.1.0.sql
+# - Used when consolidating migrations or creating major version baseline
+# 
+# Warning: Only run this when creating a new baseline version. Must be coordinated with team.
 # Requires: pg_dump available, and DATABASE_URL pointing to a fully migrated clean DB.
 set -euo pipefail
 

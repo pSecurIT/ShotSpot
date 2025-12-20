@@ -1,9 +1,19 @@
 /**
- * Store Twizzit API credentials
- * Usage: node scripts/store-twizzit-credentials.js [organization] [username] [password] [endpoint]
+ * Store Twizzit API Credentials
  * 
- * Interactive mode: node scripts/store-twizzit-credentials.js
- * Command line mode: node scripts/store-twizzit-credentials.js "KCOV v.z.w." "svc_ShotSpot" "password123"
+ * Purpose: Store encrypted Twizzit API credentials in database
+ * Usage: npm run twizzit:store-credentials [org] [username] [password] [endpoint]
+ *        or: node scripts/store-twizzit-credentials.js [org] [username] [password] [endpoint]
+ * 
+ * What it does:
+ * - Encrypts password using AES-256-CBC
+ * - Stores credentials in twizzit_credentials table
+ * - Returns credential ID for use in API calls
+ * 
+ * Interactive mode: Run without arguments for prompts
+ * Command line mode: Provide all arguments to run non-interactively
+ * 
+ * Required env var: TWIZZIT_ENCRYPTION_KEY
  */
 
 import dotenv from 'dotenv';

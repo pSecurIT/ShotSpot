@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 /**
  * Migration Consistency Checker
- * Ensures all migration files are registered in setup scripts
- * Run this before commits to catch missing migrations early
+ * 
+ * Purpose: Verify migration consistency before commits
+ * Usage: npm run check-migrations or run automatically before tests
+ * 
+ * What it does:
+ * - Checks baseline manifest against actual migration files
+ * - Ensures no migrations are missing or orphaned
+ * - Validates baseline file exists and is non-empty
+ * - Prevents deployment of inconsistent migration state
+ * 
+ * Used in: Pre-commit hooks, CI/CD pipelines, pretest script
  */
 
 import fs from 'fs';

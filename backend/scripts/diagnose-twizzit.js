@@ -1,6 +1,19 @@
 /**
- * Diagnose Twizzit API connectivity issues
- * Usage: node scripts/diagnose-twizzit.js <credential_id>
+ * Diagnose Twizzit API Connectivity Issues
+ * 
+ * Purpose: Troubleshoot Twizzit API connectivity issues
+ * Usage: npm run twizzit:diagnose <credential_id>
+ *        or: node scripts/diagnose-twizzit.js <credential_id>
+ * 
+ * What it does:
+ * - Tests base URL connectivity
+ * - Checks health and auth endpoints
+ * - Tries common API endpoint variations
+ * - Provides troubleshooting recommendations
+ * 
+ * Use case: When API connection fails, run this for detailed diagnostics
+ * 
+ * Example: npm run twizzit:diagnose 1
  */
 
 import https from 'https';
