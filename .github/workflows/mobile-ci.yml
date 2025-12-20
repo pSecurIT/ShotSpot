@@ -234,6 +234,15 @@ jobs:
             </Workspace>
           EOF
 
+      - name: Verify App.xcworkspace
+        working-directory: frontend/ios/App
+        run: |
+          set -euo pipefail
+          if [ ! -f App.xcworkspace ]; then
+              echo "::error::App.xcworkspace not found. Ensure CocoaPods dependencies are installed."
+              exit 1
+          fi
+
       - name: Install iOS dependencies
         working-directory: frontend/ios/App
         run: |
