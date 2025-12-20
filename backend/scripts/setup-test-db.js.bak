@@ -3,7 +3,6 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
-import { runMigrations } from './lib/run-migrations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -89,23 +88,71 @@ async function setupTestDb() {
     `);
     console.log(`Created database ${dbName} with owner ${owner}`);
 
-    // Build connection string for migrations
-    const connectionUser = (dbUser === adminUser) ? adminUser : dbUser;
-    const connectionPassword = (dbUser === adminUser) ? adminPassword : dbPassword;
-    const connectionString = `postgresql://${connectionUser}:${connectionPassword}@${dbHost}:${dbPort}/${dbName}`;
-
-    // Apply migrations using shared migration runner
-    console.log('Applying database migrations...');
-    await runMigrations({ connectionString });
-
-    // Connect to test database for post-migration setup
+    // Connect to test database (use admin credentials if dbUser is same as admin)
     const testPool = new pg.Pool({
-      user: connectionUser,
-      password: String(connectionPassword),
+      user: (dbUser === adminUser) ? adminUser : dbUser,
+      password: String((dbUser === adminUser) ? adminPassword : dbPassword),
       host: dbHost,
       port: parseInt(dbPort),
       database: dbName
     });
+
+    const migrationsDir = join(__dirname, '../src/migrations');
+    const baselineDir = join(migrationsDir, 'baseline');
+    const baselineFile = join(baselineDir, 'v0.1.0.sql');
+    const baselineManifest = join(baselineDir, 'manifest.json');
+
+    const baselineIncluded = new Set(
+      fs.existsSync(baselineManifest)
+        ? JSON.parse(fs.readFileSync(baselineManifest, 'utf8'))
+        : []
+    );
+
+    const numericPrefix = /^\d/;
+    const migrationSorter = (a, b) => {
+      const aIsNumeric = numericPrefix.test(a);
+      const bIsNumeric = numericPrefix.test(b);
+      if (aIsNumeric !== bIsNumeric) {
+        return aIsNumeric ? 1 : -1;
+      }
+      return a.localeCompare(b);
+    };
+
+    const allMigrations = fs.readdirSync(migrationsDir)
+      .filter(f => f.endsWith('.sql'))
+      .filter(f => f !== 'baseline')
+      .sort(migrationSorter);
+
+    const hasBaseline = fs.existsSync(baselineFile) && fs.statSync(baselineFile).size > 0;
+
+    if (hasBaseline) {
+      console.log('Applying baseline v0.1.0 to test DB...');
+      const baseline = fs.readFileSync(baselineFile, 'utf8');
+      await testPool.query(baseline);
+    } else {
+      console.log('Baseline missing or empty; applying schema.sql to test DB...');
+      const schema = fs.readFileSync(join(__dirname, '../src/schema.sql'), 'utf8');
+      await testPool.query(schema);
+    }
+
+    const postBaselineMigrations = hasBaseline
+      ? allMigrations.filter(m => !baselineIncluded.has(m))
+      : allMigrations;
+
+    for (const migrationFile of postBaselineMigrations) {
+      const migrationPath = join(migrationsDir, migrationFile);
+      if (fs.existsSync(migrationPath)) {
+        try {
+          const migration = fs.readFileSync(migrationPath, 'utf8');
+          await testPool.query(migration);
+          console.log(`Applied migration: ${migrationFile}`);
+        } catch (err) {
+          console.warn(`Warning: Migration ${migrationFile} failed:`, err.message);
+        }
+      } else {
+        console.warn(`Migration file not found: ${migrationFile}`);
+      }
+    }
 
     // Safety net: ensure trainer_assignments exists even if a migration was skipped
     await testPool.query(`
