@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client } from 'pg';
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,7 +58,7 @@ export async function runMigrations({
       }
     }
 
-    // Discover all migration files in migrations directory
+    // Discover all migration files in migrations directory (excluding directories)
     const numericPrefix = /^\d/;
     const migrationSorter = (a, b) => {
       const aIsNumeric = numericPrefix.test(a);
@@ -69,9 +69,9 @@ export async function runMigrations({
       return a.localeCompare(b);
     };
 
-    const allMigrations = fs.readdirSync(MIGRATIONS_DIR)
-      .filter(f => f.endsWith('.sql'))
-      .filter(f => f !== 'baseline')
+    const allMigrations = fs.readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
+      .filter(dirent => dirent.isFile() && dirent.name.endsWith('.sql'))
+      .map(dirent => dirent.name)
       .sort(migrationSorter);
 
     // Filter out migrations already included in baseline
