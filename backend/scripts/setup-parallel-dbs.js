@@ -6,9 +6,9 @@
 
 import { Client } from 'pg';
 import dotenv from 'dotenv';
-import { readFileSync, existsSync, statSync, readdirSync } from 'fs';
-import { join, dirname, basename } from 'path';
-import { fileURLToPath } from 'url';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runMigrations } from './lib/run-migrations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -88,6 +88,21 @@ async function setupParallelDatabases() {
     for (const dbName of databases) {
       console.log(`\n🏗️  Setting up schema for: ${dbName}`);
       
+      // Build connection string for migrations
+      const connectionUser = (testUser !== superuserConfig.user) ? testUser : superuserConfig.user;
+      const connectionPassword = (testUser !== superuserConfig.user) ? testPassword : superuserConfig.password;
+      const connectionString = `postgresql://${connectionUser}:${connectionPassword}@${superuserConfig.host}:${superuserConfig.port}/${dbName}`;
+
+      // Apply migrations using shared migration runner
+      await runMigrations({ 
+        connectionString,
+        logger: {
+          info: (msg) => console.log(msg),
+          error: (msg) => console.error(msg)
+        }
+      });
+
+      // Connect to database for post-migration setup
       const dbClient = new Client({
         ...superuserConfig,
         database: dbName
@@ -95,91 +110,6 @@ async function setupParallelDatabases() {
       
       try {
         await dbClient.connect();
-        
-        // Baseline + migrations
-        const migrationsDir = join(__dirname, '..', 'src', 'migrations');
-        const baselineDir = join(migrationsDir, 'baseline');
-        const baselineFile = join(baselineDir, 'v0.1.0.sql');
-        const baselineManifest = join(baselineDir, 'manifest.json');
-
-        const baselineIncluded = new Set(
-          existsSync(baselineManifest)
-            ? JSON.parse(readFileSync(baselineManifest, 'utf8'))
-            : []
-        );
-
-        const numericPrefix = /^\d/;
-        const migrationSorter = (a, b) => {
-          const aIsNumeric = numericPrefix.test(a);
-          const bIsNumeric = numericPrefix.test(b);
-          if (aIsNumeric !== bIsNumeric) {
-            return aIsNumeric ? 1 : -1;
-          }
-          return a.localeCompare(b);
-        };
-
-        const allMigrations = readdirSync(migrationsDir)
-          .filter(f => f.endsWith('.sql'))
-          .filter(f => f !== 'baseline')
-          .sort(migrationSorter);
-
-        const hasBaseline = existsSync(baselineFile) && statSync(baselineFile).size > 0;
-
-        if (hasBaseline) {
-          const baselineContent = readFileSync(baselineFile, 'utf8');
-          await dbClient.query(baselineContent);
-          console.log(`✅ Applied baseline v0.1.0 for ${dbName}`);
-        } else {
-          const schemaPath = join(__dirname, '..', 'src', 'schema.sql');
-          let schema;
-          try {
-            schema = readFileSync(schemaPath, 'utf8');
-            if (!schema || schema.trim().length === 0) {
-              console.error(`❌ Schema file is empty: ${schemaPath}`);
-              process.exit(1);
-            }
-            console.log(`📄 Read schema.sql (${schema.length} bytes)`);
-          } catch (err) {
-            console.error(`❌ Failed to read schema file at ${schemaPath}:`, err.message);
-            console.error(err);
-            process.exit(1);
-          }
-
-          try {
-            await dbClient.query(schema);
-            console.log(`✅ Executed schema.sql for ${dbName}`);
-          } catch (err) {
-            console.error(`❌ Failed to apply schema.sql for ${dbName}:`, err.message);
-            console.error('Full error:', err);
-            process.exit(1);
-          }
-        }
-
-        const postBaselineMigrations = hasBaseline
-          ? allMigrations.filter(m => !baselineIncluded.has(m))
-          : allMigrations;
-
-        console.log('📦 Applying migrations...');
-        for (const migrationFile of postBaselineMigrations) {
-          const migrationPath = join(migrationsDir, migrationFile);
-          try {
-            const migrationContent = readFileSync(migrationPath, 'utf8');
-            if (!migrationContent || migrationContent.trim().length === 0) {
-              console.warn(`⚠️  Migration file empty, skipping: ${basename(migrationFile)}`);
-              continue;
-            }
-            await dbClient.query(migrationContent);
-            console.log(`✅ Applied migration: ${basename(migrationFile)}`);
-          } catch (err) {
-            if (err.code === 'ENOENT') {
-              console.warn(`⚠️  Migration file not found: ${basename(migrationFile)}, skipping`);
-              continue;
-            }
-            console.error(`❌ Migration failed (${basename(migrationFile)}) for ${dbName}:`, err.message);
-            console.error('Full error:', err);
-            process.exit(1);
-          }
-        }
 
         // Safety net: ensure trainer_assignments exists even if a migration was skipped
         await dbClient.query(`

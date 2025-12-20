@@ -1,10 +1,11 @@
 import dotenv from 'dotenv';
-import { exec } from 'child_process';
-import { promises as fs } from 'fs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { promisify } from 'util';
+import { exec } from 'node:child_process';
+import { promises as fs } from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
+import { promisify } from 'node:util';
+import { runMigrations } from './lib/run-migrations.js';
 
 // Set up proper paths for environment files
 const scriptPath = fileURLToPath(import.meta.url);
@@ -39,8 +40,8 @@ const dbConfig = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   name: process.env.DB_NAME,
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || '5432'
 };
 
 // Verify required configuration
@@ -115,31 +116,6 @@ ALTER DEFAULT PRIVILEGES FOR USER ${DB_USER} IN SCHEMA public
 GRANT ALL ON SEQUENCES TO ${DB_USER};
 `;
 
-// Function to execute a SQL file (absolute or relative to this script)
-async function executeSqlFile(file, password) {
-  const filePath = path.isAbsolute(file) ? file : path.join(__dirname, file);
-  try {
-    await fs.access(filePath);
-  } catch {
-    console.log(`File ${file} does not exist, skipping`);
-    return;
-  }
-  
-  // Use environment variable instead of setting it in command
-  const options = {
-    env: {
-      ...process.env,
-      PGPASSWORD: password
-    }
-  };
-  const command = `psql -U postgres -d ${DB_NAME} -f "${filePath}"`;
-  const { stderr } = await execPromise(command, options);
-  
-  if (stderr && !stderr.includes('NOTICE')) {
-    console.warn(`Warnings while executing ${file}:`, stderr);
-  }
-}
-
 async function main() {
   try {
     // Get environment variables
@@ -172,7 +148,7 @@ async function main() {
     // Create temporary setup file
     await fs.writeFile(tempFile, setupSQL);
 
-    // Execute the setup SQL
+    // Execute the setup SQL to create/recreate database and user
     try {
       const options = {
         env: {
@@ -195,56 +171,12 @@ async function main() {
       }
     }
 
-    // Baseline + migrations
-    const migrationsDir = path.join(__dirname, '../src/migrations');
-    const baselineDir = path.join(migrationsDir, 'baseline');
-    const baselineFile = path.join(baselineDir, 'v0.1.0.sql');
-    const baselineManifest = path.join(baselineDir, 'manifest.json');
+    // Build connection string for migrations
+    const connectionString = `postgresql://${dbConfig.user}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.name}`;
 
-    const baselineIncluded = new Set(
-      await fs.readFile(baselineManifest, 'utf8').then(JSON.parse).catch(() => [])
-    );
-
-    const numericPrefix = /^\d/;
-    const migrationSorter = (a, b) => {
-      const aIsNumeric = numericPrefix.test(a);
-      const bIsNumeric = numericPrefix.test(b);
-      if (aIsNumeric !== bIsNumeric) {
-        return aIsNumeric ? 1 : -1; // run non-numeric migrations before numeric ones
-      }
-      return a.localeCompare(b);
-    };
-
-    const allMigrations = (await fs.readdir(migrationsDir))
-      .filter(f => f.endsWith('.sql'))
-      .filter(f => !f.startsWith('baseline/'))
-      .filter(f => f !== 'baseline')
-      .sort(migrationSorter);
-
-    const baselineStat = await fs.stat(baselineFile).catch(() => null);
-    const hasBaseline = baselineStat && baselineStat.size > 0;
-
-    if (hasBaseline) {
-      console.log('Applying baseline v0.1.0...');
-      await executeSqlFile(baselineFile, postgresPassword);
-    } else {
-      console.log('Baseline missing or empty; applying schema.sql instead.');
-      await executeSqlFile('../src/schema.sql', postgresPassword);
-    }
-
-    const postBaselineMigrations = hasBaseline
-      ? allMigrations.filter(m => !baselineIncluded.has(m))
-      : allMigrations;
-
+    // Apply migrations using shared migration runner
     console.log('Applying database migrations...');
-    for (const migrationFile of postBaselineMigrations) {
-      try {
-        await executeSqlFile(path.join('../src/migrations', migrationFile), postgresPassword);
-        console.log(`Applied migration: ${path.basename(migrationFile)}`);
-      } catch (err) {
-        console.warn(`Warning: Migration ${path.basename(migrationFile)} failed:`, err.message);
-      }
-    }
+    await runMigrations({ connectionString });
 
     console.log('Database setup completed successfully');
   } catch (error) {
