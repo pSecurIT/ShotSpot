@@ -130,7 +130,7 @@ const PlayerManagement: React.FC = () => {
         gender: ''
       });
       setSuccess('Player added successfully!');
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string; details?: string; validationErrors?: Array<{ path: string; msg: string }> } }; message?: string };
       
@@ -206,7 +206,7 @@ const PlayerManagement: React.FC = () => {
       setPlayers(players.map(p => p.id === editingPlayer.id ? response.data : p));
       setEditingPlayer(null);
       setSuccess('Player updated successfully!');
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string; details?: string; validationErrors?: Array<{ path: string; msg: string }> } }; message?: string };
       
@@ -251,7 +251,7 @@ const PlayerManagement: React.FC = () => {
       await fetchPlayers();
       setEditingPlayer(null); // Close edit form after archiving/reactivating
       setSuccess(`Player ${action}d successfully!`);
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string; details?: string } }; message?: string };
       const errorMessage = err.response?.data?.details || err.response?.data?.error || err.message || `Failed to ${action} player`;
