@@ -1,0 +1,6 @@
+# Prevent SQL files in scripts directory
+# Migration files belong in backend/src/migrations/
+*.sql
+
+# Exception: temporary files are auto-cleaned
+!temp-*.sql
