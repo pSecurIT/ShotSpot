@@ -115,9 +115,9 @@ ALTER DEFAULT PRIVILEGES FOR USER ${DB_USER} IN SCHEMA public
 GRANT ALL ON SEQUENCES TO ${DB_USER};
 `;
 
-// Function to execute a SQL file
+// Function to execute a SQL file (absolute or relative to this script)
 async function executeSqlFile(file, password) {
-  const filePath = path.join(__dirname, file);
+  const filePath = path.isAbsolute(file) ? file : path.join(__dirname, file);
   try {
     await fs.access(filePath);
   } catch {
@@ -195,64 +195,54 @@ async function main() {
       }
     }
 
-    // Execute schema files in sequence
-    const schemaFiles = [
-      '../src/schema.sql'  // Use the complete schema file from src/
-    ];
+    // Baseline + migrations
+    const migrationsDir = path.join(__dirname, '../src/migrations');
+    const baselineDir = path.join(migrationsDir, 'baseline');
+    const baselineFile = path.join(baselineDir, 'v0.1.0.sql');
+    const baselineManifest = path.join(baselineDir, 'manifest.json');
 
-    for (const file of schemaFiles) {
-      await executeSqlFile(file, postgresPassword);
+    const baselineIncluded = new Set(
+      await fs.readFile(baselineManifest, 'utf8').then(JSON.parse).catch(() => [])
+    );
+
+    const numericPrefix = /^\d/;
+    const migrationSorter = (a, b) => {
+      const aIsNumeric = numericPrefix.test(a);
+      const bIsNumeric = numericPrefix.test(b);
+      if (aIsNumeric !== bIsNumeric) {
+        return aIsNumeric ? 1 : -1; // run non-numeric migrations before numeric ones
+      }
+      return a.localeCompare(b);
+    };
+
+    const allMigrations = (await fs.readdir(migrationsDir))
+      .filter(f => f.endsWith('.sql'))
+      .filter(f => !f.startsWith('baseline/'))
+      .filter(f => f !== 'baseline')
+      .sort(migrationSorter);
+
+    const baselineStat = await fs.stat(baselineFile).catch(() => null);
+    const hasBaseline = baselineStat && baselineStat.size > 0;
+
+    if (hasBaseline) {
+      console.log('Applying baseline v0.1.0...');
+      await executeSqlFile(baselineFile, postgresPassword);
+    } else {
+      console.log('Baseline missing or empty; applying schema.sql instead.');
+      await executeSqlFile('../src/schema.sql', postgresPassword);
     }
 
-    // Apply all migrations in order
-    const migrations = [
-      '../src/migrations/add_player_gender.sql',
-      '../src/migrations/add_timer_fields.sql', 
-      '../src/migrations/add_game_rosters.sql',
-      '../src/migrations/add_substitutions.sql',
-      '../src/migrations/add_possession_tracking.sql',
-      '../src/migrations/add_enhanced_events.sql',
-      '../src/migrations/add_match_configuration_columns.sql',
-      '../src/migrations/add_attacking_side.sql',
-      '../src/migrations/add_starting_position.sql',
-      '../src/migrations/add_achievements_system.sql',
-      '../src/migrations/add_advanced_analytics.sql',
-      '../src/migrations/seed_achievements.sql',
-      '../src/migrations/add_password_must_change.sql',
-      '../src/migrations/add_user_activity_tracking.sql',
-      '../src/migrations/add_login_history.sql',
-      '../src/migrations/add_export_configuration.sql',
-      '../src/migrations/seed_default_report_templates.sql',
-      '../src/migrations/add_seasons.sql',
-      '../src/migrations/add_competition_management.sql',
-      '../src/migrations/add_match_templates.sql',
-      '../src/migrations/add_twizzit_integration.sql',
-      '../src/migrations/rename_teams_to_clubs_add_age_group_teams.sql',
-      '../src/migrations/add_club_jersey_number_constraint.sql',
-      '../src/migrations/update_timeouts_club_id.sql',
-      '../src/migrations/20251214_update_ball_possessions_team_to_club.sql',
-      '../src/migrations/20251214_update_game_rosters_team_to_club.sql',
-      '../src/migrations/20251214_update_games_team_to_club.sql',
-      '../src/migrations/20251214_update_players_team_to_club.sql',
-      '../src/migrations/20251214_update_substitutions_team_to_club.sql',
-      '../src/migrations/20251214_add_seasons_and_series.sql',
-      '../src/migrations/20251216_add_trainer_assignments.sql',
-      '../src/migrations/20251217_add_player_team_link.sql',
-      '../src/migrations/20251218_add_game_team_links.sql',
-      '../src/migrations/20251219_add_twizzit_player_registration.sql',
-      '../src/migrations/20251220_add_game_competition_link.sql',
-      '../src/migrations/20251221_drop_matches_add_series_to_competitions.sql',
-      '../src/migrations/20251222_fix_games_status_constraint.sql'
-    ];
+    const postBaselineMigrations = hasBaseline
+      ? allMigrations.filter(m => !baselineIncluded.has(m))
+      : allMigrations;
 
     console.log('Applying database migrations...');
-    for (const migrationFile of migrations) {
+    for (const migrationFile of postBaselineMigrations) {
       try {
-        await executeSqlFile(migrationFile, postgresPassword);
+        await executeSqlFile(path.join('../src/migrations', migrationFile), postgresPassword);
         console.log(`Applied migration: ${path.basename(migrationFile)}`);
       } catch (err) {
         console.warn(`Warning: Migration ${path.basename(migrationFile)} failed:`, err.message);
-        // Continue with other migrations - some may have already been applied
       }
     }
 
