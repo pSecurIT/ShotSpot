@@ -46,7 +46,16 @@ export async function runMigrations({
       await client.query(baselineSql);
       logger.info('[migrations] Applied baseline v0.1.0');
     } else {
-      logger.info('[migrations] Baseline missing or empty; skipping baseline application');
+      // Fallback to schema.sql if baseline is missing or empty
+      const SCHEMA_FILE = path.resolve(__dirname, '../../src/schema.sql');
+      if (fs.existsSync(SCHEMA_FILE)) {
+        logger.info('[migrations] Baseline missing or empty; applying schema.sql instead');
+        const schemaSql = fs.readFileSync(SCHEMA_FILE, 'utf8');
+        await client.query(schemaSql);
+        logger.info('[migrations] Applied schema.sql');
+      } else {
+        logger.info('[migrations] Neither baseline nor schema.sql found; skipping schema setup');
+      }
     }
 
     // Discover all migration files in migrations directory
