@@ -1,6 +1,14 @@
 /**
- * Update Twizzit API endpoint for existing credentials
+ * Update Twizzit API Endpoint
+ * 
+ * Purpose: Update API endpoint URL for existing credentials
  * Usage: node scripts/update-twizzit-endpoint.js <credential_id> <new_endpoint>
+ * 
+ * What it does:
+ * - Updates stored endpoint URL (e.g., if Twizzit changes their API URL)
+ * - Validates credential exists and is active
+ * 
+ * Example: node scripts/update-twizzit-endpoint.js 1 https://app.twizzit.com
  */
 
 import dotenv from 'dotenv';

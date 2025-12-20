@@ -1,5 +1,21 @@
 #!/usr/bin/env node
 
+/**
+ * Pre-Deployment Health Checks
+ * 
+ * Purpose: Pre-deployment health checks
+ * Usage: npm run pre-deploy
+ * 
+ * What it does:
+ * - Validates environment variables
+ * - Tests database connection
+ * - Verifies required files exist
+ * - Checks dependency installation
+ * - Runs security audit
+ * 
+ * Use case: Run before production deployments to catch issues early
+ */
+
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
