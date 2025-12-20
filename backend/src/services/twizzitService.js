@@ -52,7 +52,7 @@ export async function syncClubs() {
 
     return clubs;
   } catch (error) {
-    console.error('Failed to sync clubs:', error.message);
+    console.error('Failed to sync clubs:', error);
     throw error;
   }
 }
@@ -78,7 +78,8 @@ export async function syncPlayers(clubId) {
 
     return players;
   } catch (error) {
-    console.error(`Failed to sync players for club ${clubId}:`, error.message);
+    // Avoid user-controlled format strings in logs
+    console.error('Failed to sync players for club %s:', clubId, error);
     throw error;
   }
 }
@@ -102,7 +103,7 @@ export async function syncSeasons() {
 
     return mappedSeasons;
   } catch (error) {
-    console.error('Failed to sync seasons:', error.message);
+    console.error('Failed to sync seasons:', error);
     throw error;
   }
 }
@@ -115,7 +116,7 @@ export async function verifyTwizzitConnection() {
   try {
     return await getTwizzitClient().verifyConnection();
   } catch (error) {
-    console.error('Twizzit API connection verification failed:', error.message);
+    console.error('Twizzit API connection verification failed:', error);
     return false;
   }
 }
