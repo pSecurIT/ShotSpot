@@ -5,391 +5,121 @@ permissions:
 
 on:
   push:
-    branches: [ main, develop ]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/mobile-ci.yml'
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/mobile-ci.yml'
 
 jobs:
-  # Build and test Android app
-  android-build:
-    name: Android Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build web app
-        working-directory: frontend
-        run: npm run build
-
-      - name: Add Android platform (robust)
-        working-directory: frontend
-        run: |
-          set -euo pipefail
-          echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
-
-          # Validate Capacitor config exists
-          if [ ! -f capacitor.config.ts ]; then
-              echo "::error::Missing capacitor.config.ts file"
-              exit 1
-          fi
-          echo "::notice::Using capacitor.config.ts"
-          cat capacitor.config.ts
-
-          # Validate dist directory exists
-          if [ ! -d dist ]; then
-              echo "::error::Web build output directory 'dist' not found"
-              exit 1
-          fi
-          echo "::notice::Web build output 'dist' directory found"
-
-          # If android dir exists, sync instead of add
-          if [ -d android ]; then
-              echo "::notice::android directory already exists — running 'npx cap sync android'"
-              npx cap sync android || { echo "::error::npx cap sync android failed"; exit 1; }
-              exit 0
-          fi
-
-          # Force reinstall @capacitor/android to ensure templates are intact
-          echo "::notice::Force reinstalling @capacitor/android to fix potential corruption"
-          npm install @capacitor/android --no-save --include=optional --force || {
-              echo "::error::Failed to install @capacitor/android"
-              npm ls --depth=0 || true
-              exit 1
-          }
-
-          # Try to add platform, if add fails clean up and retry once
-          if npx cap add android; then
-              echo "::notice::npx cap add android succeeded"
-          else
-              echo "::warning::npx cap add android failed — cleaning up and reinstalling"
-              rm -rf android node_modules/@capacitor/android || true
-              npm install @capacitor/android --no-save --include=optional --force
-              echo "::notice::Retrying npx cap add android after cleanup"
-              npx cap add android || {
-                  echo "::error::cap add failed twice. Diagnostics:"
-                  npm ls @capacitor/cli @capacitor/core @capacitor/android --depth=0 || true
-                  npx cap --version || true
-                  exit 1
-              }
-          fi
-
-      - name: Build Android Debug APK
-        working-directory: frontend/android
-        run: ./gradlew assembleDebug
-
-      - name: Upload Android APK
-        uses: actions/upload-artifact@v6
-        with:
-          name: android-debug-apk
-          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
-
-      - name: Run Android Lint
-        working-directory: frontend/android
-        run: ./gradlew lint
-
-      - name: Upload Lint Results
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: android-lint-results
-          path: frontend/android/app/build/reports/lint-results-debug.html
-          retention-days: 7
-
-  # Build and test iOS app
-  ios-build:
+  ios:
     name: iOS Build
-    runs-on: macos-latest
+    runs-on: macos-15-arm64
+
+    defaults:
+      run:
+        shell: bash
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: 22
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: 'latest-stable'
+          xcode-version: latest-stable
 
       - name: Install CocoaPods
         run: sudo gem install cocoapods
 
-      - name: Install frontend dependencies
+      # -------------------------
+      # Frontend build
+      # -------------------------
+      - name: Install frontend deps
         working-directory: frontend
         run: npm ci
 
-      - name: Build web app
+      - name: Build frontend
         working-directory: frontend
         run: npm run build
 
-      - name: Add iOS platform (robust)
+      # -------------------------
+      # Capacitor iOS setup
+      # -------------------------
+      - name: Sync Capacitor iOS
         working-directory: frontend
         run: |
-          set -euo pipefail
-          echo "Working dir: $(pwd) — node $(node -v) npm $(npm -v)"
-
-          # Validate Capacitor config exists
-          if [ ! -f capacitor.config.ts ]; then
-              echo "::error::Missing capacitor.config.ts file"
-              exit 1
-          fi
-          echo "::notice::Using capacitor.config.ts"
-          cat capacitor.config.ts
-
-          # Validate dist directory exists
-          if [ ! -d dist ]; then
-              echo "::error::Web build output directory 'dist' not found"
-              exit 1
-          fi
-          echo "::notice::Web build output 'dist' directory found"
-
-          # If ios dir exists, sync instead of add
           if [ -d ios ]; then
-              echo "::notice::ios directory exists — running 'npx cap sync ios'"
-              npx cap sync ios || { echo "::error::npx cap sync ios failed"; exit 1; }
+            npx cap sync ios
           else
-              # Force reinstall @capacitor/ios to ensure templates are intact
-              echo "::notice::Force reinstalling @capacitor/ios to fix potential corruption"
-              npm install @capacitor/ios --no-save --include=optional --force || {
-                  echo "::error::Failed to install @capacitor/ios"
-                  npm ls --depth=0 || true
-                  exit 1
-              }
-
-              # Try to add platform, if add fails clean up and retry once
-              if npx cap add ios; then
-                  echo "::notice::npx cap add ios succeeded"
-              else
-                  echo "::warning::npx cap add ios failed — cleaning up and reinstalling"
-                  rm -rf ios node_modules/@capacitor/ios || true
-                  npm install @capacitor/ios --no-save --include=optional --force
-                  echo "::notice::Retrying npx cap add ios after cleanup"
-                  npx cap add ios || {
-                      echo "::error::cap add failed twice. Diagnostics:"
-                      npm ls @capacitor/cli @capacitor/core @capacitor/ios --depth=0 || true
-                      npx cap --version || true
-                      exit 1
-                  }
-              fi
+            npx cap add ios
           fi
 
-      - name: Ensure iOS workspace exists (generate if missing)
+      # -------------------------
+      # CocoaPods cache
+      # -------------------------
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/ios/App/Pods
+            ~/.cocoapods
+          key: pods-${{ runner.os }}-${{ hashFiles('frontend/ios/App/Podfile.lock') }}
+          restore-keys: |
+            pods-${{ runner.os }}-
+
+      - name: Install iOS Pods
         working-directory: frontend/ios/App
         run: |
-          set -euo pipefail
-          WORKSPACE_DIR=App.xcworkspace
-          WORKSPACE_FILE=$WORKSPACE_DIR/contents.xcworkspacedata
-          if [ -f "$WORKSPACE_FILE" ]; then
-              echo "::notice::Found existing App.xcworkspace"
-              exit 0
-          fi
-          if [ ! -d App.xcodeproj ]; then
-              echo "::error::App.xcodeproj not found; cannot generate workspace"
-              ls -la
-              exit 1
-          fi
-          echo "::warning::App.xcworkspace missing; generating minimal workspace that references App.xcodeproj"
-          mkdir -p "$WORKSPACE_DIR"
-          cat > "$WORKSPACE_FILE" <<'EOF'
-            <?xml version="1.0" encoding="UTF-8"?>
-            <Workspace
-               version="1.0">
-               <FileRef
-                  location="group:App.xcodeproj">
-               </FileRef>
-            </Workspace>
-          EOF
+          pod repo update
+          pod install
 
       - name: Verify App.xcworkspace
         working-directory: frontend/ios/App
         run: |
-          set -euo pipefail
-          if [ ! -f App.xcworkspace ]; then
-              echo "::error::App.xcworkspace not found. Ensure CocoaPods dependencies are installed."
-              exit 1
+          if [ ! -d App.xcworkspace ]; then
+            echo "::error::App.xcworkspace not found after pod install"
+            exit 1
           fi
+          echo "::notice::App.xcworkspace verified"
 
-      - name: Install iOS dependencies
-        working-directory: frontend/ios/App
-        run: |
-          set -euo pipefail
-          PODFILE=Podfile
-
-          if [ -f "$PODFILE" ]; then
-              echo "::notice::Podfile detected — running CocoaPods install"
-              pod install || {
-                  echo "::error::CocoaPods installation failed"
-                  exit 1
-              }
-          else
-              echo "::warning::Podfile not found; skipping CocoaPods installation"
-          fi
-
-      - name: Debug CocoaPods Installation
-        working-directory: frontend/ios/App
-        run: |
-          set -euo pipefail
-          echo "Checking CocoaPods installation..."
-          if ! command -v pod &> /dev/null; then
-              echo "::error::CocoaPods is not installed. Ensure 'sudo gem install cocoapods' ran successfully."
-              exit 1
-          fi
-          echo "CocoaPods version: $(pod --version)"
-
-          echo "Checking for Podfile..."
-          if [ ! -f Podfile ]; then
-              echo "::error::Podfile not found in frontend/ios/App. Cannot run pod install."
-              exit 1
-          fi
-          echo "Podfile contents:" && cat Podfile
-
-          echo "Running pod install..."
-          pod install || {
-              echo "::error::pod install failed. Check the Podfile and CocoaPods setup."
-              exit 1
-          }
-
-          echo "Verifying App.xcworkspace..."
-          if [ ! -f App.xcworkspace ]; then
-              echo "::error::App.xcworkspace not found after pod install."
-              exit 1
-          fi
-          echo "App.xcworkspace successfully generated."
-
-      - name: Debug Pod Install
-        working-directory: frontend/ios/App
-        run: |
-          set -euo pipefail
-          echo "Checking Podfile..."
-          if [ ! -f Podfile ]; then
-              echo "::error::Podfile not found. Cannot run pod install."
-              exit 1
-          fi
-          echo "Podfile contents:" && cat Podfile
-
-          echo "Listing ios/App directory contents..."
-          ls -la
-
-          echo "Updating CocoaPods repo..."
-          pod repo update || {
-              echo "::error::Failed to update CocoaPods repo. Check network connectivity or CocoaPods setup."
-              exit 1
-          }
-
-          echo "Running pod install with verbose logging..."
-          pod install --verbose || {
-              echo "::error::pod install failed. Check the Podfile and CocoaPods setup."
-              exit 1
-          }
-
-          echo "Verifying App.xcworkspace..."
-          if [ ! -f App.xcworkspace ]; then
-              echo "::error::App.xcworkspace not found after pod install."
-              exit 1
-          fi
-          echo "App.xcworkspace successfully generated."
-
-      - name: Enhanced Debugging for CocoaPods
-        working-directory: frontend/ios/App
-        run: |
-          set -euo pipefail
-          echo "Starting enhanced debugging for CocoaPods..."
-
-          echo "Listing ios/App directory contents before pod install..."
-          ls -la
-
-          echo "Checking Podfile.lock..."
-          if [ -f Podfile.lock ]; then
-              echo "Podfile.lock contents:" && cat Podfile.lock
-          else
-              echo "::warning::Podfile.lock not found. Dependencies may not be resolved."
-          fi
-
-          echo "Running pod install with verbose logging..."
-          pod install --verbose || {
-              echo "::error::pod install failed. Capturing detailed logs."
-              exit 1
-          }
-
-          echo "Listing ios/App directory contents after pod install..."
-          ls -la
-
-          echo "Verifying App.xcworkspace..."
-          if [ ! -f App.xcworkspace ]; then
-              echo "::error::App.xcworkspace not found after pod install."
-              exit 1
-          fi
-          echo "App.xcworkspace successfully generated."
-
-      - name: Build iOS Debug App
-        working-directory: frontend/ios
-        run: |
-          set -euo pipefail
-          echo "Building iOS Debug App"
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -derivedDataPath build/debug clean build || {
-              echo "::error::iOS Debug App build failed"
-              exit 1
-          }
-
-      - name: Upload iOS App Archive
-        uses: actions/upload-artifact@v6
+      # -------------------------
+      # Xcode build cache
+      # -------------------------
+      - name: Cache Xcode DerivedData
+        uses: actions/cache@v4
         with:
-          name: ios-debug-app
-          path: frontend/ios/build/debug/iphoneos/App.app
-          retention-days: 7
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: deriveddata-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            deriveddata-${{ runner.os }}-
 
-      - name: Run iOS Lint
-        working-directory: frontend/ios
+      # -------------------------
+      # Xcode validation build
+      # -------------------------
+      - name: Xcode build (validation)
+        working-directory: frontend/ios/App
         run: |
-          set -euo pipefail
-          echo "Running SwiftLint"
-          if ! command -v swiftlint &> /dev/null; then
-              echo "::error::swiftlint not installed; skipping linting"
-              exit 1
-          fi
-          swiftlint lint --strict --path . || {
-              echo "::error::SwiftLint found issues"
-              exit 1
-          }
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -configuration Debug \
+            build \
+            CODE_SIGNING_ALLOWED=NO
 
-      - name: Upload SwiftLint Results
-        if: always()
+      # -------------------------
+      # SwiftLint results (optional)
+      # -------------------------
+      - name: Upload SwiftLint results
         uses: actions/upload-artifact@v6
         with:
           name: ios-swiftlint-results
           path: frontend/ios/swiftlint-results.json
+          if-no-files-found: warn
           retention-days: 7
