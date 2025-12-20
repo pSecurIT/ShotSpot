@@ -191,8 +191,11 @@ router.get('/verify', async (req, res) => {
     }
     return res.status(500).json({ message: 'Failed to verify Twizzit API connection.' });
   } catch (error) {
-    console.error('Error verifying Twizzit API connection:', error.message);
-    return res.status(500).json({ error: error.message });
+    console.error('Error verifying Twizzit API connection:', error);
+    return res.status(500).json({ 
+      error: 'Failed to verify Twizzit API connection',
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    });
   }
 });
 
@@ -205,8 +208,11 @@ router.post('/sync/clubs', async (req, res) => {
     const clubs = await twizzitService.syncClubs();
     return res.status(200).json({ message: 'Clubs synced successfully.', clubs });
   } catch (error) {
-    console.error('Error syncing clubs:', error.message);
-    return res.status(500).json({ error: error.message });
+    console.error('Error syncing clubs:', error);
+    return res.status(500).json({ 
+      error: 'Failed to sync clubs',
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    });
   }
 });
 
@@ -220,8 +226,13 @@ router.post('/sync/players/:clubId', async (req, res) => {
     const players = await twizzitService.syncPlayers(clubId);
     return res.status(200).json({ message: `Players synced successfully for club ${clubId}.`, players });
   } catch (error) {
-    console.error(`Error syncing players for club ${clubId}:`, error.message);
-    return res.status(500).json({ error: error.message });
+    // Avoid user-controlled format strings; log structured context
+    console.error('Error syncing players for club %s:', clubId, error);
+    return res.status(500).json({ 
+      error: 'Failed to sync players',
+      clubId,
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    });
   }
 });
 
@@ -234,8 +245,11 @@ router.post('/sync/seasons', async (req, res) => {
     const seasons = await twizzitService.syncSeasons();
     return res.status(200).json({ message: 'Seasons synced successfully.', seasons });
   } catch (error) {
-    console.error('Error syncing seasons:', error.message);
-    return res.status(500).json({ error: error.message });
+    console.error('Error syncing seasons:', error);
+    return res.status(500).json({ 
+      error: 'Failed to sync seasons',
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    });
   }
 });
 
