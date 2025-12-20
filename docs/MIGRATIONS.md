@@ -28,4 +28,5 @@ Commit the updated `v0.1.0.sql` and rerun setup scripts to verify fresh-install 
 
 ## Notes
 - Baseline is schema-only; no data is included.
-- Legacy migrations up to v0.1.0 are pruned from disk and captured in the baseline; `manifest.json` lists what the baseline contains.
+- Legacy schema migrations up to v0.1.0 are pruned from disk and captured in the baseline; `manifest.json` lists what the baseline contains.
+- Seed migrations (e.g., `seed_achievements.sql`, `seed_default_report_templates.sql`) remain on disk and run after the baseline since they populate data, not schema.
