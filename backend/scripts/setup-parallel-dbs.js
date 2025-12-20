@@ -6,8 +6,8 @@
 
 import { Client } from 'pg';
 import dotenv from 'dotenv';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { runMigrations } from './lib/run-migrations.js';
 
 const __filename = fileURLToPath(import.meta.url);
