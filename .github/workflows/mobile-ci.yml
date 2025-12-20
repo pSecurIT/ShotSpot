@@ -18,9 +18,15 @@ jobs:
         shell: bash
 
     steps:
+      # -------------------------
+      # Checkout
+      # -------------------------
       - name: Checkout
         uses: actions/checkout@v6
 
+      # -------------------------
+      # Node.js setup
+      # -------------------------
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -28,18 +34,21 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # -------------------------
+      # Xcode setup
+      # -------------------------
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
-      - name: Install CocoaPods
-        run: sudo gem install cocoapods
+      - name: Verify runner architecture
+        run: uname -m
 
       # -------------------------
       # Frontend build
       # -------------------------
-      - name: Install frontend deps
+      - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
@@ -48,7 +57,7 @@ jobs:
         run: npm run build
 
       # -------------------------
-      # Capacitor iOS setup
+      # Capacitor iOS sync
       # -------------------------
       - name: Sync Capacitor iOS
         working-directory: frontend
@@ -60,46 +69,41 @@ jobs:
           fi
 
       # -------------------------
-      # CocoaPods validation
+      # Validate SPM setup
       # -------------------------
-      - name: Verify Podfile
+      - name: Verify SPM project structure
         working-directory: frontend/ios/App
         run: |
-          if [ ! -f Podfile ]; then
-            echo "::error::Podfile not found after Capacitor sync"
-            ls -la
+          if [ ! -f App.xcodeproj/project.pbxproj ]; then
+            echo "::error::App.xcodeproj not found"
             exit 1
           fi
-          echo "::notice::Podfile verified"
+          if [ ! -d CapApp-SPM ]; then
+            echo "::error::SPM directory (CapApp-SPM) not found"
+            exit 1
+          fi
+          echo "::notice::SPM setup verified"
 
       # -------------------------
-      # CocoaPods cache
-      # -------------------------
-      - name: Cache CocoaPods
-        uses: actions/cache@v4
-        with:
-          path: |
-            frontend/ios/App/Pods
-            ~/.cocoapods
-          key: pods-${{ runner.os }}-${{ hashFiles('frontend/ios/App/Podfile.lock') }}
-          restore-keys: |
-            pods-${{ runner.os }}-
-
-      - name: Install iOS Pods
-        working-directory: frontend/ios/App
-        run: |
-          pod install
-
-      # -------------------------
-      # Xcode build cache
+      # Cache Xcode DerivedData
       # -------------------------
       - name: Cache Xcode DerivedData
         uses: actions/cache@v4
         with:
           path: ~/Library/Developer/Xcode/DerivedData
-          key: deriveddata-${{ runner.os }}-${{ github.sha }}
+          key: deriveddata-${{ runner.os }}-${{ hashFiles('frontend/ios/App/**/*.swift', 'frontend/ios/App/Package.resolved') }}
           restore-keys: |
             deriveddata-${{ runner.os }}-
+
+      # -------------------------
+      # Resolve Swift packages
+      # -------------------------
+      - name: Resolve Swift Package dependencies
+        working-directory: frontend/ios/App
+        run: |
+          xcodebuild \
+            -project App.xcodeproj \
+            -resolvePackageDependencies
 
       # -------------------------
       # Xcode validation build
@@ -108,7 +112,7 @@ jobs:
         working-directory: frontend/ios/App
         run: |
           xcodebuild \
-            -workspace App.xcworkspace \
+            -project App.xcodeproj \
             -scheme App \
             -sdk iphonesimulator \
             -destination 'platform=iOS Simulator,name=iPhone 15' \
