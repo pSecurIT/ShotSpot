@@ -235,14 +235,19 @@ jobs:
           EOF
 
       - name: Install iOS dependencies
-        working-directory: frontend/ios
+        working-directory: frontend/ios/App
         run: |
           set -euo pipefail
-          if [ ! -d Pods ]; then
-              echo "::notice::Pods directory not found; installing CocoaPods dependencies"
-              pod install --repo-update || { echo "::error::CocoaPods installation failed"; exit 1; }
+          PODFILE=Podfile
+
+          if [ -f "$PODFILE" ]; then
+              echo "::notice::Podfile detected — running CocoaPods install"
+              pod install || {
+                  echo "::error::CocoaPods installation failed"
+                  exit 1
+              }
           else
-              echo "::notice::Pods directory exists; skipping CocoaPods installation"
+              echo "::warning::Podfile not found; skipping CocoaPods installation"
           fi
 
       - name: Build iOS Debug App
