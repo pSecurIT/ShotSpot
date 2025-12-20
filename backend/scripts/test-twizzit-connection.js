@@ -1,6 +1,19 @@
 /**
- * Test Twizzit API connection
- * Usage: node scripts/test-twizzit-connection.js <credential_id>
+ * Test Twizzit API Connection
+ * 
+ * Purpose: Verify Twizzit API connectivity with stored credentials
+ * Usage: npm run twizzit:test-connection <credential_id>
+ *        or: node scripts/test-twizzit-connection.js <credential_id>
+ * 
+ * What it does:
+ * - Retrieves and decrypts stored credentials
+ * - Tests authentication endpoint
+ * - Fetches organizations and groups to verify API access
+ * - Updates last verification timestamp
+ * 
+ * Examples:
+ *   npm run twizzit:test-connection 1
+ *   node scripts/test-twizzit-connection.js 1
  */
 
 import dotenv from 'dotenv';

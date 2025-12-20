@@ -1,3 +1,18 @@
+/**
+ * Database Setup Script
+ * 
+ * Purpose: Initialize or reset the main development database
+ * Usage: npm run setup-db (from backend directory)
+ * 
+ * What it does:
+ * - Drops and recreates the database and user
+ * - Applies baseline schema from migrations/baseline/v0.1.0.sql
+ * - Runs all post-baseline migrations in alphabetical order
+ * - Used for local development environment setup
+ * 
+ * Required env vars: DB_USER, DB_PASSWORD, DB_NAME, DB_HOST, DB_PORT, POSTGRES_PASSWORD
+ */
+
 import dotenv from 'dotenv';
 import { exec } from 'node:child_process';
 import { promises as fs } from 'node:fs';

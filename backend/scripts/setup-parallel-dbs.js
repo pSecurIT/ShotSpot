@@ -1,7 +1,18 @@
 #!/usr/bin/env node
 
 /**
- * Setup parallel test databases for isolated test execution
+ * Parallel Test Databases Setup Script
+ * 
+ * Purpose: Create multiple isolated test databases for parallel test execution
+ * Usage: npm run setup-parallel-dbs
+ * 
+ * What it does:
+ * - Creates 3 separate test databases (main, core-api, game-logic)
+ * - Each database gets full schema + migrations
+ * - Enables running test suites in parallel without interference
+ * - Used in CI/CD pipelines for faster test execution
+ * 
+ * Required env vars: DB_NAME, DB_NAME_CORE_API, DB_NAME_GAME_LOGIC, POSTGRES_USER, POSTGRES_PASSWORD
  */
 
 import { Client } from 'pg';
