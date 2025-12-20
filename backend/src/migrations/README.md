@@ -49,6 +49,18 @@ The `test-coverage.yml` workflow includes:
 
 This runs before tests, catching missing migrations early in CI/CD.
 
+## ⚠️ UPDATE: Auto-Discovery Now Enabled
+
+**Good news!** The setup scripts now **automatically discover** all migration files in `backend/src/migrations/`. You no longer need to manually register migrations in the three setup scripts.
+
+The migration discovery logic:
+- Scans `backend/src/migrations/` for all `.sql` files
+- Excludes the `baseline/` directory
+- Applies migrations in alphabetical order (non-numeric first, then dated)
+- Uses `IF NOT EXISTS` protection to skip already-applied migrations
+
+You still need to run `npm run check-migrations` before committing to ensure the migration system is healthy.
+
 ## Creating a New Migration
 
 ### Step-by-Step Guide
@@ -75,40 +87,7 @@ CREATE INDEX IF NOT EXISTS idx_player_stats_player_id ON player_stats(player_id)
 CREATE INDEX IF NOT EXISTS idx_player_stats_game_id ON player_stats(game_id);
 ```
 
-**3. Add to setup-db.js**
-```javascript
-const migrations = [
-  // ... existing migrations ...
-  'add_login_history.sql',
-  'add_player_stats_table.sql',  // ← Add here (alphabetical order)
-  'add_seasons.sql',
-  // ... rest of migrations ...
-];
-```
-
-**4. Add to setup-test-db.js**
-```javascript
-const migrations = [
-  // ... existing migrations ...
-  'add_login_history.sql',
-  'add_player_stats_table.sql',  // ← Add here (same order)
-  'add_seasons.sql',
-  // ... rest of migrations ...
-];
-```
-
-**5. Add to setup-parallel-dbs.js**
-```javascript
-const migrations = [
-  // ... existing migrations ...
-  '../src/migrations/add_login_history.sql',
-  '../src/migrations/add_player_stats_table.sql',  // ← Add here (note the path)
-  '../src/migrations/add_seasons.sql',
-  // ... rest of migrations ...
-];
-```
-
-**6. Verify consistency**
+**3. Verify consistency** (auto-discovery means no manual registration needed!)
 ```bash
 cd backend
 npm run check-migrations
@@ -125,28 +104,18 @@ Found 16 migration files:
   - add_player_stats_table.sql  ← Your new migration
   ...
 
-Checking setup-db.js...
-  ✅ All migrations present
-
-Checking setup-test-db.js...
-  ✅ All migrations present
-
-Checking setup-parallel-dbs.js...
-  ✅ All migrations present
-
 ✅ All migration checks passed!
 ```
 
-**7. Test the migration locally**
+**4. Test the migration locally**
 ```bash
 npm run setup-test-db  # Recreates test database with all migrations
 npm test                # Run tests to ensure nothing broke
 ```
 
-**8. Commit (pre-commit hook will auto-verify)**
+**5. Commit (pre-commit hook will auto-verify)**
 ```bash
 git add backend/src/migrations/add_player_stats_table.sql
-git add backend/scripts/*.js
 git commit -m "feat: add player stats table"
 # Pre-commit hook runs npm run check-migrations
 # Commit proceeds only if check passes
@@ -249,7 +218,159 @@ For Docker, migrations are applied via the base `schema.sql` file during contain
 
 ❌ **DON'T:**
 - Modify existing migration files (create a new one instead)
-- Commit without adding to all three setup scripts
+- Commit without running `npm run check-migrations`
+- Skip the migration consistency check
+- Create migrations that depend on specific data existing
+- Use DROP TABLE without CASCADE considerations
+
+## Safety Nets in Test Setup Scripts
+
+The test database setup scripts (`backend/scripts/setup-test-db.js`, `backend/scripts/setup-parallel-dbs.js`) include embedded SQL that creates the `trainer_assignments` table if it's not present:
+
+```javascript
+// Safety net: ensure trainer_assignments exists even if a migration was skipped
+await testPool.query(`
+  CREATE TABLE IF NOT EXISTS trainer_assignments (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    ...
+  );
+`);
+```
+
+**Why?** This is a defensive measure to ensure test databases work even if:
+- A developer accidentally skips registering a migration
+- A migration file is deleted but the table is still needed
+- A CI/CD environment is missing a migration
+
+**Important:** This embedded SQL only runs in test environments, NOT in production. It uses `IF NOT EXISTS` to be idempotent. When the corresponding migration (`20251216_add_trainer_assignments.sql`) is already applied, this code safely does nothing.
+
+**Future developers:** If you find similar `CREATE TABLE IF NOT EXISTS` statements in setup scripts, this is intentional defensive programming. Don't be alarmed—it's a safety net, not a bug.
+
+## Seed Data Files
+
+Seed files (like `seed_achievements.sql`, `seed_default_report_templates.sql`) insert reference data and configuration into the database. They differ from schema migrations:
+
+- **Schema migrations** alter table structure, add/remove columns, create indexes
+- **Seed files** insert data (achievements, templates, default values, reference data)
+
+Seed files:
+- ✅ Live in `backend/src/migrations/` alongside migrations
+- ✅ Can use descriptive names without dates (e.g., `seed_achievements.sql`)
+- ✅ Run AFTER all schema migrations are applied
+- ✅ Use `INSERT ... ON CONFLICT` for idempotency when possible
+- ✅ Should never depend on other seeds running first
+
+Example seed file pattern:
+```sql
+-- Seed achievements data
+-- This file can be safely run multiple times (idempotent)
+
+INSERT INTO achievements (name, description, category)
+VALUES ('Sharpshooter', 'Score 10+ goals in a game', 'shooting')
+ON CONFLICT (name) DO NOTHING;  -- ← Prevents duplicate key errors
+```
+
+## Baseline Versioning & Regeneration
+
+The `baseline/v0.1.0.sql` file is a snapshot of the complete database schema as it existed at version 0.1.0. The corresponding `baseline/manifest.json` tracks which migrations are already included in that snapshot.
+
+### When to Regenerate Baseline
+
+Consider regenerating the baseline when:
+- You've accumulated 50+ migration files (easier to track with baseline)
+- You're preparing a major release
+- You want to clean up migration history
+- Performance: faster to restore from baseline than apply 50+ migrations
+
+### How to Regenerate Baseline
+
+1. **Snapshot the current schema**
+   ```bash
+   cd backend/scripts
+   # Dump the production database schema
+   pg_dump -U admin -d shotspot --schema-only > ../src/migrations/baseline/v0.1.0.sql
+   ```
+
+2. **Update the manifest**
+   ```bash
+   node baseline-generate.sh
+   # This will:
+   # - Scan all migration files
+   # - Create/update baseline/manifest.json with list of migrations to exclude
+   # - Verify baseline is syntactically correct
+   ```
+
+3. **Remove old migration files from disk** (optional)
+   - The migrations are now captured in baseline, so you can remove them if they're cluttering the directory
+   - They'll still be tracked in manifest.json for historical reference
+
+4. **Commit the updated baseline**
+   ```bash
+   git add backend/src/migrations/baseline/
+   git commit -m "chore: regenerate baseline at v0.1.0"
+   ```
+
+5. **Verify baseline works**
+   ```bash
+   npm run setup-test-db  # Ensure baseline loads without errors
+   npm test
+   ```
+
+### Baseline Safety Rules
+
+- ❌ Never manually edit baseline/v0.1.0.sql
+- ❌ Don't add new migrations to baseline/ directory
+- ✅ Always keep baseline/manifest.json in sync with baseline/v0.1.0.sql
+- ✅ Document the date when baseline was generated (in a comment in v0.1.0.sql)
+
+## Schema.sql Reference File
+
+`backend/src/schema.sql` is a **documentation reference** and fallback schema. It shows the complete database schema but should not be edited manually.
+
+### When Schema.sql is Used
+
+1. **Fallback:** If baseline/v0.1.0.sql is missing or empty, setup-db.js applies schema.sql instead
+2. **Reference:** Developers can read schema.sql to understand the database structure without applying migrations
+3. **Documentation:** IDE type hints and schema exploration tools may use schema.sql
+
+### Keeping Schema.sql in Sync
+
+When you regenerate the baseline, also update schema.sql:
+
+```bash
+cd backend/src
+# Dump the schema as it should be at latest state
+pg_dump -U admin -d shotspot --schema-only -o schema.sql
+# Or manually verify it matches baseline/v0.1.0.sql
+```
+
+Then add a comment at the top:
+```sql
+-- ==============================================================================
+-- SHOTSPOT DATABASE SCHEMA - Reference snapshot
+-- ==============================================================================
+-- This represents the complete schema after all migrations.
+-- Last synchronized with baseline: 2025-12-20
+-- For the authoritative schema, see baseline/v0.1.0.sql and incremental migrations
+-- ==============================================================================
+```
+
+---
+
+## Best Practices
+
+✅ **DO:**
+- Use `IF NOT EXISTS` for idempotent migrations
+- Add indexes for foreign keys and frequently queried columns
+- Include comments explaining complex changes
+- Test migrations locally before committing
+- Run `npm run check-migrations` before pushing
+- Keep migrations small and focused on one change
+
+❌ **DON'T:**
+- Modify existing migration files (create a new one instead)
+- Commit without running `npm run check-migrations`
 - Skip the migration consistency check
 - Create migrations that depend on specific data existing
 - Use DROP TABLE without CASCADE considerations
