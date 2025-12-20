@@ -60,6 +60,19 @@ jobs:
           fi
 
       # -------------------------
+      # CocoaPods validation
+      # -------------------------
+      - name: Verify Podfile
+        working-directory: frontend/ios/App
+        run: |
+          if [ ! -f Podfile ]; then
+            echo "::error::Podfile not found after Capacitor sync"
+            ls -la
+            exit 1
+          fi
+          echo "::notice::Podfile verified"
+
+      # -------------------------
       # CocoaPods cache
       # -------------------------
       - name: Cache CocoaPods
@@ -75,17 +88,7 @@ jobs:
       - name: Install iOS Pods
         working-directory: frontend/ios/App
         run: |
-          pod repo update
           pod install
-
-      - name: Verify App.xcworkspace
-        working-directory: frontend/ios/App
-        run: |
-          if [ ! -d App.xcworkspace ]; then
-            echo "::error::App.xcworkspace not found after pod install"
-            exit 1
-          fi
-          echo "::notice::App.xcworkspace verified"
 
       # -------------------------
       # Xcode build cache
