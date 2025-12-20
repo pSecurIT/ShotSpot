@@ -323,6 +323,38 @@ jobs:
           fi
           echo "App.xcworkspace successfully generated."
 
+      - name: Enhanced Debugging for CocoaPods
+        working-directory: frontend/ios/App
+        run: |
+          set -euo pipefail
+          echo "Starting enhanced debugging for CocoaPods..."
+
+          echo "Listing ios/App directory contents before pod install..."
+          ls -la
+
+          echo "Checking Podfile.lock..."
+          if [ -f Podfile.lock ]; then
+              echo "Podfile.lock contents:" && cat Podfile.lock
+          else
+              echo "::warning::Podfile.lock not found. Dependencies may not be resolved."
+          fi
+
+          echo "Running pod install with verbose logging..."
+          pod install --verbose || {
+              echo "::error::pod install failed. Capturing detailed logs."
+              exit 1
+          }
+
+          echo "Listing ios/App directory contents after pod install..."
+          ls -la
+
+          echo "Verifying App.xcworkspace..."
+          if [ ! -f App.xcworkspace ]; then
+              echo "::error::App.xcworkspace not found after pod install."
+              exit 1
+          fi
+          echo "App.xcworkspace successfully generated."
+
       - name: Build iOS Debug App
         working-directory: frontend/ios
         run: |
