@@ -3,6 +3,7 @@
  * 
  * Purpose: Store encrypted Twizzit API credentials in database
  * Usage: npm run twizzit:store-credentials [org] [username] [password] [endpoint]
+ *        or: node scripts/store-twizzit-credentials.js [org] [username] [password] [endpoint]
  * 
  * What it does:
  * - Encrypts password using AES-256-CBC
