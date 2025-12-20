@@ -22,9 +22,9 @@ router.get('/:gameId', async (req, res) => {
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM free_shots fs
-      JOIN teams t ON fs.team_id = t.id
+      JOIN clubs c ON fs.club_id = c.id
       JOIN players p ON fs.player_id = p.id
       WHERE fs.game_id = $1
       ORDER BY fs.created_at DESC
@@ -48,7 +48,7 @@ router.get('/:gameId', async (req, res) => {
 /**
  * Create a new free shot
  * POST /api/free-shots
- * Body: { game_id, player_id, team_id, period, time_remaining?, free_shot_type, reason?, x_coord?, y_coord?, result, distance? }
+ * Body: { game_id, player_id, club_id, period, time_remaining?, free_shot_type, reason?, x_coord?, y_coord?, result, distance? }
  */
 router.post('/', [
   requireRole(['admin', 'coach']),
@@ -60,10 +60,10 @@ router.post('/', [
     .notEmpty()
     .isInt({ min: 1 })
     .withMessage('Player ID must be a positive integer'),
-  body('team_id')
+  body('club_id')
     .notEmpty()
     .isInt({ min: 1 })
-    .withMessage('Team ID must be a positive integer'),
+    .withMessage('Club ID must be a positive integer'),
   body('period')
     .notEmpty()
     .isInt({ min: 1, max: 10 })
@@ -104,7 +104,7 @@ router.post('/', [
   }
 
   const {
-    game_id: gameId, player_id, team_id, period, time_remaining, free_shot_type,
+    game_id: gameId, player_id, club_id, period, time_remaining, free_shot_type,
     reason, x_coord, y_coord, result, distance
   } = req.body;
 
@@ -123,18 +123,18 @@ router.post('/', [
       });
     }
 
-    // Verify team is participating in the game
-    if (team_id !== game.home_team_id && team_id !== game.away_team_id) {
+    // Verify club is participating in the game
+    if (club_id !== game.home_club_id && club_id !== game.away_club_id) {
       return res.status(400).json({ 
         error: 'Team is not participating in this game',
-        gameTeams: { home: game.home_team_id, away: game.away_team_id },
-        providedTeam: team_id
+        gameTeams: { home: game.home_club_id, away: game.away_club_id },
+        providedTeam: club_id
       });
     }
 
-    // Verify player belongs to the team
+    // Verify player belongs to the club
     const playerResult = await db.query(
-      'SELECT * FROM players WHERE id = $1',
+      'SELECT club_id FROM players WHERE id = $1',
       [player_id]
     );
 
@@ -142,18 +142,18 @@ router.post('/', [
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    if (playerResult.rows[0].team_id !== team_id) {
+    if (playerResult.rows[0].club_id !== club_id) {
       return res.status(400).json({ 
         error: 'Player does not belong to the specified team',
-        playerTeam: playerResult.rows[0].team_id,
-        providedTeam: team_id
+        playerTeam: playerResult.rows[0].club_id,
+        providedTeam: club_id
       });
     }
 
     // Insert the free shot
     const insertQuery = `
       INSERT INTO free_shots (
-        game_id, player_id, team_id, period, time_remaining,
+        game_id, player_id, club_id, period, time_remaining,
         free_shot_type, reason, x_coord, y_coord, result, distance
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -161,7 +161,7 @@ router.post('/', [
     `;
 
     const result_query = await db.query(insertQuery, [
-      gameId, player_id, team_id, period, time_remaining || null,
+      gameId, player_id, club_id, period, time_remaining || null,
       free_shot_type, reason || null, x_coord || null, y_coord || null,
       result, distance || null
     ]);
@@ -173,9 +173,9 @@ router.post('/', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM free_shots fs
-      JOIN teams t ON fs.team_id = t.id
+      JOIN clubs c ON fs.club_id = c.id
       JOIN players p ON fs.player_id = p.id
       WHERE fs.id = $1
     `, [result_query.rows[0].id]);
@@ -211,10 +211,10 @@ router.put('/:freeShotId', [
     .optional()
     .isInt({ min: 1 })
     .withMessage('Player ID must be a positive integer'),
-  body('team_id')
+  body('club_id')
     .optional()
     .isInt({ min: 1 })
-    .withMessage('Team ID must be a positive integer'),
+    .withMessage('Club ID must be a positive integer'),
   body('period')
     .optional()
     .isInt({ min: 1, max: 10 })
@@ -255,7 +255,11 @@ router.put('/:freeShotId', [
   }
 
   const { freeShotId } = req.params;
-  const updates = req.body;
+  const updates = { ...req.body };
+  if (updates.team_id && !updates.club_id) {
+    updates.club_id = updates.team_id;
+  }
+  delete updates.team_id;
   const gameId = updates.game_id;
 
   try {
@@ -303,9 +307,9 @@ router.put('/:freeShotId', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM free_shots fs
-      JOIN teams t ON fs.team_id = t.id
+      JOIN clubs c ON fs.club_id = c.id
       JOIN players p ON fs.player_id = p.id
       WHERE fs.id = $1
     `, [freeShotId]);

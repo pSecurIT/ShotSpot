@@ -2,6 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
+import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
 const router = express.Router();
 
@@ -192,31 +193,45 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
       return res.status(400).json({ error: 'Club does not exist' });
     }
 
+    if (req.user.role === 'coach') {
+      const allowed = await hasTrainerAccess(req.user.id, { clubId: club_id, teamId: team_id || null });
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this club/team' });
+      }
+    }
+
     // If team_id provided, verify it exists and belongs to the club
     if (team_id) {
       const teamExists = await db.query('SELECT id FROM teams WHERE id = $1 AND club_id = $2', [team_id, club_id]);
       if (teamExists.rows.length === 0) {
         return res.status(400).json({ error: 'Team does not exist or does not belong to this club' });
       }
+    }
 
-      // Check for duplicate jersey number in the same team
-      const existingPlayer = await db.query(
-        'SELECT id FROM players WHERE team_id = $1 AND jersey_number = $2',
-        [team_id, jersey_number]
-      );
+    // Check for duplicate jersey number in the same club (enforced by DB constraint)
+    const existingPlayer = await db.query(
+      'SELECT id FROM players WHERE club_id = $1 AND jersey_number = $2',
+      [club_id, jersey_number]
+    );
 
-      if (existingPlayer.rows.length > 0) {
-        return res.status(409).json({
-          error: 'Jersey number already in use for this team'
-        });
-      }
+    if (existingPlayer.rows.length > 0) {
+      return res.status(409).json({
+        error: 'Jersey number already in use for this club'
+      });
     }
 
     const result = await db.query(
-      'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [club_id, team_id || null, first_name, last_name, jersey_number, gender || null]
+      'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender, is_twizzit_registered) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [club_id, team_id || null, first_name, last_name, jersey_number, gender || null, false]
     );
-    res.status(201).json(result.rows[0]);
+    
+    const player = result.rows[0];
+    
+    // Return player with warning about Twizzit registration requirement
+    res.status(201).json({
+      ...player,
+      _warning: 'Player created but not yet registered in Twizzit. Official KBKB match participation requires Twizzit registration. Please sync from Twizzit or contact administrator.'
+    });
   } catch (err) {
     if (err.code === '23503') { // Foreign key violation
       return res.status(400).json({ error: 'Team does not exist' });
@@ -256,6 +271,13 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
     const clubExists = await db.query('SELECT id FROM clubs WHERE id = $1', [club_id]);
     if (clubExists.rows.length === 0) {
       return res.status(400).json({ error: 'Club does not exist' });
+    }
+
+    if (req.user.role === 'coach') {
+      const allowed = await hasTrainerAccess(req.user.id, { clubId: club_id, teamId: team_id || null });
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this club/team' });
+      }
     }
 
     // If team_id provided, verify it exists and belongs to the club

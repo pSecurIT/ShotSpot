@@ -445,11 +445,12 @@ describe('🏃 Ball Possessions API', () => {
 
       it('✅ should filter possessions by team_id', async () => {
         const response = await request(app)
-          .get(`/api/possessions/${game.id}?team_id=${club1.id}`)
+          .get(`/api/possessions/${game.id}?club_id=${club1.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .expect(200);
 
         expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body.length).toBeGreaterThan(0);
         response.body.forEach(possession => {
           expect(possession.club_id).toBe(club1.id);
         });
@@ -469,11 +470,12 @@ describe('🏃 Ball Possessions API', () => {
 
       it('✅ should filter by both team_id and period', async () => {
         const response = await request(app)
-          .get(`/api/possessions/${game.id}?team_id=${club2.id}&period=2`)
+          .get(`/api/possessions/${game.id}?club_id=${club2.id}&period=2`)
           .set('Authorization', `Bearer ${adminToken}`)
           .expect(200);
 
         expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body.length).toBeGreaterThan(0);
         response.body.forEach(possession => {
           expect(possession.club_id).toBe(club2.id);
           expect(possession.period).toBe(2);
@@ -604,10 +606,10 @@ describe('🏃 Ball Possessions API', () => {
       for (const scenario of scenarios) {
         // Create possession directly in database to avoid rate limiting
         const possessionResult = await db.query(
-          `INSERT INTO ball_possessions (game_id, team_id, period, shots_taken, result, started_at, ended_at, duration_seconds)
+          `INSERT INTO ball_possessions (game_id, club_id, period, shots_taken, result, started_at, ended_at, duration_seconds)
            VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP - INTERVAL '60 seconds', CURRENT_TIMESTAMP, 60)
            RETURNING *`,
-          [statsTestGame.id, scenario.team_id, scenario.period, scenario.shots, scenario.result]
+          [statsTestGame.id, scenario.club_id, scenario.period, scenario.shots, scenario.result]
         );
         statsTestPossessions.push(possessionResult.rows[0]);
       }
@@ -785,18 +787,18 @@ describe('🏃 Ball Possessions API', () => {
 
   describe('🔧 Edge Cases and Validation', () => {
     it('🔧 should handle database errors gracefully for possession creation', async () => {
-      // Use invalid team_id - should get 404 since team doesn't exist
+      // Use invalid club_id - should get 404 since club doesn't exist
       const response = await request(app)
         .post(`/api/possessions/${game.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ team_id: 99999, period: 1 });
+        .send({ club_id: 99999, period: 1 });
 
-      // Should now return 404 with proper error message (team validation before insert)
+      // Should now return 404 with proper error message (club validation before insert)
       if (response.status === 404) {
-        expect(response.body).toHaveProperty('error', 'Team not found');
+        expect(response.body).toHaveProperty('error', 'Club not found');
       } else if (response.status === 429) {
         // Rate limited - acceptable for this test
-        console.log('Rate limited during team validation test - acceptable');
+        console.log('Rate limited during club validation test - acceptable');
       } else {
         throw new Error(`Unexpected status code: ${response.status}`);
       }
@@ -903,7 +905,7 @@ describe('🏃 Ball Possessions API', () => {
             .post(`/api/possessions/${game.id}`)
             .set('Authorization', `Bearer ${adminToken}`)
             .send({ 
-              team_id: i % 2 === 0 ? club1.id : club2.id, 
+              club_id: i % 2 === 0 ? club1.id : club2.id, 
               period: 1 
             })
         );

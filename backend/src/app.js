@@ -1,7 +1,7 @@
-// Load environment variables first (in case app.js is imported before index.js dotenv config)
+// Load environment variables first (prefer test env file when under NODE_ENV=test)
 import dotenv from 'dotenv';
-dotenv.config({ path: new URL('../../.env', import.meta.url) });
-dotenv.config({ override: true });
+const envFile = process.env.NODE_ENV === 'test' ? '../../.env.test' : '../../.env';
+dotenv.config({ path: new URL(envFile, import.meta.url), override: true });
 
 import express from 'express';
 import cors from 'cors';
@@ -45,6 +45,7 @@ import competitionsRoutes from './routes/competitions.js';
 import teamAnalyticsRoutes from './routes/team-analytics.js';
 import matchTemplatesRoutes from './routes/match-templates.js';
 import twizzitRoutes from './routes/twizzit.js';
+import seriesRoutes from './routes/series.js';
 
 
 const app = express();
@@ -316,8 +317,10 @@ app.use('/api/scheduled-reports', scheduledReportsRoutes);
 app.use('/api/exports', exportsRoutes);
 app.use('/api/competitions', competitionsRoutes);
 app.use('/api/team-analytics', teamAnalyticsRoutes);
+app.use('/api/club-analytics', teamAnalyticsRoutes);
 app.use('/api/match-templates', matchTemplatesRoutes);
 app.use('/api/twizzit', twizzitRoutes);
+app.use('/api/series', seriesRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {

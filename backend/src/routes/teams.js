@@ -2,6 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
+import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
 const router = express.Router();
 
@@ -80,6 +81,13 @@ router.post('/', [
       return res.status(404).json({ error: 'Club not found' });
     }
 
+    if (req.user.role === 'coach') {
+      const allowed = await hasTrainerAccess(req.user.id, { clubId: club_id });
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this club' });
+      }
+    }
+
     const result = await db.query(
       `INSERT INTO teams (club_id, name, age_group, gender, season_id) 
        VALUES ($1, $2, $3, $4, $5) 
@@ -115,11 +123,11 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Get team players
+// Get players for a team (age group)
 router.get('/:id/players', async (req, res) => {
   const { id } = req.params;
   try {
-    // First check if team exists
+    // Verify team exists
     const teamResult = await db.query('SELECT id FROM teams WHERE id = $1', [id]);
     if (teamResult.rows.length === 0) {
       return res.status(404).json({ error: 'Team not found' });
@@ -135,7 +143,7 @@ router.get('/:id/players', async (req, res) => {
   }
 });
 
-// Update a team
+// Update a team (age group)
 router.put('/:id', [
   requireRole(['admin', 'coach']),
   body('name')
@@ -171,6 +179,19 @@ router.put('/:id', [
   const { id } = req.params;
   const { name, age_group, gender, is_active, season_id } = req.body;
   try {
+    // Load team to confirm existence and get club for trainer access
+    const teamCheck = await db.query('SELECT id, club_id FROM teams WHERE id = $1', [id]);
+    if (teamCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    if (req.user.role === 'coach') {
+      const allowed = await hasTrainerAccess(req.user.id, { clubId: Number(teamCheck.rows[0].club_id) });
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this club' });
+      }
+    }
+
     const result = await db.query(
       `UPDATE teams 
        SET name = $1, age_group = $2, gender = $3, is_active = COALESCE($4, is_active), 
@@ -191,16 +212,29 @@ router.put('/:id', [
   }
 });
 
-// Delete a team
+// Delete a team (age group)
 router.delete('/:id', [
   requireRole(['admin', 'coach'])
 ], async (req, res) => {
   const { id } = req.params;
   try {
+    // Load team to find club and verify existence
+    const teamCheck = await db.query('SELECT id, club_id FROM teams WHERE id = $1', [id]);
+    if (teamCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    if (req.user.role === 'coach') {
+      const allowed = await hasTrainerAccess(req.user.id, { clubId: Number(teamCheck.rows[0].club_id) });
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this club' });
+      }
+    }
+
     // Begin a transaction
     await db.query('BEGIN');
 
-    // Check if team has any games (as home_team_id or away_team_id in games table)
+    // Check if team has any games linked
     const gamesCheck = await db.query(
       'SELECT id FROM games WHERE home_team_id = $1 OR away_team_id = $1 LIMIT 1',
       [id]

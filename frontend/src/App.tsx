@@ -1,3 +1,4 @@
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
@@ -5,17 +6,23 @@ import TeamManagement from './components/TeamManagement';
 import PlayerManagement from './components/PlayerManagement';
 import UserManagement from './components/UserManagement';
 import GameManagement from './components/GameManagement';
-import LiveMatch from './components/LiveMatch';
-import ShotAnalytics from './components/ShotAnalytics';
-import ExportCenter from './components/ExportCenter';
+const LiveMatch = React.lazy(() => import('./components/LiveMatch'));
+const ShotAnalytics = React.lazy(() => import('./components/ShotAnalytics'));
+const ExportCenter = React.lazy(() => import('./components/ExportCenter'));
 import MatchTemplates from './components/MatchTemplates';
-import TwizzitIntegration from './components/TwizzitIntegration';
+const TwizzitIntegration = React.lazy(() => import('./components/TwizzitIntegration'));
 import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
 import OfflineIndicator from './components/OfflineIndicator';
 import logo from './img/ShotSpot_logo.png';
+
+const RouteLoader = ({ children }: { children: React.ReactNode }) => (
+  <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
+    {children}
+  </Suspense>
+);
 
 const App: React.FC = () => {
   return (
@@ -51,7 +58,7 @@ const App: React.FC = () => {
                 path="/match/:gameId" 
                 element={
                   <ProtectedRoute>
-                    <LiveMatch />
+                    <RouteLoader><LiveMatch /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />
@@ -59,7 +66,7 @@ const App: React.FC = () => {
                 path="/analytics/:gameId" 
                 element={
                   <ProtectedRoute>
-                    <ShotAnalytics />
+                    <RouteLoader><ShotAnalytics /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />
@@ -91,7 +98,7 @@ const App: React.FC = () => {
                 path="/exports" 
                 element={
                   <ProtectedRoute>
-                    <ExportCenter />
+                    <RouteLoader><ExportCenter /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />
@@ -107,7 +114,7 @@ const App: React.FC = () => {
                 path="/twizzit" 
                 element={
                   <ProtectedRoute>
-                    <TwizzitIntegration />
+                    <RouteLoader><TwizzitIntegration /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />

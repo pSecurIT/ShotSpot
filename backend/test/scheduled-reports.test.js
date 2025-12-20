@@ -33,7 +33,9 @@ describe('📅 Scheduled Reports Routes', () => {
       const template = await db.query('SELECT id FROM report_templates WHERE is_default = true LIMIT 1');
       templateId = template.rows[0]?.id;
       
-      const teamResult = await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING id', ['Test Club']);
+      const clubResult = await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING id', ['Test Club']);
+      const clubId = clubResult.rows[0].id;
+      const teamResult = await db.query('INSERT INTO teams (club_id, name) VALUES ($1, $2) RETURNING id', [clubId, 'Test Team']);
       teamId = teamResult.rows[0].id;
     } catch (error) {
       global.testContext.logTestError(error, 'Database setup failed');
@@ -43,7 +45,8 @@ describe('📅 Scheduled Reports Routes', () => {
 
   afterEach(async () => {
     try {
-      await db.query('DELETE FROM clubs WHERE id = $1', [teamId]);
+      await db.query('DELETE FROM teams WHERE id = $1', [teamId]);
+      await db.query('DELETE FROM clubs WHERE name = $1', ['Test Club']);
     } catch (error) {
       global.testContext.logTestError(error, 'Database cleanup failed');
     }

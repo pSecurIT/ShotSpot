@@ -10,6 +10,7 @@ import twizzitAuth from '../services/twizzit-auth.js';
 import twizzitSync from '../services/twizzit-sync.js';
 import TwizzitApiClient from '../services/twizzit-api-client.js';
 import db from '../db.js';
+import * as twizzitService from '../services/twizzitService.js';
 
 const router = express.Router();
 
@@ -177,6 +178,80 @@ router.post(
     }
   }
 );
+
+/**
+ * GET /api/twizzit/verify
+ * Verify Twizzit API connection
+ */
+router.get('/verify', async (req, res) => {
+  try {
+    const isConnected = await twizzitService.verifyTwizzitConnection();
+    if (isConnected) {
+      return res.status(200).json({ message: 'Twizzit API connection verified successfully.' });
+    }
+    return res.status(500).json({ message: 'Failed to verify Twizzit API connection.' });
+  } catch (error) {
+    console.error('Error verifying Twizzit API connection:', error);
+    return res.status(500).json({ 
+      error: 'Failed to verify Twizzit API connection',
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    });
+  }
+});
+
+/**
+ * POST /api/twizzit/sync/clubs
+ * Sync clubs from Twizzit API
+ */
+router.post('/sync/clubs', async (req, res) => {
+  try {
+    const clubs = await twizzitService.syncClubs();
+    return res.status(200).json({ message: 'Clubs synced successfully.', clubs });
+  } catch (error) {
+    console.error('Error syncing clubs:', error);
+    return res.status(500).json({ 
+      error: 'Failed to sync clubs',
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    });
+  }
+});
+
+/**
+ * POST /api/twizzit/sync/players/:clubId
+ * Sync players for a specific club from Twizzit API
+ */
+router.post('/sync/players/:clubId', async (req, res) => {
+  const { clubId } = req.params;
+  try {
+    const players = await twizzitService.syncPlayers(clubId);
+    return res.status(200).json({ message: `Players synced successfully for club ${clubId}.`, players });
+  } catch (error) {
+    // Avoid user-controlled format strings; log structured context
+    console.error('Error syncing players for club %s:', clubId, error);
+    return res.status(500).json({ 
+      error: 'Failed to sync players',
+      clubId,
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    });
+  }
+});
+
+/**
+ * POST /api/twizzit/sync/seasons
+ * Sync seasons from Twizzit API
+ */
+router.post('/sync/seasons', async (req, res) => {
+  try {
+    const seasons = await twizzitService.syncSeasons();
+    return res.status(200).json({ message: 'Seasons synced successfully.', seasons });
+  } catch (error) {
+    console.error('Error syncing seasons:', error);
+    return res.status(500).json({ 
+      error: 'Failed to sync seasons',
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    });
+  }
+});
 
 /**
  * POST /api/twizzit/sync/clubs/:credentialId
