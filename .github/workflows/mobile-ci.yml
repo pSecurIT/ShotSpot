@@ -115,7 +115,7 @@ jobs:
             -project App.xcodeproj \
             -scheme App \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
             -configuration Debug \
             build \
             CODE_SIGNING_ALLOWED=NO
