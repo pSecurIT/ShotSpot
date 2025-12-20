@@ -55,11 +55,8 @@ router.get('/head-to-head/:club1Id/:club2Id', [
     const club1 = clubsResult.rows.find(c => c.id === club1Id);
     const club2 = clubsResult.rows.find(c => c.id === club2Id);
 
-    // Get head-to-head record from cache
-    let h2hRecord = await db.query(
-      'SELECT * FROM head_to_head WHERE team1_id = $1 AND team2_id = $2',
-      [club1Id, club2Id]
-    );
+    // Calculate head-to-head directly from games (cache table may still use team_* columns)
+    let h2hRecord = { rows: [] };
 
     // If no cached record, calculate from games
     if (h2hRecord.rows.length === 0) {
@@ -119,46 +116,21 @@ router.get('/head-to-head/:club1Id/:club2Id', [
 
       const lastGame = gamesResult.rows[0] || null;
 
-      // Insert or update head-to-head cache
-      if (gamesResult.rows.length > 0) {
-        await db.query(`
-          INSERT INTO head_to_head 
-            (team1_id, team2_id, total_games, team1_wins, team2_wins, draws, 
-             team1_goals, team2_goals, last_game_id, last_game_date, streak_team_id, streak_count)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-          ON CONFLICT (team1_id, team2_id) 
-          DO UPDATE SET
-            total_games = EXCLUDED.total_games,
-            team1_wins = EXCLUDED.team1_wins,
-            team2_wins = EXCLUDED.team2_wins,
-            draws = EXCLUDED.draws,
-            team1_goals = EXCLUDED.team1_goals,
-            team2_goals = EXCLUDED.team2_goals,
-            last_game_id = EXCLUDED.last_game_id,
-            last_game_date = EXCLUDED.last_game_date,
-            streak_team_id = EXCLUDED.streak_team_id,
-            streak_count = EXCLUDED.streak_count,
-            updated_at = CURRENT_TIMESTAMP
-        `, [
-          club1Id, club2Id, gamesResult.rows.length, club1Wins, club2Wins, draws,
-          club1Goals, club2Goals, lastGame?.id, lastGame?.date,
-          streakClubId, streakCount
-        ]);
-      }
+      // Skip writing to legacy cache table to avoid schema drift
 
       h2hRecord = {
         rows: [{
-          team1_id: club1Id,
-          team2_id: club2Id,
+          club1_id: club1Id,
+          club2_id: club2Id,
           total_games: gamesResult.rows.length,
-          team1_wins: club1Wins,
-          team2_wins: club2Wins,
+          club1_wins: club1Wins,
+          club2_wins: club2Wins,
           draws,
-          team1_goals: club1Goals,
-          team2_goals: club2Goals,
+          club1_goals: club1Goals,
+          club2_goals: club2Goals,
           last_game_id: lastGame?.id,
           last_game_date: lastGame?.date,
-          streak_team_id: streakClubId,
+          streak_club_id: streakClubId,
           streak_count: streakCount
         }]
       };
@@ -188,24 +160,24 @@ router.get('/head-to-head/:club1Id/:club2Id', [
     const record = h2hRecord.rows[0];
 
     res.json({
-      club1: {
+      team1: {
         id: club1Id,
         name: club1.name,
-        wins: record.team1_wins,
-        goals: record.team1_goals
+        wins: record.club1_wins,
+        goals: record.club1_goals
       },
-      club2: {
+      team2: {
         id: club2Id,
         name: club2.name,
-        wins: record.team2_wins,
-        goals: record.team2_goals
+        wins: record.club2_wins,
+        goals: record.club2_goals
       },
       total_games: record.total_games,
       draws: record.draws,
       last_game_date: record.last_game_date,
-      current_streak: record.streak_team_id ? {
-        club_id: record.streak_team_id,
-        club_name: record.streak_team_id === club1Id ? club1.name : club2.name,
+      current_streak: record.streak_club_id ? {
+        team_id: record.streak_club_id,
+        team_name: record.streak_club_id === club1Id ? club1.name : club2.name,
         count: record.streak_count
       } : null,
       recent_games: recentGames.rows
@@ -242,50 +214,9 @@ router.get('/rankings', [
   const limit = parseInt(req.query.limit, 10) || 20;
 
   try {
-    let queryText;
-    let params;
-
-    if (season_id) {
-      queryText = `
-        SELECT 
-          tr.*,
-          t.name as team_name,
-          s.name as season_name
-        FROM team_rankings tr
-        JOIN teams t ON tr.team_id = t.id
-        LEFT JOIN seasons s ON tr.season_id = s.id
-        WHERE tr.season_id = $1
-        ORDER BY tr.overall_rank NULLS LAST, tr.rating DESC NULLS LAST
-        LIMIT $2
-      `;
-      params = [season_id, limit];
-    } else {
-      // Get rankings for current/latest season or overall
-      queryText = `
-        SELECT 
-          tr.*,
-          t.name as team_name,
-          s.name as season_name
-        FROM team_rankings tr
-        JOIN teams t ON tr.team_id = t.id
-        LEFT JOIN seasons s ON tr.season_id = s.id
-        WHERE tr.season_id IS NULL 
-          OR tr.season_id = (SELECT id FROM seasons WHERE is_active = true LIMIT 1)
-        ORDER BY tr.overall_rank NULLS LAST, tr.rating DESC NULLS LAST
-        LIMIT $1
-      `;
-      params = [limit];
-    }
-
-    const result = await db.query(queryText, params);
-
-    // If no rankings exist, calculate from game history
-    if (result.rows.length === 0) {
-      const calculatedRankings = await calculateTeamRankings(season_id);
-      return res.json(calculatedRankings);
-    }
-
-    res.json(result.rows);
+    // Always calculate from game history (team_rankings table may be stale after club move)
+    const calculatedRankings = await calculateTeamRankings(season_id, limit);
+    res.json(calculatedRankings);
   } catch (err) {
     console.error('Error fetching rankings:', err);
     res.status(500).json({ error: 'Failed to fetch rankings' });
@@ -307,44 +238,18 @@ router.get('/rankings/team/:teamId', [
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { teamId } = req.params;
+  const clubParamId = parseInt(req.params.teamId, 10);
   const { season_id } = req.query;
 
   try {
-    // Get team info
-    const teamResult = await db.query('SELECT id, name FROM teams WHERE id = $1', [teamId]);
-    if (teamResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Team not found' });
+    // Treat incoming ID as club identifier to align with club-centric schema
+    const clubResult = await db.query('SELECT id, name FROM clubs WHERE id = $1', [clubParamId]);
+    if (clubResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Club not found' });
     }
 
-    let queryText = `
-      SELECT 
-        tr.*,
-        t.name as team_name,
-        s.name as season_name
-      FROM team_rankings tr
-      JOIN teams t ON tr.team_id = t.id
-      LEFT JOIN seasons s ON tr.season_id = s.id
-      WHERE tr.team_id = $1
-    `;
-    const params = [teamId];
-
-    if (season_id) {
-      queryText += ' AND tr.season_id = $2';
-      params.push(season_id);
-    } else {
-      queryText += ' AND (tr.season_id IS NULL OR tr.season_id = (SELECT id FROM seasons WHERE is_active = true LIMIT 1))';
-    }
-
-    const result = await db.query(queryText, params);
-
-    if (result.rows.length === 0) {
-      // Calculate ranking on-the-fly
-      const ranking = await calculateTeamRanking(teamId, season_id);
-      return res.json(ranking);
-    }
-
-    res.json(result.rows[0]);
+    const ranking = await calculateTeamRanking(clubParamId, season_id);
+    res.json(ranking);
   } catch (err) {
     console.error('Error fetching team ranking:', err);
     res.status(500).json({ error: 'Failed to fetch team ranking' });
@@ -414,14 +319,14 @@ router.get('/compare', [
   const { season_id } = req.query;
 
   try {
-    // Get team information
-    const teamsResult = await db.query(
-      'SELECT id, name FROM teams WHERE id = ANY($1)',
+    // Get club information
+    const clubsResult = await db.query(
+      'SELECT id, name FROM clubs WHERE id = ANY($1)',
       [teamIds]
     );
 
-    if (teamsResult.rows.length !== teamIds.length) {
-      return res.status(404).json({ error: 'One or more teams not found' });
+    if (clubsResult.rows.length !== teamIds.length) {
+      return res.status(404).json({ error: 'One or more clubs not found' });
     }
 
     // Get statistics for each team
@@ -440,20 +345,20 @@ router.get('/compare', [
         SELECT
           COUNT(*) as games_played,
           COUNT(CASE 
-            WHEN (g.home_team_id = $1 AND g.home_score > g.away_score)
-              OR (g.away_team_id = $1 AND g.away_score > g.home_score) THEN 1 
+            WHEN (g.home_club_id = $1 AND g.home_score > g.away_score)
+              OR (g.away_club_id = $1 AND g.away_score > g.home_score) THEN 1 
           END) as wins,
           COUNT(CASE 
-            WHEN (g.home_team_id = $1 AND g.home_score < g.away_score)
-              OR (g.away_team_id = $1 AND g.away_score < g.home_score) THEN 1 
+            WHEN (g.home_club_id = $1 AND g.home_score < g.away_score)
+              OR (g.away_club_id = $1 AND g.away_score < g.home_score) THEN 1 
           END) as losses,
           COUNT(CASE WHEN g.home_score = g.away_score THEN 1 END) as draws,
-          SUM(CASE WHEN g.home_team_id = $1 THEN g.home_score ELSE g.away_score END) as goals_for,
-          SUM(CASE WHEN g.home_team_id = $1 THEN g.away_score ELSE g.home_score END) as goals_against,
-          COUNT(CASE WHEN g.home_team_id = $1 AND g.home_score > g.away_score THEN 1 END) as home_wins,
-          COUNT(CASE WHEN g.away_team_id = $1 AND g.away_score > g.home_score THEN 1 END) as away_wins
+          SUM(CASE WHEN g.home_club_id = $1 THEN g.home_score ELSE g.away_score END) as goals_for,
+          SUM(CASE WHEN g.home_club_id = $1 THEN g.away_score ELSE g.home_score END) as goals_against,
+          COUNT(CASE WHEN g.home_club_id = $1 AND g.home_score > g.away_score THEN 1 END) as home_wins,
+          COUNT(CASE WHEN g.away_club_id = $1 AND g.away_score > g.home_score THEN 1 END) as away_wins
         FROM games g
-        WHERE (g.home_team_id = $1 OR g.away_team_id = $1) AND ${gameFilter}
+        WHERE (g.home_club_id = $1 OR g.away_club_id = $1) AND ${gameFilter}
       `, gameParams);
 
       const stats = statsResult.rows[0];
@@ -465,7 +370,7 @@ router.get('/compare', [
       const goalsAgainst = parseInt(stats.goals_against) || 0;
 
       // Get shot statistics
-      let shotFilter = 's.team_id = $1';
+      let shotFilter = 's.club_id = $1';
       let shotParams = [teamId];
 
       if (season_id) {
@@ -489,11 +394,13 @@ router.get('/compare', [
 
       const shotStats = shotStatsResult.rows[0];
 
-      const team = teamsResult.rows.find(t => t.id === teamId);
+      const club = clubsResult.rows.find(t => t.id === teamId);
 
       return {
+        club_id: teamId,
+        club_name: club.name,
         team_id: teamId,
-        team_name: team.name,
+        team_name: club.name,
         games_played: gamesPlayed,
         wins,
         losses,
@@ -534,8 +441,8 @@ router.get('/compare', [
 /**
  * Calculate rankings for all teams
  */
-async function calculateTeamRankings(seasonId = null) {
-  // Get all teams with completed games
+async function calculateTeamRankings(seasonId = null, limit = 20) {
+  // Get all clubs with completed games
   let gameFilter = 'g.status = \'completed\'';
   const params = [];
 
@@ -544,16 +451,16 @@ async function calculateTeamRankings(seasonId = null) {
     params.push(seasonId);
   }
 
-  const teamsResult = await db.query(`
-    SELECT DISTINCT team_id FROM (
-      SELECT home_team_id as team_id FROM games g WHERE ${gameFilter}
+  const clubsResult = await db.query(`
+    SELECT DISTINCT club_id FROM (
+      SELECT home_club_id as club_id FROM games g WHERE ${gameFilter}
       UNION
-      SELECT away_team_id as team_id FROM games g WHERE ${gameFilter}
-    ) teams
+      SELECT away_club_id as club_id FROM games g WHERE ${gameFilter}
+    ) clubs
   `, params);
 
-  const rankings = await Promise.all(teamsResult.rows.map(async ({ team_id }) => {
-    return await calculateTeamRanking(team_id, seasonId);
+  const rankings = await Promise.all(clubsResult.rows.map(async ({ club_id }) => {
+    return await calculateTeamRanking(Number(club_id), seasonId);
   }));
 
   // Sort by rating and assign ranks
@@ -562,58 +469,25 @@ async function calculateTeamRankings(seasonId = null) {
     r.overall_rank = i + 1;
   });
 
-  // Save rankings to database
-  for (const ranking of rankings) {
-    await db.query(`
-      INSERT INTO team_rankings 
-        (team_id, season_id, overall_rank, points, rating, games_played, wins, losses, draws,
-         goals_for, goals_against, avg_goals_per_game, avg_goals_conceded, 
-         clean_sheets, longest_win_streak, current_streak, last_updated)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP)
-      ON CONFLICT (team_id, season_id) 
-      DO UPDATE SET
-        overall_rank = EXCLUDED.overall_rank,
-        points = EXCLUDED.points,
-        rating = EXCLUDED.rating,
-        games_played = EXCLUDED.games_played,
-        wins = EXCLUDED.wins,
-        losses = EXCLUDED.losses,
-        draws = EXCLUDED.draws,
-        goals_for = EXCLUDED.goals_for,
-        goals_against = EXCLUDED.goals_against,
-        avg_goals_per_game = EXCLUDED.avg_goals_per_game,
-        avg_goals_conceded = EXCLUDED.avg_goals_conceded,
-        clean_sheets = EXCLUDED.clean_sheets,
-        longest_win_streak = EXCLUDED.longest_win_streak,
-        current_streak = EXCLUDED.current_streak,
-        last_updated = CURRENT_TIMESTAMP
-    `, [
-      ranking.team_id, seasonId || null, ranking.overall_rank, ranking.points, 
-      ranking.rating, ranking.games_played, ranking.wins, ranking.losses, ranking.draws,
-      ranking.goals_for, ranking.goals_against, ranking.avg_goals_per_game, 
-      ranking.avg_goals_conceded, ranking.clean_sheets, ranking.longest_win_streak,
-      ranking.current_streak
-    ]);
-  }
-
-  return rankings;
+  return rankings.slice(0, limit);
 }
 
 /**
  * Calculate ranking for a single team
  */
-async function calculateTeamRanking(teamId, seasonId = null) {
-  let gameFilter = 'g.status = \'completed\' AND (g.home_team_id = $1 OR g.away_team_id = $1)';
-  const params = [teamId];
+async function calculateTeamRanking(clubId, seasonId = null) {
+  const clubIdNumber = Number(clubId);
+  let gameFilter = 'g.status = \'completed\' AND (g.home_club_id = $1 OR g.away_club_id = $1)';
+  const params = [clubIdNumber];
 
   if (seasonId) {
     gameFilter += ' AND g.season_id = $2';
     params.push(seasonId);
   }
 
-  // Get team info
-  const teamResult = await db.query('SELECT id, name FROM teams WHERE id = $1', [teamId]);
-  if (teamResult.rows.length === 0) {
+  // Get club info
+  const clubResult = await db.query('SELECT id, name FROM clubs WHERE id = $1', [clubIdNumber]);
+  if (clubResult.rows.length === 0) {
     return null;
   }
 
@@ -622,19 +496,19 @@ async function calculateTeamRanking(teamId, seasonId = null) {
     SELECT
       COUNT(*) as games_played,
       COUNT(CASE 
-        WHEN (g.home_team_id = $1 AND g.home_score > g.away_score)
-          OR (g.away_team_id = $1 AND g.away_score > g.home_score) THEN 1 
+        WHEN (g.home_club_id = $1 AND g.home_score > g.away_score)
+          OR (g.away_club_id = $1 AND g.away_score > g.home_score) THEN 1 
       END) as wins,
       COUNT(CASE 
-        WHEN (g.home_team_id = $1 AND g.home_score < g.away_score)
-          OR (g.away_team_id = $1 AND g.away_score < g.home_score) THEN 1 
+        WHEN (g.home_club_id = $1 AND g.home_score < g.away_score)
+          OR (g.away_club_id = $1 AND g.away_score < g.home_score) THEN 1 
       END) as losses,
       COUNT(CASE WHEN g.home_score = g.away_score THEN 1 END) as draws,
-      SUM(CASE WHEN g.home_team_id = $1 THEN g.home_score ELSE g.away_score END) as goals_for,
-      SUM(CASE WHEN g.home_team_id = $1 THEN g.away_score ELSE g.home_score END) as goals_against,
+      SUM(CASE WHEN g.home_club_id = $1 THEN g.home_score ELSE g.away_score END) as goals_for,
+      SUM(CASE WHEN g.home_club_id = $1 THEN g.away_score ELSE g.home_score END) as goals_against,
       COUNT(CASE 
-        WHEN (g.home_team_id = $1 AND g.away_score = 0)
-          OR (g.away_team_id = $1 AND g.home_score = 0) THEN 1 
+        WHEN (g.home_club_id = $1 AND g.away_score = 0)
+          OR (g.away_club_id = $1 AND g.home_score = 0) THEN 1 
       END) as clean_sheets
     FROM games g
     WHERE ${gameFilter}
@@ -649,8 +523,8 @@ async function calculateTeamRanking(teamId, seasonId = null) {
   const goalsAgainst = parseInt(stats.goals_against) || 0;
   const cleanSheets = parseInt(stats.clean_sheets) || 0;
 
-  // Calculate points using standard football/korfball scoring (3 for win, 1 for draw)
-  const points = (wins * 3) + draws;
+  // Calculate points using korfball scoring (2 for win, 1 for draw, 0 for loss)
+  const points = (wins * 2) + draws;
 
   /**
    * Calculate simplified performance rating
@@ -678,10 +552,10 @@ async function calculateTeamRanking(teamId, seasonId = null) {
   const recentGames = await db.query(`
     SELECT 
       CASE 
-        WHEN (g.home_team_id = $1 AND g.home_score > g.away_score)
-          OR (g.away_team_id = $1 AND g.away_score > g.home_score) THEN 'W'
-        WHEN (g.home_team_id = $1 AND g.home_score < g.away_score)
-          OR (g.away_team_id = $1 AND g.away_score < g.home_score) THEN 'L'
+        WHEN (g.home_club_id = $1 AND g.home_score > g.away_score)
+          OR (g.away_club_id = $1 AND g.away_score > g.home_score) THEN 'W'
+        WHEN (g.home_club_id = $1 AND g.home_score < g.away_score)
+          OR (g.away_club_id = $1 AND g.away_score < g.home_score) THEN 'L'
         ELSE 'D'
       END as result
     FROM games g
@@ -717,8 +591,10 @@ async function calculateTeamRanking(teamId, seasonId = null) {
   }
 
   return {
-    team_id: teamId,
-    team_name: teamResult.rows[0].name,
+    club_id: clubIdNumber,
+    club_name: clubResult.rows[0].name,
+    team_id: clubIdNumber, // alias for backward compatibility
+    team_name: clubResult.rows[0].name,
     season_id: seasonId,
     games_played: gamesPlayed,
     wins,

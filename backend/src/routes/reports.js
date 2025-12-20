@@ -275,8 +275,8 @@ router.post('/generate', [
     } else if (report_type === 'player' && player_id) {
       // Fetch player report data
       reportData = await generatePlayerReport(player_id, date_range, template, req.user);
-    } else if (report_type === 'club' && club_id) {
-      // Fetch club report data
+    } else if (report_type === 'team' && club_id) {
+      // Fetch team/club report data
       reportData = await generateTeamReport(club_id, date_range, template, req.user);
     } else if (report_type === 'season') {
       // Fetch season report data
@@ -284,6 +284,7 @@ router.post('/generate', [
     }
 
     // Create report export record
+    // Note: team_id is always NULL as we're using club-centric reporting
     const reportExport = await db.query(`
       INSERT INTO report_exports (
         template_id, generated_by, report_name, report_type, format,
@@ -297,7 +298,7 @@ router.post('/generate', [
       report_type,
       format,
       game_id || null,
-      club_id || null,
+      null,
       player_id || null,
       date_range ? JSON.stringify(date_range) : null,
       shareToken,

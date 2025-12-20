@@ -11,7 +11,7 @@ router.use(auth);
 /**
  * Get all events for a game with optional filtering
  * GET /api/events/:gameId
- * Query params: event_type, team_id, player_id, period
+ * Query params: event_type, club_id, player_id, period
  */
 router.get('/:gameId', [
   query('event_type')
@@ -97,7 +97,7 @@ router.get('/:gameId', [
 /**
  * Create a new game event
  * POST /api/events/:gameId
- * Body: { event_type, player_id?, team_id, period, time_remaining?, details? }
+ * Body: { event_type, player_id?, club_id, period, time_remaining?, details? }
  */
 router.post('/:gameId', [
   requireRole(['admin', 'coach']),
@@ -157,7 +157,7 @@ router.post('/:gameId', [
     // Verify club is participating in the game
     if (club_id !== game.home_club_id && club_id !== game.away_club_id) {
       return res.status(400).json({ 
-        error: 'Club is not participating in this game',
+        error: 'Team is not participating in this game',
         gameClubs: { home: game.home_club_id, away: game.away_club_id },
         providedClub: club_id
       });
@@ -176,7 +176,7 @@ router.post('/:gameId', [
 
       if (playerResult.rows[0].club_id !== club_id) {
         return res.status(400).json({ 
-          error: 'Player does not belong to the specified club',
+          error: 'Player does not belong to the specified team',
           playerClub: playerResult.rows[0].club_id,
           providedClub: club_id
         });
@@ -241,7 +241,7 @@ router.post('/:gameId', [
 /**
  * Update an event
  * PUT /api/events/:gameId/:eventId
- * Body: { event_type?, player_id?, team_id?, period?, time_remaining?, details? }
+ * Body: { event_type?, player_id?, club_id?, period?, time_remaining?, details? }
  */
 router.put('/:gameId/:eventId', [
   requireRole(['admin', 'coach']),
@@ -254,10 +254,10 @@ router.put('/:gameId/:eventId', [
       'match_commentary'
     ])
     .withMessage('Event type must be one of: foul, substitution, timeout, period_start, period_end, fault_offensive, fault_defensive, fault_out_of_bounds, free_shot, timeout_team, timeout_injury, timeout_official, match_commentary'),
-  body('team_id')
+  body('club_id')
     .optional()
     .isInt({ min: 1 })
-    .withMessage('Team ID must be a positive integer'),
+    .withMessage('Club ID must be a positive integer'),
   body('player_id')
     .optional({ nullable: true })
     .isInt({ min: 1 })
@@ -281,7 +281,7 @@ router.put('/:gameId/:eventId', [
   }
 
   const { gameId, eventId } = req.params;
-  const { event_type, player_id, team_id, period, time_remaining, details } = req.body;
+  const { event_type, player_id, club_id, period, time_remaining, details } = req.body;
 
   try {
     // Verify event exists
@@ -305,9 +305,9 @@ router.put('/:gameId/:eventId', [
       paramIndex++;
     }
 
-    if (team_id !== undefined) {
-      updates.push(`team_id = $${paramIndex}`);
-      params.push(team_id);
+    if (club_id !== undefined) {
+      updates.push(`club_id = $${paramIndex}`);
+      params.push(club_id);
       paramIndex++;
     }
 
@@ -356,9 +356,9 @@ router.put('/:gameId/:eventId', [
         p.first_name,
         p.last_name,
         p.jersey_number,
-        t.name as team_name
+        c.name as club_name
       FROM game_events e
-      JOIN teams t ON e.team_id = t.id
+      JOIN clubs c ON e.club_id = c.id
       LEFT JOIN players p ON e.player_id = p.id
       WHERE e.id = $1
     `, [eventId]);
@@ -433,18 +433,18 @@ router.get('/comprehensive/:gameId', [
         ge.id,
         ge.game_id,
         ge.event_type as type,
-        ge.team_id,
+        ge.club_id,
         ge.player_id,
         ge.period,
         ge.time_remaining,
         ge.details,
         ge.created_at,
-        t.name as team_name,
+          c.name as club_name,
         p.first_name,
         p.last_name,
         p.jersey_number
       FROM game_events ge
-      JOIN teams t ON ge.team_id = t.id
+        JOIN clubs c ON ge.club_id = c.id
       LEFT JOIN players p ON ge.player_id = p.id
       WHERE ge.game_id = $1
     `;
@@ -474,7 +474,7 @@ router.get('/comprehensive/:gameId', [
           fs.id,
           fs.game_id,
           CONCAT('free_shot_', fs.free_shot_type) as type,
-          fs.team_id,
+          fs.club_id,
           fs.player_id,
           fs.period,
           fs.time_remaining,
@@ -486,12 +486,12 @@ router.get('/comprehensive/:gameId', [
             'distance', fs.distance
           ) as details,
           fs.created_at,
-          t.name as team_name,
+          c.name as club_name,
           p.first_name,
           p.last_name,
           p.jersey_number
         FROM free_shots fs
-        JOIN teams t ON fs.team_id = t.id
+        JOIN clubs c ON fs.club_id = c.id
         JOIN players p ON fs.player_id = p.id
         WHERE fs.game_id = $1
       `;
@@ -522,7 +522,7 @@ router.get('/comprehensive/:gameId', [
           t.id,
           t.game_id,
           CONCAT('timeout_', t.timeout_type) as type,
-          t.team_id,
+          t.club_id,
           NULL as player_id,
           t.period,
           t.time_remaining,
@@ -533,12 +533,12 @@ router.get('/comprehensive/:gameId', [
             'ended_at', t.ended_at
           ) as details,
           t.created_at,
-          teams.name as team_name,
+          c.name as club_name,
           NULL as first_name,
           NULL as last_name,
           NULL as jersey_number
         FROM timeouts t
-        LEFT JOIN teams ON t.team_id = teams.id
+        LEFT JOIN clubs c ON t.club_id = c.id
         WHERE t.game_id = $1
       `;
       let toParams = [gameId];
@@ -568,7 +568,7 @@ router.get('/comprehensive/:gameId', [
           mc.id,
           mc.game_id,
           CONCAT('commentary_', mc.commentary_type) as type,
-          NULL as team_id,
+          NULL as club_id,
           NULL as player_id,
           mc.period,
           mc.time_remaining,
@@ -578,7 +578,7 @@ router.get('/comprehensive/:gameId', [
             'created_by', mc.created_by
           ) as details,
           mc.created_at,
-          NULL as team_name,
+          NULL as club_name,
           NULL as first_name,
           NULL as last_name,
           NULL as jersey_number

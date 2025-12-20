@@ -372,12 +372,13 @@ router.post('/:gameId/next-period', [
     );
 
     // Create a period_end event for the previous period
+    const homeClubId = game.home_club_id || game.home_team_id; // legacy fallback
     await db.query(
-      `INSERT INTO game_events (game_id, event_type, team_id, period, details)
+      `INSERT INTO game_events (game_id, event_type, club_id, period, details)
        VALUES ($1, 'period_end', $2, $3, $4)`,
       [
         gameId,
-        game.home_team_id,
+        homeClubId,
         game.current_period,
         JSON.stringify({ period_number: game.current_period })
       ]
@@ -385,11 +386,11 @@ router.post('/:gameId/next-period', [
 
     // Create a period_start event for the new period
     await db.query(
-      `INSERT INTO game_events (game_id, event_type, team_id, period, details)
+      `INSERT INTO game_events (game_id, event_type, club_id, period, details)
        VALUES ($1, 'period_start', $2, $3, $4)`,
       [
         gameId,
-        game.home_team_id,
+        homeClubId,
         result.rows[0].current_period,
         JSON.stringify({ period_number: result.rows[0].current_period })
       ]

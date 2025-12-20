@@ -15,11 +15,10 @@ describe('👤 Player Routes', () => {
   let testClubId;
   let testTeamId;
   let authToken;
+  let testCoachId;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Player Routes tests...');
-    // Generate test auth token with coach role
-    authToken = generateTestToken('coach');
 
     try {
       // Clear all tables first to ensure clean state
@@ -31,7 +30,22 @@ describe('👤 Player Routes', () => {
       await db.query('DELETE FROM games');
       await db.query('DELETE FROM players');
       await db.query('DELETE FROM teams');
+      await db.query('DELETE FROM trainer_assignments');
       await db.query('DELETE FROM clubs');
+      await db.query('DELETE FROM users WHERE username = $1', ['testuser']);
+
+      // Create test coach user (matches token userId: 1)
+      const userRes = await db.query(
+        `INSERT INTO users (id, username, email, password_hash, role) 
+         VALUES ($1, $2, $3, $4, $5) 
+         ON CONFLICT (id) DO UPDATE SET username = $2, email = $3, role = $5
+         RETURNING id`,
+        [1, 'testuser', 'testuser@test.com', 'hash', 'coach']
+      );
+      testCoachId = userRes.rows[0].id;
+
+      // Generate test auth token with coach role (userId: 1)
+      authToken = generateTestToken('coach');
 
       // Create a test club to use for player tests
       const uniqueClubName = generateUniqueClubName('TestClubPlayers');
@@ -47,6 +61,13 @@ describe('👤 Player Routes', () => {
         [testClubId, 'U17 Team', 'U17']
       );
       testTeamId = teamRes.rows[0].id;
+
+      // Create trainer assignment for the coach to access this club/team
+      await db.query(
+        `INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active, active_from)
+         VALUES ($1, $2, $3, true, CURRENT_DATE)`,
+        [testCoachId, testClubId, testTeamId]
+      );
     } catch (error) {
       global.testContext.logTestError(error, 'Player Routes setup failed');
       throw error;
@@ -68,8 +89,10 @@ describe('👤 Player Routes', () => {
     try {
       // Clean up test data in correct order
       await db.query('DELETE FROM players WHERE club_id = $1', [testClubId]);
+      await db.query('DELETE FROM trainer_assignments WHERE user_id = $1', [testCoachId]);
       await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
       await db.query('DELETE FROM clubs WHERE id = $1', [testClubId]);
+      await db.query('DELETE FROM users WHERE id = $1', [testCoachId]);
     } catch (error) {
       console.error('⚠️ Player Routes cleanup failed:', error.message);
     }
