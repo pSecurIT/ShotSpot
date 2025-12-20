@@ -290,6 +290,30 @@ jobs:
           fi
           echo "App.xcworkspace successfully generated."
 
+      - name: Debug Pod Install
+        working-directory: frontend/ios/App
+        run: |
+          set -euo pipefail
+          echo "Checking Podfile..."
+          if [ ! -f Podfile ]; then
+              echo "::error::Podfile not found. Cannot run pod install."
+              exit 1
+          fi
+          echo "Podfile contents:" && cat Podfile
+
+          echo "Running pod install..."
+          pod install --verbose || {
+              echo "::error::pod install failed. Check the Podfile and CocoaPods setup."
+              exit 1
+          }
+
+          echo "Verifying App.xcworkspace..."
+          if [ ! -f App.xcworkspace ]; then
+              echo "::error::App.xcworkspace not found after pod install."
+              exit 1
+          fi
+          echo "App.xcworkspace successfully generated."
+
       - name: Build iOS Debug App
         working-directory: frontend/ios
         run: |
