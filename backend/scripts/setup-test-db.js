@@ -95,53 +95,50 @@ async function setupTestDb() {
       database: dbName
     });
 
-    // Read and execute schema
-    const schema = fs.readFileSync(join(__dirname, '../src/schema.sql'), 'utf8');
-    await testPool.query(schema);
+    const migrationsDir = join(__dirname, '../src/migrations');
+    const baselineDir = join(migrationsDir, 'baseline');
+    const baselineFile = join(baselineDir, 'v0.1.0.sql');
+    const baselineManifest = join(baselineDir, 'manifest.json');
 
-    // Apply all migrations in order
-    const migrations = [
-      'add_player_gender.sql',
-      'add_timer_fields.sql', 
-      'add_game_rosters.sql',
-      'add_substitutions.sql',
-      'add_possession_tracking.sql',
-      'add_enhanced_events.sql',
-      'add_match_configuration_columns.sql',
-      'add_attacking_side.sql',
-      'add_starting_position.sql',
-      'add_achievements_system.sql',
-      'add_advanced_analytics.sql',
-      'add_password_must_change.sql',
-      'add_user_activity_tracking.sql',
-      'add_login_history.sql',
-      'add_export_configuration.sql',
-      'seed_default_report_templates.sql',
-      'add_seasons.sql',
-      'seed_achievements.sql',
-      'add_competition_management.sql',
-      'add_match_templates.sql',
-      'add_twizzit_integration.sql',
-      'rename_teams_to_clubs_add_age_group_teams.sql',
-      'add_club_jersey_number_constraint.sql',
-      'update_timeouts_club_id.sql',
-      '20251214_update_ball_possessions_team_to_club.sql',
-      '20251214_update_game_rosters_team_to_club.sql',
-      '20251214_update_games_team_to_club.sql',
-      '20251214_update_players_team_to_club.sql',
-      '20251214_update_substitutions_team_to_club.sql',
-      '20251214_add_seasons_and_series.sql',
-      '20251216_add_trainer_assignments.sql',
-      '20251217_add_player_team_link.sql',
-      '20251218_add_game_team_links.sql',
-      '20251219_add_twizzit_player_registration.sql',
-      '20251220_add_game_competition_link.sql',
-      '20251221_drop_matches_add_series_to_competitions.sql',
-      '20251222_fix_games_status_constraint.sql'
-    ];
+    const baselineIncluded = new Set(
+      fs.existsSync(baselineManifest)
+        ? JSON.parse(fs.readFileSync(baselineManifest, 'utf8'))
+        : []
+    );
 
-    for (const migrationFile of migrations) {
-      const migrationPath = join(__dirname, '../src/migrations', migrationFile);
+    const numericPrefix = /^\d/;
+    const migrationSorter = (a, b) => {
+      const aIsNumeric = numericPrefix.test(a);
+      const bIsNumeric = numericPrefix.test(b);
+      if (aIsNumeric !== bIsNumeric) {
+        return aIsNumeric ? 1 : -1;
+      }
+      return a.localeCompare(b);
+    };
+
+    const allMigrations = fs.readdirSync(migrationsDir)
+      .filter(f => f.endsWith('.sql'))
+      .filter(f => f !== 'baseline')
+      .sort(migrationSorter);
+
+    const hasBaseline = fs.existsSync(baselineFile) && fs.statSync(baselineFile).size > 0;
+
+    if (hasBaseline) {
+      console.log('Applying baseline v0.1.0 to test DB...');
+      const baseline = fs.readFileSync(baselineFile, 'utf8');
+      await testPool.query(baseline);
+    } else {
+      console.log('Baseline missing or empty; applying schema.sql to test DB...');
+      const schema = fs.readFileSync(join(__dirname, '../src/schema.sql'), 'utf8');
+      await testPool.query(schema);
+    }
+
+    const postBaselineMigrations = hasBaseline
+      ? allMigrations.filter(m => !baselineIncluded.has(m))
+      : allMigrations;
+
+    for (const migrationFile of postBaselineMigrations) {
+      const migrationPath = join(migrationsDir, migrationFile);
       if (fs.existsSync(migrationPath)) {
         try {
           const migration = fs.readFileSync(migrationPath, 'utf8');
@@ -149,7 +146,6 @@ async function setupTestDb() {
           console.log(`Applied migration: ${migrationFile}`);
         } catch (err) {
           console.warn(`Warning: Migration ${migrationFile} failed:`, err.message);
-          // Continue with other migrations - some may have already been applied
         }
       } else {
         console.warn(`Migration file not found: ${migrationFile}`);
