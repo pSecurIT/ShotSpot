@@ -1,10 +1,10 @@
 import dotenv from 'dotenv';
-import { exec } from 'child_process';
-import { promises as fs } from 'fs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { promisify } from 'util';
+import { exec } from 'node:child_process';
+import { promises as fs } from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
+import { promisify } from 'node:util';
 import { runMigrations } from './lib/run-migrations.js';
 
 // Set up proper paths for environment files
