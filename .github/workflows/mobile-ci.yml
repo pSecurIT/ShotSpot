@@ -106,7 +106,7 @@ jobs:
         run: ./gradlew assembleDebug
 
       - name: Upload Android APK
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: android-debug-apk
           path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
@@ -118,7 +118,7 @@ jobs:
 
       - name: Upload Lint Results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: android-lint-results
           path: frontend/android/app/build/reports/lint-results-debug.html
@@ -226,7 +226,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO
 
       - name: Archive build artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ios-build
           path: frontend/ios/App/build
@@ -276,7 +276,7 @@ jobs:
     
     steps:
       - name: Download Android APK
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: android-debug-apk
 
