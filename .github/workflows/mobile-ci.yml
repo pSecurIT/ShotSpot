@@ -301,7 +301,13 @@ jobs:
           fi
           echo "Podfile contents:" && cat Podfile
 
-          echo "Running pod install..."
+          echo "Updating CocoaPods repo..."
+          pod repo update || {
+              echo "::error::Failed to update CocoaPods repo. Check network connectivity or CocoaPods setup."
+              exit 1
+          }
+
+          echo "Running pod install with verbose logging..."
           pod install --verbose || {
               echo "::error::pod install failed. Check the Podfile and CocoaPods setup."
               exit 1
