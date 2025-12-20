@@ -10,7 +10,7 @@ import AchievementBadge from './AchievementBadge';
 import Leaderboard from './Leaderboard';
 import AchievementNotification from './AchievementNotification';
 import InteractiveShotChart from './InteractiveShotChart';
-import PlayerComparisonRadar from './PlayerComparisonRadar';
+const PlayerComparisonRadar = React.lazy(() => import('./PlayerComparisonRadar'));
 import PossessionFlowDiagram from './PossessionFlowDiagram';
 import { Achievement, LeaderboardPlayer } from '../types/achievements';
 import api from '../utils/api';
@@ -1961,13 +1961,15 @@ const ShotAnalytics: React.FC = () => {
 
     return (
       <div className="analytics-view">
-        <PlayerComparisonRadar
-          players={comparisonPlayers}
-          availablePlayers={playerStats}
-          onPlayerSelect={handlePlayerSelect}
-          onPlayerRemove={handlePlayerRemove}
-          maxPlayers={4}
-        />
+        <React.Suspense fallback={<div>Loading player comparison…</div>}>
+          <PlayerComparisonRadar
+            players={comparisonPlayers}
+            availablePlayers={playerStats}
+            onPlayerSelect={handlePlayerSelect}
+            onPlayerRemove={handlePlayerRemove}
+            maxPlayers={4}
+          />
+        </React.Suspense>
       </div>
     );
   };
