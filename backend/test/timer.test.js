@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 describe('⏱️ Timer API', () => {
   let adminToken, coachToken, userToken;
   let adminUser, coachUser, regularUser;
-  let team1, team2, game;
+  let club1, club2, game;
 
   beforeAll(async () => {
     try {
@@ -38,22 +38,22 @@ describe('⏱️ Timer API', () => {
       coachToken = jwt.sign({ id: coachUser.id, role: coachUser.role }, jwtSecret, { expiresIn: '1h' });
       userToken = jwt.sign({ id: regularUser.id, role: regularUser.role }, jwtSecret, { expiresIn: '1h' });
 
-      // Create teams with unique names
-      const team1Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-        [`Test Team Timer 1 ${uniqueId}`]
+      // Create clubs with unique names
+      const club1Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+        [`Test Club Timer 1 ${uniqueId}`]
       );
-      team1 = team1Result.rows[0];
+      club1 = club1Result.rows[0];
 
-      const team2Result = await db.query(
-        'INSERT INTO teams (name) VALUES ($1) RETURNING *',
-        [`Test Team Timer 2 ${uniqueId}`]
+      const club2Result = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+        [`Test Club Timer 2 ${uniqueId}`]
       );
-      team2 = team2Result.rows[0];
+      club2 = club2Result.rows[0];
 
       // Create an in_progress game
       const gameResult = await db.query(
-        'INSERT INTO games (home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
+        'INSERT INTO games (home_club_id, away_club_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
         [club1.id, club2.id, new Date(), 'in_progress']
       );
       game = gameResult.rows[0];
@@ -74,9 +74,9 @@ describe('⏱️ Timer API', () => {
         await db.query('DELETE FROM games WHERE id = $1', [game.id]);
       }
 
-      const teamIds = [team1?.id, team2?.id].filter(Boolean);
-      if (teamIds.length > 0) {
-        await db.query('DELETE FROM teams WHERE id = ANY($1::int[])', [teamIds]);
+      const clubIds = [club1?.id, club2?.id].filter(Boolean);
+      if (clubIds.length > 0) {
+        await db.query('DELETE FROM clubs WHERE id = ANY($1::int[])', [clubIds]);
       }
 
       const userIds = [adminUser?.id, coachUser?.id, regularUser?.id].filter(Boolean);
@@ -230,7 +230,7 @@ describe('⏱️ Timer API', () => {
       try {
         // Create a scheduled game
         const scheduledGame = await db.query(
-          'INSERT INTO games (home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
+          'INSERT INTO games (home_club_id, away_club_id, date, status) VALUES ($1, $2, $3, $4) RETURNING *',
           [club1.id, club2.id, new Date(), 'scheduled']
         );
 

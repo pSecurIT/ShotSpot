@@ -165,6 +165,20 @@ router.delete('/:id', [
       });
     }
 
+    // Check if club still has teams
+    const teamsCheck = await db.query(
+      'SELECT id FROM teams WHERE club_id = $1 LIMIT 1',
+      [id]
+    );
+
+    if (teamsCheck.rows.length > 0) {
+      await db.query('ROLLBACK');
+      return res.status(409).json({ 
+        error: 'Cannot delete club with teams',
+        details: 'Club has dependent teams. Remove teams first.'
+      });
+    }
+
     // Delete club (cascade will handle teams and players)
     const result = await db.query('DELETE FROM clubs WHERE id = $1 RETURNING *', [id]);
     

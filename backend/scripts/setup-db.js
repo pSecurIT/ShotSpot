@@ -234,7 +234,15 @@ async function main() {
       '../src/migrations/20251214_update_game_rosters_team_to_club.sql',
       '../src/migrations/20251214_update_games_team_to_club.sql',
       '../src/migrations/20251214_update_players_team_to_club.sql',
-      '../src/migrations/20251214_update_substitutions_team_to_club.sql'
+      '../src/migrations/20251214_update_substitutions_team_to_club.sql',
+      '../src/migrations/20251214_add_seasons_and_series.sql',
+      '../src/migrations/20251216_add_trainer_assignments.sql',
+      '../src/migrations/20251217_add_player_team_link.sql',
+      '../src/migrations/20251218_add_game_team_links.sql',
+      '../src/migrations/20251219_add_twizzit_player_registration.sql',
+      '../src/migrations/20251220_add_game_competition_link.sql',
+      '../src/migrations/20251221_drop_matches_add_series_to_competitions.sql',
+      '../src/migrations/20251222_fix_games_status_constraint.sql'
     ];
 
     console.log('Applying database migrations...');

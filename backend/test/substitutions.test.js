@@ -429,7 +429,7 @@ describe('🔄 Substitutions API', () => {
           });
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toContain('belong to the specified team');
+        expect(response.body.error).toContain('specified club');
         console.log('      ✅ Cross-team substitution correctly rejected');
       } catch (error) {
         console.log('      ❌ Cross-team validation test failed:', error.message);
@@ -494,17 +494,17 @@ describe('🔄 Substitutions API', () => {
     beforeEach(async () => {
       // Create test substitutions
       await db.query(
-        `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, time_remaining, reason)
+        `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, time_remaining, reason)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [testGame.id, homeTeam.id, homePlayer3.id, homePlayer1.id, 1, '00:05:00', 'tactical']
       );
       await db.query(
-        `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, time_remaining, reason)
+        `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, time_remaining, reason)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [testGame.id, homeTeam.id, homePlayer4.id, homePlayer2.id, 2, '00:03:00', 'fatigue']
       );
       await db.query(
-        `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, time_remaining, reason)
+        `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, time_remaining, reason)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [testGame.id, awayTeam.id, awayPlayer2.id, awayPlayer1.id, 1, '00:04:00', 'injury']
       );
@@ -536,12 +536,12 @@ describe('🔄 Substitutions API', () => {
     test('✅ should filter substitutions by team', async () => {
       try {
         const response = await request(app)
-          .get(`/api/substitutions/${testGame.id}?team_id=${homeTeam.id}`)
+          .get(`/api/substitutions/${testGame.id}?club_id=${homeTeam.id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
         expect(response.status).toBe(200);
         expect(response.body).toHaveLength(2);
-        expect(response.body.every(sub => sub.team_id === homeTeam.id)).toBe(true);
+        expect(response.body.every(sub => sub.club_id === homeTeam.id)).toBe(true);
         console.log('      ✅ Team filtering works correctly');
       } catch (error) {
         console.log('      ❌ Team filtering test failed:', error.message);
@@ -641,7 +641,7 @@ describe('🔄 Substitutions API', () => {
       try {
         // Make a substitution
         await db.query(
-          `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, reason)
+          `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, reason)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [testGame.id, homeTeam.id, homePlayer3.id, homePlayer1.id, 1, 'tactical']
         );
@@ -671,14 +671,14 @@ describe('🔄 Substitutions API', () => {
       try {
         // Sub 1: homePlayer1 out, homePlayer3 in
         await db.query(
-          `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, reason)
+          `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, reason)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [testGame.id, homeTeam.id, homePlayer3.id, homePlayer1.id, 1, 'tactical']
         );
 
         // Sub 2: homePlayer3 out, homePlayer1 in (bringing player back)
         await db.query(
-          `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, reason)
+          `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, reason)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [testGame.id, homeTeam.id, homePlayer1.id, homePlayer3.id, 2, 'tactical']
         );
@@ -738,7 +738,7 @@ describe('🔄 Substitutions API', () => {
     beforeEach(async () => {
       // Create test substitutions
       const sub1Result = await db.query(
-        `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, reason)
+        `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, reason)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [testGame.id, homeTeam.id, homePlayer3.id, homePlayer1.id, 1, 'tactical']
       );
@@ -748,7 +748,7 @@ describe('🔄 Substitutions API', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       const sub2Result = await db.query(
-        `INSERT INTO substitutions (game_id, team_id, player_in_id, player_out_id, period, reason)
+        `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, reason)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [testGame.id, homeTeam.id, homePlayer4.id, homePlayer2.id, 1, 'fatigue']
       );
@@ -884,7 +884,7 @@ describe('🔄 Substitutions API', () => {
           .post(`/api/substitutions/${testGame.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            team_id: awayTeam.id,
+            club_id: awayTeam.id,
             player_in_id: awayPlayer2.id,
             player_out_id: awayPlayer1.id,
             period: 1,

@@ -61,6 +61,17 @@ describe('🎮 Games API', () => {
         [`Test Club Beta ${uniqueId}`]
       );
       club2 = club2Result.rows[0];
+
+      // Create trainer_assignments for the coach to both clubs
+      // This is required for coach access to games involving these clubs
+      await db.query(
+        'INSERT INTO trainer_assignments (user_id, club_id, is_active) VALUES ($1, $2, true)',
+        [coachUser.id, club1.id]
+      );
+      await db.query(
+        'INSERT INTO trainer_assignments (user_id, club_id, is_active) VALUES ($1, $2, true)',
+        [coachUser.id, club2.id]
+      );
     } catch (error) {
       global.testContext.logTestError(error, 'Games API setup failed');
       throw error;
@@ -72,6 +83,7 @@ describe('🎮 Games API', () => {
     try {
       // Clean up test data
       await db.query('DELETE FROM games WHERE home_club_id IN ($1, $2) OR away_club_id IN ($1, $2)', [club1.id, club2.id]);
+      await db.query('DELETE FROM trainer_assignments WHERE user_id = $1', [coachUser.id]);
       await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [club1.id, club2.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
     } catch (error) {

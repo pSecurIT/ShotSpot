@@ -88,13 +88,13 @@ describe('🎮 Match Events API', () => {
 
       // Create players
       const player1Result = await db.query(
-        'INSERT INTO players (first_name, last_name, team_id, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        'INSERT INTO players (first_name, last_name, club_id, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
         [`Player1_${uniqueId}`, 'LastName1', club1.id, 10]
       );
       player1 = player1Result.rows[0];
 
       const player2Result = await db.query(
-        'INSERT INTO players (first_name, last_name, team_id, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
+        'INSERT INTO players (first_name, last_name, club_id, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
         [`Player2_${uniqueId}`, 'LastName2', club2.id, 20]
       );
       player2 = player2Result.rows[0];
@@ -126,7 +126,7 @@ describe('🎮 Match Events API', () => {
       if (player1?.id && player2?.id) {
         await db.query('DELETE FROM players WHERE id = ANY($1)', [[player1.id, player2.id]]);
       }
-      if (team1?.id && team2?.id) {
+      if (club1?.id && club2?.id) {
         await db.query('DELETE FROM clubs WHERE id = ANY($1)', [[club1.id, club2.id]]);
       }
       if (testUsers.length > 0) {
@@ -151,7 +151,7 @@ describe('🎮 Match Events API', () => {
         try {
           // Create test shot
           await db.query(
-            `INSERT INTO shots (game_id, player_id, team_id, x_coord, y_coord, result, period, time_remaining) 
+            `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, time_remaining) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [game.id, player1.id, club1.id, 10.5, 15.2, 'goal', 1, '00:10:30']
           );
@@ -376,7 +376,7 @@ describe('🎮 Match Events API', () => {
           // Create a finished game
           const finishedGameResult = await db.query(
             'INSERT INTO games (home_club_id, away_club_id, status, date) VALUES ($1, $2, $3, $4) RETURNING *',
-            [club1.id, club2.id, 'finished', new Date()]
+            [club1.id, club2.id, 'completed', new Date()]
           );
 
           const shotData = {
@@ -455,7 +455,7 @@ describe('🎮 Match Events API', () => {
         try {
           // Create test event
           await db.query(
-            `INSERT INTO game_events (game_id, event_type, team_id, player_id, period, time_remaining, details) 
+            `INSERT INTO game_events (game_id, event_type, club_id, player_id, period, time_remaining, details) 
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [game.id, 'foul', club1.id, player1.id, 1, '00:12:45', { reason: 'offensive_foul' }]
           );
@@ -485,7 +485,7 @@ describe('🎮 Match Events API', () => {
         try {
           // Create team-level event (no player)
           await db.query(
-            `INSERT INTO game_events (game_id, event_type, team_id, period, time_remaining) 
+            `INSERT INTO game_events (game_id, event_type, club_id, period, time_remaining) 
              VALUES ($1, $2, $3, $4, $5)`,
             [game.id, 'timeout', club1.id, 2, '00:05:15']
           );

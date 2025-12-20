@@ -2,8 +2,15 @@ import express from 'express';
 import { body, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
+import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
 const router = express.Router();
+
+const coachHasGameAccess = async (userId, homeClubId, awayClubId) => {
+  const homeAccess = homeClubId ? await hasTrainerAccess(userId, { clubId: homeClubId }) : false;
+  const awayAccess = awayClubId ? await hasTrainerAccess(userId, { clubId: awayClubId }) : false;
+  return homeAccess || awayAccess;
+};
 
 // Apply authentication middleware to all routes
 router.use(auth);
@@ -184,6 +191,13 @@ router.post('/', [
       return res.status(404).json({ error: 'One or both clubs not found' });
     }
 
+    if (req.user.role === 'coach') {
+      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for one of the clubs in this game' });
+      }
+    }
+
     // If team IDs provided, verify they exist and belong to the correct clubs
     if (home_team_id) {
       const homeTeamCheck = await db.query(
@@ -285,6 +299,38 @@ router.put('/:id', [
       return res.status(404).json({ error: 'Game not found' });
     }
 
+    if (req.user.role === 'coach') {
+      const { home_club_id, away_club_id } = gameCheck.rows[0];
+      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this game' });
+      }
+    }
+
+    if (req.user.role === 'coach') {
+      const { home_club_id, away_club_id } = gameCheck.rows[0];
+      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this game' });
+      }
+    }
+
+    if (req.user.role === 'coach') {
+      const { home_club_id, away_club_id } = gameCheck.rows[0];
+      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this game' });
+      }
+    }
+
+    if (req.user.role === 'coach') {
+      const { home_club_id, away_club_id } = gameCheck.rows[0];
+      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this game' });
+      }
+    }
+
     // Build update query dynamically
     const updates = [];
     const params = [];
@@ -355,8 +401,8 @@ router.put('/:id', [
         ht.name as home_team_name,
         at.name as away_team_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.id = $1
     `, [id]);
 
@@ -379,6 +425,22 @@ router.post('/:id/start', [
     const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [id]);
     if (gameCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Game not found' });
+    }
+
+    if (req.user.role === 'coach') {
+      const { home_club_id, away_club_id } = gameCheck.rows[0];
+      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this game' });
+      }
+    }
+
+    if (req.user.role === 'coach') {
+      const { home_club_id, away_club_id } = gameCheck.rows[0];
+      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this game' });
+      }
     }
 
     const game = gameCheck.rows[0];
@@ -408,8 +470,8 @@ router.post('/:id/start', [
         ht.name as home_team_name,
         at.name as away_team_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.id = $1
     `, [id]);
 
@@ -457,8 +519,8 @@ router.post('/:id/end', [
         ht.name as home_team_name,
         at.name as away_team_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.id = $1
     `, [id]);
 
@@ -506,8 +568,8 @@ router.post('/:id/cancel', [
         ht.name as home_team_name,
         at.name as away_team_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.id = $1
     `, [id]);
 
@@ -584,8 +646,8 @@ router.post('/:id/reschedule', [
         ht.name as home_team_name,
         at.name as away_team_name
       FROM games g
-      JOIN teams ht ON g.home_team_id = ht.id
-      JOIN teams at ON g.away_team_id = at.id
+      LEFT JOIN teams ht ON g.home_team_id = ht.id
+      LEFT JOIN teams at ON g.away_team_id = at.id
       WHERE g.id = $1
     `, [id]);
 
@@ -613,7 +675,12 @@ router.delete('/:id', [
   try {
     // First check if game exists
     const gameCheck = await db.query(
-      'SELECT id, status, home_team_name, away_team_name FROM (SELECT g.id, g.status, ht.name as home_team_name, at.name as away_team_name FROM games g JOIN teams ht ON g.home_team_id = ht.id JOIN teams at ON g.away_team_id = at.id WHERE g.id = $1) AS game_info',
+      `SELECT g.id, g.status, g.home_club_id, g.away_club_id,
+              ht.name as home_team_name, at.name as away_team_name
+       FROM games g
+       LEFT JOIN teams ht ON g.home_team_id = ht.id
+       LEFT JOIN teams at ON g.away_team_id = at.id
+       WHERE g.id = $1`,
       [id]
     );
     
@@ -622,6 +689,13 @@ router.delete('/:id', [
     }
 
     const game = gameCheck.rows[0];
+
+    if (req.user.role === 'coach') {
+      const allowed = await coachHasGameAccess(req.user.id, game.home_club_id, game.away_club_id);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Trainer assignment required for this game' });
+      }
+    }
     
     // Log the deletion for audit purposes
     console.log(`Deleting game ${id}: ${game.home_team_name} vs ${game.away_team_name} (Status: ${game.status})`);

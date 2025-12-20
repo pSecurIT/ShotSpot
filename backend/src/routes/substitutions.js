@@ -96,6 +96,18 @@ router.get(
     const { gameId } = req.params;
 
     try {
+      // Fetch game to determine home/away clubs
+      const gameResult = await pool.query(
+        'SELECT id, home_club_id, away_club_id FROM games WHERE id = $1',
+        [gameId]
+      );
+
+      if (gameResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Game not found' });
+      }
+
+      const game = gameResult.rows[0];
+
       // Get starting lineup from game_rosters
       const rosterResult = await pool.query(
         `SELECT 
@@ -160,9 +172,8 @@ router.get(
           club_name: player.club_name
         };
 
-        // Determine which club (we'll use first player's club as reference)
-        const clubKey = player.club_id === rosterResult.rows[0].club_id ? 'home_club' : 'away_club';
-        
+        const clubKey = player.club_id === game.home_club_id ? 'home_team' : 'away_team';
+
         if (isActive) {
           response[clubKey].active.push(playerData);
         } else {
