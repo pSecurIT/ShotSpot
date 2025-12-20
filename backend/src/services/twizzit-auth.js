@@ -80,6 +80,11 @@ export function decryptPassword(encryptedPassword, ivHex) {
     // Convert IV from hex
     const iv = Buffer.from(ivHex, 'hex');
     
+    // Validate IV length (must be 16 bytes for AES-256-CBC)
+    if (iv.length !== 16) {
+      throw new Error('IV must be exactly 16 bytes (32 hex characters)');
+    }
+    
     // Create decipher
     const decipher = crypto.createDecipheriv(ALGORITHM, encryptionKey, iv);
     
