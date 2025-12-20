@@ -1,3 +1,18 @@
+/**
+ * Test Database Setup Script
+ * 
+ * Purpose: Initialize test database for running test suites
+ * Usage: Automatically run before tests via npm test
+ * 
+ * What it does:
+ * - Creates isolated test database
+ * - Applies schema and migrations via shared migration runner
+ * - Grants permissions to test user
+ * - Ensures trainer_assignments table exists (safety net)
+ * 
+ * Required env vars: DB_USER, DB_PASSWORD, DB_NAME (or uses defaults for testing)
+ */
+
 import pg from 'pg';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
