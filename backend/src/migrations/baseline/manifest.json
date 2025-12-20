@@ -33,7 +33,5 @@
   "add_twizzit_integration.sql",
   "add_user_activity_tracking.sql",
   "rename_teams_to_clubs_add_age_group_teams.sql",
-  "seed_achievements.sql",
-  "seed_default_report_templates.sql",
   "update_timeouts_club_id.sql"
 ]

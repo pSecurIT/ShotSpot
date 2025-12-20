@@ -63,12 +63,14 @@ async function setupTestDb() {
       await adminPool.query(`
         DO $$ 
         BEGIN
-          IF NOT EXISTS (SELECT FROM pg_user WHERE usename = '${dbUser}') THEN
+          IF EXISTS (SELECT FROM pg_user WHERE usename = '${dbUser}') THEN
+            ALTER USER ${dbUser} WITH PASSWORD '${dbPassword}';
+          ELSE
             CREATE USER ${dbUser} WITH PASSWORD '${dbPassword}';
           END IF;
         END $$;
       `);
-      console.log(`Ensured user ${dbUser} exists`);
+      console.log(`Ensured user ${dbUser} exists with correct password`);
     } else {
       console.log('Using admin user for database operations (CI/CD mode)');
     }
