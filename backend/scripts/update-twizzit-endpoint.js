@@ -8,7 +8,9 @@
  * - Updates stored endpoint URL (e.g., if Twizzit changes their API URL)
  * - Validates credential exists and is active
  * 
- * Example: node scripts/update-twizzit-endpoint.js 1 https://app.twizzit.com
+ * Examples:
+ *   node scripts/update-twizzit-endpoint.js 1 https://app.twizzit.com
+ *   node scripts/update-twizzit-endpoint.js 2 https://api.twizzit.be/v1
  */
 
 import dotenv from 'dotenv';

@@ -102,6 +102,7 @@ This directory contains utility scripts for database setup, migrations, testing,
 ### `store-twizzit-credentials.js`
 **Purpose**: Store encrypted Twizzit API credentials in database  
 **Usage**: `npm run twizzit:store-credentials [org] [username] [password] [endpoint]`  
+        or: `node scripts/store-twizzit-credentials.js [org] [username] [password] [endpoint]`  
 **What it does**:
 - Encrypts password using AES-256-CBC
 - Stores credentials in `twizzit_credentials` table
@@ -111,9 +112,12 @@ This directory contains utility scripts for database setup, migrations, testing,
 
 **Interactive mode**: Run without arguments for prompts
 
+**Example**: `npm run twizzit:store-credentials`
+
 ### `test-twizzit-connection.js`
 **Purpose**: Verify Twizzit API connectivity with stored credentials  
 **Usage**: `npm run twizzit:test-connection <credential_id>`  
+        or: `node scripts/test-twizzit-connection.js <credential_id>`  
 **What it does**:
 - Retrieves and decrypts stored credentials
 - Tests authentication endpoint
@@ -125,6 +129,7 @@ This directory contains utility scripts for database setup, migrations, testing,
 ### `diagnose-twizzit.js`
 **Purpose**: Troubleshoot Twizzit API connectivity issues  
 **Usage**: `npm run twizzit:diagnose <credential_id>`  
+        or: `node scripts/diagnose-twizzit.js <credential_id>`  
 **What it does**:
 - Tests base URL connectivity
 - Checks health and auth endpoints
@@ -133,6 +138,8 @@ This directory contains utility scripts for database setup, migrations, testing,
 
 **Use case**: When API connection fails, run this for detailed diagnostics
 
+**Example**: `npm run twizzit:diagnose 1`
+
 ### `update-twizzit-endpoint.js`
 **Purpose**: Update API endpoint URL for existing credentials  
 **Usage**: `node scripts/update-twizzit-endpoint.js <credential_id> <new_endpoint>`  
@@ -140,7 +147,13 @@ This directory contains utility scripts for database setup, migrations, testing,
 - Updates stored endpoint URL (e.g., if Twizzit changes their API URL)
 - Validates credential exists and is active
 
-**Example**: `node scripts/update-twizzit-endpoint.js 1 https://app.twizzit.com`
+**Examples**:
+```bash
+node scripts/update-twizzit-endpoint.js 1 https://app.twizzit.com
+node scripts/update-twizzit-endpoint.js 2 https://api.twizzit.be/v1
+```
+
+**Note**: This script does not have an npm alias. Use the direct node command.
 
 ## Script Maintenance
 
