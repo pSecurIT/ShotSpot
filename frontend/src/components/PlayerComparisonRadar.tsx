@@ -291,7 +291,8 @@ const PlayerComparisonRadar: React.FC<PlayerComparisonRadarProps> = ({
                   borderRadius: '4px',
                   padding: '10px'
                 }}
-                formatter={(value: number) => `${value.toFixed(1)}%`}
+                formatter={(value?: number) =>
+                  typeof value === 'number' ? `${value.toFixed(1)}%` : 'N/A'}
               />
             </RadarChart>
           </ResponsiveContainer>

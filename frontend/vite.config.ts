@@ -10,6 +10,19 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: './index.html',
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('/react/')) return 'react';
+            if (id.includes('/react-dom/')) return 'react';
+            if (id.includes('/react-router-dom/')) return 'react-router';
+            if (id.includes('/recharts/')) return 'charts';
+            if (id.includes('/socket.io-client/')) return 'realtime';
+            if (id.includes('/html2canvas/') || id.includes('/jspdf/')) return 'export';
+            return 'vendor';
+          }
+        }
       }
     },
     outDir: 'dist',
