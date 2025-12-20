@@ -211,14 +211,28 @@ jobs:
         working-directory: frontend/ios/App
         run: |
           set -euo pipefail
-          if [ -f Podfile ]; then
+          PODFILE=Podfile
+          SPM_LOCAL=Package.swift
+          SPM_CAP_ROOT=../CapApp-SPM/Package.swift
+
+          if [ -f "$PODFILE" ]; then
             echo "::notice::Podfile detected — running CocoaPods install"
             pod install
-          elif [ -f Package.swift ]; then
-            echo "::notice::No Podfile; using Swift Package Manager (Capacitor 6 default). Skipping pod install."
+          elif [ -f "$SPM_LOCAL" ]; then
+            echo "::notice::No Podfile; SwiftPM Package.swift found in frontend/ios/App (Capacitor 6). Skipping pod install."
+          elif [ -f "$SPM_CAP_ROOT" ]; then
+            echo "::notice::No Podfile; SwiftPM Package.swift found in frontend/ios/CapApp-SPM. Skipping pod install."
           else
-            echo "::error::Neither Podfile nor Package.swift found in frontend/ios/App."
-            ls -la
+            echo "::error::Neither Podfile nor Package.swift found in frontend/ios/App or CapApp-SPM.";
+            echo "::group::Directory listing (frontend/ios)"
+            ls -la ..
+            echo "::endgroup::"
+            echo "::group::Directory listing (frontend/ios/App)"
+            ls -la .
+            echo "::endgroup::"
+            echo "::group::Directory listing (frontend/ios/CapApp-SPM)"
+            ls -la ../CapApp-SPM || true
+            echo "::endgroup::"
             exit 1
           fi
 
