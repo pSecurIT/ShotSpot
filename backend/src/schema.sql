@@ -2,7 +2,15 @@
 -- SHOTSPOT DATABASE SCHEMA - Complete with all migrations
 -- ==============================================================================
 -- This schema includes the base tables plus all migrations applied in order
--- Last updated: 2025-11-23
+-- Last synchronized with baseline: 2025-12-20 (Review against baseline/v0.1.0.sql for accuracy)
+-- For authoritative schema definitions, see:
+--   1. baseline/v0.1.0.sql (main schema snapshot from v0.1.0)
+--   2. incremental migrations in this directory (changes after v0.1.0)
+--
+-- This file serves as:
+--   - Fallback if baseline/v0.1.0.sql is missing
+--   - Reference documentation for IDE schema exploration
+--   - Starting point for new baseline generations
 -- ==============================================================================
 
 -- Enable UUID extension
