@@ -11,7 +11,7 @@ on:
 jobs:
   ios:
     name: iOS Build
-    runs-on: macos-15-arm64
+    runs-on: macos-latest
 
     defaults:
       run:
