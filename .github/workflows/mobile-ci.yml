@@ -301,6 +301,9 @@ jobs:
           fi
           echo "Podfile contents:" && cat Podfile
 
+          echo "Listing ios/App directory contents..."
+          ls -la
+
           echo "Updating CocoaPods repo..."
           pod repo update || {
               echo "::error::Failed to update CocoaPods repo. Check network connectivity or CocoaPods setup."
