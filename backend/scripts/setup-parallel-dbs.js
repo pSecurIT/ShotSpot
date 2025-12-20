@@ -6,7 +6,7 @@
 
 import { Client } from 'pg';
 import dotenv from 'dotenv';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -96,79 +96,72 @@ async function setupParallelDatabases() {
       try {
         await dbClient.connect();
         
-        // Read and execute schema with fail-fast error handling
-        const schemaPath = join(__dirname, '..', 'src', 'schema.sql');
-        if (!schemaPath) {
-          console.error(`❌ Schema path resolved to empty value: ${schemaPath}`);
-          process.exit(1);
-        }
-        
-        let schema;
-        try {
-          schema = readFileSync(schemaPath, 'utf8');
-          if (!schema || schema.trim().length === 0) {
-            console.error(`❌ Schema file is empty: ${schemaPath}`);
+        // Baseline + migrations
+        const migrationsDir = join(__dirname, '..', 'src', 'migrations');
+        const baselineDir = join(migrationsDir, 'baseline');
+        const baselineFile = join(baselineDir, 'v0.1.0.sql');
+        const baselineManifest = join(baselineDir, 'manifest.json');
+
+        const baselineIncluded = new Set(
+          existsSync(baselineManifest)
+            ? JSON.parse(readFileSync(baselineManifest, 'utf8'))
+            : []
+        );
+
+        const numericPrefix = /^\d/;
+        const migrationSorter = (a, b) => {
+          const aIsNumeric = numericPrefix.test(a);
+          const bIsNumeric = numericPrefix.test(b);
+          if (aIsNumeric !== bIsNumeric) {
+            return aIsNumeric ? 1 : -1;
+          }
+          return a.localeCompare(b);
+        };
+
+        const allMigrations = readdirSync(migrationsDir)
+          .filter(f => f.endsWith('.sql'))
+          .filter(f => f !== 'baseline')
+          .sort(migrationSorter);
+
+        const hasBaseline = existsSync(baselineFile) && statSync(baselineFile).size > 0;
+
+        if (hasBaseline) {
+          const baselineContent = readFileSync(baselineFile, 'utf8');
+          await dbClient.query(baselineContent);
+          console.log(`✅ Applied baseline v0.1.0 for ${dbName}`);
+        } else {
+          const schemaPath = join(__dirname, '..', 'src', 'schema.sql');
+          let schema;
+          try {
+            schema = readFileSync(schemaPath, 'utf8');
+            if (!schema || schema.trim().length === 0) {
+              console.error(`❌ Schema file is empty: ${schemaPath}`);
+              process.exit(1);
+            }
+            console.log(`📄 Read schema.sql (${schema.length} bytes)`);
+          } catch (err) {
+            console.error(`❌ Failed to read schema file at ${schemaPath}:`, err.message);
+            console.error(err);
             process.exit(1);
           }
-          console.log(`📄 Read schema.sql (${schema.length} bytes)`);
-        } catch (err) {
-          console.error(`❌ Failed to read schema file at ${schemaPath}:`, err.message);
-          console.error(err);
-          process.exit(1);
+
+          try {
+            await dbClient.query(schema);
+            console.log(`✅ Executed schema.sql for ${dbName}`);
+          } catch (err) {
+            console.error(`❌ Failed to apply schema.sql for ${dbName}:`, err.message);
+            console.error('Full error:', err);
+            process.exit(1);
+          }
         }
 
-        try {
-          // Execute schema; if this fails, stop immediately so tests aren't run against an empty DB
-          await dbClient.query(schema);
-          console.log(`✅ Executed schema.sql for ${dbName}`);
-        } catch (err) {
-          console.error(`❌ Failed to apply schema.sql for ${dbName}:`, err.message);
-          console.error('Full error:', err);
-          process.exit(1);
-        }
-        
-        // Apply all migrations in order with fail-fast error handling
-        const migrations = [
-          '../src/migrations/add_player_gender.sql',
-          '../src/migrations/add_timer_fields.sql', 
-          '../src/migrations/add_game_rosters.sql',
-          '../src/migrations/add_substitutions.sql',
-          '../src/migrations/add_possession_tracking.sql',
-          '../src/migrations/add_enhanced_events.sql',
-          '../src/migrations/add_match_configuration_columns.sql',
-          '../src/migrations/add_attacking_side.sql',
-          '../src/migrations/add_starting_position.sql',
-          '../src/migrations/add_achievements_system.sql',
-          '../src/migrations/add_advanced_analytics.sql',
-          '../src/migrations/add_export_configuration.sql',
-          '../src/migrations/add_password_must_change.sql',
-          '../src/migrations/add_user_activity_tracking.sql',
-          '../src/migrations/add_login_history.sql',
-          '../src/migrations/add_seasons.sql',
-          '../src/migrations/seed_achievements.sql',
-          '../src/migrations/seed_default_report_templates.sql',
-          '../src/migrations/add_competition_management.sql',
-          '../src/migrations/add_match_templates.sql',
-          '../src/migrations/add_twizzit_integration.sql',
-          '../src/migrations/rename_teams_to_clubs_add_age_group_teams.sql',
-          '../src/migrations/add_club_jersey_number_constraint.sql',
-          '../src/migrations/update_timeouts_club_id.sql',
-          '../src/migrations/20251214_update_ball_possessions_team_to_club.sql',
-          '../src/migrations/20251214_update_game_rosters_team_to_club.sql',
-          '../src/migrations/20251214_update_games_team_to_club.sql',
-          '../src/migrations/20251214_update_players_team_to_club.sql',
-          '../src/migrations/20251214_update_substitutions_team_to_club.sql',
-          '../src/migrations/20251214_add_seasons_and_series.sql',
-          '../src/migrations/20251216_add_trainer_assignments.sql',
-          '../src/migrations/20251217_add_player_team_link.sql',
-          '../src/migrations/20251218_add_game_team_links.sql',
-          '../src/migrations/20251219_add_twizzit_player_registration.sql',
-          '../src/migrations/20251220_add_game_competition_link.sql',
-          '../src/migrations/20251221_drop_matches_add_series_to_competitions.sql',
-          '../src/migrations/20251222_fix_games_status_constraint.sql'
-        ];        console.log('📦 Applying migrations...');
-        for (const migrationFile of migrations) {
-          const migrationPath = join(__dirname, migrationFile);
+        const postBaselineMigrations = hasBaseline
+          ? allMigrations.filter(m => !baselineIncluded.has(m))
+          : allMigrations;
+
+        console.log('📦 Applying migrations...');
+        for (const migrationFile of postBaselineMigrations) {
+          const migrationPath = join(migrationsDir, migrationFile);
           try {
             const migrationContent = readFileSync(migrationPath, 'utf8');
             if (!migrationContent || migrationContent.trim().length === 0) {
