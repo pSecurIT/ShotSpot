@@ -255,6 +255,27 @@ npm run lint
 
 For detailed installation instructions (including troubleshooting), see **[INSTALLATION.md](INSTALLATION.md)**.
 
+## Repository layout & Migration protocol (summary)
+
+- Migrations live under `backend/src/migrations/` with two concepts:
+   - Baseline: `backend/src/migrations/baseline/v0.1.0.sql` — a schema-only dump applied once on fresh installs.
+   - Incremental: `backend/src/migrations/incremental/` — ordered SQL files (use sortable names like `YYYY-MM-DD-description.sql`).
+- Runner & scripts:
+   - Migration runner: `backend/scripts/lib/run-migrations.js`
+   - Setup scripts: `backend/scripts/setup-*.js`
+   - Baseline generator: `backend/scripts/baseline-generate.sh`
+- Developer quick checks (from repo root):
+
+```bash
+cd backend
+npm ci
+npm run check-migrations
+node backend/scripts/setup-test-db.js
+```
+
+- CI should validate migrations end-to-end (run `node backend/scripts/setup-test-db.js` and `npm run check-migrations`).
+- See `docs/MIGRATIONS.md` for full protocol and `CONTRIBUTING.md` for authoring guidance.
+
 ## 🔒 Security
 
 ### Authentication & Authorization
