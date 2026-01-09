@@ -1,10 +1,23 @@
 import dotenv from 'dotenv';
 
-// Load and validate environment variables FIRST before any other imports
-// Load root .env first (shared configuration)
-dotenv.config({ path: '../.env' });
-// Then load backend/.env to override with local development settings (use override to ensure local settings take precedence)
-dotenv.config({ override: true });
+// Load environment variables FIRST before other imports.
+// In production (Docker) rely on the environment provided by the orchestration
+// layer. Only load local `.env` files for development or test runs so they
+// cannot accidentally override compose/docker-provided variables.
+if (process.env.NODE_ENV === 'test') {
+  // For tests, load test env if present
+  dotenv.config({ path: '../.env.test', override: true });
+} else if (process.env.NODE_ENV !== 'production') {
+  // Development: load root .env then backend overrides if unset. Do NOT
+  // force-override environment variables provided by Docker/Compose so
+  // runtime settings (like DB_HOST) remain authoritative when running
+  // in containers that inject env values.
+  dotenv.config({ path: '../.env' });
+  dotenv.config();
+} else {
+  // Production: do not load local .env files so docker/compose env vars win
+  console.log('NODE_ENV=production — using container environment variables');
+}
 
 // Now import modules that depend on environment variables
 import { createServer } from 'http';

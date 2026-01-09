@@ -214,24 +214,26 @@ if (!sessionSecret) {
 }
 
 // Session configuration with security settings from environment
+// Respect SESSION_SECURE env var so operators can override secure cookie
+// behavior when running in Docker without HTTPS (common in local testing).
+const secureCookie = (typeof process.env.SESSION_SECURE !== 'undefined')
+  ? (String(process.env.SESSION_SECURE).toLowerCase() === 'true')
+  : (process.env.NODE_ENV === 'production');
+
 app.use(session({
   secret: sessionSecret,
   resave: false,
-  saveUninitialized: true, // Changed to true to create session for CSRF token
-  name: 'sessionId', // Change from default 'connect.sid'
+  saveUninitialized: true, // Create session for CSRF token
+  name: 'sessionId',
   cookie: {
-    // Secure flag: always true in production, false only in development/test
-    // Note: Requires HTTPS in production - ensure reverse proxy (nginx) handles SSL termination
-    secure: process.env.NODE_ENV === 'production',
+    secure: secureCookie,
     httpOnly: true,
-    // Use 'lax' for Docker compatibility - allows cookies to be sent on initial navigation
     sameSite: process.env.SESSION_SAME_SITE || 'lax',
     maxAge: parseInt(process.env.SESSION_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
-    // Don't set domain in Docker - let browser handle it
     domain: process.env.COOKIE_DOMAIN || undefined
   },
-  rolling: true, // Refresh session with each request
+  rolling: true,
   unset: 'destroy'
 }));
 

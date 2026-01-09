@@ -23,6 +23,8 @@ services:
     tmpfs:
       - /tmp
       - /var/run/postgresql
+    env_file:
+      - .env.docker
     environment:
       POSTGRES_USER: ${DB_USER:-shotspot_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Database password required}
@@ -75,10 +77,14 @@ services:
     # read_only: true
     tmpfs:
       - /tmp/app:uid=1001,gid=1001,mode=0700
+    env_file:
+      - .env.docker
     environment:
       # Server Configuration
       PORT: ${PORT:-3001}
-      NODE_ENV: ${NODE_ENV:-production}
+      # NODE_ENV intentionally not hard-coded here. Use `.env.docker` to set
+      # the desired runtime mode (production/development) so operator can
+      # select the correct env file when launching compose.
       
       # Database Configuration
       DB_HOST: db
@@ -108,7 +114,9 @@ services:
       DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-}
       
       # API Configuration
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001,http://127.0.0.1:3001}
+      # CORS_ORIGIN will be provided via `env_file` (.env.docker).
+      # Do not set it here using compose variable substitution, which reads
+      # from the project-level .env file and may override the intended file.
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
       

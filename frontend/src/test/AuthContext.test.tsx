@@ -164,7 +164,7 @@ describe('AuthContext', () => {
       const mockToken = 'auth-token-123';
 
       // Mock CSRF token request
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
+      mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
       
       // Mock login request
       mockAxios.onPost('/auth/login').reply(200, { token: mockToken, user: mockUser });
@@ -196,7 +196,7 @@ describe('AuthContext', () => {
 
     it('should handle login failure with server error', async () => {
       // Mock CSRF token request
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
+      mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
       
       // Mock login request failure
       mockAxios.onPost('/auth/login').reply(401, { error: 'Invalid credentials' });
@@ -225,7 +225,7 @@ describe('AuthContext', () => {
 
     it('should handle CSRF token failure during login', async () => {
       // Mock CSRF token request failure
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(500, { error: 'CSRF error' });
+      mockAxios.onGet('/auth/csrf').reply(500, { error: 'CSRF error' });
 
       render(
         <AuthProvider>
@@ -248,7 +248,7 @@ describe('AuthContext', () => {
 
     it('should handle network errors during login', async () => {
       // Mock CSRF token request
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
+      mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
       
       // Mock login network error
       mockAxios.onPost('/auth/login').networkError();
@@ -274,7 +274,7 @@ describe('AuthContext', () => {
 
     it('should handle server errors without error message', async () => {
       // Mock CSRF token request
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
+      mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
       
       // Mock login request failure without error message
       mockAxios.onPost('/auth/login').reply(500);
@@ -302,7 +302,7 @@ describe('AuthContext', () => {
   describe('Registration Functionality', () => {
     it('should register successfully', async () => {
       // Mock CSRF token request
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
+      mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
       
       // Mock registration request
       mockAxios.onPost('/auth/register').reply(201, { message: 'User created successfully' });
@@ -327,7 +327,7 @@ describe('AuthContext', () => {
 
     it('should handle registration failure with server error', async () => {
       // Mock CSRF token request
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
+      mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
       
       // Mock registration request failure
       mockAxios.onPost('/auth/register').reply(400, { error: 'Username already exists' });
@@ -352,7 +352,7 @@ describe('AuthContext', () => {
 
     it('should handle CSRF token failure during registration', async () => {
       // Mock CSRF token request failure
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(500, { error: 'CSRF error' });
+      mockAxios.onGet('/auth/csrf').reply(500, { error: 'CSRF error' });
 
       render(
         <AuthProvider>
@@ -374,7 +374,7 @@ describe('AuthContext', () => {
 
     it('should handle network errors during registration', async () => {
       // Mock CSRF token request
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
+      mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
       
       // Mock registration network error
       mockAxios.onPost('/auth/register').networkError();
@@ -399,7 +399,7 @@ describe('AuthContext', () => {
 
     it('should handle server errors without error message during registration', async () => {
       // Mock CSRF token request
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
+      mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
       
       // Mock registration failure without error message
       mockAxios.onPost('/auth/register').reply(500);
@@ -553,7 +553,7 @@ describe('AuthContext', () => {
       };
 
       // Mock CSRF token request
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
+      mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });
       
       // Mock login request
       mockAxios.onPost('/auth/login').reply(200, { token: 'user-token', user: regularUser });
