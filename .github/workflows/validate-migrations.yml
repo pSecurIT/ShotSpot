@@ -1,0 +1,57 @@
+name: Validate Migrations
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/migrations/**'
+      - 'backend/scripts/**'
+      - 'docs/**'
+  push:
+    branches: [ main ]
+
+jobs:
+  validate-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: shotspot
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shotspot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Validate migration files
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/shotspot
+        run: |
+          cd backend
+          npm run check-migrations
+
+      - name: Run end-to-end migration setup (fresh DB)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/shotspot
+        run: |
+          cd backend
+          node scripts/setup-test-db.js

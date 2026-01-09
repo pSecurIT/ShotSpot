@@ -2,7 +2,7 @@ import axios from 'axios';
 import { queueAction } from './offlineSync';
 
 const api = axios.create({
-  baseURL: 'http://localhost:3001/api',
+  baseURL: (import.meta.env.VITE_API_URL as string) || '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -20,9 +20,7 @@ export const resetCsrfToken = (): void => {
 // Function to get CSRF token
 export const getCsrfToken = async (): Promise<string> => {
   if (!csrfToken) {
-    const response = await axios.get('http://localhost:3001/api/auth/csrf', {
-      withCredentials: true,
-    });
+    const response = await api.get('/auth/csrf');
     csrfToken = response.data.csrfToken;
   }
   return csrfToken as string;

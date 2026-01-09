@@ -64,9 +64,17 @@ cd ShotSpot
 ### 2. Configure Environment
 ```bash
 # Copy the Docker environment template
-cp .env.docker.example .env
+# Recommended: use an explicit `.env.docker` file for compose runs to avoid
+# accidentally using a local `.env` development file. Copy the example to
+# a local file and edit values there (do NOT commit `.env.docker` to git):
 
-# Edit .env and set secure values
+# Linux / macOS
+cp .env.docker.example .env.docker
+
+# Windows PowerShell
+Copy-Item .env.docker.example .env.docker
+
+# Edit `.env.docker` and set secure values
 # IMPORTANT: Change DB_PASSWORD and JWT_SECRET!
 ```
 
@@ -79,8 +87,8 @@ CORS_ORIGIN=http://localhost:3000
 
 ### 3. Start the Application
 ```bash
-# Build and start all services
-docker-compose up -d
+# Build and start all services (use the explicit docker env file)
+docker-compose --env-file .env.docker up -d
 
 # View logs
 docker-compose logs -f
@@ -94,6 +102,11 @@ docker-compose ps
 - **API**: http://localhost:3001/api
 - **Health Check**: http://localhost:3001/api/health
 - **Database**: localhost:5432 (for external access)
+
+Note: When running with `docker-compose --env-file .env.docker` the `DB_HOST`
+inside the `app` container will be set to the Compose service name (typically
+`db`). Do not set `DB_HOST=localhost` inside `backend/.env` or the container
+may attempt to connect to itself.
 
 ### 5. Stop the Application
 ```bash
