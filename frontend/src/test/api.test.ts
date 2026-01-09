@@ -62,7 +62,7 @@ describe('API Utility', () => {
 
   describe('Basic Configuration', () => {
     it('should have correct base URL', () => {
-      expect(api.defaults.baseURL).toBe('http://localhost:3001/api');
+      expect(api.defaults.baseURL).toBe('/api');
     });
 
     it('should have correct default headers', () => {
@@ -77,7 +77,7 @@ describe('API Utility', () => {
   describe('CSRF Token Management', () => {
     it('should fetch CSRF token when not cached', async () => {
       const mockCsrfResponse = { data: { csrfToken: 'test-csrf-token' } };
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, mockCsrfResponse.data);
+      mockAxios.onGet('/auth/csrf').reply(200, mockCsrfResponse.data);
 
       const token = await getCsrfToken();
 
@@ -86,7 +86,7 @@ describe('API Utility', () => {
 
     it('should return cached CSRF token on subsequent calls', async () => {
       const mockCsrfResponse = { data: { csrfToken: 'cached-token' } };
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, mockCsrfResponse.data);
+      mockAxios.onGet('/auth/csrf').reply(200, mockCsrfResponse.data);
 
       // First call
       const token1 = await getCsrfToken();
@@ -96,11 +96,11 @@ describe('API Utility', () => {
       expect(token1).toBe('cached-token');
       expect(token2).toBe('cached-token');
       // Should only make one request
-      expect(mockAxiosBase.history.get.length).toBe(1);
+      expect(mockAxios.history.get.length).toBe(1);
     });
 
     it('should handle CSRF token fetch error', async () => {
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(500, { error: 'Server error' });
+      mockAxios.onGet('/auth/csrf').reply(500, { error: 'Server error' });
 
       await expect(getCsrfToken()).rejects.toThrow();
     });
@@ -128,7 +128,7 @@ describe('API Utility', () => {
 
     it('should add CSRF token for POST requests', async () => {
       const mockCsrfResponse = { data: { csrfToken: 'csrf-token' } };
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, mockCsrfResponse.data);
+      mockAxios.onGet('/auth/csrf').reply(200, mockCsrfResponse.data);
       mockAxios.onPost('/test').reply(200, { data: 'success' });
 
       await api.post('/test', { data: 'test' });
@@ -139,7 +139,7 @@ describe('API Utility', () => {
 
     it('should add CSRF token for PUT requests', async () => {
       const mockCsrfResponse = { data: { csrfToken: 'csrf-token' } };
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, mockCsrfResponse.data);
+      mockAxios.onGet('/auth/csrf').reply(200, mockCsrfResponse.data);
       mockAxios.onPut('/test').reply(200, { data: 'success' });
 
       await api.put('/test', { data: 'test' });
@@ -150,7 +150,7 @@ describe('API Utility', () => {
 
     it('should add CSRF token for DELETE requests', async () => {
       const mockCsrfResponse = { data: { csrfToken: 'csrf-token' } };
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, mockCsrfResponse.data);
+      mockAxios.onGet('/auth/csrf').reply(200, mockCsrfResponse.data);
       mockAxios.onDelete('/test').reply(200, { data: 'success' });
 
       await api.delete('/test');
@@ -169,7 +169,7 @@ describe('API Utility', () => {
     });
 
     it('should handle CSRF token fetch error gracefully', async () => {
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(500);
+      mockAxios.onGet('/auth/csrf').reply(500);
       mockAxios.onPost('/test').reply(200, { data: 'success' });
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -224,11 +224,11 @@ describe('API Utility', () => {
     it('should retry request with new CSRF token on 403 CSRF error', async () => {
       // First CSRF token fetch
       const mockCsrfResponse1 = { data: { csrfToken: 'old-token' } };
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').replyOnce(200, mockCsrfResponse1.data);
+      mockAxios.onGet('/auth/csrf').replyOnce(200, mockCsrfResponse1.data);
 
       // Second CSRF token fetch for refresh
       const mockCsrfResponse2 = { data: { csrfToken: 'new-token' } };
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').replyOnce(200, mockCsrfResponse2.data);
+      mockAxios.onGet('/auth/csrf').replyOnce(200, mockCsrfResponse2.data);
 
       // First POST request fails with CSRF error
       mockAxios.onPost('/test').replyOnce(403, { error: 'Invalid CSRF token' });
@@ -241,7 +241,7 @@ describe('API Utility', () => {
       expect(response.data.data).toBe('success');
       
       // Should have made 2 CSRF requests and 2 POST requests
-      expect(mockAxiosBase.history.get.length).toBe(2);
+      expect(mockAxios.history.get.length).toBe(2);
       expect(mockAxios.history.post.length).toBe(2);
       
       // Second POST should have new CSRF token
@@ -251,7 +251,7 @@ describe('API Utility', () => {
     it('should not retry CSRF refresh more than once', async () => {
       // CSRF token fetch
       const mockCsrfResponse = { data: { csrfToken: 'token' } };
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').reply(200, mockCsrfResponse.data);
+      mockAxios.onGet('/auth/csrf').reply(200, mockCsrfResponse.data);
 
       // Both POST requests fail with CSRF error
       mockAxios.onPost('/test').reply(403, { error: 'Invalid CSRF token' });
@@ -269,10 +269,10 @@ describe('API Utility', () => {
     it('should handle CSRF refresh failure', async () => {
       // First CSRF token fetch
       const mockCsrfResponse = { data: { csrfToken: 'token' } };
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').replyOnce(200, mockCsrfResponse.data);
+      mockAxios.onGet('/auth/csrf').replyOnce(200, mockCsrfResponse.data);
 
       // CSRF refresh fails
-      mockAxiosBase.onGet('http://localhost:3001/api/auth/csrf').replyOnce(500, { error: 'Server error' });
+      mockAxios.onGet('/auth/csrf').replyOnce(500, { error: 'Server error' });
 
       // POST request fails with CSRF error
       mockAxios.onPost('/test').replyOnce(403, { error: 'Invalid CSRF token' });
@@ -301,7 +301,7 @@ describe('API Utility', () => {
 
       expect(mockQueueAction).toHaveBeenCalledWith(
         'POST',
-        'http://localhost:3001/api/test',
+        '/api/test',
         '{"data":"test"}'
       );
       
@@ -319,7 +319,7 @@ describe('API Utility', () => {
 
       expect(mockQueueAction).toHaveBeenCalledWith(
         'PUT',
-        'http://localhost:3001/api/test/1',
+        '/api/test/1',
         '{"data":"updated"}'
       );
       
@@ -333,7 +333,7 @@ describe('API Utility', () => {
 
       expect(mockQueueAction).toHaveBeenCalledWith(
         'DELETE',
-        'http://localhost:3001/api/test/1',
+        '/api/test/1',
         undefined
       );
       

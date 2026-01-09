@@ -106,7 +106,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Test Docker image
+      - name: Create .env.docker for CI
         run: |
           # Generate a secure JWT secret (64 hex chars = 32 bytes)
           JWT_SECRET=$(openssl rand -hex 32)
@@ -119,35 +119,40 @@ jobs:
           
           echo "✅ Generated JWT_SECRET with ${#JWT_SECRET} characters"
           
-          # Create test environment file
+          # Create Docker environment file (matches .env.docker.example)
           printf '%s\n' \
-            'PORT=3001' \
             'NODE_ENV=production' \
+            'PORT=3001' \
             'DB_HOST=db' \
             'DB_PORT=5432' \
             'DB_NAME=shotspot_test' \
             'DB_USER=shotspot_test' \
             'DB_PASSWORD=test_password_123' \
             "JWT_SECRET=${JWT_SECRET}" \
-            'CORS_ORIGIN=http://localhost:3000' \
+            'SESSION_SECURE=false' \
+            'SESSION_SAME_SITE=lax' \
+            'CORS_ORIGIN=http://localhost:3001' \
             'RATE_LIMIT_WINDOW_MS=900000' \
             'RATE_LIMIT_MAX=100' \
             'LOG_LEVEL=info' \
-            > .env.test
+            'VITE_API_URL=/api' \
+            > .env.docker
           
-          # Verify .env.test content (diagnostic - redact secret)
-          echo "=== .env.test content (JWT_SECRET redacted) ==="
-          grep -v "JWT_SECRET" .env.test
+          # Verify .env.docker content (diagnostic - redact secret)
+          echo "=== .env.docker content (JWT_SECRET redacted) ==="
+          grep -v "JWT_SECRET" .env.docker
           echo "JWT_SECRET=<redacted ${#JWT_SECRET} chars>"
 
-          # Start services with test environment
-          docker-compose --env-file .env.test up -d
+      - name: Test Docker image
+        run: |
+          # Start services with Docker environment
+          docker-compose --env-file .env.docker up -d
 
           # Check for immediate restarts (diagnostic)
           sleep 10
-          if docker-compose --env-file .env.test ps | grep -q "Restarting"; then
+          if docker-compose --env-file .env.docker ps | grep -q "Restarting"; then
             echo "⚠️ Container is restarting - dumping logs for diagnosis..."
-            docker-compose --env-file .env.test logs app --tail=200
+            docker-compose --env-file .env.docker logs app --tail=200
           fi
 
           # Wait for services to be healthy (increased timeout for DB init + migrations)
@@ -155,17 +160,17 @@ jobs:
           timeout 300 bash -c '
             # Re-export variables in the subshell
             set -o allexport
-            source .env.test
+            source .env.docker
             set +o allexport
             
-            until docker-compose --env-file .env.test ps | grep -q "healthy"; do
+            until docker-compose --env-file .env.docker ps | grep -q "healthy"; do
               echo "$(date) - Waiting for healthy containers..."
-              docker-compose --env-file .env.test ps
+              docker-compose --env-file .env.docker ps
               
               # Check for restart loop during wait
-              if docker-compose --env-file .env.test ps | grep -q "Restarting"; then
+              if docker-compose --env-file .env.docker ps | grep -q "Restarting"; then
                 echo "⚠️ Container restarting detected - showing recent logs..."
-                docker-compose --env-file .env.test logs app --tail=50
+                docker-compose --env-file .env.docker logs app --tail=50
               fi
               
               sleep 5
@@ -173,11 +178,11 @@ jobs:
           ' || {
             echo "❌ Services failed to become healthy after 5 minutes"
             echo "==== docker-compose ps ===="
-            docker-compose --env-file .env.test ps
+            docker-compose --env-file .env.docker ps
             echo "==== docker-compose logs (app) - last 200 lines ===="
-            docker-compose --env-file .env.test logs app --tail=200 || true
+            docker-compose --env-file .env.docker logs app --tail=200 || true
             echo "==== docker-compose logs (db) - last 100 lines ===="
-            docker-compose --env-file .env.test logs db --tail=100 || true
+            docker-compose --env-file .env.docker logs db --tail=100 || true
             exit 1
           }
 
@@ -185,15 +190,15 @@ jobs:
           echo "Testing health endpoint..."
           curl -f http://localhost:3001/api/health || {
             echo "Health check failed"
-            docker-compose --env-file .env.test logs app
+            docker-compose --env-file .env.docker logs app
             exit 1
           }
 
           # Test database connection
           echo "Testing database connection..."
-          docker-compose --env-file .env.test exec -T db psql -U shotspot_test -d shotspot_test -c "SELECT 1;" || {
+          docker-compose --env-file .env.docker exec -T db psql -U shotspot_test -d shotspot_test -c "SELECT 1;" || {
             echo "Database connection failed"
-            docker-compose --env-file .env.test logs db
+            docker-compose --env-file .env.docker logs db
             exit 1
           }
 
@@ -203,14 +208,14 @@ jobs:
         if: always()
         run: |
           # Guard docker-compose calls for robust cleanup
-          # Only cleanup if .env.test exists (meaning we got past setup)
-          if [ -f .env.test ]; then
+          # Only cleanup if .env.docker exists (meaning we got past setup)
+          if [ -f .env.docker ]; then
             if command -v docker-compose >/dev/null 2>&1; then
-              docker-compose --env-file .env.test down -v 2>/dev/null || true
+              docker-compose --env-file .env.docker down -v 2>/dev/null || true
             elif docker compose version >/dev/null 2>&1; then
-              docker compose --env-file .env.test down -v 2>/dev/null || true
+              docker compose --env-file .env.docker down -v 2>/dev/null || true
             fi
-            rm -f .env.test || true
+            rm -f .env.docker || true
           fi
 
       - name: Push Docker image
@@ -253,7 +258,7 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose version
 
-      - name: Create test environment file
+      - name: Create .env.docker for CI
         run: |
           # Generate a secure JWT secret (64 hex chars = 32 bytes)
           JWT_SECRET=$(openssl rand -hex 32)
@@ -266,67 +271,71 @@ jobs:
           
           echo "✅ Generated JWT_SECRET with ${#JWT_SECRET} characters"
           
+          # Create Docker environment file (matches .env.docker.example)
           printf '%s\n' \
-            'PORT=3001' \
             'NODE_ENV=production' \
+            'PORT=3001' \
             'DB_HOST=db' \
             'DB_PORT=5432' \
             'DB_NAME=shotspot_test' \
             'DB_USER=shotspot_test' \
             'DB_PASSWORD=test_password_123' \
             "JWT_SECRET=${JWT_SECRET}" \
-            'CORS_ORIGIN=http://localhost:3000' \
+            'SESSION_SECURE=false' \
+            'SESSION_SAME_SITE=lax' \
+            'CORS_ORIGIN=http://localhost:3001' \
             'RATE_LIMIT_WINDOW_MS=900000' \
             'RATE_LIMIT_MAX=100' \
             'LOG_LEVEL=info' \
-            > .env
+            'VITE_API_URL=/api' \
+            > .env.docker
           
-          # Verify .env content (diagnostic - redact secret)
-          echo "=== .env content (JWT_SECRET redacted) ==="
-          grep -v "JWT_SECRET" .env
+          # Verify .env.docker content (diagnostic - redact secret)
+          echo "=== .env.docker content (JWT_SECRET redacted) ==="
+          grep -v "JWT_SECRET" .env.docker
           echo "JWT_SECRET=<redacted ${#JWT_SECRET} chars>"
 
           # Export variables so docker-compose sees them during interpolation
           set -o allexport
-          source .env
+          source .env.docker
           set +o allexport
 
       - name: Validate docker-compose.yml
-        run: docker-compose --env-file .env config
+        run: docker-compose --env-file .env.docker config
 
       - name: Start Docker Compose services
-        run: docker-compose --env-file .env up -d
+        run: docker-compose --env-file .env.docker up -d
 
       - name: Check for immediate container issues
         run: |
           sleep 10
-          if docker-compose --env-file .env ps | grep -q "Restarting"; then
+          if docker-compose --env-file .env.docker ps | grep -q "Restarting"; then
             echo "⚠️ Container is restarting - dumping logs for diagnosis..."
-            docker-compose --env-file .env logs app --tail=200
+            docker-compose --env-file .env.docker logs app --tail=200
           fi
 
       - name: Wait for services
         run: |
           # Source env file for this step
           set -o allexport
-          source .env
+          source .env.docker
           set +o allexport
           
           echo "Waiting for services to be ready..."
           timeout 300 bash -c '
             # Re-export variables in the subshell
             set -o allexport
-            source .env
+            source .env.docker
             set +o allexport
             
             until [ "$(docker inspect -f {{.State.Health.Status}} shotspot-app 2>/dev/null)" == "healthy" ]; do
               echo "$(date) - Waiting for healthy app container..."
-              docker-compose --env-file .env ps
+              docker-compose --env-file .env.docker ps
               
               # Check for restart loop during wait
-              if docker-compose --env-file .env ps | grep -q "Restarting"; then
+              if docker-compose --env-file .env.docker ps | grep -q "Restarting"; then
                 echo "⚠️ Container restarting detected - showing recent logs..."
-                docker-compose --env-file .env logs app --tail=50
+                docker-compose --env-file .env.docker logs app --tail=50
               fi
               
               sleep 5
@@ -334,11 +343,11 @@ jobs:
           ' || {
             echo "❌ Application failed to become healthy after 5 minutes"
             echo "==== docker-compose ps ===="
-            docker-compose --env-file .env ps
+            docker-compose --env-file .env.docker ps
             echo "==== docker-compose logs (app) - last 200 lines ===="
-            docker-compose --env-file .env logs app --tail=200 || true
+            docker-compose --env-file .env.docker logs app --tail=200 || true
             echo "==== docker-compose logs (db) - last 100 lines ===="
-            docker-compose --env-file .env logs db --tail=100 || true
+            docker-compose --env-file .env.docker logs db --tail=100 || true
             exit 1
           }
 
@@ -352,7 +361,7 @@ jobs:
 
       - name: Check logs for errors
         run: |
-          docker-compose --env-file .env logs | grep -i error && {
+          docker-compose --env-file .env.docker logs | grep -i error && {
             echo "Errors found in logs"
             exit 1
           } || echo "No errors in logs"
@@ -361,14 +370,14 @@ jobs:
         if: always()
         run: |
           # Guard docker-compose calls for robust cleanup
-          # Only cleanup if .env exists (meaning we got past setup)
-          if [ -f .env ]; then
+          # Only cleanup if .env.docker exists (meaning we got past setup)
+          if [ -f .env.docker ]; then
             if command -v docker-compose >/dev/null 2>&1; then
-              docker-compose --env-file .env down -v 2>/dev/null || true
+              docker-compose --env-file .env.docker down -v 2>/dev/null || true
             elif docker compose version >/dev/null 2>&1; then
-              docker compose --env-file .env down -v 2>/dev/null || true
+              docker compose --env-file .env.docker down -v 2>/dev/null || true
             fi
-            rm -f .env || true
+            rm -f .env.docker || true
           fi
 
   scan-vulnerabilities:

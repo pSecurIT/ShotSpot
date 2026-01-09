@@ -1,53 +1,94 @@
-# Migration Baseline (v0.1.0)
+# Migration Baseline & Incremental Migrations
 
-## Overview
-- Fresh installs should apply the baseline schema dump, then only migrations created after v0.1.0.
-- Existing databases continue with incremental migrations; baseline is skipped when the migrations table already exists.
+## Purpose
+This document describes how ShotSpot applies schema changes for fresh installs and for existing installations, the repository layout for migrations, how to author new migrations, and how CI and developer tooling validate the migration flow.
 
-## Files
-- `backend/src/migrations/baseline/v0.1.0.sql`: Schema-only baseline (generate against a clean, fully migrated DB).
-- `backend/src/migrations/baseline/manifest.json`: Migrations covered by the v0.1.0 baseline.
-- `backend/scripts/baseline-generate.sh`: Helper to regenerate the baseline from a live database.
+## Key Concepts
+- Baseline: a single schema-only SQL dump representing all historic schema up to a major release (example: `baseline/v0.1.0.sql`). Applied only once on fresh installs.
+- Incremental migrations: ordered SQL files applied after the baseline (or when baseline is absent). Stored in `backend/src/migrations/incremental/`.
+- `_migrations` table: runtime table that records applied migration identifiers (baseline versions and incremental filenames).
 
-## Generating the Baseline
+## How it works (runner & scripts)
+- Setup scripts (`backend/scripts/setup-*.js`) call the shared runner `backend/scripts/lib/run-migrations.js`.
+- The runner ensures `_migrations` exists, detects fresh DBs (no rows), and:
+  - On a fresh DB: applies the baseline `baseline/vX.Y.Z.sql` (if present) and inserts a recorded baseline version like `vX.Y.Z-baseline` into `_migrations`, then applies any incremental migrations.
+  - On existing DB: skips baseline and applies only pending incremental migrations (in lexicographic order).
+- Each applied incremental migration is recorded using the filename (without `.sql`).
+
+## Repository layout (recommended)
+- Baseline files: `backend/src/migrations/baseline/` (e.g., `v0.1.0.sql`, `manifest.json`).
+- Incremental migrations: `backend/src/migrations/incremental/` (use sortable names: `YYYY-MM-DD-description.sql`).
+- Fallback schema: `backend/src/schema.sql` used only when no baseline exists.
+
+## Authoring incremental migrations (developer steps)
+1. Create a new `.sql` file under `backend/src/migrations/incremental/`.
+   - Use sortable names (e.g., `2025-12-21-add-match-index.sql`).
+   - Prefer additive changes and avoid in-place destructive operations; when unavoidable, include safe migration steps and a clear rollback note in the migration file header.
+2. Keep data seeds separate and prefix with `seed_` (e.g., `seed_default_reports.sql`). Seeds must be idempotent (`ON CONFLICT DO NOTHING` / `WHERE NOT EXISTS`).
+3. Run local validation: from `backend/` run `npm run check-migrations` (this script mirrors CI checks and verifies migration placement and manifest consistency).
+4. Validate end-to-end by running the setup script against a test DB: `node backend/scripts/setup-test-db.js` (CI runs a similar job).
+
+## Generating a new baseline (major releases)
+- Ensure a clean DB has all incrementals applied.
+- Run the baseline generator (script may vary on platforms):
+
 ```bash
-# Point DATABASE_URL to a clean DB that has all migrations applied
+# On Windows PowerShell (example):
+$env:DATABASE_URL="postgres://user:pass@host:5432/shotspot"
+./backend/scripts/baseline-generate.sh
+
+# On UNIX / bash:
 export DATABASE_URL=postgres://user:pass@host:5432/shotspot
 ./backend/scripts/baseline-generate.sh
 ```
-Commit the updated `v0.1.0.sql` and rerun setup scripts to verify fresh-install behavior.
 
-## Setup Flow (dev/test/CI)
-- If `v0.1.0.sql` is present and non-empty, setup scripts apply it, then run post-baseline migrations.
-- If baseline is missing/empty, scripts fall back to `schema.sql` + all migrations.
+- Commit the generated `baseline/vX.Y.Z.sql` and update `baseline/manifest.json` as needed.
+- After committing, run `node backend/scripts/setup-test-db.js` locally to validate the fresh-install path.
 
-## Adding New Migrations
-1) Add a new `.sql` file to `backend/src/migrations/` (alphabetical naming).
-2) Do **not** add it to `baseline/manifest.json` (baseline is frozen at v0.1.0).
-3) Run `npm run check-migrations` from `backend/` to ensure consistency.
+## CI and pre-commit checks
+- CI should include a job that:
+  - Runs `node backend/scripts/setup-test-db.js` against a disposable test DB to validate baseline + incremental application.
+  - Runs `npm run check-migrations` to assert migration naming and placement rules.
+- Pre-commit or pre-push hooks should reject `.sql` files placed outside `backend/src/migrations/` or `backend/src/migrations/baseline/`.
+  - Example: a simple check script can scan the repo for `*.sql` files and fail if any are outside the allowed paths.
 
-## File Organization Rules
+## Adding a migration checklist (summary)
+1. Add `backend/src/migrations/incremental/YYYY-MM-DD-description.sql`.
+2. Keep seeds as `seed_*.sql` and idempotent.
+3. Run `npm run check-migrations`.
+4. Run `node backend/scripts/setup-test-db.js` to validate the flow.
+5. Open a PR referencing this change and link to the issue that required it.
 
-### Canonical Locations
-- **Active migrations**: `backend/src/migrations/*.sql`
-  - Schema changes: Use dated format `YYYYMMDD_description.sql` or descriptive `add_feature_name.sql`
-  - Data seeds: Prefix with `seed_*.sql` (e.g., `seed_achievements.sql`)
-- **Baseline schema**: `backend/src/migrations/baseline/v0.1.0.sql`
-- **Baseline metadata**: `backend/src/migrations/baseline/manifest.json`
-- **Fallback schema**: `backend/src/schema.sql` (used when baseline is missing)
+## Conventions & constraints
+- Do not keep destructive DROP operations in normal incremental migrations; prefer explicit migration steps with safety checks.
+- Avoid creating SQL files in `backend/scripts/` or other non-migrations folders.
+- Keep the baseline schema schema-only (no runtime data).
 
-### Forbidden Locations
-- **No SQL files in `backend/scripts/`** (only JavaScript and bash scripts)
-- Exception: Temporary files like `temp-setup.sql` (auto-cleaned by scripts)
+## Troubleshooting
+- If setup scripts apply an unexpected migration order, verify filenames sort lexicographically and contain an ISO-like date prefix where appropriate.
+- If baseline is not being applied on fresh installs, verify `baseline/vX.Y.Z.sql` exists and is non-empty and that the runner's detection logic recognizes an empty `_migrations` table.
 
-### Seed Migration Conventions
-- Prefix all data seed files with `seed_*`
-- Must be idempotent (use `ON CONFLICT DO NOTHING` or `WHERE NOT EXISTS`)
-- Excluded from baseline (data, not schema)
-- Always run after baseline on fresh installs
+## Example CI job (concept)
+This is a conceptual snippet to run in GitHub Actions (implement as needed in `.github/workflows`):
 
-## Notes
-- Baseline is schema-only; no data is included.
-- Legacy schema migrations up to v0.1.0 are pruned from disk and captured in the baseline; `manifest.json` lists what the baseline contains.
-- Seed migrations (e.g., `seed_achievements.sql`, `seed_default_report_templates.sql`) remain on disk and run after the baseline since they populate data, not schema.
-- The `backend/src/schema.sql` file serves as a critical fallback when the baseline is missing and must be maintained.
+```yaml
+# name: validate-migrations
+# runs-on: ubuntu-latest
+# steps:
+#   - uses: actions/checkout@v4
+#   - name: Start postgres
+#     uses: harmon758/postgres-action@v1
+#     with:
+#       postgresql version: '15'
+#   - name: Install Node
+#     uses: actions/setup-node@v4
+#     with:
+#       node-version: '20'
+#   - name: Install deps
+#     run: npm ci --workspace=backend
+#   - name: Validate migrations
+#     run: node backend/scripts/setup-test-db.js
+```
+
+---
+Updated: Clarified baseline vs incremental behavior, added developer checklist, CI and pre-commit recommendations.
