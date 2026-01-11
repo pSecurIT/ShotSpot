@@ -20,7 +20,10 @@
     "mobile:build:android": "cd frontend && npm run build && npx cap sync android && cd android && ./gradlew assembleRelease",
     "mobile:build:ios": "cd frontend && npm run build && npx cap sync ios",
     "release:create": "node scripts/create-release.js",
-    "release:changelog": "node scripts/generate-changelog.js"
+    "release:changelog": "node scripts/generate-changelog.js",
+    "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
+    "lint:fix": "npm --prefix backend run lint:fix && npm --prefix frontend run lint:fix",
+    "test:frontend": "npm --prefix frontend run test:run"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
