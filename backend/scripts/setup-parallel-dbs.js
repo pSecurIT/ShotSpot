@@ -102,7 +102,9 @@ async function setupParallelDatabases() {
       // Build connection string for migrations
       const connectionUser = (testUser !== superuserConfig.user) ? testUser : superuserConfig.user;
       const connectionPassword = (testUser !== superuserConfig.user) ? testPassword : superuserConfig.password;
-      const connectionString = `postgresql://${connectionUser}:${connectionPassword}@${superuserConfig.host}:${superuserConfig.port}/${dbName}`;
+      const encodedUser = encodeURIComponent(String(connectionUser));
+      const encodedPassword = encodeURIComponent(String(connectionPassword));
+      const connectionString = `postgresql://${encodedUser}:${encodedPassword}@${superuserConfig.host}:${superuserConfig.port}/${dbName}`;
 
       // Apply migrations using shared migration runner
       await runMigrations({ 

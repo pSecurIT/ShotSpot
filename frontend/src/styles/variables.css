@@ -1,14 +1,22 @@
 :root {
   /* Color Palette - Fresh and Sporty */
   --primary-color: #2962ff;      /* Vibrant blue for primary actions */
+  --primary-light: #e3f2fd;      /* Light blue for hover/active states */
   --secondary-color: #00c853;    /* Energy green for success/progress */
   --accent-color: #ff3d00;       /* Dynamic orange for highlights/alerts */
+  --danger-color: #d32f2f;       /* Red for danger/delete actions */
+  --danger-hover: #b71c1c;       /* Darker red for danger hover */
   --background-light: #f5f7fa;   /* Light gray background */
   --background-dark: #1a1a1a;    /* Dark mode background */
   --text-primary: #2c3e50;       /* Main text color */
   --text-secondary: #666666;     /* Secondary text color */
   --text-light: #ffffff;         /* Light text for dark backgrounds */
+  --text-dark: #1a1a1a;          /* Dark text color */
+  --text-muted: #9e9e9e;         /* Muted text color */
   --border-color: #e0e6ed;       /* Subtle borders */
+  --hover-bg: #f5f5f5;           /* Hover background color */
+  --bg-light: #fafafa;           /* Light background variant */
+  --focus-color: #2962ff;        /* Focus outline color */
   
   /* Typography */
   --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

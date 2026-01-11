@@ -1,9 +1,9 @@
 import dotenv from 'dotenv';
 
-// Load environment variables FIRST before other imports.
-// In production (Docker) rely on the environment provided by the orchestration
-// layer. Only load local `.env` files for development or test runs so they
-// cannot accidentally override compose/docker-provided variables.
+// NOTE: In ESM, static imports are evaluated before this file's top-level code.
+// To ensure environment variables are loaded before modules that depend on
+// them, we load dotenv here and then use dynamic imports for env-dependent
+// modules (app, auth, db, validateEnv, initDefaultAdmin).
 if (process.env.NODE_ENV === 'test') {
   // For tests, load test env if present
   dotenv.config({ path: '../.env.test', override: true });
@@ -19,12 +19,20 @@ if (process.env.NODE_ENV === 'test') {
   console.log('NODE_ENV=production — using container environment variables');
 }
 
-// Now import modules that depend on environment variables
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import validateEnv from './utils/validateEnv.js';
-import app from './app.js';
-import { verifyToken } from './middleware/auth.js';
+
+const [{ default: validateEnv }, { default: app }, authModule, { default: db }, initAdminModule] =
+  await Promise.all([
+    import('./utils/validateEnv.js'),
+    import('./app.js'),
+    import('./middleware/auth.js'),
+    import('./db.js'),
+    import('../scripts/init-default-admin.js')
+  ]);
+
+const { verifyToken } = authModule;
+const initDefaultAdmin = initAdminModule.default;
 
 // Validate environment variables after loading
 validateEnv();
@@ -46,10 +54,6 @@ process.on('uncaughtException', (error) => {
     process.exit(1);
   }
 });
-
-// Test database connection before starting server
-import db from './db.js';
-import initDefaultAdmin from '../scripts/init-default-admin.js';
 
 try {
   await db.healthCheck();
