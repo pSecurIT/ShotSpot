@@ -6,14 +6,51 @@ import dotenv from 'dotenv';
 // modules (app, auth, db, validateEnv, initDefaultAdmin).
 if (process.env.NODE_ENV === 'test') {
   // For tests, load test env if present
-  dotenv.config({ path: '../.env.test', override: true });
+  const { existsSync, readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const envTestPath = fileURLToPath(new URL('./.env.test', import.meta.url));
+  if (existsSync(envTestPath)) {
+    const parsed = dotenv.parse(readFileSync(envTestPath));
+    for (const [key, value] of Object.entries(parsed)) {
+      process.env[key] = value;
+    }
+  }
 } else if (process.env.NODE_ENV !== 'production') {
   // Development: load root .env then backend overrides if unset. Do NOT
   // force-override environment variables provided by Docker/Compose so
   // runtime settings (like DB_HOST) remain authoritative when running
   // in containers that inject env values.
-  dotenv.config({ path: '../.env' });
-  dotenv.config();
+  const { existsSync, readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+
+  const rootEnvPath = fileURLToPath(new URL('../../.env', import.meta.url));
+  const backendEnvPath = fileURLToPath(new URL('../.env', import.meta.url));
+
+  /**
+   * Track where each env var came from so we can allow backend/.env
+   * to override values from root .env, without overriding OS/Docker env.
+   */
+  const envSource = new Map();
+
+  const applyParsedEnv = (parsed, source, allowOverrideFromRoot = false) => {
+    for (const [key, value] of Object.entries(parsed)) {
+      const isUnset = process.env[key] === undefined;
+      const wasFromRoot = envSource.get(key) === 'root';
+      const canOverride = allowOverrideFromRoot && wasFromRoot;
+
+      if (isUnset || canOverride) {
+        process.env[key] = value;
+        envSource.set(key, source);
+      }
+    }
+  };
+
+  if (existsSync(rootEnvPath)) {
+    applyParsedEnv(dotenv.parse(readFileSync(rootEnvPath)), 'root');
+  }
+  if (existsSync(backendEnvPath)) {
+    applyParsedEnv(dotenv.parse(readFileSync(backendEnvPath)), 'backend', true);
+  }
 } else {
   // Production: do not load local .env files so docker/compose env vars win
   console.log('NODE_ENV=production — using container environment variables');
@@ -99,9 +136,14 @@ const PORT = process.env.PORT || 3002;
 
 // Create HTTP server and attach Socket.IO
 const httpServer = createServer(app);
+
+const socketAllowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim());
+
 const io = new Server(httpServer, {
   cors: {
-    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
+    origin: socketAllowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }
