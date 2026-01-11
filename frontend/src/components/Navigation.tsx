@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { navigationConfig, BREAKPOINTS } from '../config/navigation';
+import { navigationConfig, BREAKPOINTS, NavigationItem } from '../config/navigation';
 import NavigationDropdown from './NavigationDropdown';
 import MobileMenu from './MobileMenu';
 import ChangePasswordDialog from './ChangePasswordDialog';
@@ -31,10 +31,10 @@ const Navigation: React.FC = () => {
 
   const isCollapsed = viewportWidth < BREAKPOINTS.tablet; // mobile + tablet
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     navigate('/login');
-  };
+  }, [logout, navigate]);
 
   const handlePasswordChangeSuccess = (
     token?: string,
@@ -76,7 +76,7 @@ const Navigation: React.FC = () => {
     return location.pathname.startsWith(`${path}/`);
   };
 
-  const userMenuItems = useMemo(() => {
+  const userMenuItems: NavigationItem[] = useMemo(() => {
     if (!user) return [];
     return [
       {
@@ -133,7 +133,7 @@ const Navigation: React.FC = () => {
               <NavigationDropdown
                 label={user.username}
                 icon="👤"
-                children={userMenuItems as any}
+                items={userMenuItems}
                 isActive={isPathActive('/profile') || isPathActive('/my-achievements')}
               />
             </div>
@@ -153,7 +153,7 @@ const Navigation: React.FC = () => {
                       key={item.label}
                       label={item.label}
                       icon={item.icon}
-                      children={visibleChildren}
+                      items={visibleChildren}
                       badge={item.badge}
                       isActive={isItemActive}
                     />
@@ -185,7 +185,7 @@ const Navigation: React.FC = () => {
                 <NavigationDropdown
                   label="User"
                   icon="👤"
-                  children={userMenuItems as any}
+                  items={userMenuItems}
                   isActive={isPathActive('/profile') || isPathActive('/my-achievements')}
                 />
               </div>
@@ -198,7 +198,7 @@ const Navigation: React.FC = () => {
             onClose={() => setIsMobileMenuOpen(false)}
             navigationItems={visibleItems}
             userRole={user.role}
-            userMenuItems={userMenuItems as any}
+            userMenuItems={userMenuItems}
           />
 
           {/* Change Password Dialog */}

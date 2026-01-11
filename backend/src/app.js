@@ -1,22 +1,3 @@
-// IMPORTANT: In ESM, static imports are evaluated before the importer module's
-// top-level code runs. `src/index.js` cannot reliably load env vars *before*
-// this module evaluates. Therefore, load env here.
-import dotenv from 'dotenv';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-if (process.env.NODE_ENV === 'test') {
-  dotenv.config({ path: path.resolve(__dirname, '../.env.test'), override: true });
-} else if (process.env.NODE_ENV !== 'production') {
-  // Development: load root .env, then backend/.env. Do not override env vars
-  // already provided by the runtime (e.g. Docker/Compose).
-  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-  dotenv.config({ path: path.resolve(__dirname, '../.env') });
-}
-
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -25,6 +6,7 @@ import slowDown from 'express-slow-down';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
+import path from 'node:path';
 import fs from 'fs';
 import csrf from './middleware/csrf.js';
 import { errorNotificationService } from './utils/errorNotification.js';
@@ -448,63 +430,79 @@ app.use((err, req, res, _next) => {
   }
 });
 
-// Serve static frontend files in both production and development
-// Get __dirname equivalent for ES modules
-const currentFileUrl = fileURLToPath(import.meta.url);
-const currentDir = path.dirname(currentFileUrl);
-const frontendDistPath = path.join(currentDir, '../../frontend/dist');
+// Serve static frontend files in non-test environments only.
+// Tests import the Express app directly and shouldn't depend on filesystem paths.
+if (process.env.NODE_ENV !== 'test') {
+  const distCandidates = [
+    path.resolve(process.cwd(), 'frontend', 'dist'),
+    path.resolve(process.cwd(), '..', 'frontend', 'dist'),
+    path.resolve(process.cwd(), '..', '..', 'frontend', 'dist')
+  ];
 
-// Check if frontend dist folder exists
-let serveFrontend = false;
-try {
-  fs.accessSync(frontendDistPath);
-  serveFrontend = true;
-  console.log('Frontend dist folder found, serving static files from:', frontendDistPath);
-} catch {
-  console.log('Frontend dist folder not found. Run "npm run build" in frontend directory to build.');
-}
+  let frontendDistPath = null;
+  for (const candidate of distCandidates) {
+    try {
+      fs.accessSync(candidate);
+      frontendDistPath = candidate;
+      break;
+    } catch {
+      // ignore
+    }
+  }
 
-if (serveFrontend) {
-  // Serve static files
-  app.use(express.static(frontendDistPath, {
-    maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0',
-    setHeaders: (res, filepath) => {
-      // Don't cache index.html and service-worker.js
-      if (filepath.endsWith('index.html') || filepath.endsWith('service-worker.js')) {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  const serveFrontend = Boolean(frontendDistPath);
+
+  if (serveFrontend) {
+    console.log('Frontend dist folder found, serving static files from:', frontendDistPath);
+
+    // Serve static files
+    app.use(
+      express.static(frontendDistPath, {
+        maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0',
+        setHeaders: (res, filepath) => {
+          // Don't cache index.html and service-worker.js
+          if (filepath.endsWith('index.html') || filepath.endsWith('service-worker.js')) {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+          }
+        }
+      })
+    );
+
+    // SPA fallback - serve index.html for all non-API, non-asset routes
+    // Use middleware instead of route pattern for path-to-regexp v8 compatibility
+    app.use((req, res) => {
+      // Don't serve index.html for API routes (includes /api/health)
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'Route not found' });
       }
-    }
-  }));
-  
-  // SPA fallback - serve index.html for all non-API, non-asset routes
-  // Use middleware instead of route pattern for path-to-regexp v8 compatibility
-  app.use((req, res) => {
-    // Don't serve index.html for API routes (includes /api/health)
-    if (req.path.startsWith('/api/')) {
+      // Don't serve index.html for static assets (express.static already handled these)
+      if (
+        req.path.startsWith('/assets/') ||
+        req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)
+      ) {
+        return res.status(404).json({ error: 'Asset not found' });
+      }
+      // Serve index.html for all other GET requests (SPA routing)
+      if (req.method === 'GET') {
+        return res.sendFile(path.join(frontendDistPath, 'index.html'));
+      }
+      // Non-GET requests that aren't API calls
       return res.status(404).json({ error: 'Route not found' });
-    }
-    // Don't serve index.html for static assets (express.static already handled these)
-    if (req.path.startsWith('/assets/') || req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
-      return res.status(404).json({ error: 'Asset not found' });
-    }
-    // Serve index.html for all other GET requests (SPA routing)
-    if (req.method === 'GET') {
-      return res.sendFile(path.join(frontendDistPath, 'index.html'));
-    }
-    // Non-GET requests that aren't API calls
-    res.status(404).json({ error: 'Route not found' });
-  });
-} else {
-  // 404 handler when frontend is not built
-  app.use((req, res) => {
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: 'Route not found' });
-    }
-    res.status(503).json({ 
-      error: 'Frontend not available', 
-      message: 'Run "npm run build" in the frontend directory to build the application' 
     });
-  });
+  } else {
+    console.log('Frontend dist folder not found. Run "npm run build" in frontend directory to build.');
+
+    // 404 handler when frontend is not built
+    app.use((req, res) => {
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'Route not found' });
+      }
+      return res.status(503).json({
+        error: 'Frontend not available',
+        message: 'Run "npm run build" in the frontend directory to build the application'
+      });
+    });
+  }
 }
 
 export default app;
