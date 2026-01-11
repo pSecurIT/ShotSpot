@@ -109,6 +109,28 @@ describe('🏆 Achievements Routes', () => {
     });
   });
 
+  describe('📰 GET /api/achievements/recent', () => {
+    it('✅ should return recent achievements feed (array)', async () => {
+      const response = await request(app)
+        .get('/api/achievements/recent')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+    });
+
+    it('✅ should respect limit parameter', async () => {
+      const response = await request(app)
+        .get('/api/achievements/recent')
+        .query({ limit: 1 })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBeLessThanOrEqual(1);
+    });
+  });
+
   describe('👤 GET /api/achievements/player/:playerId', () => {
     it('✅ should return empty achievements for new player', async () => {
       const response = await request(app)

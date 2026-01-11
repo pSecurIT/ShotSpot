@@ -273,6 +273,37 @@ describe('🎮 Games API', () => {
       _completedGame = completed.rows[0];
     });
 
+    it('✅ should support limit and sort=recent query params', async () => {
+      const response = await request(app)
+        .get('/api/games')
+        .query({ limit: 2, sort: 'recent' })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBeLessThanOrEqual(2);
+    });
+
+    it('✅ should support status=upcoming pseudo-status', async () => {
+      // Insert a future scheduled game
+      const futureGame = await db.query(
+        `INSERT INTO games (home_club_id, away_club_id, date, status)
+         VALUES ($1, $2, $3, 'scheduled') RETURNING *`,
+        [club1.id, club2.id, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)]
+      );
+
+      const response = await request(app)
+        .get('/api/games')
+        .query({ status: 'upcoming' })
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.some((g) => g.id === futureGame.rows[0].id)).toBe(true);
+
+      await db.query('DELETE FROM games WHERE id = $1', [futureGame.rows[0].id]);
+    });
+
     it('✅ should get all games', async () => {
       try {
         const response = await request(app)
