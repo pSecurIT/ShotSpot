@@ -6,6 +6,7 @@ import TeamManagement from './components/TeamManagement';
 import PlayerManagement from './components/PlayerManagement';
 import UserManagement from './components/UserManagement';
 import GameManagement from './components/GameManagement';
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const LiveMatch = React.lazy(() => import('./components/LiveMatch'));
 const ShotAnalytics = React.lazy(() => import('./components/ShotAnalytics'));
 const ExportCenter = React.lazy(() => import('./components/ExportCenter'));
@@ -44,15 +45,14 @@ const App: React.FC = () => {
           </header>
           <main>
             <Routes>
-              <Route path="/" element={<Navigate to="/teams" replace />} />
-              <Route path="/" element={<Navigate to="/games" replace />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <Navigate to="/games" replace />
+                    <RouteLoader><Dashboard /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
