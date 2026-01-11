@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { navigationConfig, BREAKPOINTS, NavigationItem } from '../config/navigation';
+import { BREAKPOINTS, NavigationItem } from '../config/navigation';
+import { useNavigation } from '../hooks/useNavigation';
 import NavigationDropdown from './NavigationDropdown';
 import MobileMenu from './MobileMenu';
 import ChangePasswordDialog from './ChangePasswordDialog';
@@ -13,6 +14,7 @@ const Navigation: React.FC = () => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const { visibleNavigation } = useNavigation(user);
 
   // Handle responsive breakpoints
   useEffect(() => {
@@ -53,21 +55,6 @@ const Navigation: React.FC = () => {
     navigate('/teams');
   };
 
-  // Filter navigation items based on user role
-  const getVisibleItems = () => {
-    if (!user) return [];
-    return navigationConfig.filter((item) =>
-      item.roles.includes(user.role as 'user' | 'coach' | 'admin')
-    );
-  };
-
-  // Filter children items based on user role
-  const getVisibleChildren = (children?: typeof navigationConfig) => {
-    if (!children || !user) return [];
-    return children.filter((child) =>
-      child.roles.includes(user.role as 'user' | 'coach' | 'admin')
-    );
-  };
 
   const isPathActive = (path?: string) => {
     if (!path) return false;
@@ -106,7 +93,7 @@ const Navigation: React.FC = () => {
     ];
   }, [user, handleLogout]);
 
-  const visibleItems = getVisibleItems();
+  const visibleItems = visibleNavigation;
 
   return (
     <nav className="navigation-v2" aria-label="Main navigation">
@@ -143,7 +130,7 @@ const Navigation: React.FC = () => {
           {!isCollapsed && (
             <div className="navigation-v2__desktop">
               {visibleItems.map((item) => {
-                const visibleChildren = getVisibleChildren(item.children);
+                const visibleChildren = item.children ?? [];
                 const isItemActive = isPathActive(item.path) || visibleChildren.some((c) => isPathActive(c.path));
 
                 if (item.children && visibleChildren.length > 0) {
