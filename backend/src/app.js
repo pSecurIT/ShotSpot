@@ -1,7 +1,21 @@
-// Load environment variables first (prefer test env file when under NODE_ENV=test)
+// IMPORTANT: In ESM, static imports are evaluated before the importer module's
+// top-level code runs. `src/index.js` cannot reliably load env vars *before*
+// this module evaluates. Therefore, load env here.
 import dotenv from 'dotenv';
-const envFile = process.env.NODE_ENV === 'test' ? '../../.env.test' : '../../.env';
-dotenv.config({ path: new URL(envFile, import.meta.url), override: true });
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+if (process.env.NODE_ENV === 'test') {
+  dotenv.config({ path: path.resolve(__dirname, '../.env.test'), override: true });
+} else if (process.env.NODE_ENV !== 'production') {
+  // Development: load root .env, then backend/.env. Do not override env vars
+  // already provided by the runtime (e.g. Docker/Compose).
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+}
 
 import express from 'express';
 import cors from 'cors';
@@ -11,9 +25,7 @@ import slowDown from 'express-slow-down';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
-import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import csrf from './middleware/csrf.js';
 import { errorNotificationService } from './utils/errorNotification.js';
 import authRoutes from './routes/auth.js';

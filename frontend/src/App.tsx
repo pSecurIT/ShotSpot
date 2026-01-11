@@ -16,6 +16,8 @@ import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
 import OfflineIndicator from './components/OfflineIndicator';
+import UserProfile from './components/UserProfile';
+import MyAchievements from './components/MyAchievements';
 import logo from './img/ShotSpot_logo.png';
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
@@ -46,6 +48,54 @@ const App: React.FC = () => {
               <Route path="/" element={<Navigate to="/games" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Navigate to="/games" replace />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/match"
+                element={
+                  <ProtectedRoute>
+                    <Navigate to="/games" replace />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analytics"
+                element={
+                  <ProtectedRoute>
+                    <Navigate to="/games" replace />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/achievements"
+                element={
+                  <ProtectedRoute>
+                    <Navigate to="/games" replace />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <UserProfile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-achievements"
+                element={
+                  <ProtectedRoute>
+                    <MyAchievements />
+                  </ProtectedRoute>
+                }
+              />
               <Route 
                 path="/games" 
                 element={
