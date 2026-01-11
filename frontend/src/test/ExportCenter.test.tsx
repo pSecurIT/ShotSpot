@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import ExportCenter from '../components/ExportCenter';
 
@@ -63,41 +64,43 @@ vi.mock('../utils/api', () => ({
 }));
 
 describe('ExportCenter', () => {
-  it('should render export center title', () => {
+  const renderAndWaitForLoad = async () => {
+    const user = userEvent.setup();
     render(<ExportCenter />);
-    
+    await waitForElementToBeRemoved(() => screen.queryByText('Loading exports...'));
+    return { user };
+  };
+
+  it('should render export center title', async () => {
+    await renderAndWaitForLoad();
     expect(screen.getByText('Export Center')).toBeInTheDocument();
   });
 
-  it('should render all tabs', () => {
-    render(<ExportCenter />);
-    
+  it('should render all tabs', async () => {
+    await renderAndWaitForLoad();
+
     expect(screen.getByText('Recent Exports')).toBeInTheDocument();
     expect(screen.getByText('Templates')).toBeInTheDocument();
     expect(screen.getByText('Scheduled Exports')).toBeInTheDocument();
   });
 
-  it('should switch tabs when clicked', () => {
-    render(<ExportCenter />);
-    
-    const templatesTab = screen.getByText('Templates');
-    fireEvent.click(templatesTab);
-    
+  it('should switch tabs when clicked', async () => {
+    const { user } = await renderAndWaitForLoad();
+
+    await user.click(screen.getByText('Templates'));
+
     expect(screen.getByText('Export templates help you quickly generate reports with predefined settings.')).toBeInTheDocument();
   });
 
-  it('should show new export button', () => {
-    render(<ExportCenter />);
-    
-    const newExportButton = screen.getByText('+ New Export');
-    expect(newExportButton).toBeInTheDocument();
+  it('should show new export button', async () => {
+    await renderAndWaitForLoad();
+    expect(screen.getByText('+ New Export')).toBeInTheDocument();
   });
 
   it('should open export dialog when new export clicked', async () => {
-    render(<ExportCenter />);
-    
-    const newExportButton = screen.getByText('+ New Export');
-    fireEvent.click(newExportButton);
+    const { user } = await renderAndWaitForLoad();
+
+    await user.click(screen.getByText('+ New Export'));
     
     await waitFor(() => {
       expect(screen.getByText('New Export')).toBeInTheDocument();
@@ -105,7 +108,7 @@ describe('ExportCenter', () => {
   });
 
   it('should display recent exports with mock data', async () => {
-    render(<ExportCenter />);
+    await renderAndWaitForLoad();
     
     await waitFor(() => {
       expect(screen.getByText(/Game Report - Team A vs Team B/)).toBeInTheDocument();
@@ -114,7 +117,7 @@ describe('ExportCenter', () => {
   });
 
   it('should display export status badges', async () => {
-    render(<ExportCenter />);
+    await renderAndWaitForLoad();
     
     await waitFor(() => {
       const statusBadges = screen.getAllByText('Completed');
@@ -123,7 +126,7 @@ describe('ExportCenter', () => {
   });
 
   it('should show download button for completed exports', async () => {
-    render(<ExportCenter />);
+    await renderAndWaitForLoad();
     
     await waitFor(() => {
       const downloadButtons = screen.getAllByText('Download');
@@ -132,7 +135,7 @@ describe('ExportCenter', () => {
   });
 
   it('should show delete button for all exports', async () => {
-    render(<ExportCenter />);
+    await renderAndWaitForLoad();
     
     await waitFor(() => {
       const deleteButtons = screen.getAllByText('Delete');
@@ -141,10 +144,9 @@ describe('ExportCenter', () => {
   });
 
   it('should display templates', async () => {
-    render(<ExportCenter />);
-    
-    const templatesTab = screen.getByText('Templates');
-    fireEvent.click(templatesTab);
+    const { user } = await renderAndWaitForLoad();
+
+    await user.click(screen.getByText('Templates'));
     
     await waitFor(() => {
       expect(screen.getByText('Match Summary')).toBeInTheDocument();
@@ -153,10 +155,9 @@ describe('ExportCenter', () => {
   });
 
   it('should show use template buttons', async () => {
-    render(<ExportCenter />);
-    
-    const templatesTab = screen.getByText('Templates');
-    fireEvent.click(templatesTab);
+    const { user } = await renderAndWaitForLoad();
+
+    await user.click(screen.getByText('Templates'));
     
     await waitFor(() => {
       const useTemplateButtons = screen.getAllByText('Use Template');
@@ -164,18 +165,17 @@ describe('ExportCenter', () => {
     });
   });
 
-  it('should show scheduled exports tab content', () => {
-    render(<ExportCenter />);
-    
-    const scheduleTab = screen.getByText('Scheduled Exports');
-    fireEvent.click(scheduleTab);
-    
+  it('should show scheduled exports tab content', async () => {
+    const { user } = await renderAndWaitForLoad();
+
+    await user.click(screen.getByText('Scheduled Exports'));
+
     expect(screen.getByText('Schedule automatic exports to be generated at regular intervals.')).toBeInTheDocument();
     expect(screen.getByText('No scheduled exports configured')).toBeInTheDocument();
   });
 
   it('should format relative timestamps correctly', async () => {
-    render(<ExportCenter />);
+    await renderAndWaitForLoad();
     
     await waitFor(() => {
       // Check for relative time format (e.g., "1 hour ago", "2 hours ago")
