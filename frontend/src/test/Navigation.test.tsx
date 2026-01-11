@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
@@ -103,6 +103,13 @@ describe('Navigation Component', () => {
       role: 'admin'
     };
 
+    const coachUser = {
+      id: 3,
+      username: 'coach',
+      email: 'coach@example.com',
+      role: 'coach'
+    };
+
     it('shows navigation menu when authenticated', () => {
       renderNavigation(regularUser);
       
@@ -133,6 +140,14 @@ describe('Navigation Component', () => {
       expect(screen.getByText('User Management')).toBeInTheDocument();
     });
 
+    it('shows an Admin badge for admin-only items', () => {
+      renderNavigation(adminUser);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+      const userManagement = screen.getByRole('menuitem', { name: /User Management/i });
+      expect(within(userManagement).getByText('Admin')).toBeInTheDocument();
+    });
+
     it('hides Users link for non-admin users', () => {
       renderNavigation(regularUser);
       
@@ -141,16 +156,34 @@ describe('Navigation Component', () => {
     });
 
     it('shows Users link for coach users', () => {
-      const coachUser = {
-        id: 3,
-        username: 'coach',
-        email: 'coach@example.com',
-        role: 'coach'
-      };
       renderNavigation(coachUser);
       
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
       expect(screen.queryByText('User Management')).not.toBeInTheDocument();
+    });
+
+    it('shows coach-only items for coaches but not regular users', () => {
+      const { unmount } = renderNavigation(coachUser);
+      fireEvent.click(screen.getByRole('button', { name: 'Matches' }));
+      expect(screen.getByText('Match Templates')).toBeInTheDocument();
+
+      unmount();
+
+      renderNavigation(regularUser);
+      fireEvent.click(screen.getByRole('button', { name: 'Matches' }));
+      expect(screen.queryByText('Match Templates')).not.toBeInTheDocument();
+    });
+
+    it('shows Twizzit Integration for coach/admin users', () => {
+      const { unmount } = renderNavigation(coachUser);
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+      expect(screen.getByText('Twizzit Integration')).toBeInTheDocument();
+
+      unmount();
+
+      renderNavigation(adminUser);
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+      expect(screen.getByText('Twizzit Integration')).toBeInTheDocument();
     });
   });
 

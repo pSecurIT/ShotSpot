@@ -162,11 +162,16 @@ export const navigationConfig: NavigationItem[] = [
         disabled: true
       },
       {
+        label: 'settings-divider',
+        icon: '',
+        roles: ['coach', 'admin'],
+        divider: true
+      },
+      {
         label: 'Twizzit Integration',
         path: '/twizzit',
         icon: '🔗',
-        roles: ['coach', 'admin'],
-        divider: true
+        roles: ['coach', 'admin']
       },
       {
         label: 'User Management',
