@@ -1,5 +1,6 @@
 import React, { createContext, useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useAuth } from './AuthContext';
 
 interface WebSocketContextType {
   socket: Socket | null;
@@ -21,6 +22,7 @@ interface WebSocketProviderProps {
 }
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
+  const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
@@ -28,9 +30,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   useEffect(() => {
     // Get auth token from localStorage
     const token = localStorage.getItem('token');
-    
-    if (!token) {
-      console.log('No auth token found, WebSocket not initialized');
+
+    if (!user || !token) {
+      if (!token) {
+        console.log('No auth token found, WebSocket not initialized');
+      }
       return;
     }
 
@@ -58,11 +62,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     newSocket.on('disconnect', (reason) => {
       console.log('✗ WebSocket disconnected:', reason);
       setConnected(false);
+      setSocket(null);
     });
 
     newSocket.on('connect_error', (error) => {
       console.error('WebSocket connection error:', error.message);
       setConnected(false);
+      setSocket(null);
     });
 
     // Cleanup on unmount
@@ -70,9 +76,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       if (socketRef.current) {
         console.log('Cleaning up WebSocket connection');
         socketRef.current.disconnect();
+        socketRef.current = null;
       }
     };
-  }, []);
+  }, [user]);
 
   const joinGame = (gameId: number) => {
     if (socketRef.current?.connected) {
