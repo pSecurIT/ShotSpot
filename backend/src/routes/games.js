@@ -17,12 +17,12 @@ router.use(auth);
 
 /**
  * Get all games with optional filtering
- * Query params: status, team_id, date_from, date_to
+ * Query params: status, team_id, date_from, date_to, limit, sort
  */
 router.get('/', [
   query('status')
     .optional()
-    .isIn(['scheduled', 'to_reschedule', 'in_progress', 'completed', 'cancelled'])
+    .isIn(['scheduled', 'to_reschedule', 'in_progress', 'completed', 'cancelled', 'upcoming'])
     .withMessage('Invalid status value'),
   query('club_id')
     .optional()
@@ -39,7 +39,15 @@ router.get('/', [
   query('date_to')
     .optional()
     .isISO8601()
-    .withMessage('Invalid date format for date_to')
+    .withMessage('Invalid date format for date_to'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('sort')
+    .optional()
+    .isIn(['recent'])
+    .withMessage('Invalid sort value')
 ], async (req, res) => {
   // Check for validation errors
   const errors = validationResult(req);
@@ -47,7 +55,7 @@ router.get('/', [
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { status, club_id, team_id, date_from, date_to } = req.query;
+  const { status, club_id, team_id, date_from, date_to, limit, sort } = req.query;
   
   try {
     let query = `
@@ -68,9 +76,14 @@ router.get('/', [
     let paramCount = 1;
 
     if (status) {
-      query += ` AND g.status = $${paramCount}`;
-      params.push(status);
-      paramCount++;
+      if (status === 'upcoming') {
+        // Pseudo-status for dashboard widgets: scheduled games in the future
+        query += ' AND g.status = \'scheduled\' AND g.date >= NOW()';
+      } else {
+        query += ` AND g.status = $${paramCount}`;
+        params.push(status);
+        paramCount++;
+      }
     }
 
     if (club_id) {
@@ -97,7 +110,19 @@ router.get('/', [
       paramCount++;
     }
 
-    query += ' ORDER BY g.date DESC';
+    if (status === 'upcoming') {
+      query += ' ORDER BY g.date ASC';
+    } else if (sort === 'recent') {
+      query += ' ORDER BY g.date DESC';
+    } else {
+      query += ' ORDER BY g.date DESC';
+    }
+
+    if (limit) {
+      query += ` LIMIT $${paramCount}`;
+      params.push(parseInt(limit, 10));
+      paramCount++;
+    }
 
     const result = await db.query(query, params);
     res.json(result.rows);

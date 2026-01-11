@@ -10,6 +10,52 @@ const router = express.Router();
 router.use(auth);
 
 /**
+ * GET /api/achievements/recent
+ * Recent achievements feed across players.
+ * Query params: limit
+ */
+router.get('/recent', [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const limit = parseInt(req.query.limit ?? '10', 10);
+
+  try {
+    const result = await db.query(`
+      SELECT
+        pa.id,
+        pa.earned_at,
+        pa.player_id,
+        CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+        a.name,
+        a.description,
+        a.badge_icon,
+        a.points,
+        g.id AS game_id,
+        g.date AS game_date
+      FROM player_achievements pa
+      JOIN achievements a ON pa.achievement_id = a.id
+      JOIN players p ON pa.player_id = p.id
+      LEFT JOIN games g ON pa.game_id = g.id
+      ORDER BY pa.earned_at DESC
+      LIMIT $1
+    `, [limit]);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching recent achievements:', err);
+    res.status(500).json({ error: 'Failed to fetch recent achievements' });
+  }
+});
+
+/**
  * GET /api/achievements/list
  * Get all available achievements with descriptions
  */
