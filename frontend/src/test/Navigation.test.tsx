@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import Navigation from '../components/Navigation';
@@ -40,6 +41,21 @@ const renderNavigation = (user: { username: string; role: string } | null = null
   );
 };
 
+const openUserMenu = async () => {
+  const trigger = screen.getByRole('button', { name: 'User' });
+  if (trigger.getAttribute('aria-expanded') === 'true') {
+    return;
+  }
+
+  const user = userEvent.setup();
+  await user.click(trigger);
+
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'User' })).toHaveAttribute('aria-expanded', 'true');
+  });
+  await screen.findByText('Change Password');
+};
+
 describe('Navigation Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,10 +74,11 @@ describe('Navigation Component', () => {
     it('does not show navigation menu when not authenticated', () => {
       renderNavigation(null);
       
-      expect(screen.queryByText('Games')).not.toBeInTheDocument();
-      expect(screen.queryByText('Teams')).not.toBeInTheDocument();
-      expect(screen.queryByText('Players')).not.toBeInTheDocument();
-      expect(screen.queryByText('Logout')).not.toBeInTheDocument();
+      expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Matches' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Analytics' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Data' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'User' })).not.toBeInTheDocument();
     });
 
     it('does not show change password button when not authenticated', () => {
@@ -89,34 +106,38 @@ describe('Navigation Component', () => {
     it('shows navigation menu when authenticated', () => {
       renderNavigation(regularUser);
       
-      expect(screen.getByText('Games')).toBeInTheDocument();
-      expect(screen.getByText('Teams')).toBeInTheDocument();
-      expect(screen.getByText('Players')).toBeInTheDocument();
-      expect(screen.getByText('Logout')).toBeInTheDocument();
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Matches' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Analytics' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Data' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument();
     });
 
     it('displays user information', () => {
       renderNavigation(regularUser);
       
-      expect(screen.getByText('Welcome, testuser (user)!')).toBeInTheDocument();
+      expect(screen.getByText(/testuser\s*\(\s*user\s*\)/i)).toBeInTheDocument();
     });
 
-    it('shows change password button when authenticated', () => {
+    it('shows change password button when authenticated', async () => {
       renderNavigation(regularUser);
       
+      await openUserMenu();
       expect(screen.getByText('Change Password')).toBeInTheDocument();
     });
 
     it('shows Users link for admin users', () => {
       renderNavigation(adminUser);
       
-      expect(screen.getByText('Users')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+      expect(screen.getByText('User Management')).toBeInTheDocument();
     });
 
     it('hides Users link for non-admin users', () => {
       renderNavigation(regularUser);
       
-      expect(screen.queryByText('Users')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument();
+      expect(screen.queryByText('User Management')).not.toBeInTheDocument();
     });
 
     it('shows Users link for coach users', () => {
@@ -128,7 +149,8 @@ describe('Navigation Component', () => {
       };
       renderNavigation(coachUser);
       
-      expect(screen.queryByText('Users')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+      expect(screen.queryByText('User Management')).not.toBeInTheDocument();
     });
   });
 
@@ -140,20 +162,20 @@ describe('Navigation Component', () => {
       role: 'user'
     };
 
-    it('calls logout when logout button is clicked', () => {
+    it('calls logout when logout button is clicked', async () => {
       renderNavigation(regularUser);
       
-      const logoutButton = screen.getByText('Logout');
-      fireEvent.click(logoutButton);
+      await openUserMenu();
+      fireEvent.click(screen.getByText('Logout'));
       
       expect(mockLogout).toHaveBeenCalled();
     });
 
-    it('navigates to login page after logout', () => {
+    it('navigates to login page after logout', async () => {
       renderNavigation(regularUser);
       
-      const logoutButton = screen.getByText('Logout');
-      fireEvent.click(logoutButton);
+      await openUserMenu();
+      fireEvent.click(screen.getByText('Logout'));
       
       expect(mockNavigate).toHaveBeenCalledWith('/login');
     });
@@ -167,26 +189,28 @@ describe('Navigation Component', () => {
       role: 'user'
     };
 
-    it('opens password dialog when change password button is clicked', () => {
+    it('opens password dialog when change password button is clicked', async () => {
       renderNavigation(regularUser);
       
-      const changePasswordButton = screen.getByText('Change Password');
-      fireEvent.click(changePasswordButton);
+      await openUserMenu();
+      fireEvent.click(screen.getByText('Change Password'));
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
     });
 
-    it('shows current password field in dialog', () => {
+    it('shows current password field in dialog', async () => {
       renderNavigation(regularUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       expect(screen.getByLabelText('Current Password *')).toBeInTheDocument();
     });
 
-    it('passes correct props to password dialog', () => {
+    it('passes correct props to password dialog', async () => {
       renderNavigation(regularUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       // Verify dialog is open with correct user info
@@ -196,9 +220,10 @@ describe('Navigation Component', () => {
       expect(screen.getByLabelText('Current Password *')).toBeInTheDocument();
     });
 
-    it('closes password dialog when cancel is clicked', () => {
+    it('closes password dialog when cancel is clicked', async () => {
       renderNavigation(regularUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
@@ -208,9 +233,10 @@ describe('Navigation Component', () => {
       expect(screen.queryByText('Change Your Password')).not.toBeInTheDocument();
     });
 
-    it('closes password dialog when X button is clicked', () => {
+    it('closes password dialog when X button is clicked', async () => {
       renderNavigation(regularUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       const closeButton = screen.getByLabelText('Close dialog');
@@ -225,6 +251,7 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       // Open dialog
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       // Fill in form
@@ -249,6 +276,7 @@ describe('Navigation Component', () => {
       
       renderNavigation(regularUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       fireEvent.change(screen.getByLabelText('Current Password *'), { target: { value: 'OldPass123!' } });
@@ -268,6 +296,7 @@ describe('Navigation Component', () => {
       
       renderNavigation(regularUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       fireEvent.change(screen.getByLabelText('Current Password *'), { target: { value: 'OldPass123!' } });
@@ -293,6 +322,7 @@ describe('Navigation Component', () => {
       
       renderNavigation(regularUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       fireEvent.change(screen.getByLabelText('Current Password *'), { target: { value: 'WrongPass123!' } });
@@ -307,10 +337,11 @@ describe('Navigation Component', () => {
       });
     });
 
-    it('can reopen password dialog after closing', () => {
+    it('can reopen password dialog after closing', async () => {
       renderNavigation(regularUser);
       
       // Open dialog
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
       
@@ -319,6 +350,7 @@ describe('Navigation Component', () => {
       expect(screen.queryByText('Change Your Password')).not.toBeInTheDocument();
       
       // Reopen dialog
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
     });
@@ -326,6 +358,7 @@ describe('Navigation Component', () => {
     it('validates password before submission', async () => {
       renderNavigation(regularUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       // Fill with invalid password (too short)
@@ -355,24 +388,27 @@ describe('Navigation Component', () => {
       role: 'admin'
     };
 
-    it('shows change password button for admin', () => {
+    it('shows change password button for admin', async () => {
       renderNavigation(adminUser);
       
+      await openUserMenu();
       expect(screen.getByText('Change Password')).toBeInTheDocument();
     });
 
-    it('admin can change own password via navigation', () => {
+    it('admin can change own password via navigation', async () => {
       renderNavigation(adminUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
       expect(screen.getByLabelText('Current Password *')).toBeInTheDocument();
     });
 
-    it('admin password change requires current password', () => {
+    it('admin password change requires current password', async () => {
       renderNavigation(adminUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       // Current password field should be present
@@ -388,15 +424,17 @@ describe('Navigation Component', () => {
       role: 'coach'
     };
 
-    it('shows change password button for coach', () => {
+    it('shows change password button for coach', async () => {
       renderNavigation(coachUser);
       
+      await openUserMenu();
       expect(screen.getByText('Change Password')).toBeInTheDocument();
     });
 
-    it('coach can change own password via navigation', () => {
+    it('coach can change own password via navigation', async () => {
       renderNavigation(coachUser);
       
+      await openUserMenu();
       fireEvent.click(screen.getByText('Change Password'));
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
