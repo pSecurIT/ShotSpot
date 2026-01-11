@@ -186,8 +186,10 @@ async function main() {
       }
     }
 
-    // Build connection string for migrations
-    const connectionString = `postgresql://${dbConfig.user}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.name}`;
+    // Build connection string for migrations (URL-encode credentials)
+    const encodedUser = encodeURIComponent(String(dbConfig.user));
+    const encodedPassword = encodeURIComponent(String(dbConfig.password));
+    const connectionString = `postgresql://${encodedUser}:${encodedPassword}@${dbConfig.host}:${dbConfig.port}/${dbConfig.name}`;
 
     // Apply migrations using shared migration runner
     console.log('Applying database migrations...');

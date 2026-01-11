@@ -107,7 +107,9 @@ async function setupTestDb() {
     // Build connection string for migrations
     const connectionUser = (dbUser === adminUser) ? adminUser : dbUser;
     const connectionPassword = (dbUser === adminUser) ? adminPassword : dbPassword;
-    const connectionString = `postgresql://${connectionUser}:${connectionPassword}@${dbHost}:${dbPort}/${dbName}`;
+    const encodedUser = encodeURIComponent(String(connectionUser));
+    const encodedPassword = encodeURIComponent(String(connectionPassword));
+    const connectionString = `postgresql://${encodedUser}:${encodedPassword}@${dbHost}:${dbPort}/${dbName}`;
 
     // Apply migrations using shared migration runner
     console.log('Applying database migrations...');
