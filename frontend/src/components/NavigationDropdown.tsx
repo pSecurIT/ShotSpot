@@ -5,7 +5,7 @@ import NavigationItem from './NavigationItem';
 interface NavigationDropdownProps {
   label: string;
   icon: string;
-  children: NavigationItemType[];
+  items: NavigationItemType[];
   badge?: string;
   isActive?: boolean;
 }
@@ -13,7 +13,7 @@ interface NavigationDropdownProps {
 const NavigationDropdown: React.FC<NavigationDropdownProps> = ({
   label,
   icon,
-  children,
+  items,
   badge,
   isActive = false
 }) => {
@@ -103,7 +103,7 @@ const NavigationDropdown: React.FC<NavigationDropdownProps> = ({
 
       {isOpen && (
         <div className="nav-dropdown-menu" role="menu" aria-label={`${label} menu`}>
-          {children.map((item, index) => (
+          {items.map((item, index) => (
             <div
               key={item.label}
               className="nav-dropdown-menu__item"
