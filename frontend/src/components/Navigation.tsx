@@ -52,7 +52,7 @@ const Navigation: React.FC = () => {
       updateUser(token, updatedUser);
     }
     alert('Password changed successfully!');
-    navigate('/teams');
+    navigate('/dashboard');
   };
 
 

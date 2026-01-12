@@ -19,8 +19,8 @@ const Login: React.FC = () => {
       console.log('[Login] Login result:', result);
       
       if (result.success) {
-        console.log('[Login] Success, navigating to /teams');
-        navigate('/teams');
+        console.log('[Login] Success, navigating to /dashboard');
+        navigate('/dashboard');
       } else {
         console.log('[Login] Failed, setting error:', result.error);
         setError(result.error || 'An error occurred during login');
