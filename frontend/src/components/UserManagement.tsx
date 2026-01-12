@@ -262,13 +262,13 @@ const UserManagement: React.FC = () => {
       )}
 
       {error && (
-        <div className="alert alert-error" style={{ color: 'red', marginBottom: '1rem' }}>
+        <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
           {error}
         </div>
       )}
 
       {success && (
-        <div className="alert alert-success" style={{ color: 'green', marginBottom: '1rem' }}>
+        <div className="alert alert-success" style={{ marginBottom: '1rem' }}>
           {success}
         </div>
       )}
@@ -421,7 +421,7 @@ const styles = {
     fontSize: '1rem',
     border: 'none',
     borderRadius: '4px',
-    backgroundColor: '#28a745',
+    backgroundColor: 'var(--secondary-color)',
     color: 'white',
     cursor: 'pointer',
     fontWeight: 500
@@ -429,10 +429,10 @@ const styles = {
   exportButton: {
     padding: '10px 20px',
     fontSize: '1rem',
-    border: '1px solid #007bff',
+    border: '1px solid var(--primary-color)',
     borderRadius: '4px',
-    backgroundColor: 'white',
-    color: '#007bff',
+    backgroundColor: 'var(--bg-light)',
+    color: 'var(--primary-color)',
     cursor: 'pointer',
     fontWeight: 500
   },
@@ -441,7 +441,8 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '12px',
-    backgroundColor: '#e3f2fd',
+    backgroundColor: 'rgba(41, 98, 255, 0.12)',
+    color: 'var(--text-primary)',
     borderRadius: '4px',
     marginBottom: '1rem'
   },
@@ -453,37 +454,42 @@ const styles = {
   bulkSelect: {
     padding: '8px 12px',
     borderRadius: '4px',
-    border: '1px solid #007bff',
-    backgroundColor: 'white',
+    border: '1px solid var(--border-color)',
+    backgroundColor: 'var(--background-light)',
+    color: 'var(--text-primary)',
     cursor: 'pointer',
     fontSize: '0.95rem'
   },
   clearSelectionButton: {
     padding: '8px 16px',
     fontSize: '0.95rem',
-    border: '1px solid #6c757d',
+    border: '1px solid var(--border-color)',
     borderRadius: '4px',
-    backgroundColor: 'white',
-    color: '#6c757d',
+    backgroundColor: 'var(--bg-light)',
+    color: 'var(--text-primary)',
     cursor: 'pointer'
   },
   selectedRow: {
-    backgroundColor: '#e3f2fd'
+    backgroundColor: 'rgba(41, 98, 255, 0.12)'
   },
   th: {
-    backgroundColor: '#f4f4f4',
+    backgroundColor: 'var(--hover-bg)',
+    color: 'var(--text-primary)',
     padding: '12px',
     textAlign: 'left' as const,
-    borderBottom: '2px solid #ddd'
+    borderBottom: '2px solid var(--border-color)'
   },
   td: {
     padding: '12px',
-    borderBottom: '1px solid #ddd'
+    borderBottom: '1px solid var(--border-color)',
+    color: 'var(--text-primary)'
   },
   select: {
     padding: '6px',
     borderRadius: '4px',
-    border: '1px solid #ddd'
+    border: '1px solid var(--border-color)',
+    backgroundColor: 'var(--background-light)',
+    color: 'var(--text-primary)'
   },
   actionButtons: {
     display: 'flex',
@@ -493,9 +499,10 @@ const styles = {
   editButton: {
     padding: '6px 10px',
     fontSize: '1rem',
-    border: '1px solid #007bff',
+    border: '1px solid var(--primary-color)',
     borderRadius: '4px',
-    backgroundColor: 'white',
+    backgroundColor: 'var(--bg-light)',
+    color: 'var(--text-primary)',
     cursor: 'pointer'
   },
   passwordButton: {
@@ -503,15 +510,17 @@ const styles = {
     fontSize: '1rem',
     border: '1px solid #ffc107',
     borderRadius: '4px',
-    backgroundColor: 'white',
+    backgroundColor: 'var(--bg-light)',
+    color: 'var(--text-primary)',
     cursor: 'pointer'
   },
   deleteButton: {
     padding: '6px 10px',
     fontSize: '1rem',
-    border: '1px solid #dc3545',
+    border: '1px solid var(--danger-color)',
     borderRadius: '4px',
-    backgroundColor: 'white',
+    backgroundColor: 'var(--bg-light)',
+    color: 'var(--text-primary)',
     cursor: 'pointer'
   },
   confirmDeleteButton: {
@@ -519,7 +528,7 @@ const styles = {
     fontSize: '1rem',
     border: 'none',
     borderRadius: '4px',
-    backgroundColor: '#dc3545',
+    backgroundColor: 'var(--danger-color)',
     color: 'white',
     cursor: 'pointer',
     fontWeight: 'bold'
@@ -527,9 +536,10 @@ const styles = {
   cancelDeleteButton: {
     padding: '6px 10px',
     fontSize: '1rem',
-    border: '1px solid #6c757d',
+    border: '1px solid var(--border-color)',
     borderRadius: '4px',
-    backgroundColor: 'white',
+    backgroundColor: 'var(--bg-light)',
+    color: 'var(--text-primary)',
     cursor: 'pointer',
     fontWeight: 'bold'
   }
