@@ -2,24 +2,28 @@ import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
-import TeamManagement from './components/TeamManagement';
-import PlayerManagement from './components/PlayerManagement';
-import UserManagement from './components/UserManagement';
-import GameManagement from './components/GameManagement';
-const Dashboard = React.lazy(() => import('./components/Dashboard'));
-const LiveMatch = React.lazy(() => import('./components/LiveMatch'));
-const ShotAnalytics = React.lazy(() => import('./components/ShotAnalytics'));
-const ExportCenter = React.lazy(() => import('./components/ExportCenter'));
-import MatchTemplates from './components/MatchTemplates';
-const TwizzitIntegration = React.lazy(() => import('./components/TwizzitIntegration'));
 import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
 import OfflineIndicator from './components/OfflineIndicator';
-import UserProfile from './components/UserProfile';
-import MyAchievements from './components/MyAchievements';
+import ComingSoon from './components/ComingSoon';
+import NotFound from './components/NotFound';
 import logo from './img/ShotSpot_logo.png';
+
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const GameManagement = React.lazy(() => import('./components/GameManagement'));
+const LiveMatch = React.lazy(() => import('./components/LiveMatch'));
+const ShotAnalytics = React.lazy(() => import('./components/ShotAnalytics'));
+const TeamManagement = React.lazy(() => import('./components/TeamManagement'));
+const PlayerManagement = React.lazy(() => import('./components/PlayerManagement'));
+const UserManagement = React.lazy(() => import('./components/UserManagement'));
+const ExportCenter = React.lazy(() => import('./components/ExportCenter'));
+const MatchTemplates = React.lazy(() => import('./components/MatchTemplates'));
+const TwizzitIntegration = React.lazy(() => import('./components/TwizzitIntegration'));
+const Achievements = React.lazy(() => import('./components/Achievements'));
+const UserProfile = React.lazy(() => import('./components/UserProfile'));
+const MyAchievements = React.lazy(() => import('./components/MyAchievements'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
@@ -76,7 +80,7 @@ const App: React.FC = () => {
                 path="/achievements"
                 element={
                   <ProtectedRoute>
-                    <Navigate to="/games" replace />
+                    <RouteLoader><Achievements /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
@@ -84,7 +88,7 @@ const App: React.FC = () => {
                 path="/profile"
                 element={
                   <ProtectedRoute>
-                    <UserProfile />
+                    <RouteLoader><UserProfile /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
@@ -92,7 +96,7 @@ const App: React.FC = () => {
                 path="/my-achievements"
                 element={
                   <ProtectedRoute>
-                    <MyAchievements />
+                    <RouteLoader><MyAchievements /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
@@ -100,7 +104,7 @@ const App: React.FC = () => {
                 path="/games" 
                 element={
                   <ProtectedRoute>
-                    <GameManagement />
+                    <RouteLoader><GameManagement /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />
@@ -124,7 +128,7 @@ const App: React.FC = () => {
                 path="/teams" 
                 element={
                   <ProtectedRoute>
-                    <TeamManagement />
+                    <RouteLoader><TeamManagement /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />
@@ -132,22 +136,22 @@ const App: React.FC = () => {
                 path="/players" 
                 element={
                   <ProtectedRoute>
-                    <PlayerManagement />
+                    <RouteLoader><PlayerManagement /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />
               <Route 
                 path="/users" 
                 element={
-                  <ProtectedRoute>
-                    <UserManagement />
+                  <ProtectedRoute minRole="admin">
+                    <RouteLoader><UserManagement /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />
               <Route 
                 path="/exports" 
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute minRole="coach">
                     <RouteLoader><ExportCenter /></RouteLoader>
                   </ProtectedRoute>
                 } 
@@ -155,19 +159,87 @@ const App: React.FC = () => {
               <Route 
                 path="/templates" 
                 element={
-                  <ProtectedRoute>
-                    <MatchTemplates />
+                  <ProtectedRoute minRole="coach">
+                    <RouteLoader><MatchTemplates /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />
               <Route 
                 path="/twizzit" 
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute minRole="coach">
                     <RouteLoader><TwizzitIntegration /></RouteLoader>
                   </ProtectedRoute>
                 } 
               />
+
+              {/* New navigation routes (some are placeholders / "Soon") */}
+              <Route
+                path="/advanced-analytics"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <ComingSoon title="Advanced Analytics" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/team-analytics"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <ComingSoon title="Team Analytics" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/clubs"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <ComingSoon title="Clubs" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/competitions"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <ComingSoon title="Competitions" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/series"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <ComingSoon title="Series / Divisions" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/report-templates"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <ComingSoon title="Report Templates" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/scheduled-reports"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <ComingSoon title="Scheduled Reports" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/export-settings"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <ComingSoon title="Export Settings" />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
         </div>
