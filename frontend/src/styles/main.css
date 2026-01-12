@@ -1,5 +1,6 @@
 @import './variables.css';
 @import './Navigation.css';
+@import './MobileMenu.css';
 
 /* Reset and Base Styles */
 * {
@@ -15,6 +16,66 @@ body {
   line-height: 1.6;
 }
 
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background-light: #0f1216;
+    --text-primary: #e7eaee;
+    --text-secondary: #b3b9c4;
+    --text-dark: #e7eaee;
+    --border-color: #26303a;
+    --hover-bg: rgba(255, 255, 255, 0.08);
+    --bg-light: #151a21;
+  }
+}
+
+/* Theme override (user preference) */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background-light: #0f1216;
+  --text-primary: #e7eaee;
+  --text-secondary: #b3b9c4;
+  --text-dark: #e7eaee;
+  --border-color: #26303a;
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --bg-light: #151a21;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  /* Reset to light defaults (must override prefers-color-scheme: dark) */
+  --background-light: #f5f7fa;
+  --text-primary: #2c3e50;
+  --text-secondary: #666666;
+  --text-dark: #1a1a1a;
+  --border-color: #e0e6ed;
+  --hover-bg: #f5f5f5;
+  --bg-light: #fafafa;
+}
+
+/* High contrast / accessibility */
+@media (prefers-contrast: more) {
+  :root {
+    --focus-color: #ffd400;
+  }
+}
+
+/* Print: hide navigation chrome */
+@media print {
+  .navigation-v2,
+  .mobile-menu-overlay,
+  .mobile-menu-panel,
+  .App-header {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}
+
 /* Layout */
 .App {
   min-height: 100vh;
@@ -23,7 +84,12 @@ body {
 }
 
 .App-header {
-  background: linear-gradient(to right, #34495e 0%, #1a1a1a 50%, #34495e 100%);
+  background: linear-gradient(
+    to right,
+    rgba(var(--primary-rgb), 0.38) 0%,
+    rgba(15, 18, 22, 0.98) 52%,
+    rgba(var(--primary-rgb), 0.38) 100%
+  );
   padding: var(--spacing-md) var(--spacing-xl);
   color: var(--text-light);
   box-shadow: var(--shadow-md);
@@ -103,7 +169,7 @@ main {
 
 /* Forms */
 .form-container {
-  background: white;
+  background: var(--bg-light);
   padding: var(--spacing-xl);
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-lg);
@@ -147,8 +213,31 @@ input {
 input:focus {
   outline: none;
   border-color: var(--primary-color);
-  background-color: white;
+  background-color: var(--background-light);
   box-shadow: var(--shadow-sm);
+}
+
+select {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 2px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  font-size: 1rem;
+  transition: all var(--transition-fast);
+  background-color: var(--background-light);
+  color: var(--text-primary);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-sm);
+}
+
+select option {
+  background-color: var(--background-light);
+  color: var(--text-primary);
 }
 
 /* Buttons */
@@ -233,6 +322,34 @@ input:focus {
   padding: 2rem;
 }
 
+/* Team Management Specific Styles */
+.team-management-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.team-management-container h2 {
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+
+.team-management-form {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.team-management-form input[type="text"] {
+  flex: 1;
+  min-width: 240px;
+  max-width: 520px;
+}
+
 .game-management-container h2 {
   color: var(--text-primary);
   font-family: var(--font-heading);
@@ -250,28 +367,29 @@ input:focus {
 
 .game-controls select {
   padding: 12px 16px;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-color);
   border-radius: 6px;
   font-size: 16px;
-  background-color: white;
+  background-color: var(--bg-light);
+  color: var(--text-primary);
   cursor: pointer;
   min-height: 44px;
   transition: all 0.2s ease;
 }
 
 .game-controls select:hover {
-  border-color: #bbb;
+  border-color: var(--primary-color);
 }
 
 .game-controls select:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+  box-shadow: 0 0 0 3px rgba(41, 98, 255, 0.25);
 }
 
 .create-game-form {
-  background-color: #f9f9f9;
-  border: 1px solid #ddd;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 2rem;
   margin-bottom: 2rem;
@@ -300,18 +418,20 @@ input:focus {
 .form-field input {
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-color);
   border-radius: 6px;
   font-size: 16px;
   transition: all 0.2s ease;
   min-height: 44px;
+  background-color: var(--background-light);
+  color: var(--text-primary);
 }
 
 .form-field select:focus,
 .form-field input:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+  box-shadow: 0 0 0 3px rgba(41, 98, 255, 0.25);
 }
 
 .games-list h3 {
@@ -321,8 +441,8 @@ input:focus {
 }
 
 .game-card {
-  background-color: white;
-  border: 1px solid #e0e0e0;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1.5rem;
   margin-bottom: 1rem;
@@ -350,7 +470,7 @@ input:focus {
 }
 
 .game-card-date {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
@@ -443,7 +563,7 @@ input:focus {
 input.error,
 select.error {
   border-color: #f44336;
-  background-color: #fff5f5;
+  background-color: rgba(244, 67, 54, 0.08);
 }
 
 input.error:focus,
@@ -453,7 +573,7 @@ select.error:focus {
 }
 
 .empty-state {
-  color: #999;
+  color: var(--text-muted);
   font-style: italic;
   text-align: center;
   padding: 3rem;
@@ -462,7 +582,7 @@ select.error:focus {
 
 /* Cards */
 .card {
-  background: white;
+  background: var(--bg-light);
   border-radius: var(--border-radius-md);
   box-shadow: var(--shadow-sm);
   padding: var(--spacing-lg);
@@ -2819,7 +2939,7 @@ select.error:focus {
 }
 
 .stat-row strong {
-  color: #333;
+  color: var(--text-primary);
   font-size: 1.1rem;
 }
 
@@ -2871,13 +2991,13 @@ select.error:focus {
   align-items: center;
   padding: var(--spacing-md);
   margin-bottom: var(--spacing-sm);
-  background-color: white;
+  background-color: var(--bg-light);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
 }
 
 .form-section {
-  background-color: white;
+  background-color: var(--bg-light);
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -2908,16 +3028,18 @@ select.error:focus {
 .form-group label {
   font-weight: 600;
   margin-bottom: 0.5rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .form-group input,
 .form-group select {
   padding: 0.75rem;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-color);
   border-radius: 4px;
   font-size: 1rem;
   transition: border-color 0.2s;
+  background-color: var(--background-light);
+  color: var(--text-primary);
 }
 
 .form-group input:focus,
@@ -2939,7 +3061,7 @@ select.error:focus {
 }
 
 .players-list-section {
-  background-color: white;
+  background-color: var(--bg-light);
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -2951,7 +3073,7 @@ select.error:focus {
 
 .list-header h3 {
   margin: 0 0 1rem 0;
-  color: #333;
+  color: var(--text-primary);
 }
 
 /* Search and Filters Container */
@@ -2969,16 +3091,22 @@ select.error:focus {
 .search-input {
   width: 100%;
   padding: 0.75rem 2.5rem 0.75rem 1rem;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-color);
   border-radius: 8px;
   font-size: 1rem;
   transition: border-color 0.2s;
+  background-color: var(--background-light);
+  color: var(--text-primary);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #4CAF50;
-  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(41, 98, 255, 0.25);
 }
 
 .clear-search {
@@ -2988,7 +3116,7 @@ select.error:focus {
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: #999;
+  color: var(--text-muted);
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
@@ -2997,8 +3125,8 @@ select.error:focus {
 }
 
 .clear-search:hover {
-  background-color: #f0f0f0;
-  color: #333;
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
 }
 
 /* Filters Row */
@@ -3019,30 +3147,32 @@ select.error:focus {
 .filter-group label {
   font-weight: 600;
   font-size: 0.875rem;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .filter-select {
   padding: 0.5rem 0.75rem;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-color);
   border-radius: 4px;
   font-size: 0.9rem;
-  background-color: white;
+  background-color: var(--background-light);
+  color: var(--text-primary);
   cursor: pointer;
   transition: border-color 0.2s;
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: #4CAF50;
+  border-color: var(--primary-color);
 }
 
 .sort-order-btn {
   padding: 0.5rem 0.75rem;
   margin-left: 0.5rem;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-color);
   border-radius: 4px;
-  background-color: white;
+  background-color: var(--background-light);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 1.2rem;
   font-weight: bold;
@@ -3050,8 +3180,8 @@ select.error:focus {
 }
 
 .sort-order-btn:hover {
-  background-color: #f0f0f0;
-  border-color: #4CAF50;
+  background-color: var(--hover-bg);
+  border-color: var(--primary-color);
 }
 
 .status-filter {
@@ -3066,7 +3196,7 @@ select.error:focus {
   gap: 0.5rem;
   font-weight: 600;
   font-size: 0.875rem;
-  color: #555;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
@@ -3078,10 +3208,10 @@ select.error:focus {
 
 .results-count {
   font-size: 0.875rem;
-  color: #666;
+  color: var(--text-secondary);
   font-weight: 500;
   padding: 0.5rem 0;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-color);
 }
 
 .players-grid {
@@ -3091,8 +3221,8 @@ select.error:focus {
 }
 
 .player-card {
-  background-color: #f9f9f9;
-  border: 2px solid #e0e0e0;
+  background-color: var(--bg-light);
+  border: 2px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem;
   cursor: pointer;
@@ -3101,8 +3231,8 @@ select.error:focus {
 }
 
 .player-card:hover {
-  background-color: #f0f0f0;
-  border-color: #4CAF50;
+  background-color: var(--hover-bg);
+  border-color: var(--primary-color);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
@@ -3115,8 +3245,8 @@ select.error:focus {
 
 .player-card.inactive {
   opacity: 0.7;
-  background-color: #f5f5f5;
-  border-color: #bbb;
+  background-color: var(--hover-bg);
+  border-color: var(--border-color);
   background-image: repeating-linear-gradient(
     45deg,
     transparent,
@@ -3136,13 +3266,13 @@ select.error:focus {
   align-items: center;
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--border-color);
 }
 
 .player-name {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #333;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -3157,9 +3287,10 @@ select.error:focus {
   font-size: 1.2rem;
   font-weight: 700;
   color: #4CAF50;
-  background-color: white;
+  background-color: var(--background-light);
   padding: 0.25rem 0.75rem;
   border-radius: 4px;
+  border: 1px solid var(--border-color);
 }
 
 .player-details {
@@ -3171,17 +3302,17 @@ select.error:focus {
 
 .player-team {
   font-weight: 600;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .player-gender {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .player-role {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
   text-transform: capitalize;
 }
 
@@ -3192,7 +3323,7 @@ select.error:focus {
   gap: 0.5rem;
   padding-top: 0.75rem;
   margin-top: 0.75rem;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-color);
 }
 
 .stat-item {
@@ -3204,7 +3335,7 @@ select.error:focus {
 
 .stat-label {
   font-size: 0.75rem;
-  color: #999;
+  color: var(--text-muted);
   text-transform: uppercase;
   font-weight: 600;
   margin-bottom: 0.25rem;
@@ -4392,19 +4523,19 @@ select.error:focus {
   border-bottom: 1px solid #eee;
 }
 
-.filter-group {
+.commentary-filters .filter-group {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.filter-group label {
+.commentary-filters .filter-group label {
   font-weight: 500;
   color: #666;
   font-size: 0.9rem;
 }
 
-.filter-group select {
+.commentary-filters .filter-group select {
   padding: 0.25rem 0.5rem;
   font-size: 0.9rem;
   border: 1px solid #ddd;
@@ -4595,19 +4726,19 @@ select.error:focus {
   align-items: center;
 }
 
-.filter-group {
+.timeline-filters .filter-group {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.filter-group label {
+.timeline-filters .filter-group label {
   font-weight: 500;
   color: #555;
   font-size: 14px;
 }
 
-.filter-group select {
+.timeline-filters .filter-group select {
   padding: 6px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -4617,11 +4748,11 @@ select.error:focus {
   transition: border-color 0.3s;
 }
 
-.filter-group select:hover {
+.timeline-filters .filter-group select:hover {
   border-color: #4CAF50;
 }
 
-.filter-group select:focus {
+.timeline-filters .filter-group select:focus {
   outline: none;
   border-color: #4CAF50;
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
