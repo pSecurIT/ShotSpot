@@ -134,7 +134,7 @@ describe('Login Component', () => {
       expect(mockLogin).toHaveBeenCalledWith('testuser', 'testpass');
     });
 
-    it('navigates to teams page after successful login', async () => {
+    it('navigates to dashboard after successful login', async () => {
       mockLogin.mockResolvedValue({ success: true });
       renderLogin();
 
@@ -147,7 +147,7 @@ describe('Login Component', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/teams');
+        expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
       });
     });
 
