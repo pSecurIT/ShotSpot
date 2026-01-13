@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import LiveDashboard from '../components/LiveDashboard';
 import api from '../utils/api';

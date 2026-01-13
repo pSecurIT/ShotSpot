@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
 import Leaderboard from '../components/Leaderboard';
 import type { LeaderboardPlayer } from '../types/achievements';
 

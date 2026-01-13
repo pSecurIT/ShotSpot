@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { vi } from 'vitest';
 import CourtVisualization from '../components/CourtVisualization';
 import { BrowserRouter } from 'react-router-dom';
 
