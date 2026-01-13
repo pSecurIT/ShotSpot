@@ -1,6 +1,7 @@
 :root {
   /* Color Palette - Fresh and Sporty */
   --primary-color: #2962ff;      /* Vibrant blue for primary actions */
+  --primary-rgb: 41, 98, 255;    /* RGB helper for gradients/overlays */
   --primary-light: #e3f2fd;      /* Light blue for hover/active states */
   --secondary-color: #00c853;    /* Energy green for success/progress */
   --accent-color: #ff3d00;       /* Dynamic orange for highlights/alerts */
