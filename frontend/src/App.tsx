@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -33,22 +34,23 @@ const RouteLoader = ({ children }: { children: React.ReactNode }) => (
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <WebSocketProvider>
-        <Router>
-          <div className="App">
-          <OfflineIndicator />
-          <header className="App-header">
-            <div className="header-content">
-              <div className="header-branding">
-                <img src={logo} alt="ShotSpot Logo" className="header-logo" />
-                <h1>ShotSpot - Korfball Statistics</h1>
+    <ThemeProvider>
+      <AuthProvider>
+        <WebSocketProvider>
+          <Router>
+            <div className="App">
+            <OfflineIndicator />
+            <header className="App-header">
+              <div className="header-content">
+                <div className="header-branding">
+                  <img src={logo} alt="ShotSpot Logo" className="header-logo" />
+                  <h1>ShotSpot - Korfball Statistics</h1>
+                </div>
+                <Navigation />
               </div>
-              <Navigation />
-            </div>
-          </header>
-          <main>
-            <Routes>
+            </header>
+            <main>
+              <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -240,12 +242,13 @@ const App: React.FC = () => {
               />
 
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-        </div>
-      </Router>
-    </WebSocketProvider>
-    </AuthProvider>
+              </Routes>
+            </main>
+          </div>
+          </Router>
+        </WebSocketProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

@@ -64,16 +64,16 @@ const TeamManagement: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="team-management-container">
       <h2>Team Management</h2>
       
       {error && (
-        <div className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>
+        <div className="error-message" style={{ marginBottom: '1rem' }}>
           {error}
         </div>
       )}
       
-      <form onSubmit={handleAddTeam}>
+      <form onSubmit={handleAddTeam} className="team-management-form">
         <input
           type="text"
           value={newTeamName}

@@ -17,12 +17,12 @@
 
 .match-templates-header h2 {
   margin: 0;
-  color: var(--text-color, #333);
+  color: var(--text-primary);
 }
 
 /* Template Form */
 .template-form {
-  background: var(--card-background, #fff);
+  background: var(--bg-light);
   border-radius: 12px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -42,7 +42,7 @@
 
 .form-section h4 {
   margin: 0 0 1rem 0;
-  color: var(--secondary-color, #4a4a4a);
+  color: var(--text-secondary);
 }
 
 .form-row {
@@ -59,7 +59,7 @@
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
-  color: var(--text-color, #333);
+  color: var(--text-primary);
 }
 
 .form-field input[type="text"],
@@ -72,6 +72,8 @@
   border-radius: 6px;
   font-size: 1rem;
   box-sizing: border-box;
+  background-color: var(--background-light);
+  color: var(--text-primary);
 }
 
 .form-field input:focus,
@@ -116,11 +118,11 @@
 
 .templates-section h3 {
   margin: 0 0 0.5rem 0;
-  color: var(--text-color, #333);
+  color: var(--text-primary);
 }
 
 .section-description {
-  color: var(--secondary-color, #666);
+  color: var(--text-secondary);
   margin: 0 0 1rem 0;
 }
 
@@ -133,7 +135,7 @@
 
 /* Template Card */
 .template-card {
-  background: var(--card-background, #fff);
+  background: var(--bg-light);
   border-radius: 12px;
   padding: 1.25rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -164,7 +166,7 @@
 
 .template-header h4 {
   margin: 0;
-  color: var(--text-color, #333);
+  color: var(--text-primary);
   flex: 1;
 }
 
@@ -197,7 +199,7 @@
 }
 
 .template-description {
-  color: var(--secondary-color, #666);
+  color: var(--text-secondary);
   font-size: 0.875rem;
   margin: 0 0 1rem 0;
   line-height: 1.4;
@@ -217,12 +219,12 @@
 
 .detail-label {
   font-weight: 500;
-  color: var(--secondary-color, #666);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .detail-value {
-  color: var(--text-color, #333);
+  color: var(--text-primary);
 }
 
 .detail-value.golden-goal {
@@ -242,7 +244,7 @@
 
 .system-badge {
   font-size: 0.75rem;
-  color: var(--secondary-color, #666);
+  color: var(--text-secondary);
   padding: 0.25rem 0.5rem;
   background: var(--border-color, #f5f5f5);
   border-radius: 4px;
@@ -252,13 +254,13 @@
 .empty-state {
   text-align: center;
   padding: 3rem;
-  background: var(--card-background, #fff);
+  background: var(--bg-light);
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .empty-state p {
-  color: var(--secondary-color, #666);
+  color: var(--text-secondary);
   margin-bottom: 1rem;
 }
 
