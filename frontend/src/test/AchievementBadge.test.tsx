@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
 import AchievementBadge from '../components/AchievementBadge';
 import type { Achievement } from '../types/achievements';
 
