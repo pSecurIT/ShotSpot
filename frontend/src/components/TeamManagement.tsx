@@ -100,10 +100,21 @@ const TeamManagement: React.FC = () => {
       <h2>Team Management</h2>
 
       {error && (
-        <div className="error-message">
+        <div className="error-message" style={{ marginBottom: '1rem' }}>
           {error}
         </div>
       )}
+      
+      <form onSubmit={handleAddTeam} className="team-management-form">
+        <input
+          type="text"
+          value={newTeamName}
+          onChange={(e) => setNewTeamName(e.target.value)}
+          placeholder="Enter team name"
+          required
+        />
+        <button type="submit" className="primary-button">Add Team</button>
+      </form>
 
       <div className="create-game-form create-team-form">
         <h3>Create Team</h3>

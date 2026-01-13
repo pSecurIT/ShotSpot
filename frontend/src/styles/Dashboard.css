@@ -19,7 +19,7 @@
 
 .dashboard__subtitle {
   margin: 0;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .dashboard__grid {
@@ -29,8 +29,8 @@
 }
 
 .dashboard-widget {
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--bg-light);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 12px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.04);
@@ -60,12 +60,12 @@
 .dashboard-widget__error {
   padding: 10px;
   border-radius: 10px;
-  background: rgba(0,0,0,0.03);
+  background: var(--hover-bg);
 }
 
 .dashboard-widget__error {
-  background: rgba(255, 0, 0, 0.06);
-  color: #8a0000;
+  background: rgba(211, 47, 47, 0.12);
+  color: var(--danger-color);
 }
 
 .dashboard-list {
@@ -84,8 +84,8 @@
   gap: 10px;
   padding: 10px;
   border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.06);
-  background: rgba(0,0,0,0.02);
+  border: 1px solid var(--border-color);
+  background: var(--hover-bg);
 }
 
 .dashboard-list__meta {
@@ -100,7 +100,7 @@
 
 .dashboard-list__sub {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .dashboard-list__cta {
@@ -112,7 +112,10 @@
   font-size: 0.85rem;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(0,0,0,0.06);
+  background: var(--bg-light);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  text-decoration: none;
 }
 
 .stats-row {
@@ -124,12 +127,12 @@
 .stat-card {
   padding: 10px;
   border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.06);
-  background: rgba(0,0,0,0.02);
+  border: 1px solid var(--border-color);
+  background: var(--hover-bg);
 }
 
 .stat-card__label {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
@@ -150,13 +153,14 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: #fff;
+  border: 1px solid var(--border-color);
+  background: var(--bg-light);
   cursor: pointer;
+  color: var(--text-primary);
 }
 
 .quick-actions__button:hover {
-  background: rgba(0,0,0,0.02);
+  background: var(--hover-bg);
 }
 
 .quick-actions__icon {
@@ -172,8 +176,8 @@
 .notification {
   padding: 10px;
   border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.06);
-  background: rgba(0,0,0,0.02);
+  border: 1px solid var(--border-color);
+  background: var(--hover-bg);
 }
 
 .notification--warn {
