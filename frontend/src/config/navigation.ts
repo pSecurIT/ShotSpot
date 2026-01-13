@@ -104,9 +104,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Clubs',
         path: '/clubs',
         icon: '🏢',
-        roles: ['coach', 'admin'],
-        badge: 'Soon',
-        disabled: true
+        roles: ['coach', 'admin']
       },
       {
         label: 'Competitions',
