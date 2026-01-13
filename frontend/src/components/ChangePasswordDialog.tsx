@@ -235,7 +235,7 @@ const styles = {
     zIndex: 1000
   },
   dialog: {
-    backgroundColor: 'white',
+    backgroundColor: 'var(--bg-light)',
     borderRadius: '8px',
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
     maxWidth: '500px',
@@ -248,7 +248,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '20px',
-    borderBottom: '1px solid #e0e0e0'
+    borderBottom: '1px solid var(--border-color)'
   },
   title: {
     margin: 0,
@@ -260,7 +260,7 @@ const styles = {
     border: 'none',
     fontSize: '2rem',
     cursor: 'pointer',
-    color: '#666',
+    color: 'var(--text-secondary)',
     padding: '0',
     width: '30px',
     height: '30px',
@@ -270,21 +270,21 @@ const styles = {
     lineHeight: 1
   },
   error: {
-    backgroundColor: '#fee',
-    color: '#c33',
+    backgroundColor: 'rgba(211, 47, 47, 0.12)',
+    color: 'var(--danger-color)',
     padding: '12px',
     borderRadius: '4px',
     marginBottom: '16px',
     fontSize: '0.9rem'
   },
   warning: {
-    backgroundColor: '#fff3cd',
-    color: '#856404',
+    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+    color: 'var(--text-primary)',
     padding: '12px',
     borderRadius: '4px',
     marginBottom: '16px',
     fontSize: '0.9rem',
-    border: '1px solid #ffeaa7'
+    border: '1px solid rgba(255, 193, 7, 0.35)'
   },
   field: {
     marginBottom: '20px',
@@ -294,36 +294,38 @@ const styles = {
     display: 'block',
     marginBottom: '8px',
     fontWeight: 500,
-    color: '#333'
+    color: 'var(--text-primary)'
   },
   input: {
     width: '100%',
     padding: '10px',
     fontSize: '1rem',
-    border: '1px solid #ddd',
+    border: '1px solid var(--border-color)',
     borderRadius: '4px',
-    boxSizing: 'border-box' as const
+    boxSizing: 'border-box' as const,
+    backgroundColor: 'var(--background-light)',
+    color: 'var(--text-primary)'
   },
   hint: {
     display: 'block',
     marginTop: '6px',
     fontSize: '0.85rem',
-    color: '#666'
+    color: 'var(--text-secondary)'
   },
   actions: {
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '12px',
     padding: '20px',
-    borderTop: '1px solid #e0e0e0'
+    borderTop: '1px solid var(--border-color)'
   },
   cancelButton: {
     padding: '10px 20px',
     fontSize: '1rem',
-    border: '1px solid #ddd',
+    border: '1px solid var(--border-color)',
     borderRadius: '4px',
-    backgroundColor: 'white',
-    color: '#333',
+    backgroundColor: 'var(--bg-light)',
+    color: 'var(--text-primary)',
     cursor: 'pointer'
   },
   submitButton: {
@@ -331,7 +333,7 @@ const styles = {
     fontSize: '1rem',
     border: 'none',
     borderRadius: '4px',
-    backgroundColor: '#007bff',
+    backgroundColor: 'var(--primary-color)',
     color: 'white',
     cursor: 'pointer',
     fontWeight: 500
