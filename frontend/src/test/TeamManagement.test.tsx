@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Mock } from 'vitest';
 import TeamManagement from '../components/TeamManagement';
 import api from '../utils/api';
 
@@ -12,6 +13,9 @@ vi.mock('../utils/api', () => ({
 }));
 
 describe('TeamManagement', () => {
+  const apiGetMock = api.get as unknown as Mock;
+  const apiPostMock = api.post as unknown as Mock;
+
   const mockTeams = [
     { id: 1, name: 'Team Alpha', club_id: 1, club_name: 'Alpha Club' },
     { id: 2, name: 'Team Beta', club_id: 2, club_name: 'Beta Club' }
@@ -27,12 +31,12 @@ describe('TeamManagement', () => {
     vi.clearAllMocks();
 
     // Mock successful API responses
-    (api.get as any).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/teams') return Promise.resolve({ data: mockTeams });
       if (url === '/clubs') return Promise.resolve({ data: mockClubs });
       return Promise.resolve({ data: [] });
     });
-    (api.post as any).mockResolvedValue({ data: { id: 3, name: 'New Team', club_id: 1 } });
+    apiPostMock.mockResolvedValue({ data: { id: 3, name: 'New Team', club_id: 1 } });
   });
 
   it('renders the team management interface', async () => {
@@ -78,7 +82,7 @@ describe('TeamManagement', () => {
 
   it('displays error message when team fetch fails', async () => {
     const errorMessage = 'Failed to fetch teams';
-    (api.get as any).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/clubs') return Promise.resolve({ data: mockClubs });
       if (url === '/teams') return Promise.reject({ response: { data: { error: errorMessage } } });
       return Promise.resolve({ data: [] });
@@ -93,7 +97,7 @@ describe('TeamManagement', () => {
 
   it('displays error message when team creation fails', async () => {
     const errorMessage = 'Team name already exists';
-    (api.post as any).mockRejectedValueOnce({ response: { data: { error: errorMessage } } });
+    apiPostMock.mockRejectedValueOnce({ response: { data: { error: errorMessage } } });
 
     render(<TeamManagement />);
 

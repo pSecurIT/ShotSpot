@@ -1,5 +1,6 @@
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Mock } from 'vitest';
 import PlayerManagement from '../components/PlayerManagement';
 import api from '../utils/api';
 
@@ -13,6 +14,10 @@ vi.mock('../utils/api', () => ({
 }));
 
 describe('PlayerManagement', () => {
+  const apiGetMock = api.get as unknown as Mock;
+  const apiPostMock = api.post as unknown as Mock;
+  const apiPutMock = api.put as unknown as Mock;
+
   const mockClubs = [
     { id: 1, name: 'Alpha Club' },
     { id: 2, name: 'Beta Club' }
@@ -32,7 +37,7 @@ describe('PlayerManagement', () => {
     vi.clearAllMocks();
     
     // Mock successful API responses
-    (api.get as any).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/clubs') {
         return Promise.resolve({ data: mockClubs });
       }
@@ -44,7 +49,7 @@ describe('PlayerManagement', () => {
       }
     });
     
-    (api.post as any).mockResolvedValue({
+    apiPostMock.mockResolvedValue({
       data: {
         id: 3,
         club_id: 1,
@@ -55,7 +60,7 @@ describe('PlayerManagement', () => {
       }
     });
 
-    (api.put as any).mockResolvedValue({
+    apiPutMock.mockResolvedValue({
       data: {
         id: 1,
         club_id: 1,
@@ -136,7 +141,7 @@ describe('PlayerManagement', () => {
   it('displays error when player creation fails', async () => {
     // Reset and setup mock for this specific test
     vi.clearAllMocks();
-    (api.get as any).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/clubs') {
         return Promise.resolve({ data: mockClubs });
       }
@@ -148,7 +153,7 @@ describe('PlayerManagement', () => {
       }
     });
     
-    (api.post as any).mockRejectedValueOnce({
+    apiPostMock.mockRejectedValueOnce({
       response: { data: { error: 'Jersey number already taken' } }
     });
 
@@ -183,7 +188,7 @@ describe('PlayerManagement', () => {
   it('clears form after successful player creation', async () => {
     // Reset and setup mock for this specific test to ensure success
     vi.clearAllMocks();
-    (api.get as any).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/clubs') {
         return Promise.resolve({ data: mockClubs });
       }
@@ -195,7 +200,7 @@ describe('PlayerManagement', () => {
       }
     });
     
-    (api.post as any).mockResolvedValueOnce({
+    apiPostMock.mockResolvedValueOnce({
       data: {
         id: 3,
         club_id: 1,
@@ -340,7 +345,7 @@ describe('PlayerManagement', () => {
 
   it('displays "No players found" when no players match filter', async () => {
     // Mock empty response for players
-    (api.get as any).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/teams') {
         return Promise.resolve({ data: mockTeams });
       }
@@ -386,7 +391,7 @@ describe('PlayerManagement', () => {
       gender: 'male'
     };
 
-    (api.put as any).mockResolvedValue({ data: mockUpdatedPlayer });
+    apiPutMock.mockResolvedValue({ data: mockUpdatedPlayer });
 
     render(<PlayerManagement />);
 
@@ -445,7 +450,7 @@ describe('PlayerManagement', () => {
   });
 
   it('displays update success message after player update', async () => {
-    (api.put as any).mockResolvedValue({ 
+    apiPutMock.mockResolvedValue({ 
       data: { ...mockPlayers[0], first_name: 'Updated' }
     });
 
@@ -472,7 +477,7 @@ describe('PlayerManagement', () => {
   });
 
   it('handles update errors gracefully', async () => {
-    (api.put as any).mockRejectedValue({
+    apiPutMock.mockRejectedValue({
       response: { data: { error: 'Failed to update player' } }
     });
 
@@ -555,7 +560,7 @@ describe('PlayerManagement', () => {
       is_active: false
     };
 
-    (api.get as any).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/teams') {
         return Promise.resolve({ data: mockTeams });
       }
@@ -575,7 +580,7 @@ describe('PlayerManagement', () => {
   });
 
   it('updates player active status in edit mode', async () => {
-    (api.put as any).mockResolvedValue({
+    apiPutMock.mockResolvedValue({
       data: { ...mockPlayers[0], is_active: false }
     });
 
@@ -604,7 +609,7 @@ describe('PlayerManagement', () => {
   });
 
   it('handles API errors when fetching data', async () => {
-    (api.get as any).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/teams') {
         return Promise.reject({ response: { data: { error: 'Failed to fetch teams' } } });
       }
@@ -663,7 +668,7 @@ describe('PlayerManagement', () => {
         is_active: false
       };
 
-      (api.get as any).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
@@ -689,7 +694,7 @@ describe('PlayerManagement', () => {
     it('✅ archives player when archive button is clicked in edit form and confirmed', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       
-      (api.put as any).mockResolvedValue({
+      apiPutMock.mockResolvedValue({
         data: { ...mockPlayers[0], is_active: false }
       });
 
@@ -760,7 +765,7 @@ describe('PlayerManagement', () => {
         is_active: false
       };
 
-      (api.get as any).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
@@ -771,7 +776,7 @@ describe('PlayerManagement', () => {
 
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       
-      (api.put as any).mockResolvedValue({
+      apiPutMock.mockResolvedValue({
         data: { ...inactivePlayer, is_active: true }
       });
 
@@ -804,7 +809,7 @@ describe('PlayerManagement', () => {
     it('❌ handles errors when archiving player fails', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       
-      (api.put as any).mockRejectedValue({
+      apiPutMock.mockRejectedValue({
         response: { data: { error: 'Failed to deactivate player' } }
       });
 
@@ -843,7 +848,7 @@ describe('PlayerManagement', () => {
     };
 
     beforeEach(() => {
-      (api.get as any).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
@@ -922,7 +927,7 @@ describe('PlayerManagement', () => {
         is_active: false
       };
 
-      (api.get as any).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
@@ -1047,7 +1052,7 @@ describe('PlayerManagement', () => {
         { id: 3, team_id: 1, first_name: 'Alice', last_name: 'Johnson', jersey_number: 15, is_active: true, gender: 'female', games_played: 3, goals: 5, total_shots: 10, team_name: 'Team Alpha' }
       ];
 
-      (api.get as any).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
