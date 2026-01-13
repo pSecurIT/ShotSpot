@@ -4,11 +4,9 @@ import { cleanup } from '@testing-library/react';
 import 'fake-indexeddb/auto';
 
 // Mock fetch globally
-// @ts-expect-error - test-only global shim
 globalThis.fetch = vi.fn();
 
 // Mock window.confirm for tests
-// @ts-expect-error - test-only global shim
 globalThis.confirm = vi.fn(() => true);
 
 // Mock localStorage if not available
