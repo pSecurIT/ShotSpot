@@ -43,6 +43,7 @@ describe('TeamManagement', () => {
     const heading = screen.getByRole('heading', { name: /create team/i });
     const formContainer = heading.closest('.create-team-form');
     if (!formContainer) throw new Error('Create Team form container not found');
+    if (!(formContainer instanceof HTMLElement)) throw new Error('Create Team form container is not an HTMLElement');
     return within(formContainer);
   };
 
