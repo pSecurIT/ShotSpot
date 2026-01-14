@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Mock } from 'vitest';
 import TeamManagement from '../components/TeamManagement';
@@ -39,12 +39,20 @@ describe('TeamManagement', () => {
     apiPostMock.mockResolvedValue({ data: { id: 3, name: 'New Team', club_id: 1 } });
   });
 
+  const getCreateTeamForm = () => {
+    const heading = screen.getByRole('heading', { name: /create team/i });
+    const formContainer = heading.closest('.create-team-form');
+    if (!formContainer) throw new Error('Create Team form container not found');
+    return within(formContainer);
+  };
+
   it('renders the team management interface', async () => {
     render(<TeamManagement />);
     expect(screen.getByText('Team Management')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Enter team name')).toBeInTheDocument();
-    expect(screen.getByText('Add Team')).toBeInTheDocument();
-    expect(screen.getByLabelText('Club')).toBeInTheDocument();
+    const createTeamForm = getCreateTeamForm();
+    expect(createTeamForm.getByLabelText('Team name')).toBeInTheDocument();
+    expect(createTeamForm.getByRole('button', { name: /^add team$/i })).toBeInTheDocument();
+    expect(createTeamForm.getByLabelText('Club')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/clubs');
@@ -64,9 +72,10 @@ describe('TeamManagement', () => {
 
   it('handles team creation successfully', async () => {
     render(<TeamManagement />);
-    
-    const input = screen.getByPlaceholderText('Enter team name');
-    const submitButton = screen.getByText('Add Team');
+
+    const createTeamForm = getCreateTeamForm();
+    const input = createTeamForm.getByLabelText('Team name');
+    const submitButton = createTeamForm.getByRole('button', { name: /^add team$/i });
 
     await userEvent.type(input, 'New Team');
     await userEvent.click(submitButton);
@@ -101,8 +110,9 @@ describe('TeamManagement', () => {
 
     render(<TeamManagement />);
 
-    const input = screen.getByPlaceholderText('Enter team name');
-    const submitButton = screen.getByText('Add Team');
+    const createTeamForm = getCreateTeamForm();
+    const input = createTeamForm.getByLabelText('Team name');
+    const submitButton = createTeamForm.getByRole('button', { name: /^add team$/i });
 
     await userEvent.type(input, 'New Team');
     await userEvent.click(submitButton);
@@ -114,8 +124,9 @@ describe('TeamManagement', () => {
 
   it('requires team name input before submission', async () => {
     render(<TeamManagement />);
-    
-    const submitButton = screen.getByText('Add Team');
+
+    const createTeamForm = getCreateTeamForm();
+    const submitButton = createTeamForm.getByRole('button', { name: /^add team$/i });
     await userEvent.click(submitButton);
 
     // Post should not be called if input is empty
