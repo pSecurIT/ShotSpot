@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import MockAdapter from 'axios-mock-adapter';
 import api from '../utils/api';

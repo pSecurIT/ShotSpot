@@ -2,7 +2,6 @@
  * Tests for IndexedDB Storage Utility
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   initDB,
   saveToStore,
