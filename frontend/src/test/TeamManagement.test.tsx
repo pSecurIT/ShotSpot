@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Mock } from 'vitest';
 import TeamManagement from '../components/TeamManagement';
 import api from '../utils/api';
 
@@ -13,27 +13,52 @@ vi.mock('../utils/api', () => ({
 }));
 
 describe('TeamManagement', () => {
+  const apiGetMock = api.get as unknown as Mock;
+  const apiPostMock = api.post as unknown as Mock;
+
   const mockTeams = [
-    { id: 1, name: 'Team Alpha' },
-    { id: 2, name: 'Team Beta' }
+    { id: 1, name: 'Team Alpha', club_id: 1, club_name: 'Alpha Club' },
+    { id: 2, name: 'Team Beta', club_id: 2, club_name: 'Beta Club' }
+  ];
+
+  const mockClubs = [
+    { id: 1, name: 'Alpha Club' },
+    { id: 2, name: 'Beta Club' }
   ];
 
   beforeEach(() => {
     // Clear all mocks before each test
     vi.clearAllMocks();
-    
+
     // Mock successful API responses
-    (api.get as jest.Mock).mockResolvedValue({ data: mockTeams });
-    (api.post as jest.Mock).mockResolvedValue({ data: { id: 3, name: 'New Team' } });
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/teams') return Promise.resolve({ data: mockTeams });
+      if (url === '/clubs') return Promise.resolve({ data: mockClubs });
+      return Promise.resolve({ data: [] });
+    });
+    apiPostMock.mockResolvedValue({ data: { id: 3, name: 'New Team', club_id: 1 } });
   });
 
-  it('renders the team management interface', () => {
-    act(() => {
-      render(<TeamManagement />);
-    });
+  const getCreateTeamForm = () => {
+    const heading = screen.getByRole('heading', { name: /create team/i });
+    const formContainer = heading.closest('.create-team-form');
+    if (!formContainer) throw new Error('Create Team form container not found');
+    if (!(formContainer instanceof HTMLElement)) throw new Error('Create Team form container is not an HTMLElement');
+    return within(formContainer);
+  };
+
+  it('renders the team management interface', async () => {
+    render(<TeamManagement />);
     expect(screen.getByText('Team Management')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Enter team name')).toBeInTheDocument();
-    expect(screen.getByText('Add Team')).toBeInTheDocument();
+    const createTeamForm = getCreateTeamForm();
+    expect(createTeamForm.getByLabelText('Team name')).toBeInTheDocument();
+    expect(createTeamForm.getByRole('button', { name: /^add team$/i })).toBeInTheDocument();
+    expect(createTeamForm.getByLabelText('Club')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/clubs');
+      expect(api.get).toHaveBeenCalledWith('/teams');
+    });
   });
 
   it('fetches and displays teams on mount', async () => {
@@ -41,22 +66,23 @@ describe('TeamManagement', () => {
     
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/teams');
-      expect(screen.getByText('Team Alpha')).toBeInTheDocument();
-      expect(screen.getByText('Team Beta')).toBeInTheDocument();
+      expect(screen.getByText('Alpha Club — Team Alpha')).toBeInTheDocument();
+      expect(screen.getByText('Beta Club — Team Beta')).toBeInTheDocument();
     });
   });
 
   it('handles team creation successfully', async () => {
     render(<TeamManagement />);
-    
-    const input = screen.getByPlaceholderText('Enter team name');
-    const submitButton = screen.getByText('Add Team');
+
+    const createTeamForm = getCreateTeamForm();
+    const input = createTeamForm.getByLabelText('Team name');
+    const submitButton = createTeamForm.getByRole('button', { name: /^add team$/i });
 
     await userEvent.type(input, 'New Team');
     await userEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/teams', { name: 'New Team' });
+      expect(api.post).toHaveBeenCalledWith('/teams', { club_id: 1, name: 'New Team' });
       expect(screen.getByText('New Team')).toBeInTheDocument();
     });
 
@@ -66,7 +92,11 @@ describe('TeamManagement', () => {
 
   it('displays error message when team fetch fails', async () => {
     const errorMessage = 'Failed to fetch teams';
-    (api.get as jest.Mock).mockRejectedValueOnce({ response: { data: { error: errorMessage } } });
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/clubs') return Promise.resolve({ data: mockClubs });
+      if (url === '/teams') return Promise.reject({ response: { data: { error: errorMessage } } });
+      return Promise.resolve({ data: [] });
+    });
 
     render(<TeamManagement />);
 
@@ -77,12 +107,13 @@ describe('TeamManagement', () => {
 
   it('displays error message when team creation fails', async () => {
     const errorMessage = 'Team name already exists';
-    (api.post as jest.Mock).mockRejectedValueOnce({ response: { data: { error: errorMessage } } });
+    apiPostMock.mockRejectedValueOnce({ response: { data: { error: errorMessage } } });
 
     render(<TeamManagement />);
 
-    const input = screen.getByPlaceholderText('Enter team name');
-    const submitButton = screen.getByText('Add Team');
+    const createTeamForm = getCreateTeamForm();
+    const input = createTeamForm.getByLabelText('Team name');
+    const submitButton = createTeamForm.getByRole('button', { name: /^add team$/i });
 
     await userEvent.type(input, 'New Team');
     await userEvent.click(submitButton);
@@ -94,8 +125,9 @@ describe('TeamManagement', () => {
 
   it('requires team name input before submission', async () => {
     render(<TeamManagement />);
-    
-    const submitButton = screen.getByText('Add Team');
+
+    const createTeamForm = getCreateTeamForm();
+    const submitButton = createTeamForm.getByRole('button', { name: /^add team$/i });
     await userEvent.click(submitButton);
 
     // Post should not be called if input is empty

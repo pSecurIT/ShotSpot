@@ -2,7 +2,7 @@
  * Tests for Offline Sync Manager
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { vi } from 'vitest';
 import {
   queueAction,
   processQueue,

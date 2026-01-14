@@ -5,6 +5,7 @@ import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 interface Player {
   id: number;
   team_id: number;
+  club_id: number;
   first_name: string;
   last_name: string;
   jersey_number: number;
@@ -14,9 +15,17 @@ interface Player {
   goals?: number;
   total_shots?: number;
   team_name?: string;
+  club_name?: string;
 }
 
 interface Team {
+  id: number;
+  name: string;
+  club_id: number;
+  club_name?: string;
+}
+
+interface Club {
   id: number;
   name: string;
 }
@@ -24,6 +33,7 @@ interface Team {
 const PlayerManagement: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [clubs, setClubs] = useState<Club[]>([]);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
@@ -35,6 +45,7 @@ const PlayerManagement: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [newPlayer, setNewPlayer] = useState({
+    club_id: '',
     first_name: '',
     last_name: '',
     jersey_number: '',
@@ -43,6 +54,25 @@ const PlayerManagement: React.FC = () => {
   });
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
+
+  const fetchClubs = async () => {
+    try {
+      const response = await api.get('/clubs');
+      const fetchedClubs = (response as { data?: unknown })?.data;
+      const clubList = Array.isArray(fetchedClubs) ? (fetchedClubs as Club[]) : [];
+      setClubs(clubList);
+      setNewPlayer((prev) => {
+        if (prev.club_id) return prev;
+        return {
+          ...prev,
+          club_id: clubList.length > 0 ? String(clubList[0].id) : ''
+        };
+      });
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string } }; message?: string };
+      console.error('Error fetching clubs:', err.response?.data?.error || err.message);
+    }
+  };
 
   const fetchTeams = async () => {
     try {
@@ -66,9 +96,14 @@ const PlayerManagement: React.FC = () => {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchClubs();
     fetchTeams();
     fetchPlayers();
   }, []);
+
+  const teamsForSelectedClub = newPlayer.club_id
+    ? teams.filter(t => t.club_id === Number(newPlayer.club_id))
+    : [];
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,6 +139,10 @@ const PlayerManagement: React.FC = () => {
       }
     }
 
+    if (!newPlayer.club_id) {
+      errors.club_id = 'Please select a club';
+    }
+
     if (!newPlayer.team_id) {
       errors.team_id = 'Please select a team';
     }
@@ -116,13 +155,16 @@ const PlayerManagement: React.FC = () => {
 
     try {
       const response = await api.post('/players', {
-        ...newPlayer,
+        club_id: parseInt(newPlayer.club_id),
         jersey_number: parseInt(newPlayer.jersey_number),
         team_id: parseInt(newPlayer.team_id),
+        first_name: newPlayer.first_name,
+        last_name: newPlayer.last_name,
         gender: newPlayer.gender || null
       });
       setPlayers([...players, response.data]);
       setNewPlayer({
+        club_id: newPlayer.club_id,
         first_name: '',
         last_name: '',
         jersey_number: '',
@@ -195,6 +237,7 @@ const PlayerManagement: React.FC = () => {
 
     try {
       const response = await api.put(`/players/${editingPlayer.id}`, {
+        club_id: editingPlayer.club_id,
         team_id: editingPlayer.team_id,
         first_name: editingPlayer.first_name,
         last_name: editingPlayer.last_name,
@@ -261,10 +304,19 @@ const PlayerManagement: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setNewPlayer(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setNewPlayer(prev => {
+      if (name === 'club_id') {
+        return {
+          ...prev,
+          club_id: value,
+          team_id: ''
+        };
+      }
+      return {
+        ...prev,
+        [name]: value
+      };
+    });
   };
 
   const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -373,6 +425,30 @@ const PlayerManagement: React.FC = () => {
         <form onSubmit={handleAddPlayer} className="player-form">
           <div className="form-row">
             <div className="form-group">
+              <label htmlFor="club_id">Club:</label>
+              <select
+                id="club_id"
+                name="club_id"
+                value={newPlayer.club_id}
+                onChange={handleInputChange}
+                required
+                disabled={clubs.length === 0}
+                className={validationErrors.club_id ? 'error' : ''}
+              >
+                <option value="">Select a club</option>
+                {clubs.map(club => (
+                  <option key={club.id} value={club.id}>{club.name}</option>
+                ))}
+              </select>
+              {validationErrors.club_id && (
+                <span className="field-error">{validationErrors.club_id}</span>
+              )}
+              {clubs.length === 0 && (
+                <span className="field-error">Create a club first to add players.</span>
+              )}
+            </div>
+
+            <div className="form-group">
               <label htmlFor="team_id">Team:</label>
               <select
                 id="team_id"
@@ -380,15 +456,19 @@ const PlayerManagement: React.FC = () => {
                 value={newPlayer.team_id}
                 onChange={handleInputChange}
                 required
+                disabled={!newPlayer.club_id || teamsForSelectedClub.length === 0}
                 className={validationErrors.team_id ? 'error' : ''}
               >
                 <option value="">Select a team</option>
-                {teams.map(team => (
+                {teamsForSelectedClub.map(team => (
                   <option key={team.id} value={team.id}>{team.name}</option>
                 ))}
               </select>
               {validationErrors.team_id && (
                 <span className="field-error">{validationErrors.team_id}</span>
+              )}
+              {newPlayer.club_id && teamsForSelectedClub.length === 0 && (
+                <span className="field-error">No teams found for this club. Create a team first.</span>
               )}
             </div>
 
@@ -463,7 +543,7 @@ const PlayerManagement: React.FC = () => {
             </div>
           </div>
 
-          <button type="submit" className="primary-button">
+          <button type="submit" className="primary-button" disabled={clubs.length === 0}>
             Add Player
           </button>
         </form>
@@ -695,6 +775,9 @@ const PlayerManagement: React.FC = () => {
               const shootingPercentage = player.total_shots && player.total_shots > 0
                 ? Math.round((player.goals || 0) / player.total_shots * 100)
                 : 0;
+
+              const teamName = teams.find(team => team.id === player.team_id)?.name || 'Unknown Team';
+              const clubName = player.club_name || clubs.find(club => club.id === player.club_id)?.name;
               
               return (
                 <div 
@@ -710,7 +793,7 @@ const PlayerManagement: React.FC = () => {
                   </div>
                   <div className="player-details">
                     <span className="player-team">
-                      {teams.find(team => team.id === player.team_id)?.name || 'Unknown Team'}
+                      {clubName ? `${clubName} — ${teamName}` : teamName}
                     </span>
                     {player.gender && (
                       <span className="player-gender">
