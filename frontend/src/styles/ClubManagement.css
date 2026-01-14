@@ -1,0 +1,136 @@
+.club-management {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.club-management__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.club-management__header h2 {
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  margin: 0;
+}
+
+.club-management__controls {
+  margin-bottom: 1.5rem;
+}
+
+.club-management__controls input {
+  width: 100%;
+  max-width: 420px;
+}
+
+.club-management__loading {
+  padding: 0.75rem 0;
+}
+
+.club-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.club-card__title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.club-card__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.club-card__actions--secondary {
+  margin-top: 0.75rem;
+}
+
+.club-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.club-pagination__status {
+  color: var(--text-secondary);
+}
+
+/* Dialogs */
+.club-dialog__overlay,
+.club-details__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.club-dialog__content,
+.club-details__content {
+  background: var(--bg-light);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1.5rem;
+  width: min(720px, 92vw);
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.club-dialog__header,
+.club-details__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.club-dialog__field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.club-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.club-details__muted {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 600px) {
+  .club-management {
+    padding: 1rem;
+  }
+
+  .club-management__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .club-management__controls input {
+    max-width: 100%;
+  }
+}

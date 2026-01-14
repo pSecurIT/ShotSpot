@@ -301,7 +301,7 @@ jobs:
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
-            -destination "platform=iOS Simulator,name=iPhone 16,OS=latest" \
+            -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath $PWD/build/DerivedData \
             clean build \
             CODE_SIGN_IDENTITY="" \

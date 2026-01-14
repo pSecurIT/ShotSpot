@@ -17,6 +17,7 @@ const GameManagement = React.lazy(() => import('./components/GameManagement'));
 const LiveMatch = React.lazy(() => import('./components/LiveMatch'));
 const ShotAnalytics = React.lazy(() => import('./components/ShotAnalytics'));
 const TeamManagement = React.lazy(() => import('./components/TeamManagement'));
+const ClubManagement = React.lazy(() => import('./components/ClubManagement'));
 const PlayerManagement = React.lazy(() => import('./components/PlayerManagement'));
 const UserManagement = React.lazy(() => import('./components/UserManagement'));
 const ExportCenter = React.lazy(() => import('./components/ExportCenter'));
@@ -196,7 +197,7 @@ const App: React.FC = () => {
                 path="/clubs"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <ComingSoon title="Clubs" />
+                    <RouteLoader><ClubManagement /></RouteLoader>
                   </ProtectedRoute>
                 }
               />

@@ -12,12 +12,16 @@ const generateUniqueClubName = (prefix = 'Club') => {
 };
 
 describe('🏆 Club Routes', () => {
-  let authToken;
+  let adminToken;
+  let coachToken;
+  let viewerToken;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Club Routes tests...');
-    // Generate test auth token
-    authToken = generateTestToken('admin');
+    // Generate test auth tokens
+    adminToken = generateTestToken('admin');
+    coachToken = generateTestToken('coach');
+    viewerToken = generateTestToken('viewer');
   });
 
   beforeEach(async () => {
@@ -43,11 +47,19 @@ describe('🏆 Club Routes', () => {
   });
 
   describe('📊 GET /api/clubs - Retrieving Clubs', () => {
+    it('❌ should require authentication', async () => {
+      const response = await request(app)
+        .get('/api/clubs')
+        .expect(401);
+
+      expect(response.status).toBe(401);
+    });
+
     it('✅ should return an empty array when no clubs exist', async () => {
       try {
         const response = await request(app)
           .get('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .expect('Content-Type', /json/)
           .expect(200);
 
@@ -76,7 +88,7 @@ describe('🏆 Club Routes', () => {
 
         const response = await request(app)
           .get('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .expect('Content-Type', /json/)
           .expect(200);
 
@@ -96,13 +108,39 @@ describe('🏆 Club Routes', () => {
   });
 
   describe('➕ POST /api/clubs - Creating Clubs', () => {
+    it('❌ should deny create for viewer role', async () => {
+      const uniqueClubName = generateUniqueClubName('DeniedClub');
+
+      const response = await request(app)
+        .post('/api/clubs')
+        .set('Authorization', `Bearer ${viewerToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ name: uniqueClubName })
+        .expect(403);
+
+      expect(response.status).toBe(403);
+    });
+
+    it('✅ should allow coach to create a new club', async () => {
+      const uniqueClubName = generateUniqueClubName('CoachClub');
+
+      const response = await request(app)
+        .post('/api/clubs')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ name: uniqueClubName })
+        .expect(201);
+
+      expect(response.body.name).toBe(uniqueClubName);
+    });
+
     it('✅ should create a new club successfully', async () => {
       try {
         const uniqueClubName = generateUniqueClubName('NewClub');
         
         const response = await request(app)
           .post('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .set('Content-Type', 'application/json')
           .send({ name: uniqueClubName })
           .expect('Content-Type', /json/)
@@ -124,7 +162,7 @@ describe('🏆 Club Routes', () => {
       try {
         const response = await request(app)
           .post('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .set('Content-Type', 'application/json')
           .send({})
           .expect('Content-Type', /json/)
@@ -144,7 +182,7 @@ describe('🏆 Club Routes', () => {
         // Create first club
         await request(app)
           .post('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .set('Content-Type', 'application/json')
           .send({ name: duplicateClubName })
           .expect(201);
@@ -152,7 +190,7 @@ describe('🏆 Club Routes', () => {
         // Try to create second club with same name
         const response = await request(app)
           .post('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .set('Content-Type', 'application/json')
           .send({ name: duplicateClubName })
           .expect(409);
@@ -165,14 +203,54 @@ describe('🏆 Club Routes', () => {
     });
   });
 
+  describe('📄 GET /api/clubs/:id - Club Details', () => {
+    it('✅ should return club details', async () => {
+      const clubName = generateUniqueClubName('DetailClub');
+      const createRes = await request(app)
+        .post('/api/clubs')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ name: clubName })
+        .expect(201);
+
+      const clubId = createRes.body.id;
+
+      const response = await request(app)
+        .get(`/api/clubs/${clubId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('id', clubId);
+      expect(response.body).toHaveProperty('name', clubName);
+    });
+
+    it('❌ should return 404 for missing club', async () => {
+      const response = await request(app)
+        .get('/api/clubs/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+
+      expect(response.body.error).toContain('not found');
+    });
+  });
+
   describe('📋 GET /api/clubs/:id/teams - Get Club Teams', () => {
+    it('❌ should return 404 for missing club', async () => {
+      const response = await request(app)
+        .get('/api/clubs/999999/teams')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+
+      expect(response.body.error).toContain('not found');
+    });
+
     it('✅ should return all teams for a club', async () => {
       try {
         // Create a club
         const clubName = generateUniqueClubName('TestClub');
         const clubRes = await request(app)
           .post('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .send({ name: clubName })
           .expect(201);
 
@@ -190,7 +268,7 @@ describe('🏆 Club Routes', () => {
 
         const response = await request(app)
           .get(`/api/clubs/${clubId}/teams`)
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .expect(200);
 
         expect(response.body).toHaveLength(2);
@@ -205,13 +283,22 @@ describe('🏆 Club Routes', () => {
   });
 
   describe('📋 GET /api/clubs/:id/players - Get Club Players', () => {
+    it('❌ should return 404 for missing club', async () => {
+      const response = await request(app)
+        .get('/api/clubs/999999/players')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+
+      expect(response.body.error).toContain('not found');
+    });
+
     it('✅ should return all players for a club', async () => {
       try {
         // Create a club
         const clubName = generateUniqueClubName('TestClub');
         const clubRes = await request(app)
           .post('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .send({ name: clubName })
           .expect(201);
 
@@ -229,7 +316,7 @@ describe('🏆 Club Routes', () => {
 
         const response = await request(app)
           .get(`/api/clubs/${clubId}/players`)
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .expect(200);
 
         expect(response.body).toHaveLength(2);
@@ -243,6 +330,25 @@ describe('🏆 Club Routes', () => {
   });
 
   describe('✏️ PUT /api/clubs/:id - Updating Clubs', () => {
+    it('❌ should deny update for viewer role', async () => {
+      const clubName = generateUniqueClubName('ViewUpdateClub');
+      const createRes = await request(app)
+        .post('/api/clubs')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ name: clubName })
+        .expect(201);
+
+      const response = await request(app)
+        .put(`/api/clubs/${createRes.body.id}`)
+        .set('Authorization', `Bearer ${viewerToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ name: generateUniqueClubName('NewName') })
+        .expect(403);
+
+      expect(response.status).toBe(403);
+    });
+
     it('✅ should update an existing club successfully', async () => {
       try {
         // Create a club first
@@ -251,7 +357,7 @@ describe('🏆 Club Routes', () => {
         
         const createRes = await request(app)
           .post('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .set('Content-Type', 'application/json')
           .send({ name: oldName })
           .expect(201);
@@ -261,7 +367,7 @@ describe('🏆 Club Routes', () => {
         // Update the club
         const response = await request(app)
           .put(`/api/clubs/${clubId}`)
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .set('Content-Type', 'application/json')
           .send({ name: newName })
           .expect('Content-Type', /json/)
@@ -283,7 +389,7 @@ describe('🏆 Club Routes', () => {
       try {
         const response = await request(app)
           .put('/api/clubs/999')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .set('Content-Type', 'application/json')
           .send({ name: 'New Name' })
           .expect('Content-Type', /json/)
@@ -298,6 +404,23 @@ describe('🏆 Club Routes', () => {
   });
 
   describe('🗑️ DELETE /api/clubs/:id - Deleting Clubs', () => {
+    it('❌ should deny delete for viewer role', async () => {
+      const clubName = generateUniqueClubName('ViewDeleteClub');
+      const createRes = await request(app)
+        .post('/api/clubs')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ name: clubName })
+        .expect(201);
+
+      const response = await request(app)
+        .delete(`/api/clubs/${createRes.body.id}`)
+        .set('Authorization', `Bearer ${viewerToken}`)
+        .expect(403);
+
+      expect(response.status).toBe(403);
+    });
+
     it('✅ should delete an existing club successfully', async () => {
       try {
         const clubName = generateUniqueClubName('DeleteClub');
@@ -305,7 +428,7 @@ describe('🏆 Club Routes', () => {
         // Create a club first
         const createRes = await request(app)
           .post('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .set('Content-Type', 'application/json')
           .send({ name: clubName })
           .expect(201);
@@ -315,7 +438,7 @@ describe('🏆 Club Routes', () => {
         // Delete the club
         await request(app)
           .delete(`/api/clubs/${clubId}`)
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .expect(204);
 
         // Verify club was deleted
@@ -331,7 +454,7 @@ describe('🏆 Club Routes', () => {
       try {
         const response = await request(app)
           .delete('/api/clubs/999')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .expect('Content-Type', /json/)
           .expect(404);
 
@@ -348,7 +471,7 @@ describe('🏆 Club Routes', () => {
         const clubName = generateUniqueClubName('ClubWithTeams');
         const clubRes = await request(app)
           .post('/api/clubs')
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .send({ name: clubName })
           .expect(201);
 
@@ -363,7 +486,7 @@ describe('🏆 Club Routes', () => {
         // Try to delete club
         const response = await request(app)
           .delete(`/api/clubs/${clubId}`)
-          .set('Authorization', `Bearer ${authToken}`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .expect(409);
 
         expect(response.body.error).toContain('teams');

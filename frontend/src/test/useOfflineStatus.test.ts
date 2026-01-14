@@ -2,7 +2,7 @@
  * Tests for useOfflineStatus Hook
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useOfflineStatus } from '../hooks/useOfflineStatus';
 import { queueAction, processQueue } from '../utils/offlineSync';

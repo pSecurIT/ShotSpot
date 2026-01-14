@@ -4,10 +4,10 @@ import { cleanup } from '@testing-library/react';
 import 'fake-indexeddb/auto';
 
 // Mock fetch globally
-global.fetch = vi.fn();
+globalThis.fetch = vi.fn();
 
 // Mock window.confirm for tests
-global.confirm = vi.fn(() => true);
+globalThis.confirm = vi.fn(() => true);
 
 // Mock localStorage if not available
 if (typeof Storage === 'undefined') {
@@ -18,7 +18,7 @@ if (typeof Storage === 'undefined') {
     clear: vi.fn(),
   };
   // @ts-expect-error - Adding to global for testing
-  global.localStorage = localStorageMock;
+  globalThis.localStorage = localStorageMock;
 }
 
 // Mock ServiceWorkerRegistration
@@ -29,12 +29,7 @@ class MockServiceWorkerRegistration {
 }
 
 // @ts-expect-error - Adding to global for testing
-global.ServiceWorkerRegistration = MockServiceWorkerRegistration;
-
-// Mock environment variables
-vi.mock('./env.ts', () => ({
-  API_URL: 'http://localhost:3001/api',
-}));
+globalThis.ServiceWorkerRegistration = MockServiceWorkerRegistration;
 
 // Clean up after each test
 afterEach(() => {

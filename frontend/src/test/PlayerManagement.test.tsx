@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Mock } from 'vitest';
 import PlayerManagement from '../components/PlayerManagement';
 import api from '../utils/api';
 
@@ -14,21 +14,33 @@ vi.mock('../utils/api', () => ({
 }));
 
 describe('PlayerManagement', () => {
+  const apiGetMock = api.get as unknown as Mock;
+  const apiPostMock = api.post as unknown as Mock;
+  const apiPutMock = api.put as unknown as Mock;
+
+  const mockClubs = [
+    { id: 1, name: 'Alpha Club' },
+    { id: 2, name: 'Beta Club' }
+  ];
+
   const mockTeams = [
-    { id: 1, name: 'Team Alpha' },
-    { id: 2, name: 'Team Beta' }
+    { id: 1, name: 'Team Alpha', club_id: 1, club_name: 'Alpha Club' },
+    { id: 2, name: 'Team Beta', club_id: 2, club_name: 'Beta Club' }
   ];
 
   const mockPlayers = [
-    { id: 1, team_id: 1, first_name: 'John', last_name: 'Doe', jersey_number: 10, is_active: true, gender: 'male', games_played: 5, goals: 12, total_shots: 20, team_name: 'Team Alpha' },
-    { id: 2, team_id: 2, first_name: 'Jane', last_name: 'Smith', jersey_number: 20, is_active: true, gender: 'female', games_played: 4, goals: 8, total_shots: 15, team_name: 'Team Beta' }
+    { id: 1, club_id: 1, team_id: 1, first_name: 'John', last_name: 'Doe', jersey_number: 10, is_active: true, gender: 'male', games_played: 5, goals: 12, total_shots: 20, team_name: 'Team Alpha', club_name: 'Alpha Club' },
+    { id: 2, club_id: 2, team_id: 2, first_name: 'Jane', last_name: 'Smith', jersey_number: 20, is_active: true, gender: 'female', games_played: 4, goals: 8, total_shots: 15, team_name: 'Team Beta', club_name: 'Beta Club' }
   ];
 
   beforeEach(() => {
     vi.clearAllMocks();
     
     // Mock successful API responses
-    (api.get as jest.Mock).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/clubs') {
+        return Promise.resolve({ data: mockClubs });
+      }
       if (url === '/teams') {
         return Promise.resolve({ data: mockTeams });
       }
@@ -37,9 +49,10 @@ describe('PlayerManagement', () => {
       }
     });
     
-    (api.post as jest.Mock).mockResolvedValue({
+    apiPostMock.mockResolvedValue({
       data: {
         id: 3,
+        club_id: 1,
         team_id: 1,
         first_name: 'New',
         last_name: 'Player',
@@ -47,9 +60,10 @@ describe('PlayerManagement', () => {
       }
     });
 
-    (api.put as jest.Mock).mockResolvedValue({
+    apiPutMock.mockResolvedValue({
       data: {
         id: 1,
+        club_id: 1,
         team_id: 1,
         first_name: 'Updated',
         last_name: 'Player',
@@ -71,6 +85,7 @@ describe('PlayerManagement', () => {
     render(<PlayerManagement />);
     
     await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/clubs');
       expect(api.get).toHaveBeenCalledWith('/teams');
       expect(api.get).toHaveBeenCalledWith('/players');
       expect(screen.getByText(/John Doe/)).toBeInTheDocument();
@@ -82,15 +97,17 @@ describe('PlayerManagement', () => {
     render(<PlayerManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Select a team')).toBeInTheDocument();
+      expect(screen.getByText('Select a club')).toBeInTheDocument();
     });
 
     // Fill in the form - use getElementById to avoid ambiguity with filter dropdown
+    const clubSelect = document.getElementById('club_id') as HTMLSelectElement;
     const teamSelect = document.getElementById('team_id') as HTMLSelectElement;
     const firstNameInput = screen.getByRole('textbox', { name: /first name/i });
     const lastNameInput = screen.getByRole('textbox', { name: /last name/i });
     const jerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });
 
+    await userEvent.selectOptions(clubSelect, '1');
     await userEvent.selectOptions(teamSelect, '1');
     await userEvent.type(firstNameInput, 'New');
     await userEvent.type(lastNameInput, 'Player');
@@ -101,6 +118,7 @@ describe('PlayerManagement', () => {
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/players', {
+        club_id: 1,
         team_id: 1,
         first_name: 'New',
         last_name: 'Player',
@@ -123,7 +141,10 @@ describe('PlayerManagement', () => {
   it('displays error when player creation fails', async () => {
     // Reset and setup mock for this specific test
     vi.clearAllMocks();
-    (api.get as jest.Mock).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/clubs') {
+        return Promise.resolve({ data: mockClubs });
+      }
       if (url === '/teams') {
         return Promise.resolve({ data: mockTeams });
       }
@@ -132,7 +153,7 @@ describe('PlayerManagement', () => {
       }
     });
     
-    (api.post as jest.Mock).mockRejectedValueOnce({
+    apiPostMock.mockRejectedValueOnce({
       response: { data: { error: 'Jersey number already taken' } }
     });
 
@@ -140,15 +161,17 @@ describe('PlayerManagement', () => {
 
     // Wait for initial data load
     await waitFor(() => {
-      expect(screen.getByText('Select a team')).toBeInTheDocument();
+      expect(screen.getByText('Select a club')).toBeInTheDocument();
     });
 
     // Fill in the form - use getElementById to avoid ambiguity with filter dropdown
+    const clubSelect = document.getElementById('club_id') as HTMLSelectElement;
     const teamSelect = document.getElementById('team_id') as HTMLSelectElement;
     const firstNameInput = screen.getByRole('textbox', { name: /first name/i });
     const lastNameInput = screen.getByRole('textbox', { name: /last name/i });
     const jerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });
 
+    await userEvent.selectOptions(clubSelect, '1');
     await userEvent.selectOptions(teamSelect, '1');
     await userEvent.type(firstNameInput, 'New');
     await userEvent.type(lastNameInput, 'Player');
@@ -165,7 +188,10 @@ describe('PlayerManagement', () => {
   it('clears form after successful player creation', async () => {
     // Reset and setup mock for this specific test to ensure success
     vi.clearAllMocks();
-    (api.get as jest.Mock).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/clubs') {
+        return Promise.resolve({ data: mockClubs });
+      }
       if (url === '/teams') {
         return Promise.resolve({ data: mockTeams });
       }
@@ -174,9 +200,10 @@ describe('PlayerManagement', () => {
       }
     });
     
-    (api.post as jest.Mock).mockResolvedValueOnce({
+    apiPostMock.mockResolvedValueOnce({
       data: {
         id: 3,
+        club_id: 1,
         team_id: 1,
         first_name: 'New',
         last_name: 'Player',
@@ -187,15 +214,17 @@ describe('PlayerManagement', () => {
     render(<PlayerManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Select a team')).toBeInTheDocument();
+      expect(screen.getByText('Select a club')).toBeInTheDocument();
     });
 
     // Fill in the form - use getElementById to avoid ambiguity with filter dropdown
+    const clubSelect = document.getElementById('club_id') as HTMLSelectElement;
     const teamSelect = document.getElementById('team_id') as HTMLSelectElement;
     const firstNameInput = screen.getByRole('textbox', { name: /first name/i });
     const lastNameInput = screen.getByRole('textbox', { name: /last name/i });
     const jerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });
 
+    await userEvent.selectOptions(clubSelect, '1');
     await userEvent.selectOptions(teamSelect, '1');
     await userEvent.type(firstNameInput, 'New');
     await userEvent.type(lastNameInput, 'Player');
@@ -215,11 +244,13 @@ describe('PlayerManagement', () => {
       const updatedLastNameInput = screen.getByRole('textbox', { name: /last name/i });
       const updatedJerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });
       const updatedTeamSelect = document.getElementById('team_id') as HTMLSelectElement;
+      const updatedClubSelect = document.getElementById('club_id') as HTMLSelectElement;
       
       expect(updatedFirstNameInput).toHaveValue('');
       expect(updatedLastNameInput).toHaveValue('');
       expect(updatedJerseyInput).toHaveValue(null);
       expect(updatedTeamSelect).toHaveValue('');
+      expect(updatedClubSelect).toHaveValue('1');
     });
   });
 
@@ -227,15 +258,17 @@ describe('PlayerManagement', () => {
     render(<PlayerManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Select a team')).toBeInTheDocument();
+      expect(screen.getByText('Select a club')).toBeInTheDocument();
     });
 
     // Fill in the form using getElementById to avoid ambiguity
+    const clubSelect = document.getElementById('club_id') as HTMLSelectElement;
     const teamSelect = document.getElementById('team_id') as HTMLSelectElement;
     const firstNameInput = screen.getByRole('textbox', { name: /first name/i });
     const lastNameInput = screen.getByRole('textbox', { name: /last name/i });
     const jerseyInput = screen.getByRole('spinbutton', { name: /jersey number/i });
 
+    await userEvent.selectOptions(clubSelect, '1');
     await userEvent.selectOptions(teamSelect, '1');
     await userEvent.type(firstNameInput, 'New');
     await userEvent.type(lastNameInput, 'Player');
@@ -253,7 +286,7 @@ describe('PlayerManagement', () => {
     render(<PlayerManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Select a team')).toBeInTheDocument();
+      expect(screen.getByText('Select a club')).toBeInTheDocument();
     });
 
     // Select gender using getElementById to avoid ambiguity
@@ -312,7 +345,7 @@ describe('PlayerManagement', () => {
 
   it('displays "No players found" when no players match filter', async () => {
     // Mock empty response for players
-    (api.get as jest.Mock).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/teams') {
         return Promise.resolve({ data: mockTeams });
       }
@@ -358,7 +391,7 @@ describe('PlayerManagement', () => {
       gender: 'male'
     };
 
-    (api.put as jest.Mock).mockResolvedValue({ data: mockUpdatedPlayer });
+    apiPutMock.mockResolvedValue({ data: mockUpdatedPlayer });
 
     render(<PlayerManagement />);
 
@@ -417,7 +450,7 @@ describe('PlayerManagement', () => {
   });
 
   it('displays update success message after player update', async () => {
-    (api.put as jest.Mock).mockResolvedValue({ 
+    apiPutMock.mockResolvedValue({ 
       data: { ...mockPlayers[0], first_name: 'Updated' }
     });
 
@@ -444,7 +477,7 @@ describe('PlayerManagement', () => {
   });
 
   it('handles update errors gracefully', async () => {
-    (api.put as jest.Mock).mockRejectedValue({
+    apiPutMock.mockRejectedValue({
       response: { data: { error: 'Failed to update player' } }
     });
 
@@ -527,7 +560,7 @@ describe('PlayerManagement', () => {
       is_active: false
     };
 
-    (api.get as jest.Mock).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/teams') {
         return Promise.resolve({ data: mockTeams });
       }
@@ -547,7 +580,7 @@ describe('PlayerManagement', () => {
   });
 
   it('updates player active status in edit mode', async () => {
-    (api.put as jest.Mock).mockResolvedValue({
+    apiPutMock.mockResolvedValue({
       data: { ...mockPlayers[0], is_active: false }
     });
 
@@ -576,7 +609,7 @@ describe('PlayerManagement', () => {
   });
 
   it('handles API errors when fetching data', async () => {
-    (api.get as jest.Mock).mockImplementation((url: string) => {
+    apiGetMock.mockImplementation((url: string) => {
       if (url === '/teams') {
         return Promise.reject({ response: { data: { error: 'Failed to fetch teams' } } });
       }
@@ -635,7 +668,7 @@ describe('PlayerManagement', () => {
         is_active: false
       };
 
-      (api.get as jest.Mock).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
@@ -661,7 +694,7 @@ describe('PlayerManagement', () => {
     it('✅ archives player when archive button is clicked in edit form and confirmed', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       
-      (api.put as jest.Mock).mockResolvedValue({
+      apiPutMock.mockResolvedValue({
         data: { ...mockPlayers[0], is_active: false }
       });
 
@@ -732,7 +765,7 @@ describe('PlayerManagement', () => {
         is_active: false
       };
 
-      (api.get as jest.Mock).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
@@ -743,7 +776,7 @@ describe('PlayerManagement', () => {
 
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       
-      (api.put as jest.Mock).mockResolvedValue({
+      apiPutMock.mockResolvedValue({
         data: { ...inactivePlayer, is_active: true }
       });
 
@@ -776,7 +809,7 @@ describe('PlayerManagement', () => {
     it('❌ handles errors when archiving player fails', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       
-      (api.put as jest.Mock).mockRejectedValue({
+      apiPutMock.mockRejectedValue({
         response: { data: { error: 'Failed to deactivate player' } }
       });
 
@@ -815,7 +848,7 @@ describe('PlayerManagement', () => {
     };
 
     beforeEach(() => {
-      (api.get as jest.Mock).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
@@ -894,7 +927,7 @@ describe('PlayerManagement', () => {
         is_active: false
       };
 
-      (api.get as jest.Mock).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
@@ -1019,7 +1052,7 @@ describe('PlayerManagement', () => {
         { id: 3, team_id: 1, first_name: 'Alice', last_name: 'Johnson', jersey_number: 15, is_active: true, gender: 'female', games_played: 3, goals: 5, total_shots: 10, team_name: 'Team Alpha' }
       ];
 
-      (api.get as jest.Mock).mockImplementation((url: string) => {
+      apiGetMock.mockImplementation((url: string) => {
         if (url === '/teams') {
           return Promise.resolve({ data: mockTeams });
         }
