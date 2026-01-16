@@ -26,6 +26,9 @@ const TwizzitIntegration = React.lazy(() => import('./components/TwizzitIntegrat
 const Achievements = React.lazy(() => import('./components/Achievements'));
 const UserProfile = React.lazy(() => import('./components/UserProfile'));
 const MyAchievements = React.lazy(() => import('./components/MyAchievements'));
+const CompetitionManagement = React.lazy(() => import('./components/CompetitionManagement'));
+const CompetitionBracketView = React.lazy(() => import('./components/CompetitionBracketView'));
+const CompetitionStandingsView = React.lazy(() => import('./components/CompetitionStandingsView'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
@@ -205,7 +208,23 @@ const App: React.FC = () => {
                 path="/competitions"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <ComingSoon title="Competitions" />
+                    <RouteLoader><CompetitionManagement /></RouteLoader>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/competitions/:id/bracket"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <RouteLoader><CompetitionBracketView /></RouteLoader>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/competitions/:id/standings"
+                element={
+                  <ProtectedRoute minRole="coach">
+                    <RouteLoader><CompetitionStandingsView /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
