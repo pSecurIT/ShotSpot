@@ -55,6 +55,7 @@ export const clubsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch clubs');
+      throw err;
     }
   },
 
@@ -68,6 +69,7 @@ export const clubsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch club');
+      throw err;
     }
   },
 
@@ -82,6 +84,7 @@ export const clubsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to create club');
+      throw err;
     }
   },
 
@@ -97,6 +100,7 @@ export const clubsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to update club');
+      throw err;
     }
   },
 
@@ -111,6 +115,7 @@ export const clubsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to delete club');
+      throw err;
     }
   },
 
@@ -124,6 +129,7 @@ export const clubsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch club teams');
+      throw err;
     }
   },
 
@@ -137,6 +143,7 @@ export const clubsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch club players');
+      throw err;
     }
   },
 };
