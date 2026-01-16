@@ -127,6 +127,7 @@ export const competitionsApi = {
       return (response.data || []).map(fromRow);
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch competitions');
+      throw err;
     }
   },
 
@@ -139,6 +140,7 @@ export const competitionsApi = {
       return fromRow(response.data);
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch competition');
+      throw err;
     }
   },
 
@@ -165,6 +167,7 @@ export const competitionsApi = {
       return fromRow(response.data as CompetitionRow);
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to create competition');
+      throw err;
     }
   },
 
@@ -189,6 +192,7 @@ export const competitionsApi = {
       return fromRow(response.data as CompetitionRow);
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to update competition');
+      throw err;
     }
   },
 
@@ -202,6 +206,7 @@ export const competitionsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to delete competition');
+      throw err;
     }
   },
 
@@ -222,6 +227,7 @@ export const competitionsApi = {
       }));
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch competition teams');
+      throw err;
     }
   },
 
@@ -251,6 +257,7 @@ export const competitionsApi = {
       };
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to add team to competition');
+      throw err;
     }
   },
 
@@ -263,6 +270,7 @@ export const competitionsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to remove team from competition');
+      throw err;
     }
   },
 
@@ -275,6 +283,7 @@ export const competitionsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch tournament bracket');
+      throw err;
     }
   },
 
@@ -289,6 +298,7 @@ export const competitionsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to generate tournament bracket');
+      throw err;
     }
   },
 
@@ -301,6 +311,7 @@ export const competitionsApi = {
       return response.data;
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch league standings');
+      throw err;
     }
   },
 };

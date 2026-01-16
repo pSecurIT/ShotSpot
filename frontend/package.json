@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
-    "@capacitor/cli": "^8.0.0",
+    "@capacitor/cli": "^8.0.1",
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "@capacitor/splash-screen": "^8.0.0",
@@ -84,6 +84,6 @@
   ],
   "overrides": {
     "glob": ">=11.1.0",
-    "tar": "6.2.1"
+    "tar": "7.5.3"
   }
 }
