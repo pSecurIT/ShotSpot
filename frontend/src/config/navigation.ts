@@ -110,9 +110,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Competitions',
         path: '/competitions',
         icon: '🏁',
-        roles: ['coach', 'admin'],
-        badge: 'Soon',
-        disabled: true
+        roles: ['coach', 'admin']
       },
       {
         label: 'Series/Divisions',
