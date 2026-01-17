@@ -43,7 +43,7 @@ jobs:
         run: |
           cd backend
           npm --version
-          npm install --package-lock-only --include=optional
+          npm install --package-lock-only --include=optional --ignore-scripts
           if ! git diff --quiet package-lock.json; then
             echo "❌ backend/package-lock.json is out of sync with package.json" >&2
             echo "Run 'cd backend && npm install --include=optional' and commit the updated package-lock.json" >&2
@@ -56,7 +56,7 @@ jobs:
         run: |
           cd frontend
           npm --version
-          npm install --package-lock-only --include=optional
+          npm install --package-lock-only --include=optional --ignore-scripts
           if ! git diff --quiet package-lock.json; then
             echo "❌ frontend/package-lock.json is out of sync with package.json" >&2
             echo "Run 'cd frontend && npm install --include=optional' and commit the updated package-lock.json" >&2
