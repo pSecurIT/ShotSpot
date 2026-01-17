@@ -42,6 +42,7 @@
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.0.0",
     "jsdom": "^27.1.0",
+    "patch-package": "^8.0.1",
     "start-server-and-test": "^2.0.3",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.46.3",
@@ -67,7 +68,8 @@
     "mobile:android": "npm run mobile:sync && npx cap open android",
     "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "mobile:run:android": "npm run mobile:sync && npx cap run android",
-    "mobile:run:ios": "npm run mobile:sync && npx cap run ios"
+    "mobile:run:ios": "npm run mobile:sync && npx cap run ios",
+    "postinstall": "patch-package"
   },
   "eslintConfig": {
     "extends": [
