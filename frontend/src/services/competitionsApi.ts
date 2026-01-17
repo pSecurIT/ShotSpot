@@ -303,6 +303,32 @@ export const competitionsApi = {
   },
 
   /**
+   * Update a tournament bracket match.
+   */
+  updateBracketMatch: async (
+    competitionId: number,
+    bracketId: number,
+    payload: {
+      home_team_id?: number | null;
+      away_team_id?: number | null;
+      winner_team_id?: number;
+      game_id?: number;
+      scheduled_date?: string;
+    }
+  ): Promise<unknown | QueuedActionResponse> => {
+    try {
+      const response = await api.put<unknown | QueuedActionResponse>(
+        `/competitions/${competitionId}/bracket/${bracketId}`,
+        payload
+      );
+      return response.data;
+    } catch (err) {
+      throwNormalizedApiError(err, 'Failed to update bracket match');
+      throw err;
+    }
+  },
+
+  /**
    * Get league standings for a competition.
    */
   getStandings: async (competitionId: number): Promise<LeagueStanding[]> => {
