@@ -713,6 +713,14 @@ router.put('/:id/bracket/:bracketId', [
   requireRole(['admin', 'coach']),
   param('id').isInt({ min: 1 }).withMessage('Competition ID must be a positive integer'),
   param('bracketId').isInt({ min: 1 }).withMessage('Bracket ID must be a positive integer'),
+  body('home_team_id')
+    .optional({ nullable: true })
+    .custom((value) => value === null || (Number.isInteger(value) && value > 0))
+    .withMessage('Home team ID must be a positive integer or null'),
+  body('away_team_id')
+    .optional({ nullable: true })
+    .custom((value) => value === null || (Number.isInteger(value) && value > 0))
+    .withMessage('Away team ID must be a positive integer or null'),
   body('game_id')
     .optional()
     .isInt({ min: 1 })
@@ -732,7 +740,7 @@ router.put('/:id/bracket/:bracketId', [
   }
 
   const { id, bracketId } = req.params;
-  const { game_id, winner_team_id, scheduled_date } = req.body;
+  const { home_team_id, away_team_id, game_id, winner_team_id, scheduled_date } = req.body;
 
   try {
     // Verify bracket exists and belongs to competition
@@ -750,6 +758,52 @@ router.put('/:id/bracket/:bracketId', [
     const updates = [];
     const params = [];
     let paramCount = 1;
+
+    // Team assignment (drag & drop) - only allow for first round and non-completed matches
+    if (home_team_id !== undefined || away_team_id !== undefined) {
+      if (winner_team_id !== undefined) {
+        return res.status(400).json({ error: 'Cannot set winner while changing match teams' });
+      }
+      if (bracket.round_number !== 1) {
+        return res.status(400).json({ error: 'Team assignment is only allowed in the first round' });
+      }
+      if (bracket.winner_team_id !== null || bracket.status === 'completed') {
+        return res.status(400).json({ error: 'Cannot change teams for a completed match' });
+      }
+
+      const newHome = home_team_id === undefined ? bracket.home_team_id : home_team_id;
+      const newAway = away_team_id === undefined ? bracket.away_team_id : away_team_id;
+      if (newHome !== null && newAway !== null && newHome === newAway) {
+        return res.status(400).json({ error: 'Home and away team must be different' });
+      }
+
+      // Verify assigned teams belong to this competition
+      const teamIdsToCheck = [newHome, newAway].filter((v) => v !== null);
+      if (teamIdsToCheck.length > 0) {
+        const allowedTeams = await db.query(
+          'SELECT team_id FROM competition_teams WHERE competition_id = $1 AND team_id = ANY($2::int[])',
+          [id, teamIdsToCheck]
+        );
+        if (allowedTeams.rows.length !== teamIdsToCheck.length) {
+          return res.status(400).json({ error: 'Assigned team must be registered in this competition' });
+        }
+      }
+
+      if (home_team_id !== undefined) {
+        updates.push(`home_team_id = $${paramCount}`);
+        params.push(home_team_id);
+        paramCount++;
+      }
+      if (away_team_id !== undefined) {
+        updates.push(`away_team_id = $${paramCount}`);
+        params.push(away_team_id);
+        paramCount++;
+      }
+
+      // Changing teams invalidates any previous winner.
+      updates.push('winner_team_id = NULL');
+      updates.push('status = \'pending\'');
+    }
 
     if (game_id !== undefined) {
       updates.push(`game_id = $${paramCount}`);
