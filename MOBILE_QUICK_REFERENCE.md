@@ -139,6 +139,7 @@ npm run mobile:run:ios
 | Problem | Solution |
 |---------|----------|
 | "android/ios not found" | Run `npm run mobile:sync` |
+| `npx cap add ios` fails with `...reading 'extract'` | Run `npm install` in `frontend/` so `patch-package` applies; see `frontend/patches/@capacitor+cli+8.0.1.patch` |
 | White screen on launch | Check service-worker.js in dist/ |
 | Build fails | Clean and rebuild native project |
 | Gradle errors (Android) | Delete `android/build` and sync |

@@ -115,6 +115,15 @@ For advanced mobile features, you may need to edit native files:
 ### "Android/iOS directory not found"
 Run: `npm run mobile:sync` (automatically creates platforms)
 
+### "npx cap add ios" fails with "Cannot read properties of undefined (reading 'extract')"
+
+This repo intentionally overrides `tar` to a patched v7 release for security. Some versions of `@capacitor/cli` expect a default export from `tar`, which can break `cap add ios` in CI.
+
+We ship a small `patch-package` patch to make `@capacitor/cli` work with `tar@7`. If you see this error:
+
+- Make sure you ran `npm install` in `frontend/` (the `postinstall` hook applies the patch).
+- Confirm `frontend/patches/@capacitor+cli+8.0.1.patch` exists in your branch.
+
 ### "Build failed in Android Studio"
 1. Clean project: Build → Clean Project
 2. Sync Gradle files
