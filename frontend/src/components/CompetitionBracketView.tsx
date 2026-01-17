@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { competitionsApi } from '../services/competitionsApi';
-import type { TournamentBracket } from '../types/competitions';
+import type { CompetitionTeam, TournamentBracket } from '../types/competitions';
+import { TournamentBracket as TournamentBracketSvg } from './TournamentBracket';
 import '../styles/CompetitionManagement.css';
 
 const CompetitionBracketView: React.FC = () => {
@@ -11,8 +12,10 @@ const CompetitionBracketView: React.FC = () => {
   const competitionId = Number(id);
 
   const [bracket, setBracket] = useState<TournamentBracket | null>(null);
+  const [teams, setTeams] = useState<CompetitionTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -25,8 +28,12 @@ const CompetitionBracketView: React.FC = () => {
 
         setLoading(true);
         setError(null);
-        const data = await competitionsApi.getBracket(competitionId);
-        setBracket(data);
+        const [teamsData, bracketData] = await Promise.all([
+          competitionsApi.getTeams(competitionId),
+          competitionsApi.getBracket(competitionId),
+        ]);
+        setTeams(teamsData);
+        setBracket(bracketData);
       } catch (err) {
         const errorObj = err as { response?: { data?: { error?: string; details?: string } }; message?: string };
         setError(errorObj.response?.data?.error || errorObj.response?.data?.details || 'Failed to load bracket');
@@ -47,6 +54,35 @@ const CompetitionBracketView: React.FC = () => {
         </button>
       </div>
 
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={busy || loading || !Number.isFinite(competitionId) || competitionId <= 0}
+          onClick={async () => {
+            try {
+              setBusy(true);
+              setError(null);
+              const result = await competitionsApi.generateBracket(competitionId);
+              // When online, backend may return a message payload; always refresh via GET.
+              if ((result as { queued?: boolean })?.queued) {
+                setError('Bracket generation queued (offline). Sync when online to see updates.');
+                return;
+              }
+              const refreshed = await competitionsApi.getBracket(competitionId);
+              setBracket(refreshed);
+            } catch (err) {
+              const errorObj = err as { response?: { data?: { error?: string; details?: string } }; message?: string };
+              setError(errorObj.response?.data?.error || errorObj.response?.data?.details || 'Failed to generate bracket');
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Generate / Regenerate Bracket
+        </button>
+      </div>
+
       {loading && <div>Loading bracket…</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -54,25 +90,42 @@ const CompetitionBracketView: React.FC = () => {
         <div className="competition-card">
           {bracket.rounds.length === 0 && <div className="empty-state">No rounds available</div>}
 
-          {bracket.rounds.map((round) => (
-            <div key={round.round_number} style={{ marginTop: '1rem' }}>
-              <h3 style={{ marginBottom: '0.5rem' }}>Round {round.round_number}</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {round.matches.map((match) => (
-                  <div key={match.id} className="team-item">
-                    <span>
-                      {match.home_team_name ?? 'TBD'} vs {match.away_team_name ?? 'TBD'}
-                    </span>
-                    <span className="competition-card__muted">
-                      {typeof match.home_score === 'number' || typeof match.away_score === 'number'
-                        ? `${match.home_score ?? '-'} - ${match.away_score ?? '-'}`
-                        : 'Not played'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+          {bracket.rounds.length > 0 && (
+            <TournamentBracketSvg
+              bracket={bracket}
+              teams={teams}
+              onAssignTeam={async (matchId, side, teamId) => {
+                try {
+                  setBusy(true);
+                  setError(null);
+                  await competitionsApi.updateBracketMatch(competitionId, matchId, {
+                    [side === 'home' ? 'home_team_id' : 'away_team_id']: teamId,
+                  });
+                  const refreshed = await competitionsApi.getBracket(competitionId);
+                  setBracket(refreshed);
+                } catch (err) {
+                  const errorObj = err as { response?: { data?: { error?: string; details?: string } }; message?: string };
+                  setError(errorObj.response?.data?.error || errorObj.response?.data?.details || 'Failed to assign team');
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              onSetWinner={async (matchId, winnerTeamId) => {
+                try {
+                  setBusy(true);
+                  setError(null);
+                  await competitionsApi.updateBracketMatch(competitionId, matchId, { winner_team_id: winnerTeamId });
+                  const refreshed = await competitionsApi.getBracket(competitionId);
+                  setBracket(refreshed);
+                } catch (err) {
+                  const errorObj = err as { response?: { data?: { error?: string; details?: string } }; message?: string };
+                  setError(errorObj.response?.data?.error || errorObj.response?.data?.details || 'Failed to update match result');
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
+          )}
         </div>
       )}
     </div>
