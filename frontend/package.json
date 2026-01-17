@@ -8,13 +8,14 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
-    "@capacitor/cli": "^8.0.0",
+    "@capacitor/cli": "^8.0.1",
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "@capacitor/splash-screen": "^8.0.0",
     "axios": "^1.13.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.0.0",
+    "patch-package": "^8.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.9.5",
@@ -67,7 +68,8 @@
     "mobile:android": "npm run mobile:sync && npx cap open android",
     "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "mobile:run:android": "npm run mobile:sync && npx cap run android",
-    "mobile:run:ios": "npm run mobile:sync && npx cap run ios"
+    "mobile:run:ios": "npm run mobile:sync && npx cap run ios",
+    "postinstall": "patch-package"
   },
   "eslintConfig": {
     "extends": [
