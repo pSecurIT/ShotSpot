@@ -31,7 +31,7 @@
     "twizzit:diagnose": "node scripts/diagnose-twizzit.js"
   },
   "dependencies": {
-    "axios": "^1.7.9",
+    "axios": "^1.13.3",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
