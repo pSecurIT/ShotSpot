@@ -45,7 +45,7 @@
         "path": "/v2/api/groups",
         "description": "Retrieve all groups (teams) for an organization",
         "queryParameters": {
-          "organization_id": "number (required)",
+          "organization-ids[]": "number (required)",
           "limit": "number (optional)"
         },
         "response": {
@@ -57,7 +57,7 @@
             "group_id": "number"
           }
         },
-        "notes": "Groups are equivalent to teams. Requires organization_id parameter. Returns 403 if service account lacks permission."
+        "notes": "Groups are equivalent to teams. In practice, Twizzit expects organization scoping via organization-ids[] (kebab-case array param). Returns 403 if service account lacks permission."
       },
       "getGroup": {
         "method": "GET",
@@ -65,7 +65,7 @@
         "description": "Retrieve a specific group by ID",
         "queryParameters": {
           "id": "number (group ID)",
-          "organization_id": "number (may be required)"
+          "organization-ids[]": "number (may be required)"
         },
         "response": {
           "type": "object",
@@ -84,7 +84,7 @@
         "description": "Retrieve all contacts (players)",
         "authentication": "required",
         "queryParameters": {
-          "organization_id": "number (may be required)",
+          "organization-ids[]": "number (may be required)",
           "limit": "number (optional)"
         },
         "response": {
@@ -111,22 +111,18 @@
         "description": "Retrieve all contacts (players) for a specific group (team)",
         "authentication": "required",
         "queryParameters": {
-          "group_id": "number (required)",
-          "organization_id": "number (may be required)"
+          "group-ids[]": "number (required)",
+          "organization-ids[]": "number (required)"
         },
         "response": {
           "type": "array (direct, not paginated)",
           "items": {
-            "id": "number",
-            "contact_id": "number",
-            "group_id": "number",
-            "firstName": "string",
-            "lastName": "string",
-            "first_name": "string",
-            "last_name": "string"
+            "groupId": "number",
+            "contactId": "number",
+            "contactFunctionId": "number"
           }
         },
-        "notes": "Primary endpoint for getting players for a specific team"
+        "notes": "Returns membership rows (groupId/contactId/contactFunctionId). Use /v2/api/contacts to resolve contactId to player details."
       }
     },
     "seasons": {
@@ -202,7 +198,7 @@
     "2_getOrganizations": {
       "endpoint": "GET /v2/api/organizations",
       "headers": { "Authorization": "Bearer eyJ0eXAi..." },
-      "response": [{ "id": 25537, "name": "KCOV v.z.w." }]
+      "response": [{ "id": 25537, "name": "Example Club v.z.w." }]
     },
     "3_getGroups": {
       "endpoint": "GET /v2/api/groups?organization_id=25537",

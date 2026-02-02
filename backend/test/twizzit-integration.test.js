@@ -17,12 +17,12 @@ describe('Twizzit Integration Tests', () => {
   beforeAll(async () => {
     const uniqueId = `tw_int_${Date.now()}`;
     const userRes = await db.query(
-      'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, \'hash\', \'user\') RETURNING *',
+      'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, \'hash\', \'coach\') RETURNING *',
       [`${uniqueId}`, `${uniqueId}@test.com`]
     );
     const user = userRes.rows[0];
     authToken = jwt.sign(
-      { id: user.id, role: 'user' },
+      { id: user.id, role: 'coach' },
       process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing'
     );
   });
@@ -53,7 +53,7 @@ describe('Twizzit Integration Tests', () => {
 
   test('Sync players for a specific club', async () => {
     const response = await request(app)
-      .post('/api/twizzit/sync/players/1')
+      .post('/api/twizzit/sync/players/club/1')
       .set('Authorization', `Bearer ${authToken}`)
       .send({});
     expect(response.status).toBe(200);

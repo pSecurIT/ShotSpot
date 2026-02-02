@@ -236,8 +236,14 @@ app.use(session({
 app.use((req, res, next) => {
   // Validate Content-Type for POST/PUT/PATCH requests
   if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    const contentLengthHeader = req.headers['content-length'];
+    const hasBody =
+      (typeof contentLengthHeader === 'string' && contentLengthHeader !== '0') ||
+      // Chunked requests don't have content-length; treat as having a body.
+      typeof req.headers['transfer-encoding'] === 'string';
+
     const contentType = req.headers['content-type'];
-    if (!contentType || !contentType.includes('application/json')) {
+    if (hasBody && (!contentType || !contentType.includes('application/json'))) {
       return res.status(415).json({ 
         error: 'Unsupported Media Type. Content-Type must be application/json' 
       });
