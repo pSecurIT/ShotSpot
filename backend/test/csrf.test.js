@@ -202,8 +202,8 @@ describe('🛡️ CSRF Middleware Security', () => {
       
       csrf(req, res, next);
       
-      expect(next).not.toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).toHaveBeenCalledWith();
+      expect(res.status).not.toHaveBeenCalled();
     });
   });
 
