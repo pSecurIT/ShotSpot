@@ -165,10 +165,10 @@ describe('Twizzit API Client', () => {
         data: mockGroups
       });
 
-      const result = await client.getGroups({ organization_id: 123 });
+      const result = await client.getGroups({ 'organization-ids[]': 123 });
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/groups', {
-        params: { organization_id: 123 }
+        params: { 'organization-ids[]': 123 }
       });
       expect(result.groups).toEqual(mockGroups);
       expect(result.total).toBe(2);
@@ -233,14 +233,104 @@ describe('Twizzit API Client', () => {
       const result = await client.getGroupContacts(123);
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/group-contacts', {
-        params: { group_id: 123 }
+        params: { 'group-ids[]': '123' }
       });
       expect(result.contacts).toEqual(mockContacts);
       expect(result.total).toBe(2);
     });
 
+    it('should resolve membership rows and batch contact lookups beyond 10 ids', async () => {
+      client.organizationId = 'org-test';
+
+      const contactIds = Array.from({ length: 14 }, (_, i) => `contact-${i + 1}`);
+      const membershipRows = contactIds.map((id) => ({ groupId: 'group-test', contactId: id }));
+
+      mockAxiosInstance.get.mockImplementation((url, config) => {
+        if (url === '/v2/api/group-contacts') {
+          return Promise.resolve({ data: membershipRows });
+        }
+
+        if (url === '/v2/api/contacts') {
+          // The client may first attempt a season-scoped contacts query using
+          // group+season params. Simulate Twizzit rejecting that with 400 so
+          // we exercise the membership-row fallback.
+          if (!config?.params?.['contact-ids[]']) {
+            return Promise.reject({ response: { status: 400 } });
+          }
+          const idsParam = config?.params?.['contact-ids[]'];
+          const ids = Array.isArray(idsParam) ? idsParam.map(String) : [String(idsParam)];
+          return Promise.resolve({
+            data: ids.map((id) => ({ id, 'first-name': `First${id}`, 'last-name': `Last${id}` }))
+          });
+        }
+
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      });
+
+      const result = await client.getGroupContacts('group-test');
+
+      const calls = mockAxiosInstance.get.mock.calls
+        .filter(([url]) => url === '/v2/api/contacts')
+        .map(([, cfg]) => cfg?.params?.['contact-ids[]']);
+
+      expect(calls).toHaveLength(2);
+      expect(Array.isArray(calls[0]) ? calls[0] : [calls[0]]).toHaveLength(10);
+      expect(Array.isArray(calls[1]) ? calls[1] : [calls[1]]).toHaveLength(4);
+      expect(result.total).toBe(14);
+      expect(result.contacts).toHaveLength(14);
+    });
+
+    it('should filter membership rows by seasonId when rows include season identifiers', async () => {
+      client.organizationId = 'org-test';
+
+      const membershipRows = [
+        { groupId: 'group-test', contactId: 'contact-1', seasonId: 'season-test' },
+        { groupId: 'group-test', contactId: 'contact-2', season_id: 'season-test' },
+        { groupId: 'group-test', contactId: 'contact-3', 'season-id': 'season-other' }
+      ];
+
+      mockAxiosInstance.get.mockImplementation((url, config) => {
+        if (url === '/v2/api/group-contacts') {
+          return Promise.resolve({ data: membershipRows });
+        }
+
+        if (url === '/v2/api/contacts') {
+          // The client may first attempt a season-scoped contacts query using
+          // group+season params. Simulate Twizzit rejecting that with 400 so
+          // we exercise the membership-row fallback.
+          if (!config?.params?.['contact-ids[]']) {
+            return Promise.reject({ response: { status: 400 } });
+          }
+          const idsParam = config?.params?.['contact-ids[]'];
+          const ids = Array.isArray(idsParam) ? idsParam.map(String) : [String(idsParam)];
+          return Promise.resolve({
+            data: ids.map((id) => ({ id, 'first-name': `First${id}`, 'last-name': `Last${id}` }))
+          });
+        }
+
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      });
+
+      const result = await client.getGroupContacts('group-test', { seasonId: 'season-test' });
+
+      expect(result.total).toBe(2);
+      expect(result.contacts.map((c) => String(c.id))).toEqual(['contact-1', 'contact-2']);
+    });
+
     it('should throw error if group ID is missing', async () => {
       await expect(client.getGroupContacts()).rejects.toThrow('Group ID is required');
+    });
+
+    it('should include organization filter when organizationId is set', async () => {
+      const mockContacts = [{ id: 1, first_name: 'John', last_name: 'Doe' }];
+      mockAxiosInstance.get.mockResolvedValue({ data: mockContacts });
+
+      client.organizationId = 'org-test';
+      await client.getGroupContacts('group-test');
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/group-contacts', {
+        params: { 'group-ids[]': 'group-test', 'organization-ids[]': 'org-test' }
+      });
     });
   });
 
@@ -263,10 +353,10 @@ describe('Twizzit API Client', () => {
     it('should pass organization filter', async () => {
       mockAxiosInstance.get.mockResolvedValue({ data: [] });
 
-      await client.getContacts({ filters: { organization_id: 123 } });
+      await client.getContacts({ filters: { 'organization-ids[]': 123 } });
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/contacts', {
-        params: { organization_id: 123 }
+        params: { 'organization-ids[]': 123 }
       });
     });
   });
@@ -282,7 +372,9 @@ describe('Twizzit API Client', () => {
 
       const result = await client.getSeasons();
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/seasons');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/seasons', {
+        params: {}
+      });
       expect(result.seasons).toEqual(mockSeasons);
       expect(result.total).toBe(2);
     });
@@ -292,10 +384,10 @@ describe('Twizzit API Client', () => {
     it('getTeams should call getGroups', async () => {
       mockAxiosInstance.get.mockResolvedValue({ data: [] });
       
-      const result = await client.getTeams({ organization_id: 123 });
+      const result = await client.getTeams({ 'organization-ids[]': 123 });
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/groups', {
-        params: { organization_id: 123 }
+        params: { 'organization-ids[]': 123 }
       });
       expect(result).toHaveProperty('teams');
       expect(result).toHaveProperty('groups');
@@ -318,7 +410,7 @@ describe('Twizzit API Client', () => {
       const result = await client.getTeamPlayers(123);
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/group-contacts', {
-        params: { group_id: 123 }
+        params: { 'group-ids[]': '123' }
       });
       expect(result).toHaveProperty('players');
     });
@@ -340,6 +432,9 @@ describe('Twizzit API Client', () => {
       });
 
       await expect(client.getGroups({ organization_id: 123 })).rejects.toThrow();
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/groups', {
+        params: { 'organization-ids[]': 123 }
+      });
     });
 
     it('should handle 401 unauthorized errors', async () => {
