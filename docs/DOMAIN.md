@@ -22,7 +22,7 @@ This document defines the key domain concepts used in ShotSpot, with specific co
 - See backend services: `backend/src/services/twizzit-*.js`
 
 ### Club
-An **organization** (e.g., KCOV Korfbal Club Overpelt-Neerpelt) that organizes korfball activities including trainings, friendly matches, and tournaments.
+An **organization** (e.g., a local korfball club) that organizes korfball activities including trainings, friendly matches, and tournaments.
 
 **Key characteristics:**
 - Legal entity registered with KBKB
