@@ -1,10 +1,12 @@
 name: Build and Push Docker Image
 
-# This workflow only runs on release/tag events, not on PRs
-# Trivy scan warnings during PR reviews are expected and can be ignored
+# Build/push runs only on release/tag events.
+# The Trivy SARIF scan also runs on PRs so Code Scanning can compute PR-introduced alerts.
 on:
   release:
     types: [published]
+  pull_request:
+    branches: [main]
   push:
     tags:
       - 'v*'
@@ -23,6 +25,7 @@ jobs:
   build-and-push:
     name: Build and Push Multi-Platform Image
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
       packages: write
@@ -194,6 +197,7 @@ jobs:
     name: Test Docker Image
     needs: build-and-push
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
       packages: read
@@ -431,48 +435,33 @@ jobs:
 
   scan-vulnerabilities:
     name: Scan for Vulnerabilities
-    needs: build-and-push
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: read
       security-events: write
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull built image
+      - name: Build image for scanning (local)
+        shell: bash
         run: |
-          echo "Pulling image by digest for vulnerability scan"
-          echo "Registry: ${{ env.REGISTRY }}"
-          echo "Image: ${{ env.IMAGE_NAME }}"
-          echo "Digest: ${{ needs.build-and-push.outputs.image_digest }}"
-          echo "Full reference: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }}"
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }} || {
-            echo "Failed to pull image for scanning"
-            exit 1
-          }
-          echo "Image pulled successfully for scanning"
+          set -euo pipefail
+          echo "Building local image for vulnerability scan"
+          docker build -t local/shotspot:scan-${{ github.sha }} .
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }}
+          image-ref: local/shotspot:scan-${{ github.sha }}
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -481,7 +470,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:latest image \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }} \
+            local/shotspot:scan-${{ github.sha }} \
             --severity CRITICAL,HIGH \
             --format json > vuln-report.json || true
           
