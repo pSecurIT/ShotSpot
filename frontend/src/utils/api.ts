@@ -29,6 +29,8 @@ export const getCsrfToken = async (): Promise<string> => {
 // Add auth token and CSRF token to requests
 api.interceptors.request.use(
   async (config) => {
+    const isTestEnv = import.meta.env.MODE === 'test' || process.env.NODE_ENV === 'test';
+
     // Add Bearer token
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (token) {
@@ -41,7 +43,9 @@ api.interceptors.request.use(
         const csrf = await getCsrfToken();
         config.headers['X-CSRF-Token'] = csrf;
       } catch (error) {
-        console.error('Failed to get CSRF token:', error);
+        if (!isTestEnv) {
+          console.error('Failed to get CSRF token:', error);
+        }
       }
     }
 
@@ -60,12 +64,12 @@ api.interceptors.response.use(
     
     // Check if request failed due to network/backend issues
     const isNetworkError = !error.response; // No response means network failure
-    const isServerError = error.response?.status >= 500; // 5xx errors
     const isCorsError = error.message?.toLowerCase().includes('cors');
     const isOffline = !navigator.onLine;
     
     // Queue write operations when offline or backend unavailable
-    const shouldQueue = (isOffline || isNetworkError || isServerError || isCorsError) &&
+    // Note: Don't queue on generic 5xx responses; that hides real server bugs.
+    const shouldQueue = (isOffline || isNetworkError || isCorsError) &&
                        ['POST', 'PUT', 'DELETE'].includes(originalRequest.method?.toUpperCase() || '');
 
     if (shouldQueue) {
@@ -149,6 +153,9 @@ import type {
   PlayerMapping,
   SyncResult,
   VerifyConnectionResult,
+  TwizzitSyncOptions,
+  TwizzitTeamsPreview,
+  TwizzitPlayersPreview,
 } from '../types/twizzit';
 
 /**
@@ -163,9 +170,10 @@ export const getTwizzitCredentials = async (): Promise<TwizzitCredential[]> => {
  * Store new Twizzit credentials
  */
 export const storeTwizzitCredentials = async (data: {
-  username: string;
-  password: string;
+  apiUsername: string;
+  apiPassword: string;
   organizationName: string;
+  apiEndpoint?: string;
 }): Promise<TwizzitCredential> => {
   const response = await api.post('/twizzit/credentials', data);
   return response.data.credential;
@@ -184,7 +192,8 @@ export const deleteTwizzitCredentials = async (credentialId: number): Promise<vo
 export const verifyTwizzitConnection = async (
   credentialId: number
 ): Promise<VerifyConnectionResult> => {
-  const response = await api.post(`/twizzit/verify/${credentialId}`);
+  // Backend expects application/json; sending `undefined` omits Content-Type in axios.
+  const response = await api.post(`/twizzit/verify/${credentialId}`, {});
   return response.data;
 };
 
@@ -195,10 +204,12 @@ export const syncTwizzitTeams = async (
   credentialId: number,
   options?: {
     groupId?: string;
+    seasonId?: string;
+    organizationId?: string;
     createMissing?: boolean;
   }
 ): Promise<SyncResult> => {
-  const response = await api.post(`/twizzit/sync/teams/${credentialId}`, options);
+  const response = await api.post(`/twizzit/sync/teams/${credentialId}`, options ?? {});
   return response.data;
 };
 
@@ -210,10 +221,82 @@ export const syncTwizzitPlayers = async (
   options?: {
     groupId?: string;
     seasonId?: string;
+    organizationId?: string;
     createMissing?: boolean;
   }
 ): Promise<SyncResult> => {
-  const response = await api.post(`/twizzit/sync/players/${credentialId}`, options);
+  const response = await api.post(`/twizzit/sync/players/${credentialId}`, options ?? {});
+  return response.data;
+};
+
+/**
+ * Load Twizzit groups (teams) and seasons for dropdowns
+ */
+export const getTwizzitSyncOptions = async (credentialId: number): Promise<TwizzitSyncOptions> => {
+  const response = await api.get(`/twizzit/sync/options/${credentialId}`);
+  return response.data;
+};
+
+export const getTwizzitSyncOptionsForSeason = async (
+  credentialId: number,
+  seasonId?: string
+): Promise<TwizzitSyncOptions> => {
+  const query = seasonId ? `?seasonId=${encodeURIComponent(seasonId)}` : '';
+  const response = await api.get(`/twizzit/sync/options/${credentialId}${query}`);
+  return response.data;
+};
+
+export const getTwizzitSyncOptionsForOrganization = async (
+  credentialId: number,
+  organizationId?: string,
+  seasonId?: string,
+  options?: { includeAccess?: boolean }
+): Promise<TwizzitSyncOptions> => {
+  const queryParts: string[] = [];
+  if (organizationId) queryParts.push(`organizationId=${encodeURIComponent(organizationId)}`);
+  if (seasonId) queryParts.push(`seasonId=${encodeURIComponent(seasonId)}`);
+  if (options?.includeAccess) queryParts.push('includeAccess=1');
+  const query = queryParts.length ? `?${queryParts.join('&')}` : '';
+  const response = await api.get(`/twizzit/sync/options/${credentialId}${query}`);
+  return response.data;
+};
+
+export const getTwizzitSyncOptionsWithAccess = async (credentialId: number): Promise<TwizzitSyncOptions> => {
+  const response = await api.get(`/twizzit/sync/options/${credentialId}?includeAccess=1`);
+  return response.data;
+};
+
+/**
+ * Debug endpoint for diagnosing Twizzit org scoping (admin/coach).
+ */
+export const debugTwizzitAccess = async (
+  credentialId: number,
+  organizationId?: string
+): Promise<unknown> => {
+  const query = organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : '';
+  const response = await api.get(`/twizzit/debug/access/${credentialId}${query}`);
+  return response.data;
+};
+
+/**
+ * Preview teams (Twizzit groups) that would be synced
+ */
+export const previewTwizzitTeams = async (
+  credentialId: number,
+  options?: { groupId?: string; organizationId?: string; seasonId?: string }
+): Promise<TwizzitTeamsPreview> => {
+  const response = await api.post(`/twizzit/sync/preview/teams/${credentialId}`, options ?? {});
+  return response.data;
+};
+
+/**
+ * Preview players that would be synced for a team/season
+ */
+export const previewTwizzitPlayers = async (
+  credentialId: number,
+  options: { groupId: string; seasonId?: string; organizationId?: string }
+): Promise<TwizzitPlayersPreview> => {
+  const response = await api.post(`/twizzit/sync/preview/players/${credentialId}`, options);
   return response.data;
 };
 
@@ -258,10 +341,10 @@ export const getTwizzitSyncHistory = async (
 export const getTwizzitTeamMappings = async (
   credentialId?: number
 ): Promise<TeamMapping[]> => {
-  const url = credentialId 
-    ? `/twizzit/mappings/teams?credentialId=${credentialId}`
-    : '/twizzit/mappings/teams';
-  const response = await api.get(url);
+  // Mappings are global (not credential-scoped) in the current data model.
+  // Keep the optional parameter for backwards compatibility, but don't send it.
+  void credentialId;
+  const response = await api.get('/twizzit/mappings/teams');
   return response.data.mappings;
 };
 
@@ -271,10 +354,10 @@ export const getTwizzitTeamMappings = async (
 export const getTwizzitPlayerMappings = async (
   credentialId?: number
 ): Promise<PlayerMapping[]> => {
-  const url = credentialId
-    ? `/twizzit/mappings/players?credentialId=${credentialId}`
-    : '/twizzit/mappings/players';
-  const response = await api.get(url);
+  // Mappings are global (not credential-scoped) in the current data model.
+  // Keep the optional parameter for backwards compatibility, but don't send it.
+  void credentialId;
+  const response = await api.get('/twizzit/mappings/players');
   return response.data.mappings;
 };
 

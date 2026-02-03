@@ -4,9 +4,9 @@ permissions:
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
 
 jobs:
   backend:
@@ -51,10 +51,10 @@ jobs:
         node-version: [22.x]  # Focus on latest LTS version
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v4
     
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -105,10 +105,10 @@ jobs:
         node-version: [22.x]  # Focus on latest LTS version
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v4
     
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -146,10 +146,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v4
 
     - name: Use Node.js 22.x
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v4
       with:
         node-version: 22.x
 
@@ -208,10 +208,10 @@ jobs:
   #         --health-retries 5
   #
   #   steps:
-  #   - uses: actions/checkout@v6
+  #   - uses: actions/checkout@v4
   #
   #   - name: Use Node.js 20.x
-  #     uses: actions/setup-node@v6
+  #     uses: actions/setup-node@v4
   #     with:
   #       node-version: 20.x
   #       cache: 'npm'

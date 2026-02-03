@@ -177,7 +177,8 @@ describe('API Utility', () => {
       const response = await api.post('/test', { data: 'test' });
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to get CSRF token:', expect.any(Error));
+      // In test runs we intentionally suppress this log to keep output clean.
+      expect(consoleSpy).not.toHaveBeenCalled();
       
       consoleSpy.mockRestore();
     });

@@ -6,6 +6,13 @@
 import axios from 'axios';
 
 class TwizzitApiClient {
+  static _tokenCache = new Map();
+  static _authInFlight = new Map();
+
+  static _getTokenCacheKey(apiEndpoint, username) {
+    return `${String(apiEndpoint ?? '')}|${String(username ?? '')}`;
+  }
+
   constructor(config) {
     if (!config || typeof config !== 'object') {
       throw new Error('TwizzitApiClient requires a configuration object');
@@ -15,6 +22,8 @@ class TwizzitApiClient {
     this.username = config.username;
     this.password = config.password;
     this.timeout = config.timeout || 30000;
+    this.organizationName = config.organizationName || null;
+    this.organizationId = config.organizationId || null;
     this.accessToken = null;
     this.tokenExpiry = null;
 
@@ -42,6 +51,9 @@ class TwizzitApiClient {
     // Add request interceptor for authentication
     this.client.interceptors.request.use(
       async (config) => {
+        if (!config) {
+          return config;
+        }
         // Skip auth for authenticate endpoint
         if (config.url === '/v2/api/authenticate' || config.url?.includes('/authenticate')) {
           return config;
@@ -65,7 +77,13 @@ class TwizzitApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
-        const originalRequest = error.config;
+        const originalRequest = error?.config;
+
+        // If we don't have the original request config (e.g. a failure inside an interceptor),
+        // don't attempt any retries.
+        if (!originalRequest || typeof originalRequest !== 'object') {
+          return Promise.reject(error);
+        }
 
         // Don't retry authentication requests to avoid infinite loops
         if (originalRequest.url?.includes('/authenticate')) {
@@ -82,6 +100,7 @@ class TwizzitApiClient {
           
           try {
             await this.authenticate();
+            if (!originalRequest.headers) originalRequest.headers = {};
             originalRequest.headers.Authorization = `Bearer ${this.accessToken}`;
             return this.client(originalRequest);
           } catch (authError) {
@@ -121,12 +140,21 @@ class TwizzitApiClient {
       const expiresIn = response.data.expires_in || 86400; // 24 hours default
       this.tokenExpiry = Date.now() + (expiresIn * 1000) - 300000; // Refresh 5 min before expiry
 
+      // Cache tokens across per-request client instances to avoid re-auth rate limiting.
+      if (process.env.NODE_ENV !== 'test') {
+        const cacheKey = TwizzitApiClient._getTokenCacheKey(this.apiEndpoint, this.username);
+        TwizzitApiClient._tokenCache.set(cacheKey, {
+          token: this.accessToken,
+          tokenExpiry: this.tokenExpiry
+        });
+      }
+
       return this.accessToken;
     } catch (error) {
       if (error.response?.status === 401) {
         throw new Error('Invalid Twizzit API credentials');
       }
-      throw new Error(`Authentication failed: ${error.message}`);
+      throw TwizzitApiClient._createApiError(error, 'Authentication failed');
     }
   }
 
@@ -142,6 +170,41 @@ class TwizzitApiClient {
       const timeRemaining = this.tokenExpiry - now;
       if (timeRemaining > bufferTime) {
         return; // Token is still valid
+      }
+    }
+
+    // In non-test environments, reuse tokens across per-request client instances and
+    // de-duplicate concurrent authentication calls.
+    if (process.env.NODE_ENV !== 'test') {
+      const cacheKey = TwizzitApiClient._getTokenCacheKey(this.apiEndpoint, this.username);
+      const cached = TwizzitApiClient._tokenCache.get(cacheKey);
+
+      if (cached?.token && cached?.tokenExpiry && cached.tokenExpiry - now > bufferTime) {
+        this.accessToken = cached.token;
+        this.tokenExpiry = cached.tokenExpiry;
+        return;
+      }
+
+      const inFlight = TwizzitApiClient._authInFlight.get(cacheKey);
+      if (inFlight) {
+        const result = await inFlight;
+        this.accessToken = result.token;
+        this.tokenExpiry = result.tokenExpiry;
+        return;
+      }
+
+      const authPromise = (async () => {
+        await this.authenticate();
+        return { token: this.accessToken, tokenExpiry: this.tokenExpiry };
+      })();
+
+      TwizzitApiClient._authInFlight.set(cacheKey, authPromise);
+
+      try {
+        const result = await authPromise;
+        return result;
+      } finally {
+        TwizzitApiClient._authInFlight.delete(cacheKey);
       }
     }
 
@@ -162,10 +225,362 @@ class TwizzitApiClient {
       return true;
     } catch (error) {
       if (process.env.NODE_ENV !== 'test') {
-        console.error('Connection verification error:', error.response?.status, error.response?.data || error.message);
+        console.error(
+          'Connection verification error:',
+          error?.response?.status ?? error?.status,
+          error?.response?.data ?? error?.details ?? error?.message
+        );
       }
       return false;
     }
+  }
+
+  /**
+   * Verify API connection and credentials, returning error details suitable for the UI.
+   * Does not include secrets.
+   * @returns {Promise<{ success: boolean, organizationName?: string, organizationId?: string, usableForSync?: boolean, capabilities?: { organizations: boolean, groups: boolean, seasons: boolean }, status?: number, message?: string, details?: unknown }>}
+   */
+  async verifyConnectionDetailed() {
+    try {
+      await this.ensureAuthenticated();
+      const organizations = await this.getOrganizations();
+      const desiredName = TwizzitApiClient._normalizeName(this.organizationName);
+      const matchedOrg = desiredName
+        ? organizations.find((o) => {
+          const name = TwizzitApiClient._normalizeName(o?.organization_name ?? o?.name);
+          return name === desiredName;
+        })
+        : null;
+
+      const organizationName =
+        matchedOrg?.organization_name ||
+        matchedOrg?.name ||
+        organizations[0]?.organization_name ||
+        organizations[0]?.name;
+
+      let chosenOrgId = null;
+      try {
+        // Start from the default org selection (name match or first org), but don't assume it has groups access.
+        chosenOrgId = await this.getDefaultOrganizationId();
+      } catch {
+        chosenOrgId = TwizzitApiClient._extractOrganizationId(matchedOrg || organizations[0]);
+        if (chosenOrgId) this.organizationId = String(chosenOrgId);
+      }
+
+      let effectiveOrgId = chosenOrgId;
+      let groupsOk = false;
+      let seasonsOk = false;
+
+      // Best-effort capability checks.
+      // Important: groups access can vary per organization. Use org discovery to find a working org if any.
+      try {
+        await this.getGroups({ limit: 1 });
+        groupsOk = true;
+        if (this.organizationId != null && String(this.organizationId).trim() !== '') {
+          effectiveOrgId = String(this.organizationId);
+        }
+      } catch {
+        groupsOk = false;
+      }
+
+      // If we found/selected an org id, check seasons against that org to avoid extra probing.
+      if (effectiveOrgId) {
+        try {
+          await this.getSeasons({ limit: 1 });
+          seasonsOk = true;
+        } catch {
+          seasonsOk = false;
+        }
+      }
+
+      const usableForSync = Boolean(effectiveOrgId && groupsOk);
+      const message = usableForSync
+        ? 'Connection verified successfully'
+        : groupsOk
+          ? 'Authenticated successfully, but this Twizzit account has no access to seasons for the selected organization'
+          : 'Authenticated successfully, but this Twizzit account has no access to groups/seasons for the selected organization';
+
+      return {
+        success: true,
+        message,
+        organizationName,
+        ...(effectiveOrgId ? { organizationId: effectiveOrgId } : {}),
+        usableForSync,
+        capabilities: { organizations: true, groups: groupsOk, seasons: seasonsOk }
+      };
+    } catch (error) {
+      const status = error?.response?.status ?? error?.status;
+      const details = error?.response?.data ?? error?.details;
+      const message = details?.message || details?.error || error?.message || 'Connection verification failed';
+
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Connection verification error:', status, details || message);
+      }
+
+      return { success: false, status, message, details };
+    }
+  }
+
+  static _createApiError(error, prefix) {
+    const status = error?.response?.status ?? error?.status;
+    const details = error?.response?.data ?? error?.details;
+    const upstreamMessage =
+      details?.message ||
+      details?.error ||
+      (typeof details === 'string' ? details : null) ||
+      error?.message ||
+      'Request failed';
+
+    const message = status
+      ? `${prefix}: Twizzit responded ${status}: ${upstreamMessage}`
+      : `${prefix}: ${upstreamMessage}`;
+
+    const wrapped = new Error(message);
+    wrapped.status = status;
+    wrapped.details = details;
+    return wrapped;
+  }
+
+  static _extractOrganizationId(org) {
+    // Twizzit may return multiple shapes (id, organization_id, organization-ids, etc).
+    const id = org?.organization_id ?? org?.id ?? org?.organizationId;
+    return id != null && String(id).trim() !== '' ? String(id) : null;
+  }
+
+  static _normalizeOrganizationFilter(params) {
+    if (!params || typeof params !== 'object') return { params, hasFilter: false };
+
+    const next = { ...params };
+    const pick = (value) => {
+      if (value == null) return null;
+      const asString = String(value).trim();
+      return asString !== '' ? value : null;
+    };
+
+    // Canonical (confirmed via Postman): organization-ids[]
+    const canonical = pick(next['organization-ids[]']);
+    if (canonical != null) {
+      delete next['organization-ids'];
+      delete next.organization_id;
+      delete next['organization_id[]'];
+      delete next.organization_ids;
+      delete next['organization_ids[]'];
+      return { params: next, hasFilter: true };
+    }
+
+    // Legacy/alternate shapes we've seen in older code and docs.
+    const legacy =
+      pick(next['organization-ids']) ??
+      pick(next.organization_id) ??
+      pick(next['organization_id[]']) ??
+      pick(next.organization_ids) ??
+      pick(next['organization_ids[]']);
+
+    if (legacy != null) {
+      next['organization-ids[]'] = legacy;
+      delete next['organization-ids'];
+      delete next.organization_id;
+      delete next['organization_id[]'];
+      delete next.organization_ids;
+      delete next['organization_ids[]'];
+      return { params: next, hasFilter: true };
+    }
+
+    return { params: next, hasFilter: false };
+  }
+
+  static _hasOrganizationFilter(params) {
+    return TwizzitApiClient._normalizeOrganizationFilter(params).hasFilter;
+  }
+
+  static _applyOrganizationIdToParams(params, organizationId) {
+    const { params: normalized, hasFilter } = TwizzitApiClient._normalizeOrganizationFilter(params);
+    if (!hasFilter) {
+      normalized['organization-ids[]'] = organizationId;
+    }
+    return normalized;
+  }
+
+  static _normalizeName(value) {
+    return String(value ?? '').trim().toLowerCase();
+  }
+
+  static _isNoAccessForSpecifiedOrganizations(error) {
+    const status = error?.response?.status;
+    const details = error?.response?.data;
+    const msg = String(details?.error ?? details?.message ?? '').toLowerCase();
+    return status === 403 && msg.includes('no access') && msg.includes('specified') && msg.includes('organization');
+  }
+
+  static _isBadRequest(error) {
+    return error?.response?.status === 400;
+  }
+
+  static _isRateLimited(error) {
+    const status = error?.response?.status ?? error?.status;
+    return status === 429;
+  }
+
+  async _getOrganizationIdsOrdered() {
+    const organizations = await this.getOrganizations();
+    const ids = organizations
+      .map(TwizzitApiClient._extractOrganizationId)
+      .filter(Boolean);
+
+    if (ids.length === 0) return [];
+
+    const desired = TwizzitApiClient._normalizeName(this.organizationName);
+    if (!desired) return ids;
+
+    const matching = organizations.find((o) => {
+      const name = TwizzitApiClient._normalizeName(o.organization_name ?? o.name);
+      return name === desired;
+    });
+
+    const preferredId = matching ? TwizzitApiClient._extractOrganizationId(matching) : null;
+    if (!preferredId) return ids;
+
+    return [preferredId, ...ids.filter((id) => id !== preferredId)];
+  }
+
+  async _requestGetWithOrgDiscovery(path, params = {}) {
+    const debug = process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1';
+
+    const { params: normalizedParams, hasFilter } = TwizzitApiClient._normalizeOrganizationFilter(params);
+
+    // 1) If caller already provided an organization filter, respect it.
+    if (hasFilter) {
+      return this.client.get(path, { params: normalizedParams });
+    }
+
+    // 2) First try with no org filter (some Twizzit setups default this correctly).
+    try {
+      return await this.client.get(path, { params: normalizedParams });
+    } catch (error) {
+      // If Twizzit is rate limiting / quota limiting, don't retry/probe.
+      if (TwizzitApiClient._isRateLimited(error)) {
+        throw error;
+      }
+
+      // 404 means the resource itself doesn't exist; probing org ids won't help.
+      if (error?.response?.status === 404) {
+        throw error;
+      }
+
+      if (debug) {
+        console.log(`[Twizzit] ${path} failed without organization filter`, {
+          status: error?.response?.status,
+          error: error?.response?.data?.error || error?.response?.data?.message
+        });
+      }
+      // If Twizzit rejects because an org was specified (shouldn't happen here), just continue.
+      // For 400s, we'll try with an org id.
+      if (!TwizzitApiClient._isBadRequest(error) && !TwizzitApiClient._isNoAccessForSpecifiedOrganizations(error)) {
+        // If it's a hard failure (401/403/etc), we still try org probing once below.
+      }
+
+      // 3) Try with cached/default org id (fast path)
+      try {
+        const orgId = await this.getDefaultOrganizationId();
+        if (debug) console.log(`[Twizzit] ${path} retrying with default organization`, { 'organization-ids[]': orgId });
+        return await this.client.get(path, { params: TwizzitApiClient._applyOrganizationIdToParams(normalizedParams, orgId) });
+      } catch (errorWithDefaultOrg) {
+        if (TwizzitApiClient._isRateLimited(errorWithDefaultOrg)) {
+          throw errorWithDefaultOrg;
+        }
+
+        if (debug) {
+          console.log(`[Twizzit] ${path} failed with default organization`, {
+            status: errorWithDefaultOrg?.response?.status,
+            error: errorWithDefaultOrg?.response?.data?.error || errorWithDefaultOrg?.response?.data?.message
+          });
+        }
+        // If default org is forbidden, probe all orgs.
+        const shouldProbe =
+          TwizzitApiClient._isBadRequest(error) ||
+          TwizzitApiClient._isNoAccessForSpecifiedOrganizations(errorWithDefaultOrg) ||
+          TwizzitApiClient._isNoAccessForSpecifiedOrganizations(error);
+
+        if (!shouldProbe) {
+          throw errorWithDefaultOrg;
+        }
+
+        const orgIds = await this._getOrganizationIdsOrdered();
+        if (debug) console.log(`[Twizzit] ${path} probing organizations`, { count: orgIds.length });
+        let lastError = errorWithDefaultOrg;
+
+        for (const orgId of orgIds) {
+          try {
+            const response = await this.client.get(path, { params: TwizzitApiClient._applyOrganizationIdToParams(normalizedParams, orgId) });
+            this.organizationId = orgId;
+            if (debug) console.log(`[Twizzit] ${path} succeeded with organization`, { 'organization-ids[]': orgId });
+            return response;
+          } catch (e) {
+            lastError = e;
+            // Keep trying other orgs on the specific no-access error.
+            if (!TwizzitApiClient._isNoAccessForSpecifiedOrganizations(e)) {
+              // For other errors, don't brute force further.
+              break;
+            }
+          }
+        }
+
+        // 4) As a last resort, if we only failed due to "no access for specified organizations",
+        // retry without org filter again (some accounts only allow implicit org scope).
+        if (TwizzitApiClient._isNoAccessForSpecifiedOrganizations(lastError)) {
+          if (debug) console.log(`[Twizzit] ${path} retrying again without organization filter after org probe`);
+          return this.client.get(path, { params: normalizedParams });
+        }
+
+        throw lastError;
+      }
+    }
+  }
+
+  async getOrganizations() {
+    try {
+      const response = await this.client.get('/v2/api/organizations');
+
+      const payload = response.data;
+      if (Array.isArray(payload)) return payload;
+      if (payload && Array.isArray(payload.organizations)) return payload.organizations;
+      if (payload && Array.isArray(payload.data)) return payload.data;
+      return [];
+    } catch (error) {
+      throw TwizzitApiClient._createApiError(error, 'Failed to fetch organizations');
+    }
+  }
+
+  async getDefaultOrganizationId() {
+    if (this.organizationId != null && String(this.organizationId).trim() !== '') {
+      return String(this.organizationId);
+    }
+
+    const organizations = await this.getOrganizations();
+    if (organizations.length === 0) {
+      throw new Error('No organizations returned by Twizzit for these credentials');
+    }
+
+    const desiredName = TwizzitApiClient._normalizeName(this.organizationName);
+
+    const matchByName = desiredName
+      ? organizations.find((o) => TwizzitApiClient._normalizeName(o.organization_name ?? o.name) === desiredName)
+      : null;
+
+    const chosen = matchByName || organizations[0];
+    const id = TwizzitApiClient._extractOrganizationId(chosen);
+
+    if (id == null || String(id).trim() === '') {
+      throw new Error('Twizzit organizations response missing organization id');
+    }
+
+    this.organizationId = String(id);
+    return this.organizationId;
+  }
+
+  async _withOrganizationId(params = {}) {
+    const orgId = await this.getDefaultOrganizationId();
+    return TwizzitApiClient._applyOrganizationIdToParams(params, orgId);
   }
 
   /**
@@ -175,22 +590,196 @@ class TwizzitApiClient {
    */
   async getGroups(options = {}) {
     try {
-      const params = {
-        ...options
+      const seasonId = options.seasonId != null && String(options.seasonId).trim() !== ''
+        ? String(options.seasonId)
+        : null;
+
+      const groupType = options.groupType != null && String(options.groupType).trim() !== ''
+        ? String(options.groupType)
+        : null;
+
+      const { seasonId: _seasonId, groupType: _groupType, ...rest } = options || {};
+
+      // IMPORTANT: When a season is selected, Twizzit can return a valid 200 response
+      // without an org filter, but it may be a different (non-season-scoped) dataset.
+      // The Twizzit UI uses organization scoping in combination with season-id.
+      // Ensure we apply `organization-ids[]` when we can.
+      let defaultOrgId = null;
+      try {
+        // This may call /organizations; if that endpoint is not accessible for the account,
+        // we still proceed without forcing an org filter.
+        defaultOrgId = await this.getDefaultOrganizationId();
+      } catch {
+        defaultOrgId = null;
+      }
+
+      const debugEnabled = String(process.env.TWIZZIT_DEBUG || '').toLowerCase() === '1' ||
+        String(process.env.TWIZZIT_DEBUG || '').toLowerCase() === 'true';
+
+      const withSeasonParams = (base) => (seasonId
+        ? [
+          { ...base, 'season-id': seasonId },
+          { ...base, season_id: seasonId },
+          { ...base, seasonId: seasonId },
+          // Keep the plural/array variants as fallbacks; some instances accept them,
+          // but they may not behave like the Twizzit UI.
+          { ...base, 'season-ids[]': seasonId },
+          { ...base, 'season_ids[]': seasonId },
+          { ...base, 'season-ids': seasonId }
+        ]
+        : [{ ...base }]);
+
+      // Twizzit UI uses `group-type=1` to load team categories.
+      // Some setups may require this filter to return season-scoped rows.
+      // But not all installations accept it on /groups, so always include
+      // a fallback attempt without `group-type`.
+      const baseParamsWithGroupType = groupType
+        ? { ...rest, 'group-type': groupType }
+        : null;
+      const baseParamsWithoutGroupType = { ...rest };
+
+      const attemptParamsList = baseParamsWithGroupType
+        ? [...withSeasonParams(baseParamsWithGroupType), ...withSeasonParams(baseParamsWithoutGroupType)]
+        : withSeasonParams(baseParamsWithoutGroupType);
+
+      const attemptParamsListWithOrg = defaultOrgId
+        ? attemptParamsList.map((p) => TwizzitApiClient._applyOrganizationIdToParams(p, defaultOrgId))
+        : attemptParamsList;
+
+      const shouldIgnoreError = (e) => {
+        const status = e?.response?.status ?? e?.status;
+        return status === 400 || status === 404;
       };
 
-      const response = await this.client.get('/v2/api/groups', { params });
+      const tryEndpoint = async (path, attemptParams) => {
+        try {
+          return await this._requestGetWithOrgDiscovery(path, attemptParams);
+        } catch (e) {
+          if (shouldIgnoreError(e)) return null;
+          throw e;
+        }
+      };
+
+      const looksLikeSeasonScopedGroupRow = (row) => {
+        if (!row || typeof row !== 'object') return false;
+        // Any explicit season info implies the payload is season-aware.
+        const season = row.season ?? row.seasonInfo ?? row.season_info ?? row.season_id ?? row['season-id'] ?? row['season-ids[]'];
+        if (season != null && String(season).trim() !== '' && String(season).trim() !== 'null') return true;
+
+        // Some Twizzit instances represent season-scoped groups via relation rows
+        // where `id` is the relation id and `group_id` is the base group id.
+        const id = row.id;
+        const groupId = row.group_id ?? row.groupId ?? row['group-id'];
+        if (id != null && groupId != null && String(id) !== String(groupId)) return true;
+
+        // Explicit relation id fields.
+        const rel = row.groupRelationId ?? row.group_relation_id ?? row.relationId ?? row.relation_id;
+        return rel != null && String(rel).trim() !== '';
+      };
+
+      let response;
+      let fallbackResponse;
+      for (const attemptParams of attemptParamsListWithOrg) {
+        try {
+          response = await this._requestGetWithOrgDiscovery('/v2/api/groups', attemptParams);
+          if (seasonId) {
+            const data = Array.isArray(response.data) ? response.data : [];
+            const seasonScoped = data.some((g) => looksLikeSeasonScopedGroupRow(g));
+
+            if (debugEnabled && process.env.NODE_ENV !== 'test') {
+              console.log('[twizzit] getGroups season filter attempt', {
+                seasonId,
+                params: attemptParams,
+                count: data.length,
+                seasonScoped
+              });
+            }
+
+            // Twizzit can return 200 but ignore some season param shapes.
+            // Only accept a response as final if it looks season-scoped.
+            if (!seasonScoped) {
+              fallbackResponse = fallbackResponse || response;
+              response = null;
+              continue;
+            }
+          }
+
+          break;
+        } catch (e) {
+          // Try next param shape only on 400s; bubble other failures.
+          if (e?.response?.status !== 400 && e?.status !== 400) {
+            throw e;
+          }
+        }
+      }
+
+      if (!response && fallbackResponse) {
+        response = fallbackResponse;
+      }
+
+      // Fallback: some Twizzit instances expose season-specific group relation ids via
+      // alternate endpoints (the UI uses relation ids like 1138692). Try these only
+      // when we have a season filter and the standard endpoint didn't work.
+      if (!response && seasonId) {
+        for (const attemptParams of attemptParamsListWithOrg) {
+          response = await tryEndpoint('/v2/api/group', attemptParams);
+          if (response) break;
+        }
+      }
+
+      if (!response && seasonId) {
+        for (const attemptParams of attemptParamsListWithOrg) {
+          response = await tryEndpoint('/v2/api/group-relations', attemptParams);
+          if (response) break;
+        }
+      }
+
+      if (!response) {
+        // Final fallback: call the canonical endpoint with the least risky params.
+        response = await this._requestGetWithOrgDiscovery('/v2/api/groups', baseParamsWithoutGroupType);
+      }
       
       // Twizzit returns array directly
-      const groups = Array.isArray(response.data) ? response.data : [];
-      
+      let groups = Array.isArray(response.data) ? response.data : [];
+
+      const hasAnySeasonScopedRows = seasonId
+        ? groups.some((g) => looksLikeSeasonScopedGroupRow(g))
+        : false;
+
+      // Important: Some Twizzit accounts accept season params on /groups but still
+      // return base groups with `season: null`. In that case, try /group-relations
+      // even if /groups succeeded, and prefer the relation rows when they look valid.
+      if (seasonId && !hasAnySeasonScopedRows) {
+        let relationsResponse = null;
+        for (const attemptParams of attemptParamsListWithOrg) {
+          relationsResponse = await tryEndpoint('/v2/api/group-relations', attemptParams);
+          if (relationsResponse) break;
+        }
+
+        const relationRows = relationsResponse && Array.isArray(relationsResponse.data)
+          ? relationsResponse.data
+          : [];
+
+        const hasRelationRows = relationRows.length > 0 && relationRows.some((g) => looksLikeSeasonScopedGroupRow(g));
+
+        if (hasRelationRows) {
+          groups = relationRows;
+          if (debugEnabled && process.env.NODE_ENV !== 'test') {
+            console.log('[twizzit] getGroups preferred /group-relations for season', {
+              seasonId,
+              count: groups.length
+            });
+          }
+        }
+      }
+
       return {
-        groups: groups,
+        groups,
         total: groups.length,
         hasMore: false // Twizzit returns all groups in one call
       };
     } catch (error) {
-      throw new Error(`Failed to fetch groups: ${error.message}`);
+      throw TwizzitApiClient._createApiError(error, 'Failed to fetch groups');
     }
   }
 
@@ -215,14 +804,64 @@ class TwizzitApiClient {
     }
 
     try {
-      const response = await this.client.get('/v2/api/groups', {
-        params: { id: groupId }
-      });
+      const response = await this._requestGetWithOrgDiscovery('/v2/api/groups', { id: groupId });
       const groups = Array.isArray(response.data) ? response.data : [];
-      if (groups.length === 0) {
-        throw new Error(`Group not found: ${groupId}`);
+
+      // Twizzit does not reliably support filtering by `id` for all accounts.
+      // If the upstream ignores `?id=...` and returns a full list, ensure we
+      // pick the correct group instead of accidentally returning the first.
+      const desired = String(groupId);
+      const match = groups.find((g) => {
+        const id =
+          g?.groupRelationId ??
+          g?.group_relation_id ??
+          g?.group_relationId ??
+          g?.groupRelation_id ??
+          g?.id ??
+          g?.group_id ??
+          g?.groupId;
+        return id != null && String(id) === desired;
+      });
+
+      if (match) return match;
+
+      // If Twizzit returns a single item but uses a different id shape, fall back.
+      if (groups.length === 1) return groups[0];
+
+      // Fallback: if the id is a season-specific relation id, it may only be available
+      // via /group-relations on some Twizzit setups.
+      try {
+        const relParamsList = [
+          { id: desired },
+          { groupRelationId: desired },
+          { group_relation_id: desired },
+          { relationId: desired },
+          { relation_id: desired },
+          { 'group-relation-ids[]': desired },
+          { 'group_relation_ids[]': desired }
+        ];
+
+        for (const p of relParamsList) {
+          try {
+            const relResponse = await this._requestGetWithOrgDiscovery('/v2/api/group-relations', p);
+            const relRows = Array.isArray(relResponse.data) ? relResponse.data : [];
+            const found = relRows.find((r) => {
+              const id = r?.id ?? r?.groupRelationId ?? r?.group_relation_id ?? r?.relationId ?? r?.relation_id;
+              return id != null && String(id) === desired;
+            });
+            if (found) return found;
+          } catch (e) {
+            const status = e?.response?.status ?? e?.status;
+            if (status === 400 || status === 404) continue;
+            // Non-filterable failure; stop probing.
+            break;
+          }
+        }
+      } catch {
+        // Ignore relation lookup failures and fall through.
       }
-      return groups[0];
+
+      throw new Error(`Group not found: ${groupId}`);
     } catch (error) {
       if (error.response?.status === 404) {
         throw new Error(`Group not found: ${groupId}`);
@@ -231,7 +870,7 @@ class TwizzitApiClient {
       if (error.message && error.message.includes('Group not found')) {
         throw error;
       }
-      throw new Error(`Failed to fetch group: ${error.message}`);
+      throw TwizzitApiClient._createApiError(error, 'Failed to fetch group');
     }
   }
 
@@ -252,23 +891,204 @@ class TwizzitApiClient {
     }
 
     try {
-      const params = {
-        group_id: groupId,
-        ...options.filters
+      const groupIdValue = String(groupId);
+
+      const seasonId = options.seasonId != null && String(options.seasonId).trim() !== ''
+        ? String(options.seasonId)
+        : null;
+
+      const debugEnabled = String(process.env.TWIZZIT_DEBUG || '').toLowerCase() === '1' ||
+        String(process.env.TWIZZIT_DEBUG || '').toLowerCase() === 'true';
+
+      // Note: We intentionally do NOT attempt to fetch /v2/api/contacts with group+season filters.
+      // Some Twizzit setups ignore these filters and return org-wide contacts, which breaks the
+      // expectation that groupId always scopes the result.
+
+      // Twizzit API usage (confirmed via Postman) uses kebab-case array params.
+      // Example: /v2/api/group-contacts?organization-ids[]=<orgId>&group-ids[]=<groupId>
+      const baseParams = {
+        'group-ids[]': groupIdValue,
+        ...(options.filters || {})
       };
 
-      const response = await this.client.get('/v2/api/group-contacts', { params });
-      
-      const contacts = Array.isArray(response.data) ? response.data : [];
-      
-      return {
-        contacts: contacts,
-        total: contacts.length,
-        hasMore: false
-      };
+      // Some Twizzit endpoints return 200 + [] when org scoping is missing.
+      // If this client already has a selected/default org id, include it upfront.
+      const params = this.organizationId
+        ? TwizzitApiClient._applyOrganizationIdToParams(baseParams, String(this.organizationId))
+        : baseParams;
+
+      const seasonParamVariants = seasonId
+        ? [
+          { 'season-ids[]': seasonId },
+          { 'season_ids[]': seasonId },
+          { 'season-ids': seasonId },
+          { 'season-id': seasonId },
+          { season_id: seasonId },
+          { seasonId: seasonId }
+        ]
+        : [null];
+
+      let response;
+      let payload = [];
+
+      for (const seasonParams of seasonParamVariants) {
+        const attemptParams = seasonParams ? { ...params, ...seasonParams } : params;
+        try {
+          response = await this._requestGetWithOrgDiscovery('/v2/api/group-contacts', attemptParams);
+          payload = Array.isArray(response.data) ? response.data : [];
+
+          if (debugEnabled && process.env.NODE_ENV !== 'test') {
+            console.log('[twizzit] getGroupContacts via /group-contacts', {
+              groupId: groupIdValue,
+              seasonId,
+              params: attemptParams,
+              count: payload.length
+            });
+          }
+          break;
+        } catch (e) {
+          // Try the next season param shape on 400s; bubble other failures.
+          if (e?.response?.status !== 400 && e?.status !== 400) {
+            throw e;
+          }
+        }
+      }
+
+      // Twizzit can return either:
+      // - full contact objects, OR
+      // - membership rows with contactId/groupId/contactFunctionId.
+      const first = payload[0];
+      const looksLikeMembershipRows =
+        first &&
+        (first.contactId != null || first.contact_id != null) &&
+        first.firstName == null &&
+        first.first_name == null;
+
+      if (!looksLikeMembershipRows) {
+        return {
+          contacts: payload,
+          total: payload.length,
+          hasMore: false
+        };
+      }
+
+      // If Twizzit includes season identifiers on membership rows, filter them.
+      // Some accounts ignore season filters at the endpoint level but still
+      // annotate rows, so this is a safe, best-effort improvement.
+      if (seasonId) {
+        const seasonKeys = ['seasonId', 'season_id', 'season-id', 'season'];
+        const extractSeasonId = (row) => {
+          for (const k of seasonKeys) {
+            const val = row?.[k];
+            if (val == null) continue;
+            if (Array.isArray(val)) {
+              const firstVal = val.find((v) => v != null && String(v).trim() !== '');
+              return firstVal != null ? String(firstVal) : null;
+            }
+            if (String(val).trim() !== '') return String(val);
+          }
+          return null;
+        };
+
+        const anyHasSeason = payload.some((row) => extractSeasonId(row) != null);
+        if (anyHasSeason) {
+          const beforeCount = payload.length;
+          payload = payload.filter((row) => extractSeasonId(row) === seasonId);
+
+          if (debugEnabled && process.env.NODE_ENV !== 'test') {
+            console.log('[twizzit] getGroupContacts season filter (membership rows)', {
+              groupId: groupIdValue,
+              seasonId,
+              before: beforeCount,
+              after: payload.length
+            });
+          }
+        }
+      }
+
+      const contactIds = Array.from(
+        new Set(
+          payload
+            .map((row) => row?.contactId ?? row?.contact_id ?? row?.id)
+            .filter((id) => id != null && String(id).trim() !== '')
+            .map((id) => String(id))
+        )
+      );
+
+      if (contactIds.length === 0) {
+        return { contacts: [], total: 0, hasMore: false };
+      }
+
+      const contacts = await this._fetchContactsByIds(contactIds);
+      const byId = new Map();
+      for (const c of contacts) {
+        const keys = [c?.id, c?.contact_id, c?.contactId].filter((k) => k != null && String(k).trim() !== '');
+        for (const k of keys) byId.set(String(k), c);
+      }
+
+      const ordered = contactIds.map((id) => byId.get(id)).filter(Boolean);
+      return { contacts: ordered, total: ordered.length, hasMore: false };
     } catch (error) {
-      throw new Error(`Failed to fetch group contacts: ${error.message}`);
+      throw TwizzitApiClient._createApiError(error, 'Failed to fetch group contacts');
     }
+  }
+
+  async _fetchContactsByIds(contactIds = []) {
+    const ids = Array.isArray(contactIds) ? contactIds.map((id) => String(id)).filter(Boolean) : [];
+    if (ids.length === 0) return [];
+
+    // Twizzit appears to cap list filters (like contact-ids[]) at 10 items.
+    // Batch requests to avoid silently missing results.
+    const chunkSize = 10;
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      chunks.push(ids.slice(i, i + chunkSize));
+    }
+
+    const collected = [];
+    for (const chunk of chunks) {
+      const variants = [
+        { label: 'contact-ids[]', params: { 'contact-ids[]': chunk } },
+        { label: 'ids[]', params: { 'ids[]': chunk } },
+        { label: 'contactIds[]', params: { 'contactIds[]': chunk } }
+      ];
+
+      let chunkContacts = null;
+      for (const v of variants) {
+        try {
+          const baseParams = this.organizationId
+            ? TwizzitApiClient._applyOrganizationIdToParams(v.params, String(this.organizationId))
+            : v.params;
+
+          const response = await this._requestGetWithOrgDiscovery('/v2/api/contacts', baseParams);
+          const data = Array.isArray(response.data) ? response.data : [];
+          chunkContacts = data;
+          break;
+        } catch (e) {
+          if (e?.response?.status !== 400 && e?.status !== 400) {
+            throw e;
+          }
+        }
+      }
+
+      if (Array.isArray(chunkContacts) && chunkContacts.length > 0) {
+        collected.push(...chunkContacts);
+      }
+    }
+
+    if (collected.length > 0) return collected;
+
+    // Fallback: fetch all contacts (scoped by org if available) and filter client-side.
+    // This is heavier, but contact lists are typically manageable and avoids per-id fanout.
+    const all = await this.getContacts();
+    const contacts = Array.isArray(all?.contacts) ? all.contacts : [];
+    const wanted = new Set(ids);
+    return contacts.filter((c) => {
+      const keys = [c?.id, c?.contact_id, c?.contactId]
+        .filter((k) => k != null && String(k).trim() !== '')
+        .map((k) => String(k));
+      return keys.some((k) => wanted.has(k));
+    });
   }
 
   // Alias for backward compatibility
@@ -291,8 +1111,7 @@ class TwizzitApiClient {
       const params = {
         ...options.filters
       };
-
-      const response = await this.client.get('/v2/api/contacts', { params });
+      const response = await this._requestGetWithOrgDiscovery('/v2/api/contacts', params);
       
       const contacts = Array.isArray(response.data) ? response.data : [];
       
@@ -302,7 +1121,7 @@ class TwizzitApiClient {
         hasMore: false
       };
     } catch (error) {
-      throw new Error(`Failed to fetch contacts: ${error.message}`);
+      throw TwizzitApiClient._createApiError(error, 'Failed to fetch contacts');
     }
   }
 
@@ -310,9 +1129,9 @@ class TwizzitApiClient {
    * Fetch all seasons
    * @returns {Promise<Array>} List of seasons
    */
-  async getSeasons() {
+  async getSeasons(options = {}) {
     try {
-      const response = await this.client.get('/v2/api/seasons');
+      const response = await this._requestGetWithOrgDiscovery('/v2/api/seasons', { ...options });
       const seasons = Array.isArray(response.data) ? response.data : [];
       
       return {
@@ -320,7 +1139,33 @@ class TwizzitApiClient {
         total: seasons.length
       };
     } catch (error) {
-      throw new Error(`Failed to fetch seasons: ${error.message}`);
+      throw TwizzitApiClient._createApiError(error, 'Failed to fetch seasons');
+    }
+  }
+
+  /**
+   * Fetch group types (e.g. team/committee)
+   */
+  async getGroupTypes(options = {}) {
+    try {
+      const response = await this._requestGetWithOrgDiscovery('/v2/api/group-types', { ...options });
+      const groupTypes = Array.isArray(response.data) ? response.data : [];
+      return { groupTypes, total: groupTypes.length };
+    } catch (error) {
+      throw TwizzitApiClient._createApiError(error, 'Failed to fetch group types');
+    }
+  }
+
+  /**
+   * Fetch group categories for a group type (Twizzit UI uses `group-type=1` for teams)
+   */
+  async getGroupCategories(options = {}) {
+    try {
+      const response = await this._requestGetWithOrgDiscovery('/v2/api/group-categories', { ...options });
+      const groupCategories = Array.isArray(response.data) ? response.data : [];
+      return { groupCategories, total: groupCategories.length };
+    } catch (error) {
+      throw TwizzitApiClient._createApiError(error, 'Failed to fetch group categories');
     }
   }
 }
