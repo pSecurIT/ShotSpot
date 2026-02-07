@@ -39,6 +39,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Verify package-lock.json is up to date (backend)
         run: |
           cd backend
