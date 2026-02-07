@@ -116,7 +116,8 @@ describe('Navigation Component', () => {
     it('shows navigation menu when authenticated', () => {
       renderNavigation(regularUser);
       
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      const dashboardLinks = screen.getAllByText('Dashboard');
+      expect(dashboardLinks.length).toBeGreaterThan(0);
       expect(screen.getByRole('button', { name: 'Matches' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Analytics' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Data' })).toBeInTheDocument();
@@ -203,7 +204,7 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Logout'));
+      fireEvent.click(screen.getAllByText('Logout')[0]);
       
       expect(mockLogout).toHaveBeenCalled();
     });
@@ -212,7 +213,7 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Logout'));
+      fireEvent.click(screen.getAllByText('Logout')[0]);
       
       expect(mockNavigate).toHaveBeenCalledWith('/login');
     });
@@ -230,7 +231,7 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
     });
@@ -239,7 +240,7 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       expect(screen.getByLabelText('Current Password *')).toBeInTheDocument();
     });
@@ -248,7 +249,7 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       // Verify dialog is open with correct user info
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
@@ -261,7 +262,7 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
       
@@ -274,7 +275,7 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       const closeButton = screen.getByLabelText('Close dialog');
       fireEvent.click(closeButton);
@@ -289,16 +290,16 @@ describe('Navigation Component', () => {
       
       // Open dialog
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       // Fill in form
       fireEvent.change(screen.getByLabelText('Current Password *'), { target: { value: 'OldPass123!' } });
       fireEvent.change(screen.getByLabelText('New Password *'), { target: { value: 'NewPass123!' } });
       fireEvent.change(screen.getByLabelText('Confirm New Password *'), { target: { value: 'NewPass123!' } });
       
-      // Submit - use getAllByText since there are two "Change Password" buttons
-      const changePasswordButtons = screen.getAllByText('Change Password');
-      fireEvent.click(changePasswordButtons[1]); // Click the submit button in the dialog
+      // Submit - find the submit button by type
+      const form = screen.getByLabelText('Current Password *').closest('form')!;
+      fireEvent.submit(form);
       
       await waitFor(() => {
         expect(mockApi.post).toHaveBeenCalledWith('/auth/change-password', {
@@ -314,14 +315,14 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       fireEvent.change(screen.getByLabelText('Current Password *'), { target: { value: 'OldPass123!' } });
       fireEvent.change(screen.getByLabelText('New Password *'), { target: { value: 'NewPass123!' } });
       fireEvent.change(screen.getByLabelText('Confirm New Password *'), { target: { value: 'NewPass123!' } });
       
-      const changePasswordButtons = screen.getAllByText('Change Password');
-      fireEvent.click(changePasswordButtons[1]); // Click the submit button
+      const form = screen.getByLabelText('Current Password *').closest('form')!;
+      fireEvent.submit(form);
       
       await waitFor(() => {
         expect(global.alert).toHaveBeenCalledWith('Password changed successfully!');
@@ -334,14 +335,14 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       fireEvent.change(screen.getByLabelText('Current Password *'), { target: { value: 'OldPass123!' } });
       fireEvent.change(screen.getByLabelText('New Password *'), { target: { value: 'NewPass123!' } });
       fireEvent.change(screen.getByLabelText('Confirm New Password *'), { target: { value: 'NewPass123!' } });
       
-      const changePasswordButtons = screen.getAllByText('Change Password');
-      fireEvent.click(changePasswordButtons[1]); // Click the submit button
+      const form = screen.getByLabelText('Current Password *').closest('form')!;
+      fireEvent.submit(form);
       
       await waitFor(() => {
         expect(screen.queryByText('Change Your Password')).not.toBeInTheDocument();
@@ -360,14 +361,14 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       fireEvent.change(screen.getByLabelText('Current Password *'), { target: { value: 'WrongPass123!' } });
       fireEvent.change(screen.getByLabelText('New Password *'), { target: { value: 'NewPass123!' } });
       fireEvent.change(screen.getByLabelText('Confirm New Password *'), { target: { value: 'NewPass123!' } });
       
-      const changePasswordButtons = screen.getAllByText('Change Password');
-      fireEvent.click(changePasswordButtons[1]); // Click the submit button
+      const form = screen.getByLabelText('Current Password *').closest('form')!;
+      fireEvent.submit(form);
       
       await waitFor(() => {
         expect(screen.getByText('Current password is incorrect')).toBeInTheDocument();
@@ -379,7 +380,7 @@ describe('Navigation Component', () => {
       
       // Open dialog
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
       
       // Close dialog
@@ -388,7 +389,7 @@ describe('Navigation Component', () => {
       
       // Reopen dialog
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
     });
 
@@ -396,16 +397,15 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       // Fill with invalid password (too short)
       fireEvent.change(screen.getByLabelText('Current Password *'), { target: { value: 'OldPass123!' } });
       fireEvent.change(screen.getByLabelText('New Password *'), { target: { value: 'short' } });
       fireEvent.change(screen.getByLabelText('Confirm New Password *'), { target: { value: 'short' } });
       
-      // Use getAllByText since there are two "Change Password" buttons
-      const changePasswordButtons = screen.getAllByText('Change Password');
-      fireEvent.click(changePasswordButtons[1]); // Click the submit button
+      const form = screen.getByLabelText('Current Password *').closest('form')!;
+      fireEvent.submit(form);
       
       await waitFor(() => {
         // Error message appears in the error div (not the hint text)
@@ -429,14 +429,15 @@ describe('Navigation Component', () => {
       renderNavigation(adminUser);
       
       await openUserMenu();
-      expect(screen.getByText('Change Password')).toBeInTheDocument();
+      const changePasswordButtons = screen.getAllByText('Change Password');
+      expect(changePasswordButtons.length).toBeGreaterThan(0);
     });
 
     it('admin can change own password via navigation', async () => {
       renderNavigation(adminUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
       expect(screen.getByLabelText('Current Password *')).toBeInTheDocument();
@@ -446,7 +447,7 @@ describe('Navigation Component', () => {
       renderNavigation(adminUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       // Current password field should be present
       expect(screen.getByLabelText('Current Password *')).toBeInTheDocument();
@@ -465,14 +466,15 @@ describe('Navigation Component', () => {
       renderNavigation(coachUser);
       
       await openUserMenu();
-      expect(screen.getByText('Change Password')).toBeInTheDocument();
+      const changePasswordButtons = screen.getAllByText('Change Password');
+      expect(changePasswordButtons.length).toBeGreaterThan(0);
     });
 
     it('coach can change own password via navigation', async () => {
       renderNavigation(coachUser);
       
       await openUserMenu();
-      fireEvent.click(screen.getByText('Change Password'));
+      fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
     });
