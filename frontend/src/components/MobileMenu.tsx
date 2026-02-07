@@ -34,6 +34,8 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
 
   // Close on Escape key
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
         onClose();
@@ -65,22 +67,21 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
     return items.filter((item) => item.roles.includes(userRole as 'user' | 'coach' | 'admin'));
   };
 
-  if (!isOpen) return null;
-
   return (
     <>
       {/* Overlay */}
       <div
-        className="mobile-menu-overlay"
+        className={`mobile-menu-overlay ${isOpen ? 'open' : ''}`}
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Menu Panel */}
       <div
-        className="mobile-menu-panel"
+        className={`mobile-menu-panel ${isOpen ? 'open' : ''}`}
         role="dialog"
-        aria-modal="true"
+        aria-modal={isOpen ? true : undefined}
+        aria-hidden={!isOpen}
         aria-label="Navigation menu"
       >
         {/* Header */}
