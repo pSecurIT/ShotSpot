@@ -279,6 +279,11 @@
   font-size: 0.9rem;
 }
 
+.navigation-v2__button:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
 .navigation-v2__button:hover {
   background: rgba(255, 255, 255, 0.3);
 }
@@ -310,6 +315,17 @@
   border: none;
   cursor: pointer;
   padding: 0.5rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.navigation-v2__hamburger:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.navigation-v2__hamburger:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
 }
 
 /* Compact user dropdown container (tablet/mobile header) */
@@ -338,6 +354,30 @@
   .nav-dropdown__arrow,
   .hamburger-line {
     transition: none;
+  }
+}
+
+/* Windows High Contrast / Forced Colors */
+@media (forced-colors: active) {
+  .navigation-v2 {
+    background: Canvas;
+    color: CanvasText;
+    border-bottom: 1px solid CanvasText;
+  }
+
+  .navigation-v2__link,
+  .nav-dropdown__trigger {
+    color: CanvasText;
+  }
+
+  .navigation-v2__link.active::after,
+  .nav-dropdown__trigger.active::after {
+    background: Highlight;
+  }
+
+  .nav-dropdown-menu {
+    background: Canvas;
+    border-color: CanvasText;
   }
 }
 
