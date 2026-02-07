@@ -53,7 +53,10 @@ const openUserMenu = async () => {
   await waitFor(() => {
     expect(screen.getByRole('button', { name: 'User' })).toHaveAttribute('aria-expanded', 'true');
   });
-  await screen.findByText('Change Password');
+  // Wait for menu to appear - use getAllByText since both desktop and mobile render
+  await waitFor(() => {
+    expect(screen.getAllByText('Change Password').length).toBeGreaterThan(0);
+  });
 };
 
 describe('Navigation Component', () => {
@@ -130,7 +133,8 @@ describe('Navigation Component', () => {
       renderNavigation(regularUser);
       
       await openUserMenu();
-      expect(screen.getByText('Change Password')).toBeInTheDocument();
+      const changePasswordButtons = screen.getAllByText('Change Password');
+      expect(changePasswordButtons.length).toBeGreaterThan(0);
     });
 
     it('shows Users link for admin users', () => {
