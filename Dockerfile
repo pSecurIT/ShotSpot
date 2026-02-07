@@ -3,6 +3,8 @@
 # Stage 1: Build frontend
 FROM node:lts-alpine AS frontend-builder
 
+RUN npm install -g npm@latest
+
 WORKDIR /app/frontend
 
 # Security: Copy only package files first for better layer caching
@@ -30,6 +32,8 @@ RUN npm run build
 # Stage 2: Build backend
 FROM node:lts-alpine AS backend-builder
 
+RUN npm install -g npm@latest
+
 WORKDIR /app/backend
 
 # Security: Copy package files for dependency installation
@@ -54,13 +58,14 @@ COPY backend/ ./
 # Stage 3: Production image
 FROM node:lts-alpine
 
-# Security: Update packages and install only necessary tools
+# Security: Update packages, npm, and install only necessary tools
 RUN apk update && \
     apk upgrade --no-cache && \
     apk add --no-cache \
     dumb-init \
     tini && \
-    rm -rf /var/cache/apk/*
+    rm -rf /var/cache/apk/* && \
+    npm install -g npm@latest
 
 # Security: Create non-root user (no chown on /app yet - faster)
 RUN addgroup -g 1001 -S nodejs && \
