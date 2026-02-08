@@ -10,7 +10,8 @@ vi.mock('../services/competitionsApi', () => ({
   competitionsApi: {
     getStandings: vi.fn(),
     initializeStandings: vi.fn(),
-    updateStandings: vi.fn()
+    updateStandings: vi.fn(),
+    updateStandingPoints: vi.fn()
   }
 }));
 
@@ -22,6 +23,8 @@ vi.mock('../contexts/AuthContext', () => ({
 
 describe('LeagueStandings', () => {
   const getStandingsMock = competitionsApi.getStandings as unknown as Mock;
+  const updateStandingsMock = competitionsApi.updateStandings as unknown as Mock;
+  const updateStandingPointsMock = competitionsApi.updateStandingPoints as unknown as Mock;
 
   const mockStanding = (overrides: Partial<LeagueStanding> = {}): LeagueStanding => ({
     id: 1,
@@ -254,6 +257,63 @@ describe('LeagueStandings', () => {
 
     const inputs = screen.getAllByRole('spinbutton') as HTMLInputElement[];
     expect(inputs[0].value).toBe('25');
+  });
+
+  it('persists edited points via API', async () => {
+    const standings: LeagueStanding[] = [
+      mockStanding({ team_id: 1, team_name: 'Team A', points: 25 })
+    ];
+    const updated: LeagueStanding[] = [
+      mockStanding({ team_id: 1, team_name: 'Team A', points: 30 })
+    ];
+
+    getStandingsMock.mockResolvedValue(standings);
+    updateStandingPointsMock.mockResolvedValue(updated);
+
+    render(<LeagueStandings competitionId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Team A')).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole('button', { name: /Edit points/i });
+    await userEvent.click(editButton);
+
+    const input = screen.getByRole('spinbutton');
+    await userEvent.clear(input);
+    await userEvent.type(input, '30');
+
+    const saveButton = screen.getByRole('button', { name: '✓' });
+    await userEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(updateStandingPointsMock).toHaveBeenCalledWith(1, 1, 30);
+    });
+  });
+
+  it('updates standings from a game result', async () => {
+    const standings: LeagueStanding[] = [
+      mockStanding({ team_id: 1, team_name: 'Team A', points: 25 })
+    ];
+    const updated: LeagueStanding[] = [
+      mockStanding({ team_id: 1, team_name: 'Team A', points: 27 })
+    ];
+
+    getStandingsMock.mockResolvedValue(standings);
+    updateStandingsMock.mockResolvedValue(updated);
+
+    render(<LeagueStandings competitionId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Team A')).toBeInTheDocument();
+    });
+
+    await userEvent.type(screen.getByLabelText('Game ID'), '12');
+    await userEvent.click(screen.getByRole('button', { name: /Update from game/i }));
+
+    await waitFor(() => {
+      expect(updateStandingsMock).toHaveBeenCalledWith(1, 12);
+    });
   });
 
   it('shows edit buttons for admin/coach users', async () => {
