@@ -52,8 +52,8 @@ export interface CompetitionUpdate {
   description?: string;
   status?: CompetitionStatus;
   format_config?: CompetitionFormatConfig;
-  season_id?: number;
-  series_id?: number;
+  season_id?: number | null;
+  series_id?: number | null;
 }
 
 export interface CompetitionTeam {
