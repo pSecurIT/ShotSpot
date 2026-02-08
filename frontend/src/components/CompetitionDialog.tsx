@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Competition, CompetitionCreate, CompetitionFormatConfig, CompetitionStatus, CompetitionType } from '../types/competitions';
+import type { Season } from '../types/seasons';
+import type { Series } from '../types/series';
 import { competitionsApi } from '../services/competitionsApi';
+import { seasonsApi } from '../services/seasonsApi';
+import { seriesApi } from '../services/seriesApi';
 
 interface CompetitionDialogProps {
   isOpen: boolean;
@@ -34,6 +38,10 @@ const validate = (form: FormState): Record<string, string> => {
 
   if (!form.start_date) errors.start_date = 'Start date is required';
 
+  if (form.end_date && form.start_date && form.end_date < form.start_date) {
+    errors.end_date = 'End date cannot be before start date';
+  }
+
   return errors;
 };
 
@@ -42,6 +50,14 @@ const toOptionalInt = (value: string): number | undefined => {
   if (!trimmed) return undefined;
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return parsed;
+};
+
+const toOptionalIntOrNull = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return parsed;
 };
 
@@ -66,6 +82,26 @@ const CompetitionDialog: React.FC<CompetitionDialogProps> = ({ isOpen, onClose, 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [series, setSeries] = useState<Series[]>([]);
+
+  const sortedSeasons = useMemo(() => {
+    return [...seasons].sort((a, b) => {
+      if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+      const dateOrder = b.start_date.localeCompare(a.start_date);
+      if (dateOrder !== 0) return dateOrder;
+      return a.name.localeCompare(b.name);
+    });
+  }, [seasons]);
+
+  const sortedSeries = useMemo(() => {
+    return [...series].sort((a, b) => {
+      if (a.level !== b.level) return a.level - b.level;
+      return a.name.localeCompare(b.name);
+    });
+  }, [series]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -90,6 +126,35 @@ const CompetitionDialog: React.FC<CompetitionDialogProps> = ({ isOpen, onClose, 
     setFormError(null);
     setFieldErrors({});
   }, [isOpen, competition]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+
+    const loadOptions = async () => {
+      setOptionsLoading(true);
+      setOptionsError(null);
+
+      try {
+        const [seasonData, seriesData] = await Promise.all([seasonsApi.list(), seriesApi.list()]);
+        if (!isMounted) return;
+        setSeasons(seasonData);
+        setSeries(seriesData);
+      } catch (err) {
+        if (!isMounted) return;
+        const message = err instanceof Error ? err.message : 'Failed to load seasons or series';
+        setOptionsError(message);
+      } finally {
+        if (isMounted) setOptionsLoading(false);
+      }
+    };
+
+    loadOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -131,8 +196,8 @@ const CompetitionDialog: React.FC<CompetitionDialogProps> = ({ isOpen, onClose, 
           name: form.name.trim(),
           start_date: form.start_date,
           end_date: form.end_date.trim() ? form.end_date : undefined,
-          season_id: toOptionalInt(form.season_id),
-          series_id: toOptionalInt(form.series_id),
+          season_id: toOptionalIntOrNull(form.season_id),
+          series_id: toOptionalIntOrNull(form.series_id),
           status: form.status,
           description: form.description.trim() ? form.description.trim() : undefined,
           format_config: buildFormatConfig(),
@@ -180,6 +245,7 @@ const CompetitionDialog: React.FC<CompetitionDialogProps> = ({ isOpen, onClose, 
         </div>
 
         {formError && <div className="alert alert-error">{formError}</div>}
+        {optionsError && <div className="alert alert-error">{optionsError}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="competition-dialog__grid">
@@ -232,32 +298,48 @@ const CompetitionDialog: React.FC<CompetitionDialogProps> = ({ isOpen, onClose, 
                 type="date"
                 value={form.end_date}
                 onChange={(e) => update({ end_date: e.target.value })}
+                className={fieldErrors.end_date ? 'error' : ''}
                 disabled={submitting}
               />
+              {fieldErrors.end_date && <span className="field-error">{fieldErrors.end_date}</span>}
             </div>
 
             <div className="competition-dialog__field">
-              <label htmlFor="competition-season">Season ID (optional)</label>
-              <input
+              <label htmlFor="competition-season">Season (optional)</label>
+              <select
                 id="competition-season"
-                type="number"
-                min={1}
                 value={form.season_id}
                 onChange={(e) => update({ season_id: e.target.value })}
-                disabled={submitting}
-              />
+                disabled={submitting || optionsLoading}
+              >
+                <option value="">No season</option>
+                {sortedSeasons.map((season) => {
+                  const range = `${season.start_date} - ${season.end_date}`;
+                  const activeTag = season.is_active ? ' (active)' : '';
+                  return (
+                    <option key={season.id} value={String(season.id)}>
+                      {season.name} ({range}){activeTag}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
             <div className="competition-dialog__field">
-              <label htmlFor="competition-series">Series ID (optional)</label>
-              <input
+              <label htmlFor="competition-series">Series (optional)</label>
+              <select
                 id="competition-series"
-                type="number"
-                min={1}
                 value={form.series_id}
                 onChange={(e) => update({ series_id: e.target.value })}
-                disabled={submitting}
-              />
+                disabled={submitting || optionsLoading}
+              >
+                <option value="">No series</option>
+                {sortedSeries.map((seriesItem) => (
+                  <option key={seriesItem.id} value={String(seriesItem.id)}>
+                    Level {seriesItem.level} - {seriesItem.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {isEdit && (
