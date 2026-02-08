@@ -32,6 +32,8 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'points', direction: 'desc' });
   const [editingPointId, setEditingPointId] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState<string>('');
+  const [gameIdInput, setGameIdInput] = useState<string>('');
+  const [updateLoading, setUpdateLoading] = useState(false);
 
   const loadStandings = useCallback(async () => {
     try {
@@ -100,13 +102,14 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
 
     try {
       setError(null);
-      const updatedStandings = standings.map(s =>
-        s.team_id === teamId ? { ...s, points: newPoints } : s
-      );
-      setStandings(updatedStandings);
+      const response = await competitionsApi.updateStandingPoints(competitionId, teamId, newPoints);
+
+      if (Array.isArray(response)) {
+        setStandings(response);
+        onUpdate?.(response);
+      }
+
       setEditingPointId(null);
-      onUpdate?.(updatedStandings);
-      // TODO: Call API to persist this change when endpoint is available
     } catch (err) {
       const errorObj = err as { response?: { data?: { error?: string } }; message?: string };
       setError(errorObj.response?.data?.error || 'Failed to update points');
@@ -149,6 +152,29 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
     document.body.removeChild(link);
   };
 
+  const handleUpdateFromGame = async () => {
+    const parsed = parseInt(gameIdInput, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setError('Please enter a valid game ID');
+      return;
+    }
+
+    try {
+      setError(null);
+      setUpdateLoading(true);
+      const response = await competitionsApi.updateStandings(competitionId, parsed);
+      if (Array.isArray(response)) {
+        setStandings(response);
+        onUpdate?.(response);
+      }
+    } catch (err) {
+      const errorObj = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(errorObj.response?.data?.error || 'Failed to update standings');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
   const getPositionClass = (index: number): string => {
     const position = index + 1;
     const promotionZone = promotionZones?.find(z => position >= z.from && position <= z.to);
@@ -171,6 +197,29 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       <div className="league-standings__header">
         <h2>League Standings</h2>
         <div className="league-standings__actions">
+          <div className="league-standings__update">
+            <label htmlFor="standings-game-id" className="sr-only">Game ID</label>
+            <input
+              id="standings-game-id"
+              type="number"
+              min="1"
+              inputMode="numeric"
+              value={gameIdInput}
+              onChange={(e) => setGameIdInput(e.target.value)}
+              placeholder="Game ID"
+              aria-label="Game ID"
+              disabled={updateLoading}
+            />
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleUpdateFromGame}
+              disabled={updateLoading}
+              title="Update standings from a game result"
+            >
+              {updateLoading ? 'Updating…' : 'Update from game'}
+            </button>
+          </div>
           <button
             type="button"
             className="primary-button"

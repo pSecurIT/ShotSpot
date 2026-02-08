@@ -968,6 +968,69 @@ router.get('/:id/standings', [
 });
 
 /**
+ * Manually update standings points for a team
+ */
+router.patch('/:id/standings/:teamId', [
+  requireRole(['admin', 'coach']),
+  param('id').isInt({ min: 1 }).withMessage('Competition ID must be a positive integer'),
+  param('teamId').isInt({ min: 1 }).withMessage('Team ID must be a positive integer'),
+  body('points')
+    .isInt({ min: 0 })
+    .withMessage('Points must be a non-negative integer')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const { id, teamId } = req.params;
+  const { points } = req.body;
+
+  try {
+    const existing = await db.query(
+      'SELECT id FROM competition_standings WHERE competition_id = $1 AND team_id = $2',
+      [id, teamId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Standing not found for team' });
+    }
+
+    await db.query(
+      'UPDATE competition_standings SET points = $1, updated_at = CURRENT_TIMESTAMP WHERE competition_id = $2 AND team_id = $3',
+      [points, id, teamId]
+    );
+
+    await db.query(`
+      WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (
+          ORDER BY points DESC, goal_difference DESC, goals_for DESC
+        ) as new_rank
+        FROM competition_standings
+        WHERE competition_id = $1
+      )
+      UPDATE competition_standings cs
+      SET rank = r.new_rank
+      FROM ranked r
+      WHERE cs.id = r.id
+    `, [id]);
+
+    const standings = await db.query(`
+      SELECT cs.*, t.name as team_name
+      FROM competition_standings cs
+      JOIN teams t ON cs.team_id = t.id
+      WHERE cs.competition_id = $1
+      ORDER BY cs.rank
+    `, [id]);
+
+    res.json(standings.rows);
+  } catch (err) {
+    console.error('Error updating standings points:', err);
+    res.status(500).json({ error: 'Failed to update standings points' });
+  }
+});
+
+/**
  * Initialize standings for all teams in a competition
  */
 router.post('/:id/standings/initialize', [
