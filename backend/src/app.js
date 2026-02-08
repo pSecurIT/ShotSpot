@@ -41,6 +41,7 @@ import teamAnalyticsRoutes from './routes/team-analytics.js';
 import matchTemplatesRoutes from './routes/match-templates.js';
 import twizzitRoutes from './routes/twizzit.js';
 import seriesRoutes from './routes/series.js';
+import seasonsRoutes from './routes/seasons.js';
 
 
 const app = express();
@@ -325,6 +326,7 @@ app.use('/api/club-analytics', teamAnalyticsRoutes);
 app.use('/api/match-templates', matchTemplatesRoutes);
 app.use('/api/twizzit', twizzitRoutes);
 app.use('/api/series', seriesRoutes);
+app.use('/api/seasons', seasonsRoutes);
 
 // Global error handling middleware with enhanced security
 app.use((err, req, res, _next) => {
