@@ -5,6 +5,8 @@ import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 import CompetitionManagement from '../components/CompetitionManagement';
 import { competitionsApi } from '../services/competitionsApi';
+import { seasonsApi } from '../services/seasonsApi';
+import { seriesApi } from '../services/seriesApi';
 import api from '../utils/api';
 import type { Competition } from '../types/competitions';
 
@@ -21,6 +23,18 @@ vi.mock('../services/competitionsApi', () => ({
     getBracket: vi.fn(),
     generateBracket: vi.fn(),
     getStandings: vi.fn()
+  }
+}));
+
+vi.mock('../services/seasonsApi', () => ({
+  seasonsApi: {
+    list: vi.fn()
+  }
+}));
+
+vi.mock('../services/seriesApi', () => ({
+  seriesApi: {
+    list: vi.fn()
   }
 }));
 
@@ -43,11 +57,16 @@ describe('CompetitionManagement', () => {
   const addTeamMock = competitionsApi.addTeam as unknown as Mock;
   const generateBracketMock = competitionsApi.generateBracket as unknown as Mock;
 
+  const seasonsListMock = seasonsApi.list as unknown as Mock;
+  const seriesListMock = seriesApi.list as unknown as Mock;
+
   const apiGetMock = api.get as unknown as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
+    seasonsListMock.mockResolvedValue([]);
+    seriesListMock.mockResolvedValue([]);
   });
 
   const renderAtCompetitions = () => {

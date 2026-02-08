@@ -140,6 +140,10 @@ router.post('/', [
     .optional()
     .isInt({ min: 1 })
     .withMessage('Season ID must be a positive integer'),
+  body('series_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Series ID must be a positive integer'),
   body('description')
     .optional()
     .trim()
@@ -155,7 +159,7 @@ router.post('/', [
     return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { name, competition_type, start_date, end_date, season_id, description, settings } = req.body;
+  const { name, competition_type, start_date, end_date, season_id, series_id, description, settings } = req.body;
 
   try {
     // Validate season exists if provided
@@ -166,11 +170,27 @@ router.post('/', [
       }
     }
 
+    if (series_id) {
+      const seriesCheck = await db.query('SELECT id FROM series WHERE id = $1', [series_id]);
+      if (seriesCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Series not found' });
+      }
+    }
+
     const result = await db.query(`
-      INSERT INTO competitions (name, competition_type, start_date, end_date, season_id, description, settings)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO competitions (name, competition_type, start_date, end_date, season_id, series_id, description, settings)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
-    `, [name, competition_type, start_date, end_date || null, season_id || null, description || null, settings || {}]);
+    `, [
+      name,
+      competition_type,
+      start_date,
+      end_date || null,
+      season_id || null,
+      series_id || null,
+      description || null,
+      settings || {}
+    ]);
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -204,6 +224,14 @@ router.put('/:id', [
     .optional()
     .isISO8601()
     .withMessage('End date must be a valid ISO 8601 date'),
+  body('season_id')
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage('Season ID must be a positive integer'),
+  body('series_id')
+    .optional({ nullable: true })
+    .isInt({ min: 1 })
+    .withMessage('Series ID must be a positive integer'),
   body('description')
     .optional()
     .trim()
@@ -220,13 +248,27 @@ router.put('/:id', [
   }
 
   const { id } = req.params;
-  const { name, status, start_date, end_date, description, settings } = req.body;
+  const { name, status, start_date, end_date, season_id, series_id, description, settings } = req.body;
 
   try {
     // Check if competition exists
     const existingCheck = await db.query('SELECT * FROM competitions WHERE id = $1', [id]);
     if (existingCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Competition not found' });
+    }
+
+    if (season_id !== undefined && season_id !== null) {
+      const seasonCheck = await db.query('SELECT id FROM seasons WHERE id = $1', [season_id]);
+      if (seasonCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Season not found' });
+      }
+    }
+
+    if (series_id !== undefined && series_id !== null) {
+      const seriesCheck = await db.query('SELECT id FROM series WHERE id = $1', [series_id]);
+      if (seriesCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Series not found' });
+      }
     }
 
     // Build update query dynamically
@@ -255,6 +297,18 @@ router.put('/:id', [
     if (end_date !== undefined) {
       updates.push(`end_date = $${paramCount}`);
       params.push(end_date);
+      paramCount++;
+    }
+
+    if (season_id !== undefined) {
+      updates.push(`season_id = $${paramCount}`);
+      params.push(season_id);
+      paramCount++;
+    }
+
+    if (series_id !== undefined) {
+      updates.push(`series_id = $${paramCount}`);
+      params.push(series_id);
       paramCount++;
     }
 
@@ -910,6 +964,69 @@ router.get('/:id/standings', [
   } catch (err) {
     console.error('Error fetching standings:', err);
     res.status(500).json({ error: 'Failed to fetch standings' });
+  }
+});
+
+/**
+ * Manually update standings points for a team
+ */
+router.patch('/:id/standings/:teamId', [
+  requireRole(['admin', 'coach']),
+  param('id').isInt({ min: 1 }).withMessage('Competition ID must be a positive integer'),
+  param('teamId').isInt({ min: 1 }).withMessage('Team ID must be a positive integer'),
+  body('points')
+    .isInt({ min: 0 })
+    .withMessage('Points must be a non-negative integer')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const { id, teamId } = req.params;
+  const { points } = req.body;
+
+  try {
+    const existing = await db.query(
+      'SELECT id FROM competition_standings WHERE competition_id = $1 AND team_id = $2',
+      [id, teamId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Standing not found for team' });
+    }
+
+    await db.query(
+      'UPDATE competition_standings SET points = $1, updated_at = CURRENT_TIMESTAMP WHERE competition_id = $2 AND team_id = $3',
+      [points, id, teamId]
+    );
+
+    await db.query(`
+      WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (
+          ORDER BY points DESC, goal_difference DESC, goals_for DESC
+        ) as new_rank
+        FROM competition_standings
+        WHERE competition_id = $1
+      )
+      UPDATE competition_standings cs
+      SET rank = r.new_rank
+      FROM ranked r
+      WHERE cs.id = r.id
+    `, [id]);
+
+    const standings = await db.query(`
+      SELECT cs.*, t.name as team_name
+      FROM competition_standings cs
+      JOIN teams t ON cs.team_id = t.id
+      WHERE cs.competition_id = $1
+      ORDER BY cs.rank
+    `, [id]);
+
+    res.json(standings.rows);
+  } catch (err) {
+    console.error('Error updating standings points:', err);
+    res.status(500).json({ error: 'Failed to update standings points' });
   }
 });
 
