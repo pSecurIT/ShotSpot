@@ -340,4 +340,55 @@ export const competitionsApi = {
       throw err;
     }
   },
+
+  /**
+   * Initialize standings for all teams in a competition.
+   */
+  initializeStandings: async (competitionId: number): Promise<LeagueStanding[] | QueuedActionResponse> => {
+    try {
+      const response = await api.post<LeagueStanding[] | QueuedActionResponse>(
+        `/competitions/${competitionId}/standings/initialize`
+      );
+      return response.data;
+    } catch (err) {
+      throwNormalizedApiError(err, 'Failed to initialize standings');
+      throw err;
+    }
+  },
+
+  /**
+   * Update standings after a game result.
+   */
+  updateStandings: async (competitionId: number, gameId: number): Promise<LeagueStanding[] | QueuedActionResponse> => {
+    try {
+      const response = await api.post<LeagueStanding[] | QueuedActionResponse>(
+        `/competitions/${competitionId}/standings/update`,
+        { game_id: gameId }
+      );
+      return response.data;
+    } catch (err) {
+      throwNormalizedApiError(err, 'Failed to update standings');
+      throw err;
+    }
+  },
+
+  /**
+   * Update standings points for a team (manual adjustment).
+   */
+  updateStandingPoints: async (
+    competitionId: number,
+    teamId: number,
+    points: number
+  ): Promise<LeagueStanding[] | QueuedActionResponse> => {
+    try {
+      const response = await api.patch<LeagueStanding[] | QueuedActionResponse>(
+        `/competitions/${competitionId}/standings/${teamId}`,
+        { points }
+      );
+      return response.data;
+    } catch (err) {
+      throwNormalizedApiError(err, 'Failed to update standings points');
+      throw err;
+    }
+  },
 };
