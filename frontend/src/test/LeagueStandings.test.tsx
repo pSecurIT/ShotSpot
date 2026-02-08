@@ -255,8 +255,8 @@ describe('LeagueStandings', () => {
 
     await userEvent.click(editButtons[0]);
 
-    const inputs = screen.getAllByRole('spinbutton') as HTMLInputElement[];
-    expect(inputs[0].value).toBe('25');
+    const pointsInput = screen.getByDisplayValue('25') as HTMLInputElement;
+    expect(pointsInput.value).toBe('25');
   });
 
   it('persists edited points via API', async () => {
@@ -279,9 +279,9 @@ describe('LeagueStandings', () => {
     const editButton = screen.getByRole('button', { name: /Edit points/i });
     await userEvent.click(editButton);
 
-    const input = screen.getByRole('spinbutton');
-    await userEvent.clear(input);
-    await userEvent.type(input, '30');
+    const pointsInput = screen.getByDisplayValue('25') as HTMLInputElement;
+    await userEvent.clear(pointsInput);
+    await userEvent.type(pointsInput, '30');
 
     const saveButton = screen.getByRole('button', { name: '✓' });
     await userEvent.click(saveButton);
