@@ -194,7 +194,7 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
     }
 
     if (req.user.role === 'coach') {
-      const allowed = await hasTrainerAccess(req.user.id, { clubId: club_id, teamId: team_id || null });
+      const allowed = await hasTrainerAccess(req.user.userId, { clubId: club_id, teamId: team_id || null });
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this club/team' });
       }
@@ -274,7 +274,7 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
     }
 
     if (req.user.role === 'coach') {
-      const allowed = await hasTrainerAccess(req.user.id, { clubId: club_id, teamId: team_id || null });
+      const allowed = await hasTrainerAccess(req.user.userId, { clubId: club_id, teamId: team_id || null });
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this club/team' });
       }

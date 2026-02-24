@@ -26,7 +26,7 @@ describe('🎮 Games API', () => {
         [`admin_games_${uniqueId}`, `admin_games_${uniqueId}@test.com`, 'hash', 'admin']
       );
       adminUser = adminResult.rows[0];
-      authToken = jwt.sign({ id: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
+      authToken = jwt.sign({ userId: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
 
       const coachResult = await db.query(
         `INSERT INTO users (username, email, password_hash, role) 
@@ -34,7 +34,7 @@ describe('🎮 Games API', () => {
         [`coach_games_${uniqueId}`, `coach_games_${uniqueId}@test.com`, 'hash', 'coach']
       );
       coachUser = coachResult.rows[0];
-      coachToken = jwt.sign({ id: coachUser.id, role: 'coach' }, process.env.JWT_SECRET);
+      coachToken = jwt.sign({ userId: coachUser.id, role: 'coach' }, process.env.JWT_SECRET);
 
       const userResult = await db.query(
         `INSERT INTO users (username, email, password_hash, role) 
@@ -42,7 +42,7 @@ describe('🎮 Games API', () => {
         [`user_games_${uniqueId}`, `user_games_${uniqueId}@test.com`, 'hash', 'user']
       );
       regularUser = userResult.rows[0];
-      userToken = jwt.sign({ id: regularUser.id, role: 'user' }, process.env.JWT_SECRET);
+      userToken = jwt.sign({ userId: regularUser.id, role: 'user' }, process.env.JWT_SECRET);
 
       // Validate tokens were created successfully
       if (!authToken || !coachToken || !userToken) {

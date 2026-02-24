@@ -28,7 +28,7 @@ describe('📊 Club Analytics API', () => {
         [`admin_analytics_${uniqueId}`, `admin_analytics_${uniqueId}@test.com`, 'hash', 'admin']
       );
       adminUser = adminResult.rows[0];
-      authToken = jwt.sign({ id: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
+      authToken = jwt.sign({ userId: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
 
       // Create test clubs
       const club1Result = await db.query(

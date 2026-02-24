@@ -28,7 +28,7 @@ describe('📊 Export API Tests', () => {
     testUser = userResult.rows[0];
     
     // Generate JWT token directly
-    authToken = jwt.sign({ id: testUser.id, role: 'coach' }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ userId: testUser.id, role: 'coach' }, process.env.JWT_SECRET);
 
     // Create test teams directly in DB
     const club1Result = await db.query(
