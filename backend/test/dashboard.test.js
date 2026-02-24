@@ -16,7 +16,7 @@ describe('📊 Dashboard API', () => {
     );
 
     testUser = userResult.rows[0];
-    authToken = jwt.sign({ id: testUser.id, role: 'user' }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ userId: testUser.id, role: 'user' }, process.env.JWT_SECRET);
   });
 
   afterAll(async () => {

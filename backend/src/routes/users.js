@@ -40,7 +40,7 @@ router.get('/me', async (req, res) => {
       SELECT id, username, email, role, created_at, updated_at
       FROM users
       WHERE id = $1
-    `, [req.user.id]);
+    `, [req.user.userId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -60,7 +60,7 @@ router.get('/:userId/login-history', async (req, res) => {
 
   try {
     // Check if user is admin or viewing their own history
-    if (req.user.role !== 'admin' && req.user.id !== parseInt(userId)) {
+    if (req.user.role !== 'admin' && req.user.userId !== parseInt(userId)) {
       return res.status(403).json({ error: 'Forbidden: Cannot view other users\' login history' });
     }
 
@@ -116,7 +116,7 @@ router.put('/:userId/role', [
     }
 
     // Prevent self-demotion for admin
-    if (parseInt(userId) === req.user.id && req.user.role === 'admin' && role !== 'admin') {
+    if (parseInt(userId) === req.user.userId && req.user.role === 'admin' && role !== 'admin') {
       return res.status(403).json({ 
         error: 'Cannot remove admin role from yourself' 
       });
@@ -138,7 +138,7 @@ router.put('/:userId/role', [
 // Update user password (self or admin)
 router.put('/:userId/password', [
   body('currentPassword')
-    .if((value, { req }) => req.user.id === parseInt(req.params.userId, 10))
+    .if((value, { req }) => req.user.userId === parseInt(req.params.userId, 10))
     .notEmpty()
     .withMessage('Current password is required'),
   body('newPassword')
@@ -160,13 +160,13 @@ router.put('/:userId/password', [
   }
 
   // Only allow users to change their own password unless they're admin
-  if (req.user.id !== userIdNum && req.user.role !== 'admin') {
+  if (req.user.userId !== userIdNum && req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Not authorized to change other users\' passwords' });
   }
 
   try {
     // If user is changing their own password, verify current password
-    if (req.user.id === userIdNum) {
+    if (req.user.userId === userIdNum) {
       const user = await db.query(
         'SELECT password_hash FROM users WHERE id = $1',
         [userId]
@@ -280,7 +280,7 @@ router.patch('/:userId', [
   }
 
   // Only allow users to edit their own profile unless they're admin
-  if (req.user.id !== userIdNum && req.user.role !== 'admin') {
+  if (req.user.userId !== userIdNum && req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Not authorized to edit other users\' profiles' });
   }
 
@@ -366,7 +366,7 @@ router.post('/bulk-role-change', [
 
   try {
     // Check if trying to change own role
-    if (userIds.includes(req.user.id)) {
+    if (userIds.includes(req.user.userId)) {
       return res.status(403).json({ 
         error: 'Cannot change your own role in bulk operation' 
       });
@@ -395,7 +395,7 @@ router.delete('/:userId', requireRole(['admin']), async (req, res) => {
 
   try {
     // Prevent self-deletion
-    if (parseInt(userId) === req.user.id) {
+    if (parseInt(userId) === req.user.userId) {
       return res.status(403).json({ 
         error: 'Cannot delete your own account' 
       });

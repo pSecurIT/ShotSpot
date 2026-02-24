@@ -217,7 +217,7 @@ router.post('/', [
     }
 
     if (req.user.role === 'coach') {
-      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      const allowed = await coachHasGameAccess(req.user.userId, home_club_id, away_club_id);
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for one of the clubs in this game' });
       }
@@ -326,7 +326,7 @@ router.put('/:id', [
 
     if (req.user.role === 'coach') {
       const { home_club_id, away_club_id } = gameCheck.rows[0];
-      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      const allowed = await coachHasGameAccess(req.user.userId, home_club_id, away_club_id);
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this game' });
       }
@@ -334,7 +334,7 @@ router.put('/:id', [
 
     if (req.user.role === 'coach') {
       const { home_club_id, away_club_id } = gameCheck.rows[0];
-      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      const allowed = await coachHasGameAccess(req.user.userId, home_club_id, away_club_id);
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this game' });
       }
@@ -342,7 +342,7 @@ router.put('/:id', [
 
     if (req.user.role === 'coach') {
       const { home_club_id, away_club_id } = gameCheck.rows[0];
-      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      const allowed = await coachHasGameAccess(req.user.userId, home_club_id, away_club_id);
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this game' });
       }
@@ -350,7 +350,7 @@ router.put('/:id', [
 
     if (req.user.role === 'coach') {
       const { home_club_id, away_club_id } = gameCheck.rows[0];
-      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      const allowed = await coachHasGameAccess(req.user.userId, home_club_id, away_club_id);
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this game' });
       }
@@ -454,7 +454,7 @@ router.post('/:id/start', [
 
     if (req.user.role === 'coach') {
       const { home_club_id, away_club_id } = gameCheck.rows[0];
-      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      const allowed = await coachHasGameAccess(req.user.userId, home_club_id, away_club_id);
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this game' });
       }
@@ -462,7 +462,7 @@ router.post('/:id/start', [
 
     if (req.user.role === 'coach') {
       const { home_club_id, away_club_id } = gameCheck.rows[0];
-      const allowed = await coachHasGameAccess(req.user.id, home_club_id, away_club_id);
+      const allowed = await coachHasGameAccess(req.user.userId, home_club_id, away_club_id);
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this game' });
       }
@@ -716,7 +716,7 @@ router.delete('/:id', [
     const game = gameCheck.rows[0];
 
     if (req.user.role === 'coach') {
-      const allowed = await coachHasGameAccess(req.user.id, game.home_club_id, game.away_club_id);
+      const allowed = await coachHasGameAccess(req.user.userId, game.home_club_id, game.away_club_id);
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this game' });
       }

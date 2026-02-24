@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
   try {
     let result = await db.query(
       'SELECT * FROM export_settings WHERE user_id = $1',
-      [req.user.id]
+      [req.user.userId]
     );
 
     // If user has no settings, create default settings
@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
         ) VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
       `, [
-        req.user.id,
+        req.user.userId,
         'pdf',
         false,
         true,
@@ -103,7 +103,7 @@ router.put('/', [
       const template = templateCheck.rows[0];
 
       // Check if user has access to this template
-      if (!template.is_default && template.created_by !== req.user.id && req.user.role !== 'admin') {
+      if (!template.is_default && template.created_by !== req.user.userId && req.user.role !== 'admin') {
         return res.status(403).json({ error: 'You do not have access to this template' });
       }
     }
@@ -111,7 +111,7 @@ router.put('/', [
     // Check if settings exist
     const existingSettings = await db.query(
       'SELECT id FROM export_settings WHERE user_id = $1',
-      [req.user.id]
+      [req.user.userId]
     );
 
     let result;
@@ -119,7 +119,7 @@ router.put('/', [
     if (existingSettings.rows.length === 0) {
       // Create new settings
       const fields = ['user_id'];
-      const values = [req.user.id];
+      const values = [req.user.userId];
       const placeholders = ['$1'];
       let paramIndex = 2;
 
@@ -185,7 +185,7 @@ router.put('/', [
         return res.status(400).json({ error: 'No valid fields to update' });
       }
 
-      values.push(req.user.id);
+      values.push(req.user.userId);
 
       result = await db.query(`
         UPDATE export_settings
@@ -227,7 +227,7 @@ router.post('/reset', async (req, res) => {
         default_template_id = NULL
       RETURNING *
     `, [
-      req.user.id,
+      req.user.userId,
       'pdf',
       false,
       true,
