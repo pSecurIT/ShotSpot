@@ -82,7 +82,7 @@ router.post('/', [
     }
 
     if (req.user.role === 'coach') {
-      const allowed = await hasTrainerAccess(req.user.id, { clubId: club_id });
+      const allowed = await hasTrainerAccess(req.user.userId, { clubId: club_id });
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this club' });
       }
@@ -186,7 +186,7 @@ router.put('/:id', [
     }
 
     if (req.user.role === 'coach') {
-      const allowed = await hasTrainerAccess(req.user.id, { clubId: Number(teamCheck.rows[0].club_id) });
+      const allowed = await hasTrainerAccess(req.user.userId, { clubId: Number(teamCheck.rows[0].club_id) });
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this club' });
       }
@@ -225,7 +225,7 @@ router.delete('/:id', [
     }
 
     if (req.user.role === 'coach') {
-      const allowed = await hasTrainerAccess(req.user.id, { clubId: Number(teamCheck.rows[0].club_id) });
+      const allowed = await hasTrainerAccess(req.user.userId, { clubId: Number(teamCheck.rows[0].club_id) });
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this club' });
       }

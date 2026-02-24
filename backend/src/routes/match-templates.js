@@ -14,7 +14,7 @@ router.use(auth);
  */
 router.get('/', async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     
     // Get all system templates plus user's own templates
     const result = await pool.query(
@@ -114,7 +114,7 @@ router.post('/', [
     competition_type
   } = req.body;
 
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   try {
     const result = await pool.query(
@@ -179,7 +179,7 @@ router.put('/:id', [
   }
 
   const { id } = req.params;
-  const userId = req.user.id;
+  const userId = req.user.userId;
   const userRole = req.user.role?.toLowerCase();
 
   try {
@@ -256,7 +256,7 @@ router.delete('/:id', [
   }
 
   const { id } = req.params;
-  const userId = req.user.id;
+  const userId = req.user.userId;
   const userRole = req.user.role?.toLowerCase();
 
   try {

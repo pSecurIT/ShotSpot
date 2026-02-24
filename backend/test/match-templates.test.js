@@ -23,7 +23,7 @@ describe('Match Templates API', () => {
     );
     userId = userResult.rows[0].id;
     authToken = jwt.sign(
-      { id: userId, username: `templateadmin_${uniqueSuffix}`, role: 'admin' },
+      { userId, username: `templateadmin_${uniqueSuffix}`, role: 'admin' },
       process.env.JWT_SECRET || 'test-secret',
       { expiresIn: '1h' }
     );
@@ -35,7 +35,7 @@ describe('Match Templates API', () => {
     );
     coachId = coachResult.rows[0].id;
     coachToken = jwt.sign(
-      { id: coachId, username: `templatecoach_${uniqueSuffix}`, role: 'coach' },
+      { userId: coachId, username: `templatecoach_${uniqueSuffix}`, role: 'coach' },
       process.env.JWT_SECRET || 'test-secret',
       { expiresIn: '1h' }
     );
@@ -47,7 +47,7 @@ describe('Match Templates API', () => {
     );
     regularUserId = regularUserResult.rows[0].id;
     userToken = jwt.sign(
-      { id: regularUserId, username: `templateuser_${uniqueSuffix}`, role: 'user' },
+      { userId: regularUserId, username: `templateuser_${uniqueSuffix}`, role: 'user' },
       process.env.JWT_SECRET || 'test-secret',
       { expiresIn: '1h' }
     );

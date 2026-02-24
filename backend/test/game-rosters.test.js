@@ -31,7 +31,7 @@ describe('📋 Game Rosters API', () => {
         [`admin_roster_${uniqueId}`, `admin_roster_${uniqueId}@test.com`, 'hash', 'admin']
       );
       adminUser = adminResult.rows[0];
-      authToken = jwt.sign({ id: adminUser.id, username: adminUser.username, role: 'admin' }, process.env.JWT_SECRET);
+      authToken = jwt.sign({ userId: adminUser.id, username: adminUser.username, role: 'admin' }, process.env.JWT_SECRET);
 
       const coachResult = await db.query(
         `INSERT INTO users (username, email, password_hash, role) 
@@ -39,7 +39,7 @@ describe('📋 Game Rosters API', () => {
         [`coach_roster_${uniqueId}`, `coach_roster_${uniqueId}@test.com`, 'hash', 'coach']
       );
       coachUser = coachResult.rows[0];
-      coachToken = jwt.sign({ id: coachUser.id, username: coachUser.username, role: 'coach' }, process.env.JWT_SECRET);
+      coachToken = jwt.sign({ userId: coachUser.id, username: coachUser.username, role: 'coach' }, process.env.JWT_SECRET);
 
       const viewerResult = await db.query(
         `INSERT INTO users (username, email, password_hash, role) 
@@ -47,7 +47,7 @@ describe('📋 Game Rosters API', () => {
         [`viewer_roster_${uniqueId}`, `viewer_roster_${uniqueId}@test.com`, 'hash', 'viewer']
       );
       viewerUser = viewerResult.rows[0];
-      viewerToken = jwt.sign({ id: viewerUser.id, username: viewerUser.username, role: 'viewer' }, process.env.JWT_SECRET);
+      viewerToken = jwt.sign({ userId: viewerUser.id, username: viewerUser.username, role: 'viewer' }, process.env.JWT_SECRET);
 
       // Validate tokens were created successfully
       if (!authToken || !coachToken || !viewerToken) {

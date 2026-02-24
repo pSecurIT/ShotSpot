@@ -114,13 +114,13 @@ router.post(
               AND is_active = true
               AND active_from <= CURRENT_DATE
               AND (active_to IS NULL OR active_to >= CURRENT_DATE)`,
-          [req.user.id]
+          [req.user.userId]
         );
 
         if (assignments.rowCount > 0) {
           const clubIds = [...new Set(players.map((p) => p.club_id))];
           for (const clubId of clubIds) {
-            const allowed = await hasTrainerAccess(req.user.id, { clubId });
+            const allowed = await hasTrainerAccess(req.user.userId, { clubId });
             if (!allowed) {
               return res.status(403).json({ error: 'Trainer assignment required for this club to set roster', clubId });
             }
@@ -244,7 +244,7 @@ router.put(
       const entry = currentEntry.rows[0];
 
       if (req.user.role === 'coach') {
-        const allowed = await hasTrainerAccess(req.user.id, { clubId: entry.club_id });
+        const allowed = await hasTrainerAccess(req.user.userId, { clubId: entry.club_id });
         if (!allowed) {
           await pool.query('ROLLBACK');
           return res.status(403).json({ error: 'Trainer assignment required for this club to update roster' });
@@ -323,7 +323,7 @@ router.delete(
       }
 
       if (req.user.role === 'coach') {
-        const allowed = await hasTrainerAccess(req.user.id, { clubId: existing.rows[0].club_id });
+        const allowed = await hasTrainerAccess(req.user.userId, { clubId: existing.rows[0].club_id });
         if (!allowed) {
           return res.status(403).json({ error: 'Trainer assignment required for this club to remove roster entry' });
         }

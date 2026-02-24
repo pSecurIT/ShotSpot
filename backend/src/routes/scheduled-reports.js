@@ -42,7 +42,7 @@ router.get('/', [
     // Non-admin users can only see their own scheduled reports
     if (req.user.role !== 'admin') {
       queryText += ` AND sr.created_by = $${paramIndex}`;
-      queryParams.push(req.user.id);
+      queryParams.push(req.user.userId);
       paramIndex++;
     }
 
@@ -102,7 +102,7 @@ router.get('/:id', [
     const scheduledReport = result.rows[0];
 
     // Non-admin users can only access their own scheduled reports
-    if (req.user.role !== 'admin' && scheduledReport.created_by !== req.user.id) {
+    if (req.user.role !== 'admin' && scheduledReport.created_by !== req.user.userId) {
       return res.status(403).json({ error: 'Access denied to this scheduled report' });
     }
 
@@ -192,7 +192,7 @@ router.post('/', [
 
     const template = templateCheck.rows[0];
 
-    if (!template.is_default && template.created_by !== req.user.id && req.user.role !== 'admin') {
+    if (!template.is_default && template.created_by !== req.user.userId && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'You do not have access to this template' });
     }
 
@@ -213,7 +213,7 @@ router.post('/', [
       RETURNING *
     `, [
       name,
-      req.user.id,
+      req.user.userId,
       template_id,
       schedule_type,
       true,
@@ -306,7 +306,7 @@ router.put('/:id', [
     const report = reportCheck.rows[0];
 
     // Only creator or admin can update
-    if (req.user.role !== 'admin' && report.created_by !== req.user.id) {
+    if (req.user.role !== 'admin' && report.created_by !== req.user.userId) {
       return res.status(403).json({ error: 'You do not have permission to update this scheduled report' });
     }
 
@@ -323,7 +323,7 @@ router.put('/:id', [
 
       const template = templateCheck.rows[0];
 
-      if (!template.is_default && template.created_by !== req.user.id && req.user.role !== 'admin') {
+      if (!template.is_default && template.created_by !== req.user.userId && req.user.role !== 'admin') {
         return res.status(403).json({ error: 'You do not have access to this template' });
       }
     }
@@ -417,7 +417,7 @@ router.delete('/:id', [
     const report = reportCheck.rows[0];
 
     // Only creator or admin can delete
-    if (req.user.role !== 'admin' && report.created_by !== req.user.id) {
+    if (req.user.role !== 'admin' && report.created_by !== req.user.userId) {
       return res.status(403).json({ error: 'You do not have permission to delete this scheduled report' });
     }
 
