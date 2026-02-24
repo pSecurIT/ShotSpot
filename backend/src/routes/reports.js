@@ -61,7 +61,7 @@ router.get('/', [
     // Non-admin users can only see their own reports or public reports
     if (req.user.role !== 'admin') {
       queryText += ` AND (re.generated_by = $${paramIndex} OR re.is_public = true)`;
-      queryParams.push(req.user.id);
+      queryParams.push(req.user.userId);
       paramIndex++;
     }
 
@@ -138,7 +138,7 @@ router.get('/:id', [
     const report = result.rows[0];
 
     // Non-admin users can only access their own reports or public reports
-    if (req.user.role !== 'admin' && report.generated_by !== req.user.id && !report.is_public) {
+    if (req.user.role !== 'admin' && report.generated_by !== req.user.userId && !report.is_public) {
       return res.status(403).json({ error: 'Access denied to this report' });
     }
 
@@ -223,7 +223,7 @@ router.post('/generate', [
 
     const template = templateCheck.rows[0];
 
-    if (!template.is_default && template.created_by !== req.user.id && req.user.role !== 'admin') {
+    if (!template.is_default && template.created_by !== req.user.userId && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'You do not have access to this template' });
     }
 
@@ -253,7 +253,7 @@ router.post('/generate', [
     let expiresAt = null;
     const settingsResult = await db.query(
       'SELECT auto_delete_after_days FROM export_settings WHERE user_id = $1',
-      [req.user.id]
+      [req.user.userId]
     );
 
     if (settingsResult.rows.length > 0 && settingsResult.rows[0].auto_delete_after_days) {
@@ -293,7 +293,7 @@ router.post('/generate', [
       RETURNING *
     `, [
       template_id,
-      req.user.id,
+      req.user.userId,
       report_name,
       report_type,
       format,
@@ -345,7 +345,7 @@ router.delete('/:id', [
     const report = reportCheck.rows[0];
 
     // Only creator or admin can delete
-    if (req.user.role !== 'admin' && report.generated_by !== req.user.id) {
+    if (req.user.role !== 'admin' && report.generated_by !== req.user.userId) {
       return res.status(403).json({ error: 'You do not have permission to delete this report' });
     }
 

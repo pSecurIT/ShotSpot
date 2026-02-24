@@ -35,9 +35,9 @@ describe('🎯 Events API', () => {
 
       // Create JWT tokens directly (no dependency on login endpoint)
       const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
-      adminToken = jwt.sign({ id: adminUser.id, role: adminUser.role }, jwtSecret, { expiresIn: '1h' });
-      coachToken = jwt.sign({ id: coachUser.id, role: coachUser.role }, jwtSecret, { expiresIn: '1h' });
-      userToken = jwt.sign({ id: regularUser.id, role: regularUser.role }, jwtSecret, { expiresIn: '1h' });
+      adminToken = jwt.sign({ userId: adminUser.id, role: adminUser.role }, jwtSecret, { expiresIn: '1h' });
+      coachToken = jwt.sign({ userId: coachUser.id, role: coachUser.role }, jwtSecret, { expiresIn: '1h' });
+      userToken = jwt.sign({ userId: regularUser.id, role: regularUser.role }, jwtSecret, { expiresIn: '1h' });
 
       // Create teams with unique names
       const club1Result = await db.query(
