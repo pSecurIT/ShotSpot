@@ -39,6 +39,31 @@ type CompetitionRow = {
   games_played?: string | number;
 };
 
+type BracketRow = {
+  id: number;
+  competition_id: number;
+  round_number: number;
+  round_name: string;
+  match_number: number;
+  home_team_id: number | null;
+  away_team_id: number | null;
+  winner_team_id: number | null;
+  game_id: number | null;
+  home_team_name?: string | null;
+  away_team_name?: string | null;
+  winner_team_name?: string | null;
+  home_score?: number | null;
+  away_score?: number | null;
+  game_status?: string | null;
+};
+
+type GeneratedBracketResponse = {
+  message?: string;
+  total_rounds?: number;
+  total_matches?: number;
+  bracket?: BracketRow[];
+};
+
 const extractApiErrorMessage = (data: unknown): string | undefined => {
   if (!data || typeof data !== 'object') return undefined;
   const payload = data as ApiErrorPayload;
@@ -104,6 +129,42 @@ const fromRow = (row: CompetitionRow): Competition => {
     season_name: row.season_name ?? null,
     team_count: toNumber(row.team_count),
     games_played: toNumber(row.games_played),
+  };
+};
+
+const normalizeBracket = (data: unknown, competitionId: number): TournamentBracket => {
+  if (data && typeof data === 'object') {
+    const payload = data as Partial<TournamentBracket> & GeneratedBracketResponse;
+    if (Array.isArray(payload.rounds)) {
+      return payload as TournamentBracket;
+    }
+
+    if (Array.isArray(payload.bracket)) {
+      const roundsMap = new Map<number, { round_number: number; round_name: string; matches: BracketRow[] }>();
+      payload.bracket.forEach((match) => {
+        const round = roundsMap.get(match.round_number);
+        if (round) {
+          round.matches.push(match);
+        } else {
+          roundsMap.set(match.round_number, {
+            round_number: match.round_number,
+            round_name: match.round_name,
+            matches: [match],
+          });
+        }
+      });
+
+      const rounds = Array.from(roundsMap.values()).sort((a, b) => a.round_number - b.round_number);
+      return {
+        competition_id: competitionId,
+        rounds,
+      };
+    }
+  }
+
+  return {
+    competition_id: competitionId,
+    rounds: [],
   };
 };
 
@@ -280,7 +341,7 @@ export const competitionsApi = {
   getBracket: async (competitionId: number): Promise<TournamentBracket> => {
     try {
       const response = await api.get<TournamentBracket>(`/competitions/${competitionId}/bracket`);
-      return response.data;
+      return normalizeBracket(response.data, competitionId);
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to fetch tournament bracket');
       throw err;
@@ -292,10 +353,11 @@ export const competitionsApi = {
    */
   generateBracket: async (competitionId: number): Promise<TournamentBracket | QueuedActionResponse> => {
     try {
-      const response = await api.post<TournamentBracket | QueuedActionResponse>(
+      const response = await api.post<GeneratedBracketResponse | TournamentBracket | QueuedActionResponse>(
         `/competitions/${competitionId}/bracket/generate`
       );
-      return response.data;
+      if ((response.data as QueuedActionResponse)?.queued) return response.data as QueuedActionResponse;
+      return normalizeBracket(response.data, competitionId);
     } catch (err) {
       throwNormalizedApiError(err, 'Failed to generate tournament bracket');
       throw err;
