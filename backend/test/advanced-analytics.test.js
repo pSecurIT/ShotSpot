@@ -31,7 +31,7 @@ describe('📊 Advanced Analytics Routes', () => {
       [`admin_adv_analytics_${uniqueId}`, `admin_adv_${uniqueId}@test.com`, 'hash', 'admin']
     );
     adminUserId = adminResult.rows[0].id;
-    authToken = jwt.sign({ id: adminUserId, role: 'admin' }, process.env.JWT_SECRET);
+    authToken = jwt.sign({ userId: adminUserId, role: 'admin' }, process.env.JWT_SECRET);
 
     const coachResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
@@ -39,7 +39,7 @@ describe('📊 Advanced Analytics Routes', () => {
       [`coach_adv_analytics_${uniqueId}`, `coach_adv_${uniqueId}@test.com`, 'hash', 'coach']
     );
     coachUserId = coachResult.rows[0].id;
-    coachToken = jwt.sign({ id: coachUserId, role: 'coach' }, process.env.JWT_SECRET);
+    coachToken = jwt.sign({ userId: coachUserId, role: 'coach' }, process.env.JWT_SECRET);
 
     const userResult = await db.query(
       `INSERT INTO users (username, email, password_hash, role) 
@@ -47,7 +47,7 @@ describe('📊 Advanced Analytics Routes', () => {
       [`user_adv_analytics_${uniqueId}`, `user_adv_${uniqueId}@test.com`, 'hash', 'user']
     );
     regularUserId = userResult.rows[0].id;
-    userToken = jwt.sign({ id: regularUserId, role: 'user' }, process.env.JWT_SECRET);
+    userToken = jwt.sign({ userId: regularUserId, role: 'user' }, process.env.JWT_SECRET);
 
     // Create test teams
     const club1Result = await db.query(

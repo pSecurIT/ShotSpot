@@ -58,7 +58,7 @@ router.get('/', [
     // Non-admin users can only see default templates or their own custom templates
     if (req.user.role !== 'admin') {
       queryText += ` AND (rt.is_default = true OR rt.created_by = $${paramIndex})`;
-      queryParams.push(req.user.id);
+      queryParams.push(req.user.userId);
       paramIndex++;
     }
 
@@ -102,7 +102,7 @@ router.get('/:id', [
     const template = result.rows[0];
 
     // Non-admin users can only access default templates or their own custom templates
-    if (req.user.role !== 'admin' && !template.is_default && template.created_by !== req.user.id) {
+    if (req.user.role !== 'admin' && !template.is_default && template.created_by !== req.user.userId) {
       return res.status(403).json({ error: 'Access denied to this template' });
     }
 
@@ -177,7 +177,7 @@ router.post('/', [
       type,
       false, // Custom templates are never default
       true,
-      req.user.id,
+      req.user.userId,
       description || null,
       JSON.stringify(sections),
       JSON.stringify(metrics),
@@ -260,7 +260,7 @@ router.put('/:id', [
     }
 
     // Only creator or admin can update
-    if (req.user.role !== 'admin' && template.created_by !== req.user.id) {
+    if (req.user.role !== 'admin' && template.created_by !== req.user.userId) {
       return res.status(403).json({ error: 'You do not have permission to update this template' });
     }
 
@@ -340,7 +340,7 @@ router.delete('/:id', [
     }
 
     // Only creator or admin can delete
-    if (req.user.role !== 'admin' && template.created_by !== req.user.id) {
+    if (req.user.role !== 'admin' && template.created_by !== req.user.userId) {
       return res.status(403).json({ error: 'You do not have permission to delete this template' });
     }
 
