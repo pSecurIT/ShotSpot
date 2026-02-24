@@ -108,7 +108,7 @@ router.post('/', [
   }
 
   const { game_id: gameId, period, time_remaining, commentary_type, title, content } = req.body;
-  const userId = req.user.id; // From auth middleware
+  const userId = req.user.userId; // From auth middleware
 
   try {
     // Verify game exists
@@ -188,7 +188,7 @@ router.put('/:commentaryId', [
 
   const { commentaryId } = req.params;
   const updates = req.body;
-  const userId = req.user.id; // From auth middleware
+  const userId = req.user.userId; // From auth middleware
 
   try {
     // Verify commentary exists (no need for game_id verification in update)
@@ -273,7 +273,7 @@ router.delete('/:commentaryId', [
   }
 
   const { commentaryId } = req.params;
-  const userId = req.user.id; // From auth middleware
+  const userId = req.user.userId; // From auth middleware
 
   try {
     // Verify commentary exists

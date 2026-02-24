@@ -34,9 +34,9 @@ describe('👥 Trainer assignments guard access', () => {
       [`coach_u_${uniqueId}`, `coach_u_${uniqueId}@test.com`]
     )).rows[0];
 
-    _adminToken = signToken({ id: admin.id, role: 'admin' });
-    assignedToken = signToken({ id: coachAssigned.id, role: 'coach' });
-    unassignedToken = signToken({ id: coachUnassigned.id, role: 'coach' });
+    _adminToken = signToken({ userId: admin.id, role: 'admin' });
+    assignedToken = signToken({ userId: coachAssigned.id, role: 'coach' });
+    unassignedToken = signToken({ userId: coachUnassigned.id, role: 'coach' });
 
     club1 = (await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING *', [`Club A ${uniqueId}`])).rows[0];
     club2 = (await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING *', [`Club B ${uniqueId}`])).rows[0];

@@ -46,7 +46,7 @@ export const requireTrainerForClubOrTeam = (extractTarget) => async (req, res, n
       return res.status(400).json({ error: 'Club or team context required' });
     }
 
-    const allowed = await hasTrainerAccess(req.user.id, { clubId, teamId });
+    const allowed = await hasTrainerAccess(req.user.userId, { clubId, teamId });
     if (!allowed) {
       return res.status(403).json({
         error: 'Trainer assignment required for this club/team',
