@@ -181,6 +181,169 @@ router.post(
 );
 
 /**
+ * GET /api/twizzit/organization/:credentialId
+ * Get organization info (admin/coach)
+ * This should be called first to get the organization ID for efficient subsequent calls
+ */
+router.get(
+  '/organization/:credentialId',
+  requireRole(['admin', 'coach']),
+  [
+    param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID')
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const credentialId = parseInt(req.params.credentialId);
+      const credentials = await twizzitAuth.getCredentials(credentialId);
+
+      const apiClient = new TwizzitApiClient({
+        apiEndpoint: credentials.apiEndpoint,
+        username: credentials.apiUsername,
+        password: credentials.apiPassword,
+        organizationName: credentials.organizationName
+      });
+
+      // Get the organization ID
+      const organizationId = await apiClient.getDefaultOrganizationId();
+      
+      res.json({ 
+        organizationId,
+        organizationName: credentials.organizationName
+      });
+    } catch (error) {
+      console.error('Failed to get organization info:', error);
+      res.status(500).json({ 
+        error: 'Failed to get organization information',
+        message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/twizzit/groups/:credentialId
+ * Fetch available groups/teams from Twizzit (admin/coach)
+ */
+router.get(
+  '/groups/:credentialId',
+  requireRole(['admin', 'coach']),
+  [
+    param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID'),
+    query('organizationId').optional().isString().withMessage('organizationId must be a string'),
+    query('seasonId').optional().isString().withMessage('seasonId must be a string'),
+    query('groupType').optional().isString().withMessage('groupType must be a string')
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const credentialId = parseInt(req.params.credentialId);
+      const credentials = await twizzitAuth.getCredentials(credentialId);
+
+      console.log('[Twizzit Groups] Credentials loaded:', {
+        organizationName: credentials.organizationName,
+        apiEndpoint: credentials.apiEndpoint,
+        username: credentials.apiUsername,
+        providedOrgId: req.query.organizationId
+      });
+
+      const apiClient = new TwizzitApiClient({
+        apiEndpoint: credentials.apiEndpoint,
+        username: credentials.apiUsername,
+        password: credentials.apiPassword,
+        organizationName: credentials.organizationName,
+        organizationId: req.query.organizationId || undefined
+      });
+
+      const options = {};
+      if (req.query.seasonId) {
+        options.seasonId = req.query.seasonId;
+      }
+      if (req.query.groupType) {
+        options.groupType = req.query.groupType;
+      }
+
+      console.log('[Twizzit Groups] Fetching with options:', options);
+      const result = await apiClient.getGroups(options);
+      console.log('[Twizzit Groups] Success! Received result:', { 
+        groupCount: result.groups?.length || 0,
+        total: result.total,
+        hasMore: result.hasMore,
+        sampleGroup: result.groups?.[0] ? { id: result.groups[0].id, name: result.groups[0].name } : null
+      });
+      res.json(result);
+    } catch (error) {
+      console.error('[Twizzit Groups] Error details:', {
+        message: error.message,
+        status: error.status,
+        response: error.response?.data,
+        stack: error.stack?.split('\n').slice(0, 3).join('\n')
+      });
+      // Return error to frontend so it knows something went wrong
+      res.status(500).json({ 
+        error: 'Failed to fetch groups from Twizzit',
+        message: error.message,
+        details: error.response?.data
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/twizzit/seasons/:credentialId
+ * Fetch available seasons from Twizzit (admin/coach)
+ * Note: Extracted from groups response since direct seasons endpoint is unreliable
+ */
+router.get(
+  '/seasons/:credentialId',
+  requireRole(['admin', 'coach']),
+  [
+    param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID'),
+    query('organizationId').optional().isString().withMessage('organizationId must be a string')
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const credentialId = parseInt(req.params.credentialId);
+      const credentials = await twizzitAuth.getCredentials(credentialId);
+
+      const apiClient = new TwizzitApiClient({
+        apiEndpoint: credentials.apiEndpoint,
+        username: credentials.apiUsername,
+        password: credentials.apiPassword,
+        organizationName: credentials.organizationName,
+        organizationId: req.query.organizationId || undefined
+      });
+
+      console.log('[Twizzit Seasons] Fetching seasons from API...');
+      
+      // Fetch seasons directly from Twizzit API
+      const result = await apiClient.getSeasons({});
+      
+      console.log('[Twizzit Seasons] Successfully fetched seasons:', { 
+        seasonCount: result.seasons.length,
+        sampleSeason: result.seasons[0] ? { id: result.seasons[0].id, name: result.seasons[0].name } : null
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error('[Twizzit Seasons] Error details:', {
+        message: error.message,
+        status: error.status,
+        response: error.response?.data,
+        stack: error.stack?.split('\n').slice(0, 3).join('\n')
+      });
+      // Return error to frontend so it knows something went wrong
+      res.status(500).json({ 
+        error: 'Failed to fetch seasons from Twizzit',
+        message: error.message,
+        details: error.response?.data
+      });
+    }
+  }
+);
+
+/**
  * GET /api/twizzit/verify
  * Verify Twizzit API connection
  */
@@ -195,60 +358,6 @@ router.get('/verify', async (req, res) => {
     console.error('Error verifying Twizzit API connection:', error);
     return res.status(500).json({ 
       error: 'Failed to verify Twizzit API connection',
-      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
-    });
-  }
-});
-
-/**
- * POST /api/twizzit/sync/clubs
- * Sync clubs from Twizzit API
- */
-router.post('/sync/clubs', async (req, res) => {
-  try {
-    const clubs = await twizzitService.syncClubs();
-    return res.status(200).json({ message: 'Clubs synced successfully.', clubs });
-  } catch (error) {
-    console.error('Error syncing clubs:', error);
-    return res.status(500).json({ 
-      error: 'Failed to sync clubs',
-      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
-    });
-  }
-});
-
-/**
- * POST /api/twizzit/sync/players/:clubId
- * Sync players for a specific club from Twizzit API
- */
-router.post('/sync/players/:clubId', async (req, res) => {
-  const { clubId } = req.params;
-  try {
-    const players = await twizzitService.syncPlayers(clubId);
-    return res.status(200).json({ message: `Players synced successfully for club ${clubId}.`, players });
-  } catch (error) {
-    // Avoid user-controlled format strings; log structured context
-    console.error('Error syncing players for club %s:', clubId, error);
-    return res.status(500).json({ 
-      error: 'Failed to sync players',
-      clubId,
-      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
-    });
-  }
-});
-
-/**
- * POST /api/twizzit/sync/seasons
- * Sync seasons from Twizzit API
- */
-router.post('/sync/seasons', async (req, res) => {
-  try {
-    const seasons = await twizzitService.syncSeasons();
-    return res.status(200).json({ message: 'Seasons synced successfully.', seasons });
-  } catch (error) {
-    console.error('Error syncing seasons:', error);
-    return res.status(500).json({ 
-      error: 'Failed to sync seasons',
       message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
     });
   }
@@ -287,6 +396,42 @@ router.post(
 );
 
 /**
+ * POST /api/twizzit/sync/teams/:credentialId
+ * Alias for sync/clubs for frontend compatibility
+ * Sync teams/clubs from Twizzit (admin/coach)
+ */
+router.post(
+  '/sync/teams/:credentialId',
+  requireRole(['admin', 'coach']),
+  [
+    param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID'),
+    body('groupId').optional().isString().withMessage('groupId must be a string'),
+    body('seasonId').optional().isString().withMessage('seasonId must be a string'),
+    body('createMissing').optional().isBoolean().withMessage('createMissing must be boolean')
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const credentialId = parseInt(req.params.credentialId);
+      const options = {
+        ...(req.body.groupId && { groupId: req.body.groupId }),
+        ...(req.body.seasonId && { seasonId: req.body.seasonId }),
+        createMissing: req.body.createMissing !== undefined ? req.body.createMissing : true
+      };
+
+      const result = await twizzitSync.syncClubsFromTwizzit(credentialId, options);
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to sync teams:', error);
+      res.status(500).json({ 
+        error: 'Failed to sync teams',
+        message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+      });
+    }
+  }
+);
+
+/**
  * POST /api/twizzit/sync/players/:credentialId
  * Sync players from Twizzit (admin/coach)
  */
@@ -294,13 +439,22 @@ router.post(
   '/sync/players/:credentialId',
   requireRole(['admin', 'coach']),
   [
-    param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID')
+    param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID'),
+    body('groupId').optional().isString().withMessage('groupId must be a string'),
+    body('seasonId').optional().isString().withMessage('seasonId must be a string'),
+    body('createMissing').optional().isBoolean().withMessage('createMissing must be boolean')
   ],
   validate,
   async (req, res) => {
     try {
       const credentialId = parseInt(req.params.credentialId);
-      const result = await twizzitSync.syncPlayersFromTwizzit(credentialId);
+      const options = {
+        ...(req.body.groupId && { groupId: req.body.groupId }),
+        ...(req.body.seasonId && { seasonId: req.body.seasonId }),
+        createMissing: req.body.createMissing !== undefined ? req.body.createMissing : true
+      };
+      
+      const result = await twizzitSync.syncPlayersFromTwizzit(credentialId, options);
       res.json(result);
     } catch (error) {
       console.error('Failed to sync players:', error);
@@ -326,13 +480,27 @@ router.get(
   async (req, res) => {
     try {
       const credentialId = parseInt(req.params.credentialId);
-      const config = await twizzitSync.getSyncConfig(credentialId);
+      // Use ensureSyncConfig to create default config if it doesn't exist
+      const config = await twizzitSync.ensureSyncConfig(credentialId);
       
       if (!config) {
-        return res.status(404).json({ error: 'Sync configuration not found' });
+        return res.status(404).json({ error: 'Credential not found' });
       }
 
-      res.json({ config });
+      // Convert sync_interval_minutes to hours/days for API
+      const totalMinutes = Number(config.syncIntervalMinutes || 60);
+      const isDayBased = totalMinutes % (24 * 60) === 0;
+      const apiConfig = {
+        ...config,
+        syncIntervalHours: Math.max(1, Math.round(totalMinutes / 60)),
+        syncIntervalDays: Math.max(1, Math.round(totalMinutes / (24 * 60))),
+        syncIntervalUnit: isDayBased ? 'days' : 'hours',
+        // Remove the minutes field from the API response
+        syncIntervalMinutes: undefined
+      };
+      delete apiConfig.syncIntervalMinutes;
+
+      res.json({ config: apiConfig });
     } catch (error) {
       console.error('Failed to get sync config:', error);
       res.status(500).json({ 
@@ -355,17 +523,41 @@ router.put(
     body('syncTeams').optional().isBoolean(),
     body('syncPlayers').optional().isBoolean(),
     body('syncCompetitions').optional().isBoolean(),
-    body('syncIntervalMinutes').optional().isInt({ min: 1, max: 1440 }),
+    body('syncIntervalHours').optional().isInt({ min: 1, max: 168 }),
+    body('syncIntervalDays').optional().isInt({ min: 1, max: 365 }),
     body('autoSyncEnabled').optional().isBoolean()
   ],
   validate,
   async (req, res) => {
     try {
       const credentialId = parseInt(req.params.credentialId);
-      const config = await twizzitSync.updateSyncConfig(credentialId, req.body);
+      
+      // Convert sync interval from API to syncIntervalMinutes for DB
+      const dbConfig = { ...req.body };
+      if (req.body.syncIntervalDays !== undefined) {
+        dbConfig.syncIntervalMinutes = req.body.syncIntervalDays * 24 * 60;
+        delete dbConfig.syncIntervalDays;
+        delete dbConfig.syncIntervalHours;
+      } else if (req.body.syncIntervalHours !== undefined) {
+        dbConfig.syncIntervalMinutes = req.body.syncIntervalHours * 60;
+        delete dbConfig.syncIntervalHours;
+      }
+      
+      const config = await twizzitSync.updateSyncConfig(credentialId, dbConfig);
+      
+      // Convert response back to hours/days for API
+      const totalMinutes = Number(config.sync_interval_minutes || 60);
+      const isDayBased = totalMinutes % (24 * 60) === 0;
+      const apiConfig = {
+        ...config,
+        syncIntervalHours: Math.max(1, Math.round(totalMinutes / 60)),
+        syncIntervalDays: Math.max(1, Math.round(totalMinutes / (24 * 60))),
+        syncIntervalUnit: isDayBased ? 'days' : 'hours'
+      };
+      
       res.json({ 
         message: 'Sync configuration updated',
-        config 
+        config: apiConfig
       });
     } catch (error) {
       console.error('Failed to update sync config:', error);
@@ -398,7 +590,24 @@ router.get(
         offset: parseInt(req.query.offset) || 0
       };
 
-      const history = await twizzitSync.getSyncHistory(credentialId, options);
+      const historyRows = await twizzitSync.getSyncHistory(credentialId, options);
+      
+      // Transform snake_case to camelCase for frontend
+      const history = historyRows.map(row => ({
+        id: row.id,
+        credentialId: row.credential_id,
+        syncType: row.sync_type,
+        syncDirection: row.sync_direction,
+        status: row.status,
+        itemsProcessed: row.items_processed || 0,
+        itemsSucceeded: row.items_succeeded || 0,
+        itemsFailed: row.items_failed || 0,
+        errorMessage: row.error_message,
+        syncedAt: row.completed_at || row.started_at,
+        startedAt: row.started_at,
+        completedAt: row.completed_at
+      }));
+      
       res.json({ history });
     } catch (error) {
       console.error('Failed to get sync history:', error);
@@ -434,7 +643,19 @@ router.get(
          ORDER BY tm.last_synced_at DESC`
       );
 
-      res.json({ mappings: result.rows });
+      // Transform to camelCase
+      const mappings = result.rows.map(row => ({
+        id: row.id,
+        internalTeamId: row.local_club_id,
+        internalTeamName: row.local_club_name,
+        twizzitTeamId: row.twizzit_team_id,
+        twizzitTeamName: row.twizzit_team_name,
+        lastSyncedAt: row.last_synced_at,
+        syncStatus: row.sync_status,
+        syncError: row.sync_error
+      }));
+
+      res.json({ mappings });
     } catch (error) {
       console.error('Failed to get team mappings:', error);
       res.status(500).json({ 
@@ -486,7 +707,25 @@ router.get(
       query += ' ORDER BY pm.last_synced_at DESC';
 
       const result = await db.query(query, params);
-      res.json({ mappings: result.rows });
+      
+      // Transform to camelCase
+      const mappings = result.rows.map(row => ({
+        id: row.id,
+        internalPlayerId: row.local_player_id,
+        internalPlayerName: `${row.first_name} ${row.last_name}`,
+        internalPlayerFirstName: row.first_name,
+        internalPlayerLastName: row.last_name,
+        jerseyNumber: row.jersey_number,
+        twizzitPlayerId: row.twizzit_player_id,
+        twizzitPlayerName: row.twizzit_player_name,
+        internalTeamId: row.local_club_id,
+        internalTeamName: row.club_name,
+        lastSyncedAt: row.last_synced_at,
+        syncStatus: row.sync_status,
+        syncError: row.sync_error
+      }));
+      
+      res.json({ mappings });
     } catch (error) {
       console.error('Failed to get player mappings:', error);
       res.status(500).json({ 
