@@ -86,8 +86,6 @@ class TwizzitApiClient {
           if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
             console.log(`[Twizzit Auth] Token attached:`, {
               hasToken: !!this.accessToken,
-              tokenLength: this.accessToken?.length,
-              tokenPrefix: this.accessToken?.substring(0, 20) + '...',
               expiresIn: this.tokenExpiry ? Math.round((this.tokenExpiry - Date.now()) / 1000 / 60) + ' minutes' : 'unknown'
             });
           }
@@ -188,8 +186,7 @@ class TwizzitApiClient {
         console.log('[Twizzit Auth] Starting authentication...', {
           endpoint: this.apiEndpoint,
           username: this.username,
-          hasPassword: !!this.password,
-          passwordLength: this.password?.length
+          hasPassword: !!this.password
         });
       }
 
@@ -217,8 +214,7 @@ class TwizzitApiClient {
 
       if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
         console.log('[Twizzit Auth] Authentication successful!', {
-          tokenLength: this.accessToken.length,
-          tokenPrefix: this.accessToken.substring(0, 20) + '...',
+          hasToken: !!this.accessToken,
           expiresIn: expiresIn + ' seconds'
         });
       }
