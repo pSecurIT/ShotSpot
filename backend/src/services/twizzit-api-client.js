@@ -43,8 +43,26 @@ class TwizzitApiClient {
       baseURL: this.apiEndpoint,
       timeout: this.timeout,
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'User-Agent': 'ShotSpot-TwizzitSync/1.0'
+      },
+      paramsSerializer: {
+        serialize: (params) => {
+          // Manually serialize params to handle arrays properly
+          const parts = [];
+          for (const [key, value] of Object.entries(params)) {
+            if (Array.isArray(value)) {
+              // Serialize arrays as key[]=value1&key[]=value2
+              // IMPORTANT: Encode the brackets as %5B%5D for Twizzit compatibility
+              value.forEach(v => {
+                parts.push(`${encodeURIComponent(key + '[]')}=${encodeURIComponent(v)}`);
+              });
+            } else if (value != null) {
+              parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+            }
+          }
+          return parts.join('&');
+        }
       }
     });
 
@@ -64,6 +82,35 @@ class TwizzitApiClient {
         
         if (this.accessToken) {
           config.headers.Authorization = `Bearer ${this.accessToken}`;
+          
+          if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+            console.log(`[Twizzit Auth] Token attached:`, {
+              hasToken: !!this.accessToken,
+              tokenLength: this.accessToken?.length,
+              tokenPrefix: this.accessToken?.substring(0, 20) + '...',
+              expiresIn: this.tokenExpiry ? Math.round((this.tokenExpiry - Date.now()) / 1000 / 60) + ' minutes' : 'unknown'
+            });
+          }
+        } else if (process.env.NODE_ENV !== 'test') {
+          console.warn('[Twizzit Auth] WARNING: No access token available for request!');
+        }
+
+        // Debug log the actual request URL with params
+        if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+          const url = config.url;
+          const params = config.params;
+          // Manually build the URL to see what's actually being sent
+          let fullUrl = `${config.baseURL}${url}`;
+          if (params && Object.keys(params).length > 0) {
+            const queryString = config.paramsSerializer.serialize(params);
+            fullUrl += `?${queryString}`;
+          }
+          console.log(`[Twizzit API Request]`, {
+            method: config.method?.toUpperCase(),
+            fullUrl,
+            params,
+            hasAuth: !!config.headers.Authorization
+          });
         }
 
         return config;
@@ -77,6 +124,20 @@ class TwizzitApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
+        if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+          console.error('[Twizzit API Error]', {
+            url: error.config?.url,
+            method: error.config?.method,
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            hasData: !!error.response?.data,
+            dataType: typeof error.response?.data,
+            dataPreview: typeof error.response?.data === 'string' 
+              ? error.response.data.substring(0, 200) 
+              : error.response?.data
+          });
+        }
+
         const originalRequest = error?.config;
 
         // If we don't have the original request config (e.g. a failure inside an interceptor),
@@ -92,6 +153,10 @@ class TwizzitApiClient {
 
         // Handle 401 errors (token expired)
         if (error.response?.status === 401 && !originalRequest._retry) {
+          if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+            console.log('[Twizzit Auth] Got 401, clearing token and retrying...');
+          }
+          
           originalRequest._retry = true;
           
           // Clear expired token and retry
@@ -119,6 +184,15 @@ class TwizzitApiClient {
    */
   async authenticate() {
     try {
+      if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+        console.log('[Twizzit Auth] Starting authentication...', {
+          endpoint: this.apiEndpoint,
+          username: this.username,
+          hasPassword: !!this.password,
+          passwordLength: this.password?.length
+        });
+      }
+
       // Twizzit API requires application/x-www-form-urlencoded
       const params = new URLSearchParams();
       params.append('username', this.username);
@@ -131,6 +205,7 @@ class TwizzitApiClient {
       });
 
       if (!response.data?.token) {
+        console.error('[Twizzit Auth] Authentication response missing token:', response.data);
         throw new Error('Authentication response missing token');
       }
 
@@ -139,6 +214,14 @@ class TwizzitApiClient {
       // Twizzit tokens typically last 24 hours
       const expiresIn = response.data.expires_in || 86400; // 24 hours default
       this.tokenExpiry = Date.now() + (expiresIn * 1000) - 300000; // Refresh 5 min before expiry
+
+      if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+        console.log('[Twizzit Auth] Authentication successful!', {
+          tokenLength: this.accessToken.length,
+          tokenPrefix: this.accessToken.substring(0, 20) + '...',
+          expiresIn: expiresIn + ' seconds'
+        });
+      }
 
       // Cache tokens across per-request client instances to avoid re-auth rate limiting.
       if (process.env.NODE_ENV !== 'test') {
@@ -165,10 +248,21 @@ class TwizzitApiClient {
     const now = Date.now();
     const bufferTime = 5 * 60 * 1000; // 5 minutes buffer
 
+    if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+      console.log('[Twizzit Auth] Ensuring authentication...', {
+        hasToken: !!this.accessToken,
+        hasExpiry: !!this.tokenExpiry,
+        isExpired: this.tokenExpiry ? (this.tokenExpiry - now) <= bufferTime : 'N/A'
+      });
+    }
+
     // Check if token exists and is not expired (with buffer)
     if (this.accessToken && this.tokenExpiry) {
       const timeRemaining = this.tokenExpiry - now;
       if (timeRemaining > bufferTime) {
+        if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+          console.log('[Twizzit Auth] Using existing valid token');
+        }
         return; // Token is still valid
       }
     }
@@ -180,6 +274,9 @@ class TwizzitApiClient {
       const cached = TwizzitApiClient._tokenCache.get(cacheKey);
 
       if (cached?.token && cached?.tokenExpiry && cached.tokenExpiry - now > bufferTime) {
+        if (process.env.TWIZZIT_DEBUG === '1') {
+          console.log('[Twizzit Auth] Using cached token from other instance');
+        }
         this.accessToken = cached.token;
         this.tokenExpiry = cached.tokenExpiry;
         return;
@@ -187,10 +284,17 @@ class TwizzitApiClient {
 
       const inFlight = TwizzitApiClient._authInFlight.get(cacheKey);
       if (inFlight) {
+        if (process.env.TWIZZIT_DEBUG === '1') {
+          console.log('[Twizzit Auth] Waiting for in-flight authentication...');
+        }
         const result = await inFlight;
         this.accessToken = result.token;
         this.tokenExpiry = result.tokenExpiry;
         return;
+      }
+
+      if (process.env.TWIZZIT_DEBUG === '1') {
+        console.log('[Twizzit Auth] Need to authenticate (no valid token found)');
       }
 
       const authPromise = (async () => {
@@ -324,12 +428,18 @@ class TwizzitApiClient {
   static _createApiError(error, prefix) {
     const status = error?.response?.status ?? error?.status;
     const details = error?.response?.data ?? error?.details;
-    const upstreamMessage =
+    
+    let upstreamMessage =
       details?.message ||
       details?.error ||
       (typeof details === 'string' ? details : null) ||
       error?.message ||
       'Request failed';
+
+    // If Twizzit returned HTML (error page), provide a cleaner message
+    if (typeof upstreamMessage === 'string' && upstreamMessage.includes('<!DOCTYPE html>')) {
+      upstreamMessage = 'Twizzit returned an error page. The API request may be malformed or unauthorized.';
+    }
 
     const message = status
       ? `${prefix}: Twizzit responded ${status}: ${upstreamMessage}`
@@ -357,10 +467,14 @@ class TwizzitApiClient {
       return asString !== '' ? value : null;
     };
 
-    // Canonical (confirmed via Postman): organization-ids[]
-    const canonical = pick(next['organization-ids[]']);
-    if (canonical != null) {
-      delete next['organization-ids'];
+    // Check for organization-ids as array (canonical axios format)
+    const canonicalArray = next['organization-ids'];
+    if (canonicalArray != null && (Array.isArray(canonicalArray) || pick(canonicalArray) != null)) {
+      // Ensure it's an array
+      if (!Array.isArray(canonicalArray)) {
+        next['organization-ids'] = [canonicalArray];
+      }
+      delete next['organization-ids[]'];
       delete next.organization_id;
       delete next['organization_id[]'];
       delete next.organization_ids;
@@ -370,15 +484,16 @@ class TwizzitApiClient {
 
     // Legacy/alternate shapes we've seen in older code and docs.
     const legacy =
-      pick(next['organization-ids']) ??
+      pick(next['organization-ids[]']) ??
       pick(next.organization_id) ??
       pick(next['organization_id[]']) ??
       pick(next.organization_ids) ??
       pick(next['organization_ids[]']);
 
     if (legacy != null) {
-      next['organization-ids[]'] = legacy;
-      delete next['organization-ids'];
+      // Convert to array format for axios
+      next['organization-ids'] = Array.isArray(legacy) ? legacy : [legacy];
+      delete next['organization-ids[]'];
       delete next.organization_id;
       delete next['organization_id[]'];
       delete next.organization_ids;
@@ -396,7 +511,8 @@ class TwizzitApiClient {
   static _applyOrganizationIdToParams(params, organizationId) {
     const { params: normalized, hasFilter } = TwizzitApiClient._normalizeOrganizationFilter(params);
     if (!hasFilter) {
-      normalized['organization-ids[]'] = organizationId;
+      // Pass as array so axios serializes it as organization-ids[]=value
+      normalized['organization-ids'] = [organizationId];
     }
     return normalized;
   }
@@ -482,8 +598,9 @@ class TwizzitApiClient {
       // 3) Try with cached/default org id (fast path)
       try {
         const orgId = await this.getDefaultOrganizationId();
-        if (debug) console.log(`[Twizzit] ${path} retrying with default organization`, { 'organization-ids[]': orgId });
-        return await this.client.get(path, { params: TwizzitApiClient._applyOrganizationIdToParams(normalizedParams, orgId) });
+        const paramsWithOrg = TwizzitApiClient._applyOrganizationIdToParams(normalizedParams, orgId);
+        if (debug) console.log(`[Twizzit] ${path} retrying with default organization`, { orgId, params: paramsWithOrg });
+        return await this.client.get(path, { params: paramsWithOrg });
       } catch (errorWithDefaultOrg) {
         if (TwizzitApiClient._isRateLimited(errorWithDefaultOrg)) {
           throw errorWithDefaultOrg;
@@ -600,178 +717,35 @@ class TwizzitApiClient {
 
       const { seasonId: _seasonId, groupType: _groupType, ...rest } = options || {};
 
-      // IMPORTANT: When a season is selected, Twizzit can return a valid 200 response
-      // without an org filter, but it may be a different (non-season-scoped) dataset.
-      // The Twizzit UI uses organization scoping in combination with season-id.
-      // Ensure we apply `organization-ids[]` when we can.
-      let defaultOrgId = null;
-      try {
-        // This may call /organizations; if that endpoint is not accessible for the account,
-        // we still proceed without forcing an org filter.
-        defaultOrgId = await this.getDefaultOrganizationId();
-      } catch {
-        defaultOrgId = null;
+      // Ensure we're authenticated before making requests
+      await this.ensureAuthenticated();
+
+      // Build params in the exact format Twizzit expects: season-id and group-type (kebab-case)
+      const params = { ...rest };
+      
+      if (seasonId) {
+        params['season-id'] = seasonId;
+      }
+      
+      if (groupType) {
+        params['group-type'] = groupType;
       }
 
-      const debugEnabled = String(process.env.TWIZZIT_DEBUG || '').toLowerCase() === '1' ||
-        String(process.env.TWIZZIT_DEBUG || '').toLowerCase() === 'true';
-
-      const withSeasonParams = (base) => (seasonId
-        ? [
-          { ...base, 'season-id': seasonId },
-          { ...base, season_id: seasonId },
-          { ...base, seasonId: seasonId },
-          // Keep the plural/array variants as fallbacks; some instances accept them,
-          // but they may not behave like the Twizzit UI.
-          { ...base, 'season-ids[]': seasonId },
-          { ...base, 'season_ids[]': seasonId },
-          { ...base, 'season-ids': seasonId }
-        ]
-        : [{ ...base }]);
-
-      // Twizzit UI uses `group-type=1` to load team categories.
-      // Some setups may require this filter to return season-scoped rows.
-      // But not all installations accept it on /groups, so always include
-      // a fallback attempt without `group-type`.
-      const baseParamsWithGroupType = groupType
-        ? { ...rest, 'group-type': groupType }
-        : null;
-      const baseParamsWithoutGroupType = { ...rest };
-
-      const attemptParamsList = baseParamsWithGroupType
-        ? [...withSeasonParams(baseParamsWithGroupType), ...withSeasonParams(baseParamsWithoutGroupType)]
-        : withSeasonParams(baseParamsWithoutGroupType);
-
-      const attemptParamsListWithOrg = defaultOrgId
-        ? attemptParamsList.map((p) => TwizzitApiClient._applyOrganizationIdToParams(p, defaultOrgId))
-        : attemptParamsList;
-
-      const shouldIgnoreError = (e) => {
-        const status = e?.response?.status ?? e?.status;
-        return status === 400 || status === 404;
-      };
-
-      const tryEndpoint = async (path, attemptParams) => {
-        try {
-          return await this._requestGetWithOrgDiscovery(path, attemptParams);
-        } catch (e) {
-          if (shouldIgnoreError(e)) return null;
-          throw e;
-        }
-      };
-
-      const looksLikeSeasonScopedGroupRow = (row) => {
-        if (!row || typeof row !== 'object') return false;
-        // Any explicit season info implies the payload is season-aware.
-        const season = row.season ?? row.seasonInfo ?? row.season_info ?? row.season_id ?? row['season-id'] ?? row['season-ids[]'];
-        if (season != null && String(season).trim() !== '' && String(season).trim() !== 'null') return true;
-
-        // Some Twizzit instances represent season-scoped groups via relation rows
-        // where `id` is the relation id and `group_id` is the base group id.
-        const id = row.id;
-        const groupId = row.group_id ?? row.groupId ?? row['group-id'];
-        if (id != null && groupId != null && String(id) !== String(groupId)) return true;
-
-        // Explicit relation id fields.
-        const rel = row.groupRelationId ?? row.group_relation_id ?? row.relationId ?? row.relation_id;
-        return rel != null && String(rel).trim() !== '';
-      };
-
-      let response;
-      let fallbackResponse;
-      for (const attemptParams of attemptParamsListWithOrg) {
-        try {
-          response = await this._requestGetWithOrgDiscovery('/v2/api/groups', attemptParams);
-          if (seasonId) {
-            const data = Array.isArray(response.data) ? response.data : [];
-            const seasonScoped = data.some((g) => looksLikeSeasonScopedGroupRow(g));
-
-            if (debugEnabled && process.env.NODE_ENV !== 'test') {
-              console.log('[twizzit] getGroups season filter attempt', {
-                seasonId,
-                params: attemptParams,
-                count: data.length,
-                seasonScoped
-              });
-            }
-
-            // Twizzit can return 200 but ignore some season param shapes.
-            // Only accept a response as final if it looks season-scoped.
-            if (!seasonScoped) {
-              fallbackResponse = fallbackResponse || response;
-              response = null;
-              continue;
-            }
-          }
-
-          break;
-        } catch (e) {
-          // Try next param shape only on 400s; bubble other failures.
-          if (e?.response?.status !== 400 && e?.status !== 400) {
-            throw e;
-          }
-        }
+      if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+        console.log('[Twizzit] Fetching groups with params:', params);
       }
 
-      if (!response && fallbackResponse) {
-        response = fallbackResponse;
-      }
+      // Use _requestGetWithOrgDiscovery which handles org ID discovery and fallbacks
+      const response = await this._requestGetWithOrgDiscovery('/v2/api/groups', params);
 
-      // Fallback: some Twizzit instances expose season-specific group relation ids via
-      // alternate endpoints (the UI uses relation ids like 1138692). Try these only
-      // when we have a season filter and the standard endpoint didn't work.
-      if (!response && seasonId) {
-        for (const attemptParams of attemptParamsListWithOrg) {
-          response = await tryEndpoint('/v2/api/group', attemptParams);
-          if (response) break;
-        }
-      }
-
-      if (!response && seasonId) {
-        for (const attemptParams of attemptParamsListWithOrg) {
-          response = await tryEndpoint('/v2/api/group-relations', attemptParams);
-          if (response) break;
-        }
-      }
-
-      if (!response) {
-        // Final fallback: call the canonical endpoint with the least risky params.
-        response = await this._requestGetWithOrgDiscovery('/v2/api/groups', baseParamsWithoutGroupType);
+      if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
+        console.log('[Twizzit] Successfully fetched groups:', {
+          count: Array.isArray(response.data) ? response.data.length : 0
+        });
       }
       
       // Twizzit returns array directly
-      let groups = Array.isArray(response.data) ? response.data : [];
-
-      const hasAnySeasonScopedRows = seasonId
-        ? groups.some((g) => looksLikeSeasonScopedGroupRow(g))
-        : false;
-
-      // Important: Some Twizzit accounts accept season params on /groups but still
-      // return base groups with `season: null`. In that case, try /group-relations
-      // even if /groups succeeded, and prefer the relation rows when they look valid.
-      if (seasonId && !hasAnySeasonScopedRows) {
-        let relationsResponse = null;
-        for (const attemptParams of attemptParamsListWithOrg) {
-          relationsResponse = await tryEndpoint('/v2/api/group-relations', attemptParams);
-          if (relationsResponse) break;
-        }
-
-        const relationRows = relationsResponse && Array.isArray(relationsResponse.data)
-          ? relationsResponse.data
-          : [];
-
-        const hasRelationRows = relationRows.length > 0 && relationRows.some((g) => looksLikeSeasonScopedGroupRow(g));
-
-        if (hasRelationRows) {
-          groups = relationRows;
-          if (debugEnabled && process.env.NODE_ENV !== 'test') {
-            console.log('[twizzit] getGroups preferred /group-relations for season', {
-              seasonId,
-              count: groups.length
-            });
-          }
-        }
-      }
+      const groups = Array.isArray(response.data) ? response.data : [];
 
       return {
         groups,
