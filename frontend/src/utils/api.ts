@@ -145,6 +145,8 @@ import type {
   TwizzitCredential,
   TwizzitSyncConfig,
   TwizzitSyncHistory,
+  TwizzitGroup,
+  TwizzitSeason,
   TeamMapping,
   PlayerMapping,
   SyncResult,
@@ -193,6 +195,39 @@ export const verifyTwizzitConnection = async (
 };
 
 /**
+ * Get available groups/teams from Twizzit
+ */
+export const getTwizzitGroups = async (
+  credentialId: number,
+  options?: {
+    seasonId?: string;
+    groupType?: string;
+  }
+): Promise<TwizzitGroup[]> => {
+  const params = new URLSearchParams();
+  if (options?.seasonId) {
+    params.append('seasonId', options.seasonId);
+  }
+  if (options?.groupType) {
+    params.append('groupType', options.groupType);
+  }
+  const queryString = params.toString();
+  const url = `/twizzit/groups/${credentialId}${queryString ? `?${queryString}` : ''}`;
+  const response = await api.get(url);
+  return response.data.groups || [];
+};
+
+/**
+ * Get available seasons from Twizzit
+ */
+export const getTwizzitSeasons = async (
+  credentialId: number
+): Promise<TwizzitSeason[]> => {
+  const response = await api.get(`/twizzit/seasons/${credentialId}`);
+  return response.data.seasons || [];
+};
+
+/**
  * Sync teams from Twizzit
  */
 export const syncTwizzitTeams = async (
@@ -238,7 +273,8 @@ export const updateTwizzitSyncConfig = async (
   credentialId: number,
   config: {
     autoSyncEnabled: boolean;
-    syncIntervalHours: number;
+    syncIntervalHours?: number;
+    syncIntervalDays?: number;
   }
 ): Promise<TwizzitSyncConfig> => {
   const response = await api.put(`/twizzit/sync/config/${credentialId}`, config);
