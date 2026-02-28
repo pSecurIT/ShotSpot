@@ -1,0 +1,166 @@
+name: Security Scan
+
+# Run security scans regularly to keep vulnerability reports up to date
+on:
+  schedule:
+    # Run weekly on Monday at 2 AM UTC
+    - cron: '0 2 * * 1'
+  workflow_dispatch: # Allow manual trigger
+  push:
+    branches: [ main ]
+    paths:
+      - 'Dockerfile'
+      - 'package*.json'
+      - 'backend/package*.json'
+      - 'frontend/package*.json'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  scan-vulnerabilities:
+    name: Scan for Vulnerabilities
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build image for scanning
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Building local image for vulnerability scan"
+          docker build -t local/shotspot:scan-${{ github.sha }} .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: local/shotspot:scan-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy-container-scan'
+
+      - name: Generate vulnerability summary
+        if: always()
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image \
+            local/shotspot:scan-${{ github.sha }} \
+            --severity CRITICAL,HIGH,MEDIUM \
+            --format json > vuln-report.json || true
+          
+          echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f vuln-report.json ]; then
+            CRITICAL=$(cat vuln-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' || echo "0")
+            HIGH=$(cat vuln-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' || echo "0")
+            MEDIUM=$(cat vuln-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' || echo "0")
+            
+            echo "**Vulnerability Summary:**" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔴 Critical: $CRITICAL" >> $GITHUB_STEP_SUMMARY
+            echo "- 🟠 High: $HIGH" >> $GITHUB_STEP_SUMMARY
+            echo "- 🟡 Medium: $MEDIUM" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "$CRITICAL" -gt 0 ]; then
+              echo "⚠️ **Action Required**: Critical vulnerabilities detected!" >> $GITHUB_STEP_SUMMARY
+              echo "Review findings in the Security tab." >> $GITHUB_STEP_SUMMARY
+            elif [ "$HIGH" -gt 0 ]; then
+              echo "⚠️ **Warning**: High severity vulnerabilities detected." >> $GITHUB_STEP_SUMMARY
+              echo "Review findings in the Security tab." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ No critical or high severity vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "Scan completed. Check the Security tab for full details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail on critical vulnerabilities
+        if: always()
+        run: |
+          if [ -f vuln-report.json ]; then
+            CRITICAL=$(cat vuln-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' || echo "0")
+            if [ "$CRITICAL" -gt 0 ]; then
+              echo "::error::Critical vulnerabilities found. Please address them promptly."
+              exit 1
+            fi
+          fi
+
+  scan-filesystem:
+    name: Scan Filesystem
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy filesystem results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+          category: 'trivy-filesystem-scan'
+
+      - name: Generate filesystem scan summary
+        if: always()
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            aquasec/trivy:latest fs \
+            --severity CRITICAL,HIGH,MEDIUM \
+            --format json /workspace > fs-vuln-report.json || true
+          
+          echo "## 📂 Filesystem Security Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f fs-vuln-report.json ]; then
+            CRITICAL=$(cat fs-vuln-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' || echo "0")
+            HIGH=$(cat fs-vuln-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' || echo "0")
+            MEDIUM=$(cat fs-vuln-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' || echo "0")
+            
+            echo "**Dependency Vulnerabilities:**" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔴 Critical: $CRITICAL" >> $GITHUB_STEP_SUMMARY
+            echo "- 🟠 High: $HIGH" >> $GITHUB_STEP_SUMMARY
+            echo "- 🟡 Medium: $MEDIUM" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "$CRITICAL" -gt 0 ]; then
+              echo "⚠️ **Action Required**: Critical dependency vulnerabilities!" >> $GITHUB_STEP_SUMMARY
+            elif [ "$HIGH" -gt 0 ]; then
+              echo "⚠️ **Warning**: High severity dependency vulnerabilities." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ No critical or high severity dependency vulnerabilities" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
