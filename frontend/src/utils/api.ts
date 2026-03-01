@@ -18,12 +18,12 @@ export const resetCsrfToken = (): void => {
 };
 
 // Function to get CSRF token
-export const getCsrfToken = async (): Promise<string> => {
+export const getCsrfToken = async (): Promise<string | null> => {
   if (!csrfToken) {
     const response = await api.get('/auth/csrf');
     csrfToken = response.data.csrfToken;
   }
-  return csrfToken as string;
+  return csrfToken;
 };
 
 // Add auth token and CSRF token to requests
@@ -39,9 +39,12 @@ api.interceptors.request.use(
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method?.toUpperCase() || '')) {
       try {
         const csrf = await getCsrfToken();
-        config.headers['X-CSRF-Token'] = csrf;
-      } catch (error) {
-        console.error('Failed to get CSRF token:', error);
+        if (csrf) {
+          config.headers['X-CSRF-Token'] = csrf;
+        }
+      } catch {
+        // Silently fail if CSRF token fetch fails - the request will still be sent
+        // and the server will handle the missing token appropriately
       }
     }
 
