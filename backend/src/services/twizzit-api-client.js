@@ -184,8 +184,8 @@ class TwizzitApiClient {
     try {
       if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
         console.log('[Twizzit Auth] Starting authentication...', {
-          endpoint: this.apiEndpoint,
-          username: this.username,
+          hasEndpoint: !!this.apiEndpoint,
+          hasUsername: !!this.username,
           hasPassword: !!this.password
         });
       }
