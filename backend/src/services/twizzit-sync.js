@@ -1127,7 +1127,7 @@ async function syncTeamPlayers(credentialId, twizzitTeamId, localTeamId, options
                sync_error = NULL
            WHERE id = $2`,
           [
-            `${twizzitPlayer.first_name || twizzitPlayer.firstName} ${twizzitPlayer.last_name || twizzitPlayer.lastName}`,
+            `${firstName} ${lastName}`,
             existingMapping.rows[0].id
           ]
         );
@@ -1158,7 +1158,7 @@ async function syncTeamPlayers(credentialId, twizzitTeamId, localTeamId, options
           [
             localPlayerId,
             twizzitPlayer.id,
-            `${twizzitPlayer.first_name || twizzitPlayer.firstName} ${twizzitPlayer.last_name || twizzitPlayer.lastName}`,
+            `${firstName} ${lastName}`,
             teamMappingId
           ]
         );

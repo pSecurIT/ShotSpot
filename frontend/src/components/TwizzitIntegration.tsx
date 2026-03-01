@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../utils/api';
 import {
   getTwizzitCredentials,
   storeTwizzitCredentials,
@@ -6,12 +7,6 @@ import {
   verifyTwizzitConnection,
   syncTwizzitTeams,
   syncTwizzitPlayers,
-  getTwizzitSyncOptionsForSeason,
-  getTwizzitSyncOptionsForOrganization,
-  getTwizzitSyncOptionsWithAccess,
-  debugTwizzitAccess,
-  previewTwizzitTeams,
-  previewTwizzitPlayers,
   getTwizzitSyncConfig,
   updateTwizzitSyncConfig,
   getTwizzitSyncHistory,
@@ -22,24 +17,19 @@ import type {
   TwizzitCredential,
   TwizzitSyncConfig,
   TwizzitSyncHistory,
+  TwizzitGroup,
+  TwizzitSeason,
   TeamMapping,
   PlayerMapping,
-  TwizzitOption,
-  TwizzitOrganizationAccess,
-  TwizzitTeamsPreview,
-  TwizzitPlayersPreview,
 } from '../types/twizzit';
 import './TwizzitIntegration.css';
 
 type TabType = 'credentials' | 'sync' | 'config' | 'history' | 'mappings';
 
-const ACTIVE_TWIZZIT_CREDENTIAL_STORAGE_KEY = 'shotspot.twizzit.activeCredentialId';
-
 const TwizzitIntegration: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('credentials');
   const [credentials, setCredentials] = useState<TwizzitCredential[]>([]);
   const [selectedCredential, setSelectedCredential] = useState<number | null>(null);
-  const [activeCredential, setActiveCredential] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -54,22 +44,20 @@ const TwizzitIntegration: React.FC = () => {
   // Sync config
   const [syncConfig, setSyncConfig] = useState<TwizzitSyncConfig | null>(null);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
-  const [syncIntervalHours, setSyncIntervalHours] = useState(24);
+  const [syncIntervalValue, setSyncIntervalValue] = useState(24);
+  const [syncIntervalUnit, setSyncIntervalUnit] = useState<'hours' | 'days'>('hours');
 
   // Sync options
-  const [syncOptionsLoading, setSyncOptionsLoading] = useState(false);
-  const [organizations, setOrganizations] = useState<TwizzitOption[]>([]);
-  const [organizationAccess, setOrganizationAccess] = useState<TwizzitOrganizationAccess[]>([]);
-  const [organizationAccessKey, setOrganizationAccessKey] = useState<string>('');
-  const [groups, setGroups] = useState<TwizzitOption[]>([]);
-  const [seasons, setSeasons] = useState<TwizzitOption[]>([]);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>('');
-  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
-  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
+  const [groupId, setGroupId] = useState('');
+  const [seasonId, setSeasonId] = useState('');
   const [createMissing, setCreateMissing] = useState(true);
 
-  const [teamsPreview, setTeamsPreview] = useState<TwizzitTeamsPreview | null>(null);
-  const [playersPreview, setPlayersPreview] = useState<TwizzitPlayersPreview | null>(null);
+  // Available groups and seasons from Twizzit
+  const [availableGroups, setAvailableGroups] = useState<TwizzitGroup[]>([]);
+  const [availableSeasons, setAvailableSeasons] = useState<TwizzitSeason[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [loadingSeasons, setLoadingSeasons] = useState(false);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
 
   // History and mappings
   const [syncHistory, setSyncHistory] = useState<TwizzitSyncHistory[]>([]);
@@ -84,53 +72,107 @@ const TwizzitIntegration: React.FC = () => {
 
   // Load data when credential is selected
   useEffect(() => {
-    if (activeCredential) {
+    if (selectedCredential) {
       if (activeTab === 'config') {
         loadSyncConfig();
       } else if (activeTab === 'history') {
         loadSyncHistory();
       } else if (activeTab === 'mappings') {
         loadMappings();
-      } else if (activeTab === 'sync') {
-        loadTwizzitSyncOptions();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCredential, activeTab, selectedOrganizationId, selectedSeasonId]);
+  }, [selectedCredential, activeTab]);
 
-  // Reset previews when selection changes
+  // Load seasons when credential is selected
   useEffect(() => {
-    setTeamsPreview(null);
-    setPlayersPreview(null);
-  }, [activeCredential, selectedOrganizationId, selectedGroupId, selectedSeasonId]);
+    if (selectedCredential && activeTab === 'sync') {
+      loadSeasons();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCredential, activeTab]);
 
+  // Load groups when season is selected
   useEffect(() => {
-    // Reset access diagnostics when switching credential.
-    setOrganizationAccess([]);
-    setOrganizationAccessKey('');
-  }, [activeCredential]);
+    if (selectedCredential && seasonId && activeTab === 'sync') {
+      loadGroups();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seasonId]);
 
-  const getStoredActiveCredentialId = (): number | null => {
+  const loadSeasons = async () => {
+    if (!selectedCredential) return;
+
+    // First, get the organization ID if we don't have it
+    let orgId = organizationId;
+    if (!orgId) {
+      try {
+        const response = await api.get(`/twizzit/organization/${selectedCredential}`);
+        orgId = response.data.organizationId;
+        setOrganizationId(orgId);
+        console.log('[Twizzit] Fetched organization ID:', orgId);
+      } catch (err: unknown) {
+        console.error('Failed to load organization ID:', err);
+        // Continue without org ID, API will auto-discover
+      }
+    }
+
+    // Load seasons
+    setLoadingSeasons(true);
     try {
-      const raw = localStorage.getItem(ACTIVE_TWIZZIT_CREDENTIAL_STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? parsed : null;
-    } catch {
-      return null;
+      const params = orgId ? { organizationId: orgId } : {};
+      const response = await api.get(`/twizzit/seasons/${selectedCredential}`, { params });
+      setAvailableSeasons(response.data.seasons || []);
+    } catch (err: unknown) {
+      console.error('Failed to load seasons:', err);
+      setAvailableSeasons([]);
+      setError(getErrorMessage(err, 'Failed to load seasons from Twizzit'));
+    } finally {
+      setLoadingSeasons(false);
     }
   };
 
-  const setStoredActiveCredentialId = (credentialId: number | null) => {
-    try {
-      if (credentialId == null) {
-        localStorage.removeItem(ACTIVE_TWIZZIT_CREDENTIAL_STORAGE_KEY);
-      } else {
-        localStorage.setItem(ACTIVE_TWIZZIT_CREDENTIAL_STORAGE_KEY, String(credentialId));
+  const loadGroups = async () => {
+    if (!selectedCredential || !seasonId) return;
+
+    // Get the organization ID if we don't have it
+    let orgId = organizationId;
+    if (!orgId) {
+      try {
+        const response = await api.get(`/twizzit/organization/${selectedCredential}`);
+        orgId = response.data.organizationId;
+        setOrganizationId(orgId);
+        console.log('[Twizzit] Fetched organization ID:', orgId);
+      } catch (err: unknown) {
+        console.error('Failed to load organization ID:', err);
+        // Continue without org ID, API will auto-discover
       }
-    } catch {
-      // Ignore storage errors (private mode, blocked storage, etc.)
     }
+
+    // Load groups filtered by season
+    setLoadingGroups(true);
+    try {
+      const params: { organizationId?: string; seasonId?: string } = {};
+      if (orgId) params.organizationId = orgId;
+      if (seasonId) params.seasonId = seasonId;
+      
+      const response = await api.get(`/twizzit/groups/${selectedCredential}`, { params });
+      setAvailableGroups(response.data.groups || []);
+    } catch (err: unknown) {
+      console.error('Failed to load groups:', err);
+      setAvailableGroups([]);
+      setError(getErrorMessage(err, 'Failed to load groups from Twizzit'));
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const handleSeasonChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newSeasonId = e.target.value;
+    setSeasonId(newSeasonId);
+    // Clear groups when season changes
+    setAvailableGroups([]);
+    setGroupId('');
   };
 
   const clearMessages = () => {
@@ -140,46 +182,22 @@ const TwizzitIntegration: React.FC = () => {
 
   const getErrorMessage = (err: unknown, defaultMessage: string): string => {
     if (err && typeof err === 'object' && 'response' in err) {
-      const response = (err as {
-        response?: {
-          status?: number;
-          data?: {
-            error?: string;
-            message?: string;
-            details?: Array<{ msg?: string; param?: string; path?: string } | string>;
-          };
-        };
-        message?: string;
-      }).response;
-
-      const data = response?.data;
-      if (data) {
-        const details = Array.isArray(data.details) ? data.details : null;
-        if (details && details.length > 0) {
-          const formattedDetails = details
-            .map((d) => {
-              if (typeof d === 'string') return d;
-              const key = d.param || d.path;
-              return key ? `${key}: ${d.msg ?? ''}`.trim() : (d.msg ?? '').trim();
-            })
-            .filter(Boolean)
-            .join(' | ');
-
-          return `${data.error || defaultMessage}${formattedDetails ? `: ${formattedDetails}` : ''}`;
+      const response = (err as { response?: { data?: { error?: string; details?: Array<{ param?: string; msg?: string }> } } }).response;
+      if (response && typeof response === 'object' && 'data' in response && response.data && typeof response.data === 'object') {
+        const errorData = response.data;
+        let message = errorData.error || defaultMessage;
+        
+        // Append detailed validation errors if present
+        if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
+          const detailMessages = errorData.details
+            .map((detail) => `${detail.param}: ${detail.msg}`)
+            .join(', ');
+          message += ` (${detailMessages})`;
         }
-
-        if (data.error && data.message) {
-          return `${data.error}: ${data.message}`;
-        }
-        if (data.error) return data.error;
-        if (data.message) return data.message;
+        
+        return message;
       }
     }
-
-    if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
-      return (err as { message: string }).message || defaultMessage;
-    }
-
     return defaultMessage;
   };
 
@@ -188,30 +206,10 @@ const TwizzitIntegration: React.FC = () => {
       setLoading(true);
       const data = await getTwizzitCredentials();
       setCredentials(data);
-
-      const hasCredential = (id: number | null) => id != null && data.some((c) => c.id === id);
-
-      const storedActive = getStoredActiveCredentialId();
-      const nextActive = hasCredential(activeCredential)
-        ? activeCredential
-        : hasCredential(storedActive)
-          ? storedActive
-          : data.length > 0
-            ? data[0].id
-            : null;
-
-      if (nextActive !== activeCredential) {
-        setActiveCredential(nextActive);
-        setStoredActiveCredentialId(nextActive);
-      }
-
-      // Keep a UI selection, but don't auto-change the active credential unless needed.
-      const nextSelected = hasCredential(selectedCredential)
-        ? selectedCredential
-        : nextActive;
-
-      if (nextSelected !== selectedCredential) {
-        setSelectedCredential(nextSelected);
+      
+      // Auto-select first credential if none selected
+      if (data.length > 0 && !selectedCredential) {
+        setSelectedCredential(data[0].id);
       }
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to load credentials'));
@@ -231,13 +229,24 @@ const TwizzitIntegration: React.FC = () => {
     try {
       setLoading(true);
       clearMessages();
-      const payload = {
+      
+      const credentialsData: {
+        apiUsername: string;
+        apiPassword: string;
+        organizationName: string;
+        apiEndpoint?: string;
+      } = {
         apiUsername: username,
         apiPassword: password,
         organizationName,
-        ...(apiEndpoint.trim() ? { apiEndpoint: apiEndpoint.trim() } : {}),
       };
-      const credential = await storeTwizzitCredentials(payload);
+      
+      // Only include apiEndpoint if provided
+      if (apiEndpoint.trim()) {
+        credentialsData.apiEndpoint = apiEndpoint;
+      }
+      
+      const credential = await storeTwizzitCredentials(credentialsData);
       
       setUsername('');
       setPassword('');
@@ -248,20 +257,14 @@ const TwizzitIntegration: React.FC = () => {
       // Reload credentials and select the new one
       await loadCredentials();
       setSelectedCredential(credential.id);
-      setSuccess('Credentials added successfully. Click Activate to use them for sync calls.');
+      
+      // Set success message after loadCredentials completes
+      setSuccess('Credentials added successfully');
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to add credentials'));
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleActivateCredential = (credentialId: number) => {
-    clearMessages();
-    setActiveCredential(credentialId);
-    setStoredActiveCredentialId(credentialId);
-    setSelectedCredential(credentialId);
-    setSuccess('Credential activated');
   };
 
   const handleDeleteCredential = async (id: number) => {
@@ -278,11 +281,6 @@ const TwizzitIntegration: React.FC = () => {
       if (selectedCredential === id) {
         setSelectedCredential(null);
       }
-
-       if (activeCredential === id) {
-        setActiveCredential(null);
-        setStoredActiveCredentialId(null);
-      }
       
       await loadCredentials();
     } catch (err: unknown) {
@@ -293,32 +291,18 @@ const TwizzitIntegration: React.FC = () => {
   };
 
   const handleVerifyConnection = async () => {
-    if (!activeCredential) {
-      setError('Please activate a credential');
+    if (!selectedCredential) {
+      setError('Please select a credential');
       return;
     }
 
     try {
       setLoading(true);
       clearMessages();
-      const result = await verifyTwizzitConnection(activeCredential);
+      const result = await verifyTwizzitConnection(selectedCredential);
       
       if (result.success) {
-        const cap = result.capabilities;
-        const usable = result.usableForSync;
-
-        if (usable === false) {
-          const capText = cap
-            ? ` (organizations=${cap.organizations ? 'yes' : 'no'}, groups=${cap.groups ? 'yes' : 'no'}, seasons=${cap.seasons ? 'yes' : 'no'})`
-            : '';
-          setError((result.message || 'Twizzit connection verified but missing permissions') + capText);
-        } else {
-          setSuccess(
-            result.organizationName
-              ? `Connected successfully! Organization: ${result.organizationName}`
-              : (result.message || 'Connected successfully!')
-          );
-        }
+        setSuccess(`Connected successfully! Organization: ${result.organizationName}`);
       } else {
         setError(result.message || 'Connection failed');
       }
@@ -330,23 +314,16 @@ const TwizzitIntegration: React.FC = () => {
   };
 
   const handleSyncTeams = async () => {
-    if (!activeCredential) {
-      setError('Please activate a credential');
-      return;
-    }
-
-    if (!teamsPreview) {
-      setError('Please preview teams before syncing');
+    if (!selectedCredential) {
+      setError('Please select a credential');
       return;
     }
 
     try {
       setLoading(true);
       clearMessages();
-      const result = await syncTwizzitTeams(activeCredential, {
-        organizationId: selectedOrganizationId || undefined,
-        groupId: selectedGroupId || undefined,
-        seasonId: selectedSeasonId || undefined,
+      const result = await syncTwizzitTeams(selectedCredential, {
+        groupId: groupId || undefined,
         createMissing,
       });
       
@@ -364,23 +341,17 @@ const TwizzitIntegration: React.FC = () => {
   };
 
   const handleSyncPlayers = async () => {
-    if (!activeCredential) {
-      setError('Please activate a credential');
-      return;
-    }
-
-    if (!playersPreview) {
-      setError('Please preview players before syncing');
+    if (!selectedCredential) {
+      setError('Please select a credential');
       return;
     }
 
     try {
       setLoading(true);
       clearMessages();
-      const result = await syncTwizzitPlayers(activeCredential, {
-        organizationId: selectedOrganizationId || undefined,
-        groupId: selectedGroupId || undefined,
-        seasonId: selectedSeasonId || undefined,
+      const result = await syncTwizzitPlayers(selectedCredential, {
+        groupId: groupId || undefined,
+        seasonId: seasonId || undefined,
         createMissing,
       });
       
@@ -398,14 +369,21 @@ const TwizzitIntegration: React.FC = () => {
   };
 
   const loadSyncConfig = async () => {
-    if (!activeCredential) return;
+    if (!selectedCredential) return;
 
     try {
       setLoading(true);
-      const config = await getTwizzitSyncConfig(activeCredential);
+      clearMessages();
+      const config = await getTwizzitSyncConfig(selectedCredential);
       setSyncConfig(config);
       setAutoSyncEnabled(config.autoSyncEnabled);
-      setSyncIntervalHours(config.syncIntervalHours);
+      const unit = config.syncIntervalUnit === 'days' ? 'days' : 'hours';
+      setSyncIntervalUnit(unit);
+      setSyncIntervalValue(
+        unit === 'days'
+          ? (config.syncIntervalDays || 1)
+          : (config.syncIntervalHours || 24)
+      );
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to load sync config'));
     } finally {
@@ -413,178 +391,23 @@ const TwizzitIntegration: React.FC = () => {
     }
   };
 
-  const loadTwizzitSyncOptions = async () => {
-    if (!activeCredential) return;
-
-    try {
-      setSyncOptionsLoading(true);
-      clearMessages();
-      const result = selectedOrganizationId
-        ? await getTwizzitSyncOptionsForOrganization(
-            activeCredential,
-            selectedOrganizationId,
-            selectedSeasonId || undefined
-          )
-        : await getTwizzitSyncOptionsForSeason(activeCredential, selectedSeasonId || undefined);
-
-      const sortedOrgs = [...(result.organizations || [])].sort((a, b) => a.name.localeCompare(b.name));
-      const sortedGroups = [...(result.groups || [])].sort((a, b) => a.name.localeCompare(b.name));
-      const sortedSeasons = [...(result.seasons || [])].sort((a, b) => a.name.localeCompare(b.name));
-
-      setOrganizations(sortedOrgs);
-      setGroups(sortedGroups);
-      setSeasons(sortedSeasons);
-
-      // If the current selection is no longer available under the active filters, reset it.
-      if (selectedGroupId && !sortedGroups.some((g) => g.id === selectedGroupId)) {
-        setSelectedGroupId('');
-      }
-
-      // If no organization chosen yet, prefer the backend's default (may be discovered via access probing).
-      if (!selectedOrganizationId && sortedOrgs.length > 0) {
-        const preferredOrgId = result.defaultOrganizationId;
-        const exists = preferredOrgId && sortedOrgs.some((o) => o.id === preferredOrgId);
-        setSelectedOrganizationId(exists ? preferredOrgId! : sortedOrgs[0].id);
-      }
-
-      const warningsText = (result.warnings || []).join(' | ').toLowerCase();
-      const looksLikeNoAccess =
-        warningsText.includes('no access for specified organizations') ||
-        warningsText.includes('twizzit responded 403');
-
-      // If warnings are severe (permissions), treat them as an error to avoid a confusing green banner.
-      if (result.warnings && result.warnings.length > 0 && !looksLikeNoAccess) {
-        setSuccess(`Twizzit options loaded with warnings: ${result.warnings.join(' | ')}`);
-      }
-
-      const shouldDiagnose = looksLikeNoAccess && sortedOrgs.length > 0 && sortedGroups.length === 0 && sortedSeasons.length === 0;
-
-      // If Twizzit returns orgs but blocks groups/seasons, fetch access diagnostics once.
-      const accessKey = `${activeCredential}:${selectedOrganizationId || 'auto'}`;
-      if (shouldDiagnose && organizationAccessKey !== accessKey) {
-        setOrganizationAccessKey(accessKey);
-
-        try {
-          const accessResult = selectedOrganizationId
-            ? await getTwizzitSyncOptionsForOrganization(
-                activeCredential,
-                selectedOrganizationId,
-                selectedSeasonId || undefined,
-                { includeAccess: true }
-              )
-            : await getTwizzitSyncOptionsWithAccess(activeCredential);
-
-          setOrganizationAccess(accessResult.organizationAccess || []);
-        } catch {
-          // Diagnostics are best-effort; ignore failures.
-        }
-
-        setError(
-          'Twizzit credentials can list organizations but do not have permission to list teams (groups) or seasons for this organization. Ask your Twizzit admin/federation to grant group/season access to this API user.'
-        );
-      }
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to load Twizzit options'));
-    } finally {
-      setSyncOptionsLoading(false);
-    }
-  };
-
-  const copyTwizzitDiagnostics = async () => {
-    if (!activeCredential) return;
-
-    let accessDebug: unknown = null;
-    try {
-      accessDebug = await debugTwizzitAccess(
-        activeCredential,
-        selectedOrganizationId ? selectedOrganizationId : undefined
-      );
-    } catch {
-      accessDebug = null;
-    }
-
-    const payload = {
-      credentialId: activeCredential,
-      selectedOrganizationId: selectedOrganizationId || null,
-      organizationAccess,
-      accessDebug,
-      timestamp: new Date().toISOString()
-    };
-
-    const text = JSON.stringify(payload, null, 2);
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setSuccess('Diagnostics copied to clipboard');
-    } catch {
-      // Fallback if clipboard API is blocked.
-      prompt('Copy diagnostics JSON:', text);
-    }
-  };
-
-  const handlePreviewTeams = async () => {
-    if (!activeCredential) {
-      setError('Please activate a credential');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      clearMessages();
-      const preview = await previewTwizzitTeams(activeCredential, {
-        organizationId: selectedOrganizationId || undefined,
-        groupId: selectedGroupId || undefined,
-        seasonId: selectedSeasonId || undefined,
-      });
-      setTeamsPreview(preview);
-      setSuccess(`Preview loaded: ${preview.total} team(s)`);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to preview teams'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePreviewPlayers = async () => {
-    if (!activeCredential) {
-      setError('Please activate a credential');
-      return;
-    }
-
-    if (!selectedGroupId) {
-      setError('Please select a team before previewing players');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      clearMessages();
-      const preview = await previewTwizzitPlayers(activeCredential, {
-        organizationId: selectedOrganizationId || undefined,
-        groupId: selectedGroupId,
-        seasonId: selectedSeasonId || undefined,
-      });
-      setPlayersPreview(preview);
-      setSuccess(`Preview loaded: ${preview.total} player(s)`);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to preview players'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleUpdateSyncConfig = async () => {
-    if (!activeCredential) {
-      setError('Please activate a credential');
+    if (!selectedCredential) {
+      setError('Please select a credential');
       return;
     }
 
     try {
       setLoading(true);
       clearMessages();
-      const config = await updateTwizzitSyncConfig(activeCredential, {
+      const intervalPayload =
+        syncIntervalUnit === 'days'
+          ? { syncIntervalDays: syncIntervalValue }
+          : { syncIntervalHours: syncIntervalValue };
+
+      const config = await updateTwizzitSyncConfig(selectedCredential, {
         autoSyncEnabled,
-        syncIntervalHours,
+        ...intervalPayload,
       });
       
       setSyncConfig(config);
@@ -597,11 +420,12 @@ const TwizzitIntegration: React.FC = () => {
   };
 
   const loadSyncHistory = async () => {
-    if (!activeCredential) return;
+    if (!selectedCredential) return;
 
     try {
       setLoading(true);
-      const history = await getTwizzitSyncHistory(activeCredential);
+      clearMessages();
+      const history = await getTwizzitSyncHistory(selectedCredential);
       setSyncHistory(history);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to load sync history'));
@@ -611,13 +435,14 @@ const TwizzitIntegration: React.FC = () => {
   };
 
   const loadMappings = async () => {
-    if (!activeCredential) return;
+    if (!selectedCredential) return;
 
     try {
       setLoading(true);
+      clearMessages();
       const [teams, players] = await Promise.all([
-        getTwizzitTeamMappings(activeCredential),
-        getTwizzitPlayerMappings(activeCredential),
+        getTwizzitTeamMappings(selectedCredential),
+        getTwizzitPlayerMappings(selectedCredential),
       ]);
       setTeamMappings(teams);
       setPlayerMappings(players);
@@ -672,7 +497,7 @@ const TwizzitIntegration: React.FC = () => {
               type="text"
               value={organizationName}
               onChange={(e) => setOrganizationName(e.target.value)}
-              placeholder="Your club"
+              placeholder="KCOV"
               required
             />
           </div>
@@ -703,34 +528,13 @@ const TwizzitIntegration: React.FC = () => {
               onClick={() => setSelectedCredential(cred.id)}
             >
               <div className="credential-info">
-                <div className="credential-info-header">
-                  <h4>{cred.organizationName}</h4>
-                  {activeCredential === cred.id ? (
-                    <span className="credential-badge">Active</span>
-                  ) : null}
-                </div>
-                <p>Username: {cred.apiUsername ?? cred.username}</p>
-                <p className="text-muted">Credential ID: {cred.id}</p>
-                <p className="text-muted">
-                  API Endpoint: {cred.apiEndpoint ? cred.apiEndpoint : 'https://app.twizzit.com (default)'}
-                </p>
+                <h4>{cred.organizationName}</h4>
+                <p>Username: {cred.apiUsername}</p>
                 <p className="text-muted">
                   Created: {new Date(cred.createdAt).toLocaleDateString()}
-                  {cred.createdByUsername && ` by ${cred.createdByUsername}`}
                 </p>
               </div>
               <div className="credential-actions">
-                <button
-                  className="btn btn-success btn-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleActivateCredential(cred.id);
-                  }}
-                  disabled={loading || activeCredential === cred.id}
-                  title={activeCredential === cred.id ? 'This credential is already active' : 'Use this credential for all Twizzit calls'}
-                >
-                  {activeCredential === cred.id ? 'Active' : 'Activate'}
-                </button>
                 <button
                   className="btn btn-danger btn-sm"
                   onClick={(e) => {
@@ -753,8 +557,8 @@ const TwizzitIntegration: React.FC = () => {
     <div className="twizzit-section">
       <h3>Sync Data</h3>
 
-      {!activeCredential ? (
-        <p className="empty-state">Please activate a credential first</p>
+      {!selectedCredential ? (
+        <p className="empty-state">Please select a credential first</p>
       ) : (
         <>
           <div className="sync-actions">
@@ -770,95 +574,47 @@ const TwizzitIntegration: React.FC = () => {
           <div className="sync-options">
             <h4>Sync Options</h4>
             <div className="form-group">
-              <label htmlFor="orgSelect">Organization (Twizzit)</label>
+              <label htmlFor="seasonId">Season *</label>
               <select
-                id="orgSelect"
-                value={selectedOrganizationId}
-                onChange={(e) => {
-                  setSelectedOrganizationId(e.target.value);
-                  setSelectedGroupId('');
-                  setSelectedSeasonId('');
-                }}
-                disabled={syncOptionsLoading || organizations.length === 0}
+                id="seasonId"
+                value={seasonId}
+                onChange={handleSeasonChange}
+                disabled={loadingSeasons}
               >
-                <option value="">Auto / default</option>
-                {organizations.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
+                <option value="">Select a season</option>
+                {loadingSeasons ? (
+                  <option disabled>Loading seasons...</option>
+                ) : (
+                  availableSeasons.map((season) => (
+                    <option key={season.id} value={season.id}>
+                      {season.name}
+                    </option>
+                  ))
+                )}
               </select>
-              <p className="text-muted">
-                {syncOptionsLoading
-                  ? 'Loading organizations from Twizzit...'
-                  : organizations.length === 0
-                    ? 'No organizations returned by Twizzit for these credentials.'
-                    : 'Select the organization you want to sync from.'}
-              </p>
-              {selectedOrganizationId && organizationAccess.length > 0 ? (
-                (() => {
-                  const access = organizationAccess.find((a) => a.id === selectedOrganizationId);
-                  if (!access) return null;
-                  const isDenied = !access.canFetchGroups && !access.canFetchSeasons;
-                  return (
-                    <p className="text-muted" style={isDenied ? { color: '#b00020' } : undefined}>
-                      Access check: groups={access.canFetchGroups ? 'yes' : 'no'}, seasons={access.canFetchSeasons ? 'yes' : 'no'}
-                    </p>
-                  );
-                })()
-              ) : null}
+              {loadingSeasons && <small>Loading available seasons...</small>}
             </div>
             <div className="form-group">
-              <label htmlFor="seasonSelect">Season (optional)</label>
+              <label htmlFor="groupId">Group / Team</label>
               <select
-                id="seasonSelect"
-                value={selectedSeasonId}
-                onChange={(e) => {
-                  setSelectedSeasonId(e.target.value);
-                }}
-                disabled={syncOptionsLoading || seasons.length === 0}
+                id="groupId"
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
+                disabled={loadingGroups || !seasonId}
               >
-                <option value="">All seasons</option>
-                {seasons.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
+                <option value="">{!seasonId ? 'Select a season first' : 'All groups'}</option>
+                {loadingGroups ? (
+                  <option disabled>Loading groups...</option>
+                ) : (
+                  availableGroups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))
+                )}
               </select>
-              <p className="text-muted">Used for preview/filtering when supported by Twizzit.</p>
-            </div>
-            <div className="form-group">
-              <label htmlFor="teamSelect">Team (Twizzit group)</label>
-              <select
-                id="teamSelect"
-                value={selectedGroupId}
-                onChange={(e) => setSelectedGroupId(e.target.value)}
-                disabled={syncOptionsLoading || groups.length === 0}
-              >
-                <option value="">All teams</option>
-                {(() => {
-                  const counts = new Map<string, number>();
-                  for (const g of groups) {
-                    counts.set(g.name, (counts.get(g.name) || 0) + 1);
-                  }
-                  return groups.map((g) => {
-                    const isDuplicate = (counts.get(g.name) || 0) > 1;
-                    const label = isDuplicate ? `${g.name} (${g.id})` : g.name;
-                    return (
-                      <option key={g.id} value={g.id}>
-                        {label}
-                      </option>
-                    );
-                  });
-                })()}
-              </select>
-              <p className="text-muted">
-                {syncOptionsLoading
-                  ? 'Loading teams from Twizzit...'
-                  : groups.length === 0
-                    ? 'No teams returned from Twizzit (often a permissions issue for the selected organization and/or season).'
-                    : 'Select a team to scope preview/sync, or leave as All teams'}
-              </p>
+              {loadingGroups && <small>Loading available groups...</small>}
+              {!seasonId && !loadingSeasons && <small>Please select a season to load groups</small>}
             </div>
             <div className="form-group checkbox">
               <label>
@@ -870,97 +626,23 @@ const TwizzitIntegration: React.FC = () => {
                 Create missing teams/players in local database
               </label>
             </div>
-            <div className="sync-actions">
-              <button
-                className="btn btn-secondary"
-                onClick={loadTwizzitSyncOptions}
-                disabled={loading || syncOptionsLoading}
-              >
-                {syncOptionsLoading ? 'Loading...' : 'Reload Twizzit Options'}
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={copyTwizzitDiagnostics}
-                disabled={loading || syncOptionsLoading || organizationAccess.length === 0}
-                title={organizationAccess.length === 0 ? 'Load options first to generate diagnostics' : undefined}
-              >
-                Copy diagnostics
-              </button>
-            </div>
           </div>
 
-          <div className="sync-actions-stack">
-            <div className="sync-actions">
-              <button
-                className="btn btn-secondary"
-                onClick={handlePreviewTeams}
-                disabled={loading || syncOptionsLoading || groups.length === 0}
-                title={groups.length === 0 ? 'No teams available from Twizzit for the selected organization' : undefined}
-              >
-                {loading ? 'Loading...' : 'Preview Teams'}
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleSyncTeams}
-                disabled={loading || !teamsPreview}
-              >
-                {loading ? 'Syncing...' : 'Sync Teams'}
-              </button>
-            </div>
-
-            {teamsPreview && (
-              <div className="sync-options">
-                <h4>Teams Preview</h4>
-                <p className="text-muted">{teamsPreview.total} team(s) will be synced.</p>
-                {teamsPreview.teams.length > 0 && (
-                  <div style={{ maxHeight: 260, overflow: 'auto' }}>
-                    <ul>
-                      {teamsPreview.teams.map((t) => (
-                        <li key={t.id}>
-                          {t.name} ({t.id})
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="sync-actions">
-              <button
-                className="btn btn-secondary"
-                onClick={handlePreviewPlayers}
-                disabled={loading || !selectedGroupId}
-                title={!selectedGroupId ? 'Select a team first' : undefined}
-              >
-                {loading ? 'Loading...' : 'Preview Players'}
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleSyncPlayers}
-                disabled={loading || !playersPreview}
-              >
-                {loading ? 'Syncing...' : 'Sync Players'}
-              </button>
-            </div>
-
-            {playersPreview && (
-              <div className="sync-options">
-                <h4>Players Preview</h4>
-                <p className="text-muted">{playersPreview.total} player(s) will be synced.</p>
-                {playersPreview.players.length > 0 && (
-                  <div style={{ maxHeight: 260, overflow: 'auto' }}>
-                    <ul>
-                      {playersPreview.players.map((p) => (
-                        <li key={p.id}>
-                          {p.firstName} {p.lastName} ({p.id})
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
+          <div className="sync-actions">
+            <button
+              className="btn btn-primary"
+              onClick={handleSyncTeams}
+              disabled={loading}
+            >
+              {loading ? 'Syncing...' : 'Sync Teams'}
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleSyncPlayers}
+              disabled={loading}
+            >
+              {loading ? 'Syncing...' : 'Sync Players'}
+            </button>
           </div>
         </>
       )}
@@ -971,8 +653,8 @@ const TwizzitIntegration: React.FC = () => {
     <div className="twizzit-section">
       <h3>Auto-Sync Configuration</h3>
 
-      {!activeCredential ? (
-        <p className="empty-state">Please activate a credential first</p>
+      {!selectedCredential ? (
+        <p className="empty-state">Please select a credential first</p>
       ) : !syncConfig ? (
         <p>Loading configuration...</p>
       ) : (
@@ -988,17 +670,32 @@ const TwizzitIntegration: React.FC = () => {
             </label>
           </div>
           <div className="form-group">
-            <label htmlFor="syncIntervalHours">Sync Interval (hours)</label>
+            <label htmlFor="syncIntervalValue">Sync Interval</label>
             <input
-              id="syncIntervalHours"
+              id="syncIntervalValue"
               type="number"
               min="1"
-              max="168"
-              value={syncIntervalHours}
-              onChange={(e) => setSyncIntervalHours(parseInt(e.target.value))}
+              max={syncIntervalUnit === 'days' ? '365' : '168'}
+              value={syncIntervalValue || (syncIntervalUnit === 'days' ? 1 : 24)}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                setSyncIntervalValue(isNaN(val) ? (syncIntervalUnit === 'days' ? 1 : 24) : val);
+              }}
               disabled={!autoSyncEnabled}
             />
-            <p className="text-muted">Set how often data should be synchronized (1-168 hours)</p>
+            <label htmlFor="syncIntervalUnit">Interval Unit</label>
+            <select
+              id="syncIntervalUnit"
+              value={syncIntervalUnit}
+              onChange={(e) => setSyncIntervalUnit(e.target.value as 'hours' | 'days')}
+              disabled={!autoSyncEnabled}
+            >
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+            </select>
+            <p className="text-muted">
+              Set how often data should be synchronized ({syncIntervalUnit === 'days' ? '1-365 days' : '1-168 hours'})
+            </p>
           </div>
           {syncConfig.lastSyncAt && (
             <div className="form-group">
@@ -1018,109 +715,188 @@ const TwizzitIntegration: React.FC = () => {
     </div>
   );
 
-  const renderHistory = () => (
-    <div className="twizzit-section">
-      <h3>Sync History</h3>
+  const renderHistory = () => {
+    const formatDuration = (startedAt?: string, completedAt?: string | null) => {
+      if (!startedAt || !completedAt) return null;
+      const start = new Date(startedAt);
+      const end = new Date(completedAt);
+      const durationMs = end.getTime() - start.getTime();
+      
+      if (durationMs < 1000) return `${durationMs}ms`;
+      if (durationMs < 60000) return `${(durationMs / 1000).toFixed(1)}s`;
+      return `${(durationMs / 60000).toFixed(1)}m`;
+    };
 
-      {!activeCredential ? (
-        <p className="empty-state">Please activate a credential first</p>
-      ) : syncHistory.length === 0 ? (
-        <p className="empty-state">No sync history yet</p>
-      ) : (
-        <div className="history-list">
-          {syncHistory.map((entry) => (
-            <div key={entry.id} className={`history-item status-${entry.status}`}>
-              <div className="history-header">
-                <span className="history-type">{entry.syncType}</span>
-                <span className={`history-status ${entry.status}`}>
-                  {entry.status.toUpperCase()}
-                </span>
-                <span className="history-date">
-                  {new Date(entry.syncedAt).toLocaleString()}
-                </span>
-              </div>
-              <div className="history-stats">
-                <span>Processed: {entry.itemsProcessed}</span>
-                <span>Succeeded: {entry.itemsSucceeded}</span>
-                {entry.itemsFailed > 0 && (
-                  <span className="text-danger">Failed: {entry.itemsFailed}</span>
+    const formatDate = (dateStr: string) => {
+      try {
+        const date = new Date(dateStr);
+        // Check if valid date
+        if (isNaN(date.getTime())) return 'Invalid date';
+        
+        // Format as: "Mar 1, 2026 at 2:30 PM"
+        return date.toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+      } catch {
+        return 'Invalid date';
+      }
+    };
+
+    return (
+      <div className="twizzit-section">
+        <h3>Sync History</h3>
+
+        {!selectedCredential ? (
+          <p className="empty-state">Please select a credential first</p>
+        ) : syncHistory.length === 0 ? (
+          <p className="empty-state">No sync history yet</p>
+        ) : (
+          <div className="history-list">
+            {syncHistory.map((entry) => (
+              <div key={entry.id} className={`history-item status-${entry.status}`}>
+                <div className="history-header">
+                  <span className="history-type">
+                    {entry.syncType.charAt(0).toUpperCase() + entry.syncType.slice(1)} Sync
+                  </span>
+                  <span className={`history-status ${entry.status}`}>
+                    {entry.status.toUpperCase()}
+                  </span>
+                  <span className="history-date">
+                    {formatDate(entry.syncedAt)}
+                  </span>
+                </div>
+                <div className="history-stats">
+                  <span>Processed: <strong>{entry.itemsProcessed}</strong></span>
+                  <span className="text-success">Succeeded: <strong>{entry.itemsSucceeded}</strong></span>
+                  {entry.itemsFailed > 0 && (
+                    <span className="text-danger">Failed: <strong>{entry.itemsFailed}</strong></span>
+                  )}
+                  {formatDuration(entry.startedAt, entry.completedAt) && (
+                    <span className="history-duration">
+                      Duration: {formatDuration(entry.startedAt, entry.completedAt)}
+                    </span>
+                  )}
+                </div>
+                {entry.errorMessage && (
+                  <div className="history-error">
+                    <strong>Error:</strong> {entry.errorMessage}
+                  </div>
                 )}
               </div>
-              {entry.errorMessage && (
-                <div className="history-error">
-                  <strong>Error:</strong> {entry.errorMessage}
-                </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderMappings = () => {
+    const formatDate = (dateStr: string | null) => {
+      if (!dateStr) return 'Never synced';
+      try {
+        const date = new Date(dateStr);
+        // Check if valid date
+        if (isNaN(date.getTime())) return 'Invalid date';
+        
+        // Format as: "Mar 1, 2026 at 2:30 PM"
+        return date.toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+      } catch {
+        return 'Invalid date';
+      }
+    };
+
+    return (
+      <div className="twizzit-section">
+        <h3>Data Mappings</h3>
+
+        {!selectedCredential ? (
+          <p className="empty-state">Please select a credential first</p>
+        ) : (
+          <>
+            <div className="mappings-section">
+              <h4>Team Mappings ({teamMappings.length})</h4>
+              {teamMappings.length === 0 ? (
+                <p className="empty-state">No team mappings yet</p>
+              ) : (
+                <table className="mappings-table">
+                  <thead>
+                    <tr>
+                      <th>Local Team</th>
+                      <th>Twizzit Team</th>
+                      <th>Status</th>
+                      <th>Last Synced</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamMappings.map((mapping) => (
+                      <tr key={mapping.id}>
+                        <td>{mapping.internalTeamName}</td>
+                        <td>{mapping.twizzitTeamName}</td>
+                        <td>
+                          <span className={`sync-status status-${mapping.syncStatus}`}>
+                            {mapping.syncStatus}
+                          </span>
+                        </td>
+                        <td>{formatDate(mapping.lastSyncedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
-  const renderMappings = () => (
-    <div className="twizzit-section">
-      <h3>Data Mappings</h3>
-
-      {!activeCredential ? (
-        <p className="empty-state">Please activate a credential first</p>
-      ) : (
-        <>
-          <div className="mappings-section">
-            <h4>Team Mappings ({teamMappings.length})</h4>
-            {teamMappings.length === 0 ? (
-              <p className="empty-state">No team mappings yet</p>
-            ) : (
-              <table className="mappings-table">
-                <thead>
-                  <tr>
-                    <th>Local Team</th>
-                    <th>Twizzit Team</th>
-                    <th>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teamMappings.map((mapping) => (
-                    <tr key={mapping.id}>
-                      <td>{mapping.internalTeamName}</td>
-                      <td>{mapping.twizzitTeamName}</td>
-                      <td>{new Date(mapping.createdAt).toLocaleDateString()}</td>
+            <div className="mappings-section">
+              <h4>Player Mappings ({playerMappings.length})</h4>
+              {playerMappings.length === 0 ? (
+                <p className="empty-state">No player mappings yet</p>
+              ) : (
+                <table className="mappings-table">
+                  <thead>
+                    <tr>
+                      <th>Local Player</th>
+                      <th>Team</th>
+                      <th>Jersey #</th>
+                      <th>Twizzit Player</th>
+                      <th>Status</th>
+                      <th>Last Synced</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          <div className="mappings-section">
-            <h4>Player Mappings ({playerMappings.length})</h4>
-            {playerMappings.length === 0 ? (
-              <p className="empty-state">No player mappings yet</p>
-            ) : (
-              <table className="mappings-table">
-                <thead>
-                  <tr>
-                    <th>Local Player</th>
-                    <th>Twizzit Player</th>
-                    <th>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {playerMappings.map((mapping) => (
-                    <tr key={mapping.id}>
-                      <td>{mapping.internalPlayerName}</td>
-                      <td>{mapping.twizzitPlayerName}</td>
-                      <td>{new Date(mapping.createdAt).toLocaleDateString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
+                  </thead>
+                  <tbody>
+                    {playerMappings.map((mapping) => (
+                      <tr key={mapping.id}>
+                        <td>{mapping.internalPlayerName}</td>
+                        <td>{mapping.internalTeamName}</td>
+                        <td>{mapping.jerseyNumber || '-'}</td>
+                        <td>{mapping.twizzitPlayerName}</td>
+                        <td>
+                          <span className={`sync-status status-${mapping.syncStatus}`}>
+                            {mapping.syncStatus}
+                          </span>
+                        </td>
+                        <td>{formatDate(mapping.lastSyncedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="twizzit-integration">
@@ -1161,21 +937,21 @@ const TwizzitIntegration: React.FC = () => {
         <button
           className={`tab ${activeTab === 'config' ? 'active' : ''}`}
           onClick={() => setActiveTab('config')}
-          disabled={!activeCredential}
+          disabled={!selectedCredential}
         >
           Configuration
         </button>
         <button
           className={`tab ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveTab('history')}
-          disabled={!activeCredential}
+          disabled={!selectedCredential}
         >
           History
         </button>
         <button
           className={`tab ${activeTab === 'mappings' ? 'active' : ''}`}
           onClick={() => setActiveTab('mappings')}
-          disabled={!activeCredential}
+          disabled={!selectedCredential}
         >
           Mappings
         </button>
