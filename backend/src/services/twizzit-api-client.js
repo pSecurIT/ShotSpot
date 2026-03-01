@@ -84,7 +84,7 @@ class TwizzitApiClient {
           config.headers.Authorization = `Bearer ${this.accessToken}`;
           
           if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-            console.log(`[Twizzit Auth] Token attached:`, {
+            console.log('[Twizzit Auth] Token attached:', {
               hasToken: !!this.accessToken,
               expiresIn: this.tokenExpiry ? Math.round((this.tokenExpiry - Date.now()) / 1000 / 60) + ' minutes' : 'unknown'
             });
@@ -103,7 +103,7 @@ class TwizzitApiClient {
             const queryString = config.paramsSerializer.serialize(params);
             fullUrl += `?${queryString}`;
           }
-          console.log(`[Twizzit API Request]`, {
+          console.log('[Twizzit API Request]', {
             method: config.method?.toUpperCase(),
             fullUrl,
             params,

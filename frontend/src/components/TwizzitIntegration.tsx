@@ -38,6 +38,7 @@ const TwizzitIntegration: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [organizationName, setOrganizationName] = useState('');
+  const [apiEndpoint, setApiEndpoint] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
 
   // Sync config
@@ -181,9 +182,20 @@ const TwizzitIntegration: React.FC = () => {
 
   const getErrorMessage = (err: unknown, defaultMessage: string): string => {
     if (err && typeof err === 'object' && 'response' in err) {
-      const response = (err as { response?: { data?: { error?: string } } }).response;
-      if (response && typeof response === 'object' && 'data' in response && response.data && typeof response.data === 'object' && 'error' in response.data) {
-        return response.data.error || defaultMessage;
+      const response = (err as { response?: { data?: { error?: string; details?: Array<{ param?: string; msg?: string }> } } }).response;
+      if (response && typeof response === 'object' && 'data' in response && response.data && typeof response.data === 'object') {
+        const errorData = response.data;
+        let message = errorData.error || defaultMessage;
+        
+        // Append detailed validation errors if present
+        if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
+          const detailMessages = errorData.details
+            .map((detail) => `${detail.param}: ${detail.msg}`)
+            .join(', ');
+          message += ` (${detailMessages})`;
+        }
+        
+        return message;
       }
     }
     return defaultMessage;
@@ -192,7 +204,6 @@ const TwizzitIntegration: React.FC = () => {
   const loadCredentials = async () => {
     try {
       setLoading(true);
-      clearMessages();
       const data = await getTwizzitCredentials();
       setCredentials(data);
       
@@ -218,21 +229,37 @@ const TwizzitIntegration: React.FC = () => {
     try {
       setLoading(true);
       clearMessages();
-      const credential = await storeTwizzitCredentials({
-        username,
-        password,
-        organizationName,
-      });
       
-      setSuccess('Credentials added successfully');
+      const credentialsData: {
+        apiUsername: string;
+        apiPassword: string;
+        organizationName: string;
+        apiEndpoint?: string;
+      } = {
+        apiUsername: username,
+        apiPassword: password,
+        organizationName,
+      };
+      
+      // Only include apiEndpoint if provided
+      if (apiEndpoint.trim()) {
+        credentialsData.apiEndpoint = apiEndpoint;
+      }
+      
+      const credential = await storeTwizzitCredentials(credentialsData);
+      
       setUsername('');
       setPassword('');
       setOrganizationName('');
+      setApiEndpoint('');
       setShowAddForm(false);
       
       // Reload credentials and select the new one
       await loadCredentials();
       setSelectedCredential(credential.id);
+      
+      // Set success message after loadCredentials completes
+      setSuccess('Credentials added successfully');
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to add credentials'));
     } finally {
@@ -472,6 +499,16 @@ const TwizzitIntegration: React.FC = () => {
               onChange={(e) => setOrganizationName(e.target.value)}
               placeholder="KCOV"
               required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="apiEndpoint">API Endpoint (optional)</label>
+            <input
+              id="apiEndpoint"
+              type="url"
+              value={apiEndpoint}
+              onChange={(e) => setApiEndpoint(e.target.value)}
+              placeholder="https://app.twizzit.com"
             />
           </div>
           <button type="submit" className="btn btn-success" disabled={loading}>
