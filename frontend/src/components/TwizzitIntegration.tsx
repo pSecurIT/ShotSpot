@@ -231,13 +231,13 @@ const TwizzitIntegration: React.FC = () => {
       clearMessages();
       
       const credentialsData: {
-        username: string;
-        password: string;
+        apiUsername: string;
+        apiPassword: string;
         organizationName: string;
         apiEndpoint?: string;
       } = {
-        username,
-        password,
+        apiUsername: username,
+        apiPassword: password,
         organizationName,
       };
       
