@@ -37,10 +37,22 @@ describe('Twizzit Integration Tests', () => {
   });
 
   test('Sync clubs from Twizzit', async () => {
-    const response = await request(app)
-      .post('/api/twizzit/sync/clubs')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({});
+     // Create a credential first
+     const credRes = await request(app)
+       .post('/api/twizzit/credentials')
+       .set('Authorization', `Bearer ${authToken}`)
+       .send({
+         apiUsername: 'test@twizzit.com',
+         apiPassword: 'password123',
+         organizationName: 'Test Org'
+       });
+   
+     const credentialId = credRes.body.id;
+   
+     const response = await request(app)
+       .post(`/api/twizzit/sync/clubs/${credentialId}`)
+       .set('Authorization', `Bearer ${authToken}`)
+       .send({});
     expect(response.status).toBe(200);
     expect(response.body.message).toBe('Clubs synced successfully.');
     expect(response.body.clubs).toEqual(
@@ -52,10 +64,22 @@ describe('Twizzit Integration Tests', () => {
   });
 
   test('Sync players for a specific club', async () => {
-    const response = await request(app)
-      .post('/api/twizzit/sync/players/club/1')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({});
+     // Create a credential first
+     const credRes = await request(app)
+       .post('/api/twizzit/credentials')
+       .set('Authorization', `Bearer ${authToken}`)
+       .send({
+         apiUsername: 'test@twizzit.com',
+         apiPassword: 'password123',
+         organizationName: 'Test Org'
+       });
+   
+     const credentialId = credRes.body.id;
+   
+     const response = await request(app)
+       .post(`/api/twizzit/sync/players/${credentialId}`)
+       .set('Authorization', `Bearer ${authToken}`)
+       .send({});
     expect(response.status).toBe(200);
     expect(response.body.message).toBe('Players synced successfully for club 1.');
     expect(response.body.players).toEqual(
@@ -67,10 +91,23 @@ describe('Twizzit Integration Tests', () => {
   });
 
   test('Sync seasons from Twizzit', async () => {
-    const response = await request(app)
-      .post('/api/twizzit/sync/seasons')
-      .set('Authorization', `Bearer ${authToken}`)
-      .send({});
+     // Seasons sync is not a direct endpoint, verify via clubs sync
+     // Create a credential first
+     const credRes = await request(app)
+       .post('/api/twizzit/credentials')
+       .set('Authorization', `Bearer ${authToken}`)
+       .send({
+         apiUsername: 'test@twizzit.com',
+         apiPassword: 'password123',
+         organizationName: 'Test Org'
+       });
+   
+     const credentialId = credRes.body.id;
+   
+     const response = await request(app)
+       .post(`/api/twizzit/sync/clubs/${credentialId}`)
+       .set('Authorization', `Bearer ${authToken}`)
+       .send({});
     expect(response.status).toBe(200);
     expect(response.body.message).toBe('Seasons synced successfully.');
     expect(response.body.seasons).toEqual(
