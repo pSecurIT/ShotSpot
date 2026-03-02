@@ -425,6 +425,30 @@
   gap: 1rem;
   font-size: 0.9rem;
   color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.history-stats span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.history-stats strong {
+  color: var(--text-primary);
+}
+
+.history-stats .text-success {
+  color: #28a745;
+}
+
+.history-stats .text-danger {
+  color: #dc3545;
+}
+
+.history-duration {
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 .history-error {
@@ -462,6 +486,31 @@
 
 .mappings-table tr:hover {
   background-color: var(--hover-bg);
+}
+
+.sync-status {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+.sync-status.status-success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.sync-status.status-failed,
+.sync-status.status-error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.sync-status.status-partial {
+  background-color: #fff3cd;
+  color: #856404;
 }
 
 /* Responsive */
