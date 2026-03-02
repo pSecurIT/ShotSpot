@@ -115,7 +115,7 @@ describe('Twizzit Authentication Service', () => {
       testCredentialId = result.id;
     });
 
-    it('should update existing credentials on conflict', async () => {
+    it('should allow multiple credentials with the same organization name', async () => {
       const credentials = {
         organizationName: 'Test Organization 2',
         apiUsername: 'user1',
@@ -126,16 +126,17 @@ describe('Twizzit Authentication Service', () => {
       // Store initial credentials
       const initial = await twizzitAuth.storeCredentials(credentials);
 
-      // Store with same organization name but different details
-      const updated = await twizzitAuth.storeCredentials({
+      // Store a second credential with same organization name but different details
+      const second = await twizzitAuth.storeCredentials({
         ...credentials,
         apiUsername: 'user2',
         apiPassword: 'password2'
       });
 
-      expect(updated.id).toBe(initial.id);
-      expect(updated.api_username).toBe('user2');
-      expect(updated.encrypted_password).not.toBe(initial.encrypted_password);
+      expect(second.id).not.toBe(initial.id);
+      expect(second.organization_name).toBe(initial.organization_name);
+      expect(second.api_username).toBe('user2');
+      expect(second.encrypted_password).not.toBe(initial.encrypted_password);
     });
 
     it('should use default API endpoint if not provided', async () => {
@@ -200,6 +201,31 @@ describe('Twizzit Authentication Service', () => {
       expect(credentials).toBeDefined();
       expect(credentials.organizationName).toBe('Test Get Credentials');
       expect(credentials.apiPassword).toBe('get-test-password');
+    });
+
+    it('should return the most recently stored credential for organization lookup', async () => {
+      const first = await twizzitAuth.storeCredentials({
+        organizationName: 'Test Latest Org',
+        apiUsername: 'first-user',
+        apiPassword: 'first-pass',
+        apiEndpoint: 'https://api.test.com/v1'
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const second = await twizzitAuth.storeCredentials({
+        organizationName: 'Test Latest Org',
+        apiUsername: 'second-user',
+        apiPassword: 'second-pass',
+        apiEndpoint: 'https://api.test.com/v1'
+      });
+
+      const credentials = await twizzitAuth.getCredentialsByOrganization('Test Latest Org');
+
+      expect(second.id).not.toBe(first.id);
+      expect(credentials.id).toBe(second.id);
+      expect(credentials.apiUsername).toBe('second-user');
+      expect(credentials.apiPassword).toBe('second-pass');
     });
 
     it('should throw error for non-existent credential ID', async () => {

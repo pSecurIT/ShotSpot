@@ -125,13 +125,6 @@ export async function storeCredentials(credentials) {
       `INSERT INTO twizzit_credentials 
        (organization_name, api_username, encrypted_password, encryption_iv, api_endpoint, is_active)
        VALUES ($1, $2, $3, $4, $5, true)
-       ON CONFLICT (organization_name) 
-       DO UPDATE SET 
-         api_username = EXCLUDED.api_username,
-         encrypted_password = EXCLUDED.encrypted_password,
-         encryption_iv = EXCLUDED.encryption_iv,
-         api_endpoint = EXCLUDED.api_endpoint,
-         updated_at = CURRENT_TIMESTAMP
        RETURNING *`,
       [
         organizationName,
@@ -203,7 +196,11 @@ export async function getCredentialsByOrganization(organizationName) {
 
   try {
     const result = await db.query(
-      'SELECT * FROM twizzit_credentials WHERE organization_name = $1 AND is_active = true',
+      `SELECT *
+       FROM twizzit_credentials
+       WHERE organization_name = $1 AND is_active = true
+       ORDER BY updated_at DESC, created_at DESC, id DESC
+       LIMIT 1`,
       [organizationName]
     );
 
