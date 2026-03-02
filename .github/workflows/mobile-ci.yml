@@ -127,7 +127,7 @@ jobs:
       # SwiftLint results (optional)
       # -------------------------
       - name: Upload SwiftLint results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ios-swiftlint-results
           path: frontend/ios/swiftlint-results.json
