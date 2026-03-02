@@ -71,17 +71,24 @@ export const processQueue = async (): Promise<{
       // Get CSRF token for state-changing requests
       const csrfToken = await getCsrfToken();
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Include auth token if available
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Include CSRF token if available
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+
       const response = await fetch(action.endpoint, {
         method: action.type,
-        headers: {
-          'Content-Type': 'application/json',
-          // Include auth token if available
-          ...(localStorage.getItem('token') && {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }),
-          // Include CSRF token
-          'X-CSRF-Token': csrfToken
-        },
+        headers,
         credentials: 'include', // Important: include cookies for session
         body
       });
