@@ -168,25 +168,12 @@ export const getTwizzitCredentials = async (): Promise<TwizzitCredential[]> => {
  * Store new Twizzit credentials
  */
 export const storeTwizzitCredentials = async (data: {
-  username: string;
-  password: string;
+  apiUsername: string;
+  apiPassword: string;
   organizationName: string;
   apiEndpoint?: string;
 }): Promise<TwizzitCredential> => {
-  const payload: {
-    apiUsername: string;
-    apiPassword: string;
-    organizationName: string;
-    apiEndpoint?: string;
-  } = {
-    apiUsername: data.username,
-    apiPassword: data.password,
-    organizationName: data.organizationName,
-  };
-  if (data.apiEndpoint) {
-    payload.apiEndpoint = data.apiEndpoint;
-  }
-  const response = await api.post('/twizzit/credentials', payload);
+  const response = await api.post('/twizzit/credentials', data);
   return response.data.credential;
 };
 
