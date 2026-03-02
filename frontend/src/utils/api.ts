@@ -173,7 +173,12 @@ export const storeTwizzitCredentials = async (data: {
   organizationName: string;
   apiEndpoint?: string;
 }): Promise<TwizzitCredential> => {
-  const payload: any = {
+  const payload: {
+    apiUsername: string;
+    apiPassword: string;
+    organizationName: string;
+    apiEndpoint?: string;
+  } = {
     apiUsername: data.username,
     apiPassword: data.password,
     organizationName: data.organizationName,
