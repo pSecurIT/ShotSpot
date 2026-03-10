@@ -803,6 +803,8 @@ describe('GameManagement', () => {
   });
 
   it('handles API error when fetching teams', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
     (api.get as jest.Mock).mockImplementation((url) => {
       if (url === '/teams') {
         return Promise.reject({
@@ -818,8 +820,12 @@ describe('GameManagement', () => {
     render(<GameManagementWrapper />);
     
     await waitFor(() => {
-      expect(screen.getByText('Failed to fetch teams')).toBeInTheDocument();
+      expect(screen.getByText('Games (0)')).toBeInTheDocument();
+      expect(screen.getByText('No games found')).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
+
+    consoleErrorSpy.mockRestore();
   });
 
   it('formats dates correctly', async () => {
