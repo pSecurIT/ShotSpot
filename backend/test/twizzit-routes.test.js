@@ -394,7 +394,7 @@ describe('Twizzit API Routes', () => {
         `INSERT INTO twizzit_team_mappings (local_club_id, twizzit_team_id, twizzit_team_name, sync_status, last_synced_at)
          VALUES ($1, $2, $3, 'success', CURRENT_TIMESTAMP)
          RETURNING id`,
-        [mappingsClubId, 'tw-team-1', 'Twizzit Team Name']
+        [mappingsTeamId, 'tw-team-1', 'Twizzit Team Name']
       );
       mappingsTeamMappingId = tm.rows[0].id;
 
@@ -411,7 +411,7 @@ describe('Twizzit API Routes', () => {
       expect(row).toBeTruthy();
       expect(row).toMatchObject({
         internalTeamId: mappingsTeamId,
-        internalTeamName: 'Twizzit Mappings Club',
+        internalTeamName: 'Twizzit Mappings Team',
         twizzitTeamId: 'tw-team-1',
         twizzitTeamName: 'Twizzit Team Name',
         syncStatus: 'success'
@@ -462,7 +462,7 @@ describe('Twizzit API Routes', () => {
           `INSERT INTO twizzit_team_mappings (local_club_id, twizzit_team_id, twizzit_team_name, sync_status, last_synced_at)
            VALUES ($1, $2, $3, 'success', CURRENT_TIMESTAMP)
            RETURNING id`,
-          [mappingsClubId, 'tw-team-1', 'Twizzit Team Name']
+          [mappingsTeamId, 'tw-team-1', 'Twizzit Team Name']
         );
         mappingsTeamMappingId = tm.rows[0].id;
       }
@@ -489,7 +489,7 @@ describe('Twizzit API Routes', () => {
 
       // Act: filtered list
       const response = await request(app)
-        .get(`/api/twizzit/mappings/players?teamId=${mappingsClubId}`)
+        .get(`/api/twizzit/mappings/players?teamId=${mappingsTeamId}`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       // Assert
@@ -505,7 +505,7 @@ describe('Twizzit API Routes', () => {
         twizzitPlayerId: 'tw-player-1',
         twizzitPlayerName: 'Twizzit Player Name',
         internalTeamId: mappingsTeamId,
-        internalTeamName: 'Twizzit Mappings Club',
+        internalTeamName: 'Twizzit Mappings Team',
         syncStatus: 'success'
       });
       expect(row.lastSyncedAt).toBeTruthy();

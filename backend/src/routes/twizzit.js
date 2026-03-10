@@ -671,14 +671,14 @@ router.get(
         `SELECT 
           tm.id,
           tm.local_club_id,
-          t.name as local_club_name,
+          t.name as local_team_name,
           tm.twizzit_team_id,
           tm.twizzit_team_name,
           tm.last_synced_at,
           tm.sync_status,
           tm.sync_error
          FROM twizzit_team_mappings tm
-         JOIN clubs t ON tm.local_club_id = t.id
+         JOIN teams t ON tm.local_club_id = t.id
          ORDER BY tm.last_synced_at DESC`
       );
 
@@ -686,7 +686,7 @@ router.get(
       const mappings = result.rows.map(row => ({
         id: row.id,
         internalTeamId: row.local_club_id,
-        internalTeamName: row.local_club_name,
+        internalTeamName: row.local_team_name,
         twizzitTeamId: row.twizzit_team_id,
         twizzitTeamName: row.twizzit_team_name,
         lastSyncedAt: row.last_synced_at,
@@ -731,11 +731,11 @@ router.get(
           pm.sync_status,
           pm.sync_error,
           tm.local_club_id,
-          t.name as club_name
+          t.name as team_name
         FROM twizzit_player_mappings pm
         JOIN players p ON pm.local_player_id = p.id
         JOIN twizzit_team_mappings tm ON pm.team_mapping_id = tm.id
-        JOIN clubs t ON tm.local_club_id = t.id`;
+        JOIN teams t ON tm.local_club_id = t.id`;
 
       const params = [];
       if (req.query.teamId) {
@@ -758,7 +758,7 @@ router.get(
         twizzitPlayerId: row.twizzit_player_id,
         twizzitPlayerName: row.twizzit_player_name,
         internalTeamId: row.local_club_id,
-        internalTeamName: row.club_name,
+        internalTeamName: row.team_name,
         lastSyncedAt: row.last_synced_at,
         syncStatus: row.sync_status,
         syncError: row.sync_error
