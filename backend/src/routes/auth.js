@@ -71,16 +71,49 @@ router.post('/register', validateRegistration, async (req, res) => {
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Create user
-    const result = await db.query(
-      'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email',
-      [username, email, passwordHash]
-    );
+    // Begin transaction to create user, club, team, and trainer assignment
+    await db.query('BEGIN');
 
-    res.status(201).json({
-      message: 'User registered successfully',
-      user: result.rows[0]
-    });
+    try {
+      // Create user with coach role
+      const userResult = await db.query(
+        'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, username, email, role',
+        [username, email, passwordHash, 'coach']
+      );
+      const user = userResult.rows[0];
+
+      // Create club for the user
+      const clubResult = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING id, name',
+        [`${username}'s Club`]
+      );
+      const club = clubResult.rows[0];
+
+      // Create team for the club
+      const teamResult = await db.query(
+        'INSERT INTO teams (club_id, name) VALUES ($1, $2) RETURNING id, name',
+        [club.id, `${username}'s Team`]
+      );
+      const team = teamResult.rows[0];
+
+      // Create trainer assignment
+      await db.query(
+        'INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active) VALUES ($1, $2, $3, $4)',
+        [user.id, club.id, team.id, true]
+      );
+
+      await db.query('COMMIT');
+
+      res.status(201).json({
+        message: 'User registered successfully. Your team has been created!',
+        user: user,
+        club: club,
+        team: team
+      });
+    } catch (txError) {
+      await db.query('ROLLBACK');
+      throw txError;
+    }
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ error: 'Error creating user' });

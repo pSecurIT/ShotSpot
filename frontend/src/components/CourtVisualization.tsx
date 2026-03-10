@@ -102,6 +102,7 @@ interface CourtVisualizationProps {
   onResumeTimer?: () => void; // Resume timer when clicking court
   onPauseTimer?: () => void; // Pause timer when needed
   canAddEvents?: () => boolean; // Period end check function
+  userAssignedTeam?: 'home' | 'away' | null; // Which team the user can record events for
 }
 
 const CourtVisualization: React.FC<CourtVisualizationProps> = ({
@@ -121,7 +122,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   timerState,
   onResumeTimer,
   onPauseTimer: _onPauseTimer, // eslint-disable-line @typescript-eslint/no-unused-vars
-  canAddEvents
+  canAddEvents,
+  userAssignedTeam
 }) => {
   const [homePlayers, setHomePlayers] = useState<Player[]>(homePlayersProps || []);
   const [awayPlayers, setAwayPlayers] = useState<Player[]>(awayPlayersProps || []);
@@ -138,6 +140,13 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   const [shotType, setShotType] = useState<string>('running_shot'); // Default to most common shot type
   const [clickedCoords, setClickedCoords] = useState<{ x: number; y: number } | null>(null);
   const [lastSelectedPlayerId, setLastSelectedPlayerId] = useState<number | null>(null); // Remember last player
+  
+  // Auto-select the user's assigned team when available
+  useEffect(() => {
+    if (userAssignedTeam) {
+      setSelectedTeam(userAssignedTeam);
+    }
+  }, [userAssignedTeam]);
   
   // Korf (goal) positions on the field - these are constants, no need to recalculate
   const KORF_LEFT = useMemo(() => ({ x: 13, y: 50 }), []);  // Left korf at 13% from left, center height
@@ -347,7 +356,6 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   }, [KORF_LEFT, KORF_RIGHT]);
 
   // Calculate which players are currently in offense for a team
-  // Offense and defense switch every 2 goals scored by that team
   // Handle court click to record coordinates - memoize with useCallback
   const handleCourtClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!imageRef.current || !courtRef.current) return;
@@ -376,6 +384,12 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       setError('Unable to determine which team shoots from this position');
       return;
     }
+
+    // Check if user is allowed to record for this team
+    if (userAssignedTeam && teamInfo.side !== userAssignedTeam) {
+      setError(`You can only record shots for the ${userAssignedTeam === 'home' ? homeTeamName : awayTeamName}`);
+      return;
+    }
     
     // Auto-select the correct team
     setSelectedTeam(teamInfo.side);
@@ -401,7 +415,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     
     // Team selection is automatic based on possession - no need to show message
     // (Possession buttons already indicate which team is attacking)
-  }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, timerState]);
+  }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, timerState, userAssignedTeam, homeTeamName, awayTeamName]);
 
   // Record shot with specific result - memoize with useCallback
   const handleRecordShot = useCallback(async (result: 'goal' | 'miss' | 'blocked') => {
@@ -412,6 +426,12 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
 
     if (!selectedPlayerId) {
       setError('Please select a player');
+      return;
+    }
+
+    // Check if user is allowed to record for the selected team
+    if (userAssignedTeam && selectedTeam !== userAssignedTeam) {
+      setError(`You can only record shots for the ${userAssignedTeam === 'home' ? homeTeamName : awayTeamName}`);
       return;
     }
 
@@ -493,7 +513,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error recording shot');
     }
-  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers, canAddEvents]);
+  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers, canAddEvents, userAssignedTeam, homeTeamName, awayTeamName]);
 
   // Render shot markers on court
   const renderShotMarkers = () => {
@@ -679,20 +699,27 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           {/* Team Selection */}
           <div className="form-group">
             <label>Team:</label>
-            <select
-              value={selectedTeam}
-              onChange={(e) => {
-                const newTeam = e.target.value as 'home' | 'away';
-                setSelectedTeam(newTeam);
-                // Auto-select first offensive player from new team
-                const teamId = newTeam === 'home' ? homeTeamId : awayTeamId;
-                const offensivePlayers = getCurrentOffensivePlayers(teamId);
-                setSelectedPlayerId(offensivePlayers.length > 0 ? offensivePlayers[0].id : null);
-              }}
-            >
-              <option value="home">{homeTeamName} (Home)</option>
-              <option value="away">{awayTeamName} (Away)</option>
-            </select>
+            {userAssignedTeam ? (
+              <div className="team-restriction-notice">
+                <strong>📍 Your Team:</strong> {userAssignedTeam === 'home' ? homeTeamName : awayTeamName}
+                <p className="restriction-text">You can only record events for your assigned team</p>
+              </div>
+            ) : (
+              <select
+                value={selectedTeam}
+                onChange={(e) => {
+                  const newTeam = e.target.value as 'home' | 'away';
+                  setSelectedTeam(newTeam);
+                  // Auto-select first offensive player from new team
+                  const teamId = newTeam === 'home' ? homeTeamId : awayTeamId;
+                  const offensivePlayers = getCurrentOffensivePlayers(teamId);
+                  setSelectedPlayerId(offensivePlayers.length > 0 ? offensivePlayers[0].id : null);
+                }}
+              >
+                <option value="home">{homeTeamName} (Home)</option>
+                <option value="away">{awayTeamName} (Away)</option>
+              </select>
+            )}
           </div>
 
           {/* Solution 3: Mobile Player Grid - Touch-friendly player selection */}

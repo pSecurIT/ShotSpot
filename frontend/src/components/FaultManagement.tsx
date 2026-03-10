@@ -20,6 +20,7 @@ interface FaultManagementProps {
   timeRemaining?: string;
   onFaultRecorded?: () => void;
   canAddEvents?: () => boolean; // Period end check function
+  userAssignedTeam?: 'home' | 'away' | null; // Which team the user can record events for
 }
 
 interface Fault {
@@ -49,7 +50,8 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
   currentPeriod,
   timeRemaining,
   onFaultRecorded,
-  canAddEvents
+  canAddEvents,
+  userAssignedTeam
 }) => {
   const [players, setPlayers] = useState<{ home: Player[]; away: Player[] }>({ home: [], away: [] });
   const [recentFaults, setRecentFaults] = useState<Fault[]>([]);
@@ -65,6 +67,15 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
 
   // Ref to track mounted state for cleanup
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-select the user's assigned team
+  useEffect(() => {
+    if (userAssignedTeam === 'home') {
+      setSelectedTeam(homeTeamId);
+    } else if (userAssignedTeam === 'away') {
+      setSelectedTeam(awayTeamId);
+    }
+  }, [userAssignedTeam, homeTeamId, awayTeamId]);
 
   useEffect(() => {
     fetchPlayers();
@@ -109,6 +120,13 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
   const handleRecordFault = async () => {
     if (!selectedTeam) {
       setError('Please select a team');
+      return;
+    }
+
+    // Check if user is allowed to record faults for the selected team
+    const selectedTeamType = selectedTeam === homeTeamId ? 'home' : 'away';
+    if (userAssignedTeam && selectedTeamType !== userAssignedTeam) {
+      setError(`You can only record faults for the ${userAssignedTeam === 'home' ? homeTeamName : awayTeamName}`);
       return;
     }
 
@@ -259,16 +277,23 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
         {/* Team Selection */}
         <div className="form-group">
           <label>Team:</label>
-          <select
-            value={selectedTeam}
-            onChange={(e) => {
-              setSelectedTeam(parseInt(e.target.value));
-              setSelectedPlayer(null); // Reset player selection when team changes
-            }}
-          >
-            <option value={homeTeamId}>{homeTeamName} (Home)</option>
-            <option value={awayTeamId}>{awayTeamName} (Away)</option>
-          </select>
+          {userAssignedTeam ? (
+            <div className="team-restriction-notice">
+              <strong>📍 Your Team:</strong> {userAssignedTeam === 'home' ? homeTeamName : awayTeamName}
+              <p className="restriction-text">You can only record faults for your assigned team</p>
+            </div>
+          ) : (
+            <select
+              value={selectedTeam}
+              onChange={(e) => {
+                setSelectedTeam(parseInt(e.target.value));
+                setSelectedPlayer(null); // Reset player selection when team changes
+              }}
+            >
+              <option value={homeTeamId}>{homeTeamName} (Home)</option>
+              <option value={awayTeamId}>{awayTeamName} (Away)</option>
+            </select>
+          )}
         </div>
 
         {/* Player Selection */}
