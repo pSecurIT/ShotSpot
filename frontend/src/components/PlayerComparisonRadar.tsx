@@ -292,11 +292,7 @@ const PlayerComparisonRadar: React.FC<PlayerComparisonRadarProps> = ({
                   padding: '10px'
                 }}
                 formatter={(
-                  value: number | string | readonly (number | string)[] | undefined,
-                  _name: string | number | undefined,
-                  _item: unknown,
-                  _index: number,
-                  _payload: unknown
+                  value: number | string | readonly (number | string)[] | undefined
                 ) => {
                   const numericValue =
                     typeof value === 'number'
