@@ -407,6 +407,7 @@ router.post(
     param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID'),
     body('groupId').optional().isString().withMessage('groupId must be a string'),
     body('seasonId').optional().isString().withMessage('seasonId must be a string'),
+    body('organizationId').optional().isString().withMessage('organizationId must be a string'),
     body('createMissing').optional().isBoolean().withMessage('createMissing must be boolean')
   ],
   validate,
@@ -416,6 +417,7 @@ router.post(
       const options = {
         ...(req.body.groupId && { groupId: req.body.groupId }),
         ...(req.body.seasonId && { seasonId: req.body.seasonId }),
+        ...(req.body.organizationId && { organizationId: req.body.organizationId }),
         createMissing: req.body.createMissing !== undefined ? req.body.createMissing : true
       };
 
@@ -461,6 +463,43 @@ router.post(
       res.status(500).json({ 
         error: 'Failed to sync players',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/twizzit/sync/preview/players/:credentialId
+ * Preview players for a selected Twizzit team/group (admin/coach)
+ */
+router.post(
+  '/sync/preview/players/:credentialId',
+  requireRole(['admin', 'coach']),
+  [
+    param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID'),
+    body('groupId').trim().notEmpty().withMessage('groupId is required'),
+    body('seasonId').optional().isString().withMessage('seasonId must be a string'),
+    body('organizationId').optional().isString().withMessage('organizationId must be a string')
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const credentialId = parseInt(req.params.credentialId);
+      const options = {
+        groupId: String(req.body.groupId),
+        ...(req.body.seasonId ? { seasonId: req.body.seasonId } : {}),
+        ...(req.body.organizationId ? { organizationId: req.body.organizationId } : {})
+      };
+
+      const preview = await twizzitSync.previewPlayersFromTwizzit(credentialId, options);
+      res.json(preview);
+    } catch (error) {
+      const status = error?.status || 500;
+      console.error('Failed to preview players:', error);
+      res.status(status).json({
+        error: 'Failed to preview players',
+        message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
+        details: error?.details
       });
     }
   }

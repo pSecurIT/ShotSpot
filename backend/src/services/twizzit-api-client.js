@@ -768,30 +768,64 @@ class TwizzitApiClient {
    * @param {string} groupId - Twizzit group ID
    * @returns {Promise<Object>} Group details
    */
-  async getGroup(groupId) {
+  async getGroup(groupId, options = {}) {
     if (!groupId) {
       throw new Error('Group ID is required');
     }
 
     try {
+      const desired = String(groupId);
+      const seasonId = options?.seasonId != null && String(options.seasonId).trim() !== ''
+        ? String(options.seasonId)
+        : null;
+
+      const resolveMatchingGroup = (rows) => {
+        if (!Array.isArray(rows)) return null;
+
+        return rows.find((group) => {
+          const ids = [
+            group?.groupRelationId,
+            group?.group_relation_id,
+            group?.group_relationId,
+            group?.groupRelation_id,
+            group?.id,
+            group?.group_id,
+            group?.groupId,
+            group?.['group-id'],
+            group?.relationId,
+            group?.relation_id,
+            group?.groupRelation?.id,
+            group?.group_relation?.id,
+            group?.relation?.id,
+            group?.group?.id,
+            group?.groupInfo?.id,
+            group?.group_info?.id
+          ]
+            .filter((value) => value != null && String(value).trim() !== '')
+            .map((value) => String(value));
+
+          return ids.includes(desired);
+        });
+      };
+
+      if (seasonId) {
+        try {
+          const seasonGroupsResult = await this.getGroups({ seasonId });
+          const seasonRows = Array.isArray(seasonGroupsResult?.groups) ? seasonGroupsResult.groups : [];
+          const seasonMatch = resolveMatchingGroup(seasonRows);
+          if (seasonMatch) return seasonMatch;
+        } catch {
+          // Fall back to direct id lookup.
+        }
+      }
+
       const response = await this._requestGetWithOrgDiscovery('/v2/api/groups', { id: groupId });
       const groups = Array.isArray(response.data) ? response.data : [];
 
       // Twizzit does not reliably support filtering by `id` for all accounts.
       // If the upstream ignores `?id=...` and returns a full list, ensure we
       // pick the correct group instead of accidentally returning the first.
-      const desired = String(groupId);
-      const match = groups.find((g) => {
-        const id =
-          g?.groupRelationId ??
-          g?.group_relation_id ??
-          g?.group_relationId ??
-          g?.groupRelation_id ??
-          g?.id ??
-          g?.group_id ??
-          g?.groupId;
-        return id != null && String(id) === desired;
-      });
+      const match = resolveMatchingGroup(groups);
 
       if (match) return match;
 
@@ -845,8 +879,8 @@ class TwizzitApiClient {
   }
 
   // Alias for backward compatibility
-  async getTeam(teamId) {
-    return this.getGroup(teamId);
+  async getTeam(teamId, options = {}) {
+    return this.getGroup(teamId, options);
   }
 
   /**

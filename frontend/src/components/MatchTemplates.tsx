@@ -14,6 +14,7 @@ interface MatchTemplate {
   created_by_username?: string;
   created_at: string;
   updated_at: string;
+  allow_same_team: boolean;
 }
 
 interface MatchTemplatesProps {
@@ -38,7 +39,8 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
     description: '',
     number_of_periods: 4,
     period_duration_minutes: 10,
-    competition_type: ''
+    competition_type: '',
+    allow_same_team: false
   });
 
   const fetchTemplates = useCallback(async () => {
@@ -65,7 +67,8 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
       description: '',
       number_of_periods: 4,
       period_duration_minutes: 10,
-      competition_type: ''
+      competition_type: '',
+      allow_same_team: false
     });
     setEditingTemplate(null);
     setShowForm(false);
@@ -106,7 +109,8 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
       description: template.description || '',
       number_of_periods: template.number_of_periods,
       period_duration_minutes: template.period_duration_minutes,
-      competition_type: template.competition_type || ''
+      competition_type: template.competition_type || '',
+      allow_same_team: template.allow_same_team || false
     });
     setShowForm(true);
   };
@@ -129,6 +133,32 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
       setError(axiosError.response?.data?.error || 'Failed to delete template');
+    }
+  };
+
+  const handleClone = async (template: MatchTemplate) => {
+    try {
+      const response = await api.post(`/match-templates/${template.id}/clone`, {});
+      setSuccess(`Template "${template.name}" cloned successfully`);
+      await fetchTemplates();
+      
+      // Optionally open the cloned template for editing
+      const clonedTemplate = response.data;
+      setEditingTemplate(clonedTemplate);
+      setFormData({
+        name: clonedTemplate.name,
+        description: clonedTemplate.description || '',
+        number_of_periods: clonedTemplate.number_of_periods,
+        period_duration_minutes: clonedTemplate.period_duration_minutes,
+        competition_type: clonedTemplate.competition_type || '',
+        allow_same_team: clonedTemplate.allow_same_team || false
+      });
+      setShowForm(true);
+      
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      setError(axiosError.response?.data?.error || 'Failed to clone template');
     }
   };
 
@@ -243,6 +273,21 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
             </div>
           </div>
 
+          <div className="form-section">
+            <h4>🏆 Match Rules</h4>
+            <div className="form-field checkbox-field">
+              <label htmlFor="allow-same-team">
+                <input
+                  id="allow-same-team"
+                  type="checkbox"
+                  checked={formData.allow_same_team}
+                  onChange={(e) => setFormData({ ...formData, allow_same_team: e.target.checked })}
+                />
+                <span>Allow teams to play against themselves (practice matches)</span>
+              </label>
+            </div>
+          </div>
+
           <div className="form-actions">
             <button type="submit" className="primary-button">
               {editingTemplate ? 'Update Template' : 'Create Template'}
@@ -282,6 +327,11 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
                     {template.number_of_periods} × {template.period_duration_minutes} min
                   </span>
                 </div>
+                {template.allow_same_team && (
+                  <div className="detail-row">
+                    <span className="detail-label">✅ Same team allowed</span>
+                  </div>
+                )}
               </div>
               
               <div className="template-actions">
@@ -293,7 +343,16 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
                     Use Template
                   </button>
                 ) : (
-                  <span className="system-badge">System Template</span>
+                  <>
+                    <button 
+                      className="secondary-button"
+                      onClick={() => handleClone(template)}
+                      title="Clone this template to customize it"
+                    >
+                      📋 Clone
+                    </button>
+                    <span className="system-badge">System Template</span>
+                  </>
                 )}
               </div>
             </div>

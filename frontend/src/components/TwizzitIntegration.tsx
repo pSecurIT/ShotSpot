@@ -324,6 +324,8 @@ const TwizzitIntegration: React.FC = () => {
       clearMessages();
       const result = await syncTwizzitTeams(selectedCredential, {
         groupId: groupId || undefined,
+        seasonId: seasonId || undefined,
+        organizationId: organizationId || undefined,
         createMissing,
       });
       

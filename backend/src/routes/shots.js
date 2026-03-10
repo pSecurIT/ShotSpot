@@ -2,6 +2,7 @@ import express from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
+import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
 const router = express.Router();
 
@@ -128,6 +129,18 @@ router.post('/:gameId', [
     // Verify club is participating in this game
     if (club_id !== game.home_club_id && club_id !== game.away_club_id) {
       return res.status(400).json({ error: 'Club is not participating in this game' });
+    }
+
+    // For coaches: verify they have trainer access to the club they're recording for
+    if (req.user.role === 'coach') {
+      const hasAccess = await hasTrainerAccess(req.user.userId, { clubId: club_id });
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'You can only record shots for your assigned team',
+          providedClub: club_id,
+          gameClubs: { home: game.home_club_id, away: game.away_club_id }
+        });
+      }
     }
 
     // Insert shot

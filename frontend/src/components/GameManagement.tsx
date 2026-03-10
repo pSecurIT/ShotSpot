@@ -1,8 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
 interface Team {
+  id: number;
+  name: string;
+  club_id: number;
+  club_name?: string;
+}
+
+interface ClubOption {
   id: number;
   name: string;
 }
@@ -29,6 +36,11 @@ interface MatchTemplate {
   period_duration_minutes: number;
   competition_type: string | null;
   is_system_template: boolean;
+  allow_same_team: boolean;
+}
+
+interface ApiValidationError {
+  msg?: string;
 }
 
 const GameManagement: React.FC = () => {
@@ -44,7 +56,9 @@ const GameManagement: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [newGame, setNewGame] = useState({
+    home_club_id: '',
     home_team_id: '',
+    away_club_id: '',
     away_team_id: '',
     date: ''
   });
@@ -54,15 +68,34 @@ const GameManagement: React.FC = () => {
   const [rescheduleGameId, setRescheduleGameId] = useState<number | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
 
-  const fetchTemplates = useCallback(async () => {
-    try {
-      const response = await api.get('/match-templates');
-      setTemplates(response.data);
-    } catch (error) {
-      console.error('Error fetching templates:', error);
-    }
-  }, []);
+  // Computed values
+  const clubs = useMemo<ClubOption[]>(() => {
+    const uniqueClubs = new Map<number, string>();
+    teams.forEach((team) => {
+      const clubName = typeof team.club_name === 'string' ? team.club_name.trim() : '';
+      if (typeof team.club_id === 'number' && clubName && !uniqueClubs.has(team.club_id)) {
+        uniqueClubs.set(team.club_id, clubName);
+      }
+    });
 
+    return Array.from(uniqueClubs.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [teams]);
+
+  const homeTeams = useMemo(() => {
+    if (!newGame.home_club_id) return [];
+    const selectedHomeClubId = Number(newGame.home_club_id);
+    return teams.filter((team) => team.club_id === selectedHomeClubId);
+  }, [teams, newGame.home_club_id]);
+
+  const awayTeams = useMemo(() => {
+    if (!newGame.away_club_id) return [];
+    const selectedAwayClubId = Number(newGame.away_club_id);
+    return teams.filter((team) => team.club_id === selectedAwayClubId);
+  }, [teams, newGame.away_club_id]);
+
+  // Fetch functions
   const fetchTeams = useCallback(async () => {
     try {
       const response = await api.get('/teams');
@@ -70,6 +103,15 @@ const GameManagement: React.FC = () => {
     } catch (error) {
       console.error('Error fetching teams:', error);
       setError('Failed to fetch teams');
+    }
+  }, []);
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const response = await api.get('/match-templates');
+      setTemplates(response.data);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
     }
   }, []);
 
@@ -87,53 +129,66 @@ const GameManagement: React.FC = () => {
   }, [filterStatus]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchTeams();
-    fetchGames();
-    fetchTemplates();
+    const timeoutId = window.setTimeout(() => {
+      void fetchTeams();
+      void fetchGames();
+      void fetchTemplates();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [fetchTeams, fetchGames, fetchTemplates]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchGames();
-  }, [filterStatus, fetchGames]);
+    const timeoutId = window.setTimeout(() => {
+      void fetchGames();
+    }, 0);
 
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchGames]);
+
+  // Handle game creation
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
-    if (!newGame.home_team_id || !newGame.away_team_id || !newGame.date) {
+    if (!newGame.home_club_id || !newGame.home_team_id || !newGame.away_club_id || !newGame.away_team_id || !newGame.date) {
       setError('All fields are required');
       return;
     }
 
-    if (newGame.home_team_id === newGame.away_team_id) {
+    const selectedTemplateData = selectedTemplate 
+      ? templates.find(t => t.id === parseInt(selectedTemplate))
+      : null;
+    
+    const allowSameTeam = selectedTemplateData?.allow_same_team || false;
+
+    if (newGame.home_team_id === newGame.away_team_id && !allowSameTeam) {
       setError('Home and away teams must be different');
       return;
     }
 
     try {
-      // Create the game first
-      const response = await api.post('/games', {
+      const requestBody = {
+        home_club_id: parseInt(newGame.home_club_id),
+        away_club_id: parseInt(newGame.away_club_id),
         home_team_id: parseInt(newGame.home_team_id),
         away_team_id: parseInt(newGame.away_team_id),
         date: new Date(newGame.date).toISOString()
-      });
+      };
+      console.log('Sending game creation request:', requestBody);
+      const response = await api.post('/games', requestBody);
       
       const createdGame = response.data;
       
-      // Apply template if selected
       if (selectedTemplate) {
         try {
           await api.post(`/match-templates/${selectedTemplate}/apply-to-game/${createdGame.id}`);
-          // Re-fetch the game to get updated data with template applied
           const updatedResponse = await api.get(`/games/${createdGame.id}`);
           setGames([updatedResponse.data, ...games]);
           setSuccess('Game created with template applied successfully');
         } catch (templateErr) {
           console.error('Error applying template:', templateErr);
-          // Game was created but template failed, still show the game
           setGames([createdGame, ...games]);
           setSuccess('Game created, but template could not be applied');
         }
@@ -142,17 +197,27 @@ const GameManagement: React.FC = () => {
         setSuccess('Game created successfully');
       }
       
-      setNewGame({ home_team_id: '', away_team_id: '', date: '' });
+      setNewGame({ home_club_id: '', home_team_id: '', away_club_id: '', away_team_id: '', date: '' });
       setSelectedTemplate('');
       setShowCreateForm(false);
+      
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      const err = error as { response?: { data?: { error?: string } }; message?: string };
-      setError(err.response?.data?.error || 'Error creating game');
-      console.error('Error creating game:', error);
+      const err = error as { response?: { status?: number; data?: { error?: string; errors?: ApiValidationError[] } }; message?: string };
+      const errorMessage = err.response?.data?.error 
+        || err.response?.data?.errors?.[0]?.msg
+        || `Error creating game (HTTP ${err.response?.status || 'unknown'})`;
+      setError(errorMessage);
+      console.error('Error creating game:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+        fullError: error
+      });
     }
   };
 
+  // Other handlers
   const handleEndGame = async (gameId: number) => {
     try {
       setError(null);
@@ -300,15 +365,34 @@ const GameManagement: React.FC = () => {
           <h3>Create New Game</h3>
           <form onSubmit={handleCreateGame}>
             <div className="form-field">
-              <label>
+              <label htmlFor="home-club-select">
+                Home Club:
+                <select
+                  id="home-club-select"
+                  value={newGame.home_club_id}
+                  onChange={(e) => setNewGame({ ...newGame, home_club_id: e.target.value, home_team_id: '' })}
+                  required
+                >
+                  <option value="">Select home club</option>
+                  {clubs.map(club => (
+                    <option key={club.id} value={club.id}>{club.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="home-team-select">
                 Home Team:
                 <select
+                  id="home-team-select"
                   value={newGame.home_team_id}
                   onChange={(e) => setNewGame({ ...newGame, home_team_id: e.target.value })}
+                  disabled={!newGame.home_club_id}
                   required
                 >
                   <option value="">Select home team</option>
-                  {teams.map(team => (
+                  {homeTeams.map(team => (
                     <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
                 </select>
@@ -316,15 +400,34 @@ const GameManagement: React.FC = () => {
             </div>
 
             <div className="form-field">
-              <label>
+              <label htmlFor="away-club-select">
+                Away Club:
+                <select
+                  id="away-club-select"
+                  value={newGame.away_club_id}
+                  onChange={(e) => setNewGame({ ...newGame, away_club_id: e.target.value, away_team_id: '' })}
+                  required
+                >
+                  <option value="">Select away club</option>
+                  {clubs.map(club => (
+                    <option key={club.id} value={club.id}>{club.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="away-team-select">
                 Away Team:
                 <select
+                  id="away-team-select"
                   value={newGame.away_team_id}
                   onChange={(e) => setNewGame({ ...newGame, away_team_id: e.target.value })}
+                  disabled={!newGame.away_club_id}
                   required
                 >
                   <option value="">Select away team</option>
-                  {teams.map(team => (
+                  {awayTeams.map(team => (
                     <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
                 </select>
@@ -513,12 +616,14 @@ const GameManagement: React.FC = () => {
                   )}
 
                   {game.status === 'scheduled' && (
-                    <button 
-                      onClick={() => navigate(`/match/${game.id}`)}
-                      className="primary-button"
-                    >
-                      Prepare Match
-                    </button>
+                    <>
+                      <button 
+                        onClick={() => navigate(`/match/${game.id}`)}
+                        className="primary-button"
+                      >
+                        Prepare Match
+                      </button>
+                    </>
                   )}
 
                   {game.status === 'to_reschedule' && (
