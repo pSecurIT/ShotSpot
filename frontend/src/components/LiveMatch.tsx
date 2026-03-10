@@ -97,6 +97,10 @@ interface Player {
   starting_position?: 'offense' | 'defense'; // Position at match start
 }
 
+interface AssignableTeam {
+  id: number;
+}
+
 interface Possession {
   id: number;
   game_id: number;
@@ -152,6 +156,7 @@ const LiveMatch: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userAssignedTeam, setUserAssignedTeam] = useState<'home' | 'away' | null>(null);
   
   // Pre-match setup state
   const [homePlayers, setHomePlayers] = useState<Player[]>([]);
@@ -291,6 +296,35 @@ const LiveMatch: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id, game?.status, game?.home_team_id, game?.away_team_id]);
 
+  // Fetch user's assignable teams and determine which team they're assigned to in this game
+  const fetchUserAssignedTeam = useCallback(async () => {
+    try {
+      const response = await api.get('/users/me/assignable-teams');
+      const teams = response.data as AssignableTeam[];
+      
+      // If game is loaded, determine which team the user is assigned to
+      if (game?.home_team_id && game?.away_team_id) {
+        const userTeamIds = new Set(teams.map((team) => team.id));
+        
+        // Check if user's team is the home or away team in this game
+        if (userTeamIds.has(game.home_team_id)) {
+          setUserAssignedTeam('home');
+        } else if (userTeamIds.has(game.away_team_id)) {
+          setUserAssignedTeam('away');
+        } else {
+          // User is not assigned to either team (admin without specific team assignment)
+          setUserAssignedTeam(null);
+        }
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching user assigned team:', error);
+      }
+      // Silently fail - this is not critical for the match to proceed
+      setUserAssignedTeam(null);
+    }
+  }, [game?.away_team_id, game?.home_team_id]);
+
   // Check if teams meet minimum player requirements
   const checkTeamRequirements = (): { valid: boolean; message: string } => {
     const homeCount = selectedHomePlayers.size;
@@ -422,11 +456,11 @@ const LiveMatch: React.FC = () => {
   };
 
   // Toggle player selection
-  const togglePlayerSelection = (playerId: number, teamId: number) => {
-    const player = (teamId === game?.home_team_id ? homePlayers : awayPlayers).find(p => p.id === playerId);
+  const togglePlayerSelection = (playerId: number, side: 'home' | 'away') => {
+    const player = (side === 'home' ? homePlayers : awayPlayers).find(p => p.id === playerId);
     if (!player) return;
 
-    if (teamId === game?.home_team_id) {
+    if (side === 'home') {
       setSelectedHomePlayers(prev => {
         const newSet = new Set(prev);
         if (newSet.has(playerId)) {
@@ -490,8 +524,8 @@ const LiveMatch: React.FC = () => {
   };
 
   // Toggle bench player selection (no gender/count limits)
-  const toggleBenchPlayerSelection = (playerId: number, teamId: number) => {
-    if (teamId === game?.home_team_id) {
+  const toggleBenchPlayerSelection = (playerId: number, side: 'home' | 'away') => {
+    if (side === 'home') {
       setHomeBenchPlayers(prev => {
         const newSet = new Set(prev);
         if (newSet.has(playerId)) {
@@ -527,8 +561,8 @@ const LiveMatch: React.FC = () => {
   };
 
   // Set captain (can only select from selected players)
-  const setCaptain = (playerId: number, teamId: number) => {
-    if (teamId === game?.home_team_id) {
+  const setCaptain = (playerId: number, side: 'home' | 'away') => {
+    if (side === 'home') {
       if (selectedHomePlayers.has(playerId)) {
         setHomeCaptainId(playerId);
       }
@@ -540,11 +574,11 @@ const LiveMatch: React.FC = () => {
   };
 
   // Toggle offense assignment (can only assign selected players)
-  const toggleOffenseAssignment = (playerId: number, teamId: number) => {
-    const player = (teamId === game?.home_team_id ? homePlayers : awayPlayers).find(p => p.id === playerId);
+  const toggleOffenseAssignment = (playerId: number, side: 'home' | 'away') => {
+    const player = (side === 'home' ? homePlayers : awayPlayers).find(p => p.id === playerId);
     if (!player) return;
 
-    if (teamId === game?.home_team_id) {
+    if (side === 'home') {
       setHomeOffensePlayers(prev => {
         const newSet = new Set(prev);
         if (newSet.has(playerId)) {
@@ -725,6 +759,14 @@ const LiveMatch: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id, game?.status, game?.home_attacking_side]);
+
+  // Fetch user's assigned team when game is loaded
+  useEffect(() => {
+    if (game) {
+      fetchUserAssignedTeam();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.id, game?.home_team_id, game?.away_team_id]);
 
   // Timer control handlers
   const handleStartTimer = async () => {
@@ -1363,7 +1405,7 @@ const LiveMatch: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={selectedHomePlayers.has(player.id)}
-                          onChange={() => togglePlayerSelection(player.id, game.home_team_id)}
+                          onChange={() => togglePlayerSelection(player.id, 'home')}
                         />
                         <span className="player-info">
                           <span className="player-name-jersey">
@@ -1380,14 +1422,14 @@ const LiveMatch: React.FC = () => {
                         <>
                           <button
                             className={`captain-button ${homeCaptainId === player.id ? 'active' : ''}`}
-                            onClick={() => setCaptain(player.id, game.home_team_id)}
+                            onClick={() => setCaptain(player.id, 'home')}
                             title="Set as captain"
                           >
                             {homeCaptainId === player.id ? '👑 Captain' : 'Make Captain'}
                           </button>
                           <button
                             className={`offense-button ${homeOffensePlayers.has(player.id) ? 'active' : ''}`}
-                            onClick={() => toggleOffenseAssignment(player.id, game.home_team_id)}
+                            onClick={() => toggleOffenseAssignment(player.id, 'home')}
                             title="Assign to offense (need 2M + 2F)"
                           >
                             {homeOffensePlayers.has(player.id) ? '⚔️ Offense' : '🛡️ Defense'}
@@ -1446,7 +1488,7 @@ const LiveMatch: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={selectedAwayPlayers.has(player.id)}
-                          onChange={() => togglePlayerSelection(player.id, game.away_team_id)}
+                          onChange={() => togglePlayerSelection(player.id, 'away')}
                         />
                         <span className="player-info">
                           <span className="player-name-jersey">
@@ -1463,14 +1505,14 @@ const LiveMatch: React.FC = () => {
                         <>
                           <button
                             className={`captain-button ${awayCaptainId === player.id ? 'active' : ''}`}
-                            onClick={() => setCaptain(player.id, game.away_team_id)}
+                            onClick={() => setCaptain(player.id, 'away')}
                             title="Set as captain"
                           >
                             {awayCaptainId === player.id ? '👑 Captain' : 'Make Captain'}
                           </button>
                           <button
                             className={`offense-button ${awayOffensePlayers.has(player.id) ? 'active' : ''}`}
-                            onClick={() => toggleOffenseAssignment(player.id, game.away_team_id)}
+                            onClick={() => toggleOffenseAssignment(player.id, 'away')}
                             title="Assign to offense (need 2M + 2F)"
                           >
                             {awayOffensePlayers.has(player.id) ? '⚔️ Offense' : '🛡️ Defense'}
@@ -1516,7 +1558,7 @@ const LiveMatch: React.FC = () => {
                             <input
                               type="checkbox"
                               checked={homeBenchPlayers.has(player.id)}
-                              onChange={() => toggleBenchPlayerSelection(player.id, game.home_team_id)}
+                              onChange={() => toggleBenchPlayerSelection(player.id, 'home')}
                             />
                             <span className="player-info">
                               <span className="player-name-jersey">
@@ -1553,7 +1595,7 @@ const LiveMatch: React.FC = () => {
                             <input
                               type="checkbox"
                               checked={awayBenchPlayers.has(player.id)}
-                              onChange={() => toggleBenchPlayerSelection(player.id, game.away_team_id)}
+                              onChange={() => toggleBenchPlayerSelection(player.id, 'away')}
                             />
                             <span className="player-info">
                               <span className="player-name-jersey">
@@ -1844,6 +1886,7 @@ const LiveMatch: React.FC = () => {
           onResumeTimer={handleStartTimer}
           onPauseTimer={handlePauseTimer}
           canAddEvents={canAddEvents}
+          userAssignedTeam={userAssignedTeam}
         />
       </div>
 
@@ -1945,6 +1988,7 @@ const LiveMatch: React.FC = () => {
                       fetchGame();
                     }}
                     canAddEvents={canAddEvents}
+                    userAssignedTeam={userAssignedTeam}
                   />
                 )}
 

@@ -39,9 +39,9 @@ const GameManagementWrapper = () => (
 
 describe('GameManagement', () => {
   const mockTeams = [
-    { id: 1, name: 'Team Alpha' },
-    { id: 2, name: 'Team Beta' },
-    { id: 3, name: 'Team Gamma' }
+    { id: 1, name: 'Team Alpha', club_id: 10, club_name: 'Club Alpha' },
+    { id: 2, name: 'Team Beta', club_id: 20, club_name: 'Club Beta' },
+    { id: 3, name: 'Team Gamma', club_id: 30, club_name: 'Club Gamma' }
   ];
 
   const mockGames = [
@@ -86,6 +86,32 @@ describe('GameManagement', () => {
       if (url === '/games') {
         return Promise.resolve({ data: mockGames });
       }
+      if (url === '/match-templates') {
+        return Promise.resolve({ 
+          data: [
+            {
+              id: 1,
+              name: 'Standard Match',
+              description: 'Standard match template',
+              number_of_periods: 4,
+              period_duration_minutes: 10,
+              competition_type: 'league',
+              is_system_template: true,
+              allow_same_team: false
+            },
+            {
+              id: 2,
+              name: 'Practice Match',
+              description: 'Practice match template allowing same team',
+              number_of_periods: 2,
+              period_duration_minutes: 15,
+              competition_type: 'friendly',
+              is_system_template: false,
+              allow_same_team: true
+            }
+          ]
+        });
+      }
       return Promise.resolve({ data: [] });
     });
   });
@@ -125,7 +151,9 @@ describe('GameManagement', () => {
     await user.click(screen.getByText('Create New Game'));
     
     expect(screen.getByText('Create New Game')).toBeInTheDocument();
+    expect(screen.getByText('Home Club:')).toBeInTheDocument();
     expect(screen.getByText('Home Team:')).toBeInTheDocument();
+    expect(screen.getByText('Away Club:')).toBeInTheDocument();
     expect(screen.getByText('Away Team:')).toBeInTheDocument();
     expect(screen.getByText('Date & Time:')).toBeInTheDocument();
   });
@@ -178,13 +206,17 @@ describe('GameManagement', () => {
     await user.click(screen.getByText('Create New Game'));
     
     // Fill out form
-    const homeTeamSelect = screen.getByDisplayValue('Select home team');
-    const awayTeamSelect = screen.getByDisplayValue('Select away team');
+    const homeClubSelect = screen.getByLabelText('Home Club:');
+    const homeTeamSelect = screen.getByLabelText('Home Team:');
+    const awayClubSelect = screen.getByLabelText('Away Club:');
+    const awayTeamSelect = screen.getByLabelText('Away Team:');
     const dateInput = screen.getByLabelText('Date & Time:');
     
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select home team'));
+    await waitForSelectOptions(() => screen.getByLabelText('Home Club:'));
+    await user.selectOptions(homeClubSelect, '10');
     await user.selectOptions(homeTeamSelect, '1');
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select away team'));
+    await waitForSelectOptions(() => screen.getByLabelText('Away Club:'));
+    await user.selectOptions(awayClubSelect, '30');
     await user.selectOptions(awayTeamSelect, '3');
     await user.type(dateInput, '2025-11-15T16:00');
     
@@ -193,6 +225,8 @@ describe('GameManagement', () => {
     
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/games', {
+        home_club_id: 10,
+        away_club_id: 30,
         home_team_id: 1,
         away_team_id: 3,
         date: expect.any(String)
@@ -213,13 +247,17 @@ describe('GameManagement', () => {
     await user.click(screen.getByText('Create New Game'));
     
     // Fill out form with same team for home and away
-    const homeTeamSelect = screen.getByDisplayValue('Select home team');
-    const awayTeamSelect = screen.getByDisplayValue('Select away team');
+    const homeClubSelect = screen.getByLabelText('Home Club:');
+    const homeTeamSelect = screen.getByLabelText('Home Team:');
+    const awayClubSelect = screen.getByLabelText('Away Club:');
+    const awayTeamSelect = screen.getByLabelText('Away Team:');
     const dateInput = screen.getByLabelText('Date & Time:');
     
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select home team'));
+    await waitForSelectOptions(() => screen.getByLabelText('Home Club:'));
+    await user.selectOptions(homeClubSelect, '10');
     await user.selectOptions(homeTeamSelect, '1');
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select away team'));
+    await waitForSelectOptions(() => screen.getByLabelText('Away Club:'));
+    await user.selectOptions(awayClubSelect, '10');
     await user.selectOptions(awayTeamSelect, '1');
     await user.type(dateInput, '2025-11-15T16:00');
     
@@ -231,6 +269,119 @@ describe('GameManagement', () => {
     });
     
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('allows same team when template with allow_same_team is selected', async () => {
+    const user = userEvent.setup();
+    
+    const newGame = {
+      id: 10,
+      home_team_id: 1,
+      away_team_id: 1,
+      home_team_name: 'Team Alpha',
+      away_team_name: 'Team Alpha',
+      date: '2025-11-15T16:00:00Z',
+      status: 'scheduled' as const,
+      home_score: 0,
+      away_score: 0,
+      created_at: '2025-11-06T10:00:00Z',
+      updated_at: '2025-11-06T10:00:00Z'
+    };
+    
+    // Mock successful game creation and template application
+    (api.post as jest.Mock).mockResolvedValueOnce({
+      data: newGame
+    }).mockResolvedValueOnce({
+      // Mock for template application
+      data: {
+        number_of_periods: 2,
+        period_duration_minutes: 15
+      }
+    });
+    
+    // Mock the GET request that fetches the updated game after template application
+    (api.get as jest.Mock).mockImplementation((url) => {
+      if (url === '/teams') {
+        return Promise.resolve({ data: mockTeams });
+      }
+      if (url === '/games') {
+        return Promise.resolve({ data: mockGames });
+      }
+      if (url === '/match-templates') {
+        return Promise.resolve({ 
+          data: [
+            {
+              id: 1,
+              name: 'Standard Match',
+              description: 'Standard match template',
+              number_of_periods: 4,
+              period_duration_minutes: 10,
+              competition_type: 'league',
+              is_system_template: true,
+              allow_same_team: false
+            },
+            {
+              id: 2,
+              name: 'Practice Match',
+              description: 'Practice match template allowing same team',
+              number_of_periods: 2,
+              period_duration_minutes: 15,
+              competition_type: 'friendly',
+              is_system_template: false,
+              allow_same_team: true
+            }
+          ]
+        });
+      }
+      if (url === '/games/10') {
+        return Promise.resolve({ data: newGame });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    
+    render(<GameManagementWrapper />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Create New Game')).toBeInTheDocument();
+    });
+    
+    // Open create form
+    await user.click(screen.getByText('Create New Game'));
+    
+    // Select template that allows same team
+    const templateSelect = screen.getByLabelText('Match Template (Optional):');
+    await user.selectOptions(templateSelect, '2');
+    
+    // Fill out form with same team for home and away
+    const homeClubSelect = screen.getByLabelText('Home Club:');
+    const homeTeamSelect = screen.getByLabelText('Home Team:');
+    const awayClubSelect = screen.getByLabelText('Away Club:');
+    const awayTeamSelect = screen.getByLabelText('Away Team:');
+    const dateInput = screen.getByLabelText('Date & Time:');
+    
+    await waitForSelectOptions(() => screen.getByLabelText('Home Club:'));
+    await user.selectOptions(homeClubSelect, '10');
+    await user.selectOptions(homeTeamSelect, '1');
+    await waitForSelectOptions(() => screen.getByLabelText('Away Club:'));
+    await user.selectOptions(awayClubSelect, '10');
+    await user.selectOptions(awayTeamSelect, '1');
+    await user.type(dateInput, '2025-11-15T16:00');
+    
+    // Submit form - should succeed
+    await user.click(screen.getByText('Create Game'));
+    
+    await waitFor(() => {
+      expect(api.post).toHaveBeenNthCalledWith(1, '/games', {
+        home_club_id: 10,
+        away_club_id: 10,
+        home_team_id: 1,
+        away_team_id: 1,
+        date: expect.any(String)
+      });
+    });
+    
+    // Should not show error
+    expect(screen.queryByText('Home and away teams must be different')).not.toBeInTheDocument();
   });
 
   it('validates required fields', async () => {
@@ -273,6 +424,48 @@ describe('GameManagement', () => {
 
   it('handles API error when creating game', async () => {
     const user = userEvent.setup();
+    
+    // Clear all mocks first
+    vi.clearAllMocks();
+    
+    // Re-setup the GET mocks
+    (api.get as jest.Mock).mockImplementation((url) => {
+      if (url === '/teams') {
+        return Promise.resolve({ data: mockTeams });
+      }
+      if (url === '/games') {
+        return Promise.resolve({ data: mockGames });
+      }
+      if (url === '/match-templates') {
+        return Promise.resolve({ 
+          data: [
+            {
+              id: 1,
+              name: 'Standard Match',
+              description: 'Standard match template',
+              number_of_periods: 4,
+              period_duration_minutes: 10,
+              competition_type: 'league',
+              is_system_template: true,
+              allow_same_team: false
+            },
+            {
+              id: 2,
+              name: 'Practice Match',
+              description: 'Practice match template allowing same team',
+              number_of_periods: 2,
+              period_duration_minutes: 15,
+              competition_type: 'friendly',
+              is_system_template: false,
+              allow_same_team: true
+            }
+          ]
+        });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    
+    // Setup POST to reject with error
     (api.post as jest.Mock).mockRejectedValue({
       response: { data: { error: 'Team conflict: both teams already have a game scheduled' } }
     });
@@ -286,13 +479,17 @@ describe('GameManagement', () => {
     // Open create form and fill it
     await user.click(screen.getByText('Create New Game'));
     
-    const homeTeamSelect = screen.getByDisplayValue('Select home team');
-    const awayTeamSelect = screen.getByDisplayValue('Select away team');
+    const homeClubSelect = screen.getByLabelText('Home Club:');
+    const homeTeamSelect = screen.getByLabelText('Home Team:');
+    const awayClubSelect = screen.getByLabelText('Away Club:');
+    const awayTeamSelect = screen.getByLabelText('Away Team:');
     const dateInput = screen.getByLabelText('Date & Time:');
     
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select home team'));
+    await waitForSelectOptions(() => screen.getByLabelText('Home Club:'));
+    await user.selectOptions(homeClubSelect, '10');
     await user.selectOptions(homeTeamSelect, '1');
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select away team'));
+    await waitForSelectOptions(() => screen.getByLabelText('Away Club:'));
+    await user.selectOptions(awayClubSelect, '20');
     await user.selectOptions(awayTeamSelect, '2');
     await user.type(dateInput, '2025-11-15T16:00');
     
@@ -662,13 +859,17 @@ describe('GameManagement', () => {
     // Open create form and fill it
     await user.click(screen.getByText('Create New Game'));
     
-    const homeTeamSelect = screen.getByDisplayValue('Select home team');
-    const awayTeamSelect = screen.getByDisplayValue('Select away team');
+    const homeClubSelect = screen.getByLabelText('Home Club:');
+    const homeTeamSelect = screen.getByLabelText('Home Team:');
+    const awayClubSelect = screen.getByLabelText('Away Club:');
+    const awayTeamSelect = screen.getByLabelText('Away Team:');
     const dateInput = screen.getByLabelText('Date & Time:');
     
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select home team'));
+    await waitForSelectOptions(() => screen.getByLabelText('Home Club:'));
+    await user.selectOptions(homeClubSelect, '10');
     await user.selectOptions(homeTeamSelect, '1');
-    await waitForSelectOptions(() => screen.getByDisplayValue('Select away team'));
+    await waitForSelectOptions(() => screen.getByLabelText('Away Club:'));
+    await user.selectOptions(awayClubSelect, '30');
     await user.selectOptions(awayTeamSelect, '3');
     await user.type(dateInput, '2025-11-15T16:00');
     

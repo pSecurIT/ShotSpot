@@ -234,6 +234,8 @@ export const syncTwizzitTeams = async (
   credentialId: number,
   options?: {
     groupId?: string;
+    seasonId?: string;
+    organizationId?: string;
     createMissing?: boolean;
   }
 ): Promise<SyncResult> => {

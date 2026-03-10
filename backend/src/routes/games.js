@@ -206,14 +206,28 @@ router.post('/', [
   }
 
   try {
-    // Verify both clubs exist
-    const clubsCheck = await db.query(
-      'SELECT id FROM clubs WHERE id = $1 OR id = $2',
-      [home_club_id, away_club_id]
-    );
-
-    if (clubsCheck.rows.length !== 2) {
-      return res.status(404).json({ error: 'One or both clubs not found' });
+    // Verify clubs exist
+    // If same club for home and away, just check that one club exists once
+    // If different clubs, check that both exist
+    let clubsCheck;
+    if (home_club_id === away_club_id) {
+      // Same club for both sides (allowed for team-level games like practice matches)
+      clubsCheck = await db.query(
+        'SELECT id FROM clubs WHERE id = $1',
+        [home_club_id]
+      );
+      if (clubsCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Club not found' });
+      }
+    } else {
+      // Different clubs for home and away
+      clubsCheck = await db.query(
+        'SELECT id FROM clubs WHERE id = $1 OR id = $2',
+        [home_club_id, away_club_id]
+      );
+      if (clubsCheck.rows.length !== 2) {
+        return res.status(404).json({ error: 'One or both clubs not found' });
+      }
     }
 
     if (req.user.role === 'coach') {

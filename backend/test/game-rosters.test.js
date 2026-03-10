@@ -623,6 +623,200 @@ describe('📋 Game Rosters API', () => {
       }
     });
   });
+
+  describe('🎯 Team Restriction for Coaches', () => {
+    let restrictedClub, restrictedTeam, otherClub, otherTeam, restrictedPlayer, otherPlayer;
+
+    beforeAll(async () => {
+      try {
+        const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+        // Create a club and team that coach has access to
+        const restrictedClubResult = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+          [`Coach Assigned Club ${uniqueId}`]
+        );
+        restrictedClub = restrictedClubResult.rows[0];
+
+        const restrictedTeamResult = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          [`Coach Team ${uniqueId}`, restrictedClub.id]
+        );
+        restrictedTeam = restrictedTeamResult.rows[0];
+
+        // Assign coach to this team
+        await db.query(
+          'INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active) VALUES ($1, $2, $3, true)',
+          [coachUser.id, restrictedClub.id, restrictedTeam.id]
+        );
+
+        // Create player in assigned club
+        const restrictedPlayerResult = await db.query(
+          'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+          [restrictedClub.id, restrictedTeam.id, 'Assigned', 'Player', 99, 'male']
+        );
+        restrictedPlayer = restrictedPlayerResult.rows[0];
+
+        // Create another club/team that coach does NOT have access to
+        const otherClubResult = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+          [`Other Club ${uniqueId}`]
+        );
+        otherClub = otherClubResult.rows[0];
+
+        const otherTeamResult = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          [`Other Team ${uniqueId}`, otherClub.id]
+        );
+        otherTeam = otherTeamResult.rows[0];
+
+        // Create player in other club
+        const otherPlayerResult = await db.query(
+          'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+          [otherClub.id, otherTeam.id, 'Other', 'Player', 88, 'male']
+        );
+        otherPlayer = otherPlayerResult.rows[0];
+
+        console.log('      🔧 Team restriction test data created');
+      } catch (error) {
+        console.error('⚠️ Team restriction test setup failed:', error.message);
+        throw error;
+      }
+    });
+
+    afterAll(async () => {
+      try {
+        await db.query('DELETE FROM trainer_assignments WHERE user_id = $1 AND club_id IN ($2, $3)', [coachUser.id, restrictedClub.id, otherClub.id]);
+        await db.query('DELETE FROM players WHERE id IN ($1, $2)', [restrictedPlayer.id, otherPlayer.id]);
+        await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [restrictedTeam.id, otherTeam.id]);
+        await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [restrictedClub.id, otherClub.id]);
+        console.log('      ✅ Team restriction test cleanup complete');
+      } catch (error) {
+        console.error('⚠️ Team restriction test cleanup failed:', error.message);
+      }
+    });
+
+    it('✅ admin should register players for any club', async () => {
+      try {
+        // Create game with other club
+        const gameResult = await db.query(
+          'INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4, NOW(), \'scheduled\') RETURNING *',
+          [otherClub.id, homeTeam.id, otherTeam.id, null]
+        );
+        const game = gameResult.rows[0];
+
+        const response = await request(app)
+          .post(`/api/game-rosters/${game.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            players: [
+              { club_id: otherClub.id, player_id: otherPlayer.id, is_captain: true, is_starting: true }
+            ]
+          });
+
+        expect(response.status).toBe(201);
+        expect(response.body.roster).toHaveLength(1);
+        console.log('      ✅ Admin can register players from any club');
+
+        await db.query('DELETE FROM games WHERE id = $1', [game.id]);
+      } catch (error) {
+        console.log('      ❌ Admin unrestricted access test failed:', error.message);
+        global.testContext.logTestError(error, 'Admin unrestricted access failed');
+        throw error;
+      }
+    });
+
+    it('✅ coach should register players only from assigned team', async () => {
+      try {
+        // Create game with coach's assigned team
+        const gameResult = await db.query(
+          'INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4, NOW(), \'scheduled\') RETURNING *',
+          [restrictedClub.id, homeTeam.id, restrictedTeam.id, null]
+        );
+        const game = gameResult.rows[0];
+
+        const response = await request(app)
+          .post(`/api/game-rosters/${game.id}`)
+          .set('Authorization', `Bearer ${coachToken}`)
+          .send({
+            players: [
+              { club_id: restrictedClub.id, player_id: restrictedPlayer.id, is_captain: true, is_starting: true }
+            ]
+          });
+
+        expect(response.status).toBe(201);
+        expect(response.body.roster).toHaveLength(1);
+        console.log('      ✅ Coach can register players from assigned team');
+
+        await db.query('DELETE FROM games WHERE id = $1', [game.id]);
+      } catch (error) {
+        console.log('      ❌ Coach assigned team access test failed:', error.message);
+        global.testContext.logTestError(error, 'Coach assigned team access failed');
+        throw error;
+      }
+    });
+
+    it('❌ coach should NOT register players from unassigned club', async () => {
+      try {
+        // Create game with other club (not assigned to coach)
+        const gameResult = await db.query(
+          'INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4, NOW(), \'scheduled\') RETURNING *',
+          [otherClub.id, homeTeam.id, otherTeam.id, null]
+        );
+        const game = gameResult.rows[0];
+
+        const response = await request(app)
+          .post(`/api/game-rosters/${game.id}`)
+          .set('Authorization', `Bearer ${coachToken}`)
+          .send({
+            players: [
+              { club_id: otherClub.id, player_id: otherPlayer.id, is_captain: true, is_starting: true }
+            ]
+          });
+
+        expect(response.status).toBe(403);
+        expect(response.body.error).toContain('assigned team');
+        console.log('      ✅ Coach correctly blocked from unassigned club');
+
+        await db.query('DELETE FROM games WHERE id = $1', [game.id]);
+      } catch (error) {
+        console.log('      ❌ Coach restriction test failed:', error.message);
+        global.testContext.logTestError(error, 'Coach restriction failed');
+        throw error;
+      }
+    });
+
+    it('❌ coach should NOT register players from multiple clubs', async () => {
+      try {
+        // Create game
+        const gameResult = await db.query(
+          'INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4, NOW(), \'scheduled\') RETURNING *',
+          [restrictedClub.id, homeTeam.id, restrictedTeam.id, null]
+        );
+        const game = gameResult.rows[0];
+
+        const response = await request(app)
+          .post(`/api/game-rosters/${game.id}`)
+          .set('Authorization', `Bearer ${coachToken}`)
+          .send({
+            players: [
+              { club_id: restrictedClub.id, player_id: restrictedPlayer.id, is_captain: true, is_starting: true },
+              { club_id: otherClub.id, player_id: otherPlayer.id, is_captain: false, is_starting: true }
+            ]
+          });
+
+        expect(response.status).toBe(403);
+        expect(response.body.error).toContain('assigned team');
+        console.log('      ✅ Coach correctly blocked from multi-club registration');
+
+        await db.query('DELETE FROM games WHERE id = $1', [game.id]);
+      } catch (error) {
+        console.log('      ❌ Multi-club restriction test failed:', error.message);
+        global.testContext.logTestError(error, 'Multi-club restriction failed');
+        throw error;
+      }
+    });
+  });
 });
 
 

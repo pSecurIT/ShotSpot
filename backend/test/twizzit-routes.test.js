@@ -281,8 +281,7 @@ describe('Twizzit API Routes', () => {
     });
   });
 
-  describe.skip('POST /api/twizzit/sync/preview/players/:credentialId', () => {
-    // Route not yet implemented
+  describe('POST /api/twizzit/sync/preview/players/:credentialId', () => {
     it('should validate missing groupId', async () => {
       const response = await request(app)
         .post(`/api/twizzit/sync/preview/players/${credentialId}`)
@@ -395,7 +394,7 @@ describe('Twizzit API Routes', () => {
         `INSERT INTO twizzit_team_mappings (local_club_id, twizzit_team_id, twizzit_team_name, sync_status, last_synced_at)
          VALUES ($1, $2, $3, 'success', CURRENT_TIMESTAMP)
          RETURNING id`,
-        [mappingsTeamId, 'tw-team-1', 'Twizzit Team Name']
+        [mappingsClubId, 'tw-team-1', 'Twizzit Team Name']
       );
       mappingsTeamMappingId = tm.rows[0].id;
 
@@ -463,7 +462,7 @@ describe('Twizzit API Routes', () => {
           `INSERT INTO twizzit_team_mappings (local_club_id, twizzit_team_id, twizzit_team_name, sync_status, last_synced_at)
            VALUES ($1, $2, $3, 'success', CURRENT_TIMESTAMP)
            RETURNING id`,
-          [mappingsTeamId, 'tw-team-1', 'Twizzit Team Name']
+          [mappingsClubId, 'tw-team-1', 'Twizzit Team Name']
         );
         mappingsTeamMappingId = tm.rows[0].id;
       }
@@ -490,7 +489,7 @@ describe('Twizzit API Routes', () => {
 
       // Act: filtered list
       const response = await request(app)
-        .get(`/api/twizzit/mappings/players?teamId=${mappingsTeamId}`)
+        .get(`/api/twizzit/mappings/players?teamId=${mappingsClubId}`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       // Assert

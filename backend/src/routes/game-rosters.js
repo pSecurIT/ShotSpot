@@ -89,11 +89,17 @@ router.post(
     const { players } = req.body;
 
     try {
-      // Check if game exists
-      const gameCheck = await pool.query('SELECT id FROM games WHERE id = $1', [gameId]);
+      // Check if game exists and fetch its details
+      const gameCheck = await pool.query(
+        'SELECT id, home_club_id, away_club_id FROM games WHERE id = $1',
+        [gameId]
+      );
       if (gameCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Game not found' });
       }
+
+      const game = gameCheck.rows[0];
+      const gameClubIds = [game.home_club_id, game.away_club_id].filter(Boolean);
 
       // Preload Twizzit mappings for provided players to surface non-blocking alerts
       const playerIds = players.map((p) => p.player_id);
@@ -105,10 +111,10 @@ router.post(
         : { rows: [] };
       const mappingByPlayer = new Map(mappingResult.rows.map((row) => [row.local_player_id, row]));
 
-      // For coaches, enforce trainer assignment only when assignments exist for the coach
+      // For coaches, enforce trainer assignment and single team restriction
       if (req.user.role === 'coach') {
         const assignments = await pool.query(
-          `SELECT club_id, team_id
+          `SELECT DISTINCT club_id, team_id
              FROM trainer_assignments
             WHERE user_id = $1
               AND is_active = true
@@ -118,12 +124,38 @@ router.post(
         );
 
         if (assignments.rowCount > 0) {
+          const assignedClubIds = new Set(assignments.rows.map((a) => a.club_id));
           const clubIds = [...new Set(players.map((p) => p.club_id))];
+
+          // Validate: coaches can only register for their assigned clubs
           for (const clubId of clubIds) {
-            const allowed = await hasTrainerAccess(req.user.userId, { clubId });
-            if (!allowed) {
-              return res.status(403).json({ error: 'Trainer assignment required for this club to set roster', clubId });
+            if (!assignedClubIds.has(clubId)) {
+              return res.status(403).json({
+                error: 'You can only register players for your assigned team',
+                providedClub: clubId,
+                assignedClubs: Array.from(assignedClubIds)
+              });
             }
+          }
+
+          // Validate: coaches can only register for clubs participating in this game
+          for (const clubId of clubIds) {
+            if (!gameClubIds.includes(clubId)) {
+              return res.status(403).json({
+                error: 'Your assigned team is not participating in this game',
+                providedClub: clubId,
+                gameClubs: gameClubIds
+              });
+            }
+          }
+
+          // Validate: coaches can only register players for ONE club per game
+          if (clubIds.length > 1) {
+            return res.status(400).json({
+              error: 'Can only register players for one team per game',
+              providedClubs: clubIds,
+              gameClubs: gameClubIds
+            });
           }
         }
       }

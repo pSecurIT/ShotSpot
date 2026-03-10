@@ -2,6 +2,7 @@ import express from 'express';
 import { body, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
+import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
 const router = express.Router();
 
@@ -141,12 +142,28 @@ router.post('/:gameId', [
 
   try {
     // Verify game exists and is in progress
-    const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
+    const gameResult = await db.query(
+      'SELECT * FROM games WHERE id = $1',
+      [gameId]
+    );
     if (gameResult.rows.length === 0) {
       return res.status(404).json({ error: 'Game not found' });
     }
 
     const game = gameResult.rows[0];
+
+    // Check trainer access for coaches
+    if (req.user.role === 'coach') {
+      const hasHomeAccess = game.home_club_id ? await hasTrainerAccess(req.user.userId, { clubId: game.home_club_id }) : false;
+      const hasAwayAccess = game.away_club_id ? await hasTrainerAccess(req.user.userId, { clubId: game.away_club_id }) : false;
+      
+      if (!hasHomeAccess && !hasAwayAccess) {
+        return res.status(403).json({ 
+          error: 'You must be assigned as trainer to one of the teams to create events for this game'
+        });
+      }
+    }
+
     if (game.status !== 'in_progress') {
       return res.status(400).json({ 
         error: 'Cannot add events to game that is not in progress',
@@ -161,6 +178,18 @@ router.post('/:gameId', [
         gameClubs: { home: game.home_club_id, away: game.away_club_id },
         providedClub: club_id
       });
+    }
+
+    // For coaches: verify they have trainer access to the club they're recording for
+    if (req.user.role === 'coach') {
+      const hasAccess = await hasTrainerAccess(req.user.userId, { clubId: club_id });
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'You can only record events for your assigned team',
+          providedClub: club_id,
+          gameClubs: { home: game.home_club_id, away: game.away_club_id }
+        });
+      }
     }
 
     // If player_id is provided, verify player belongs to the club
@@ -281,6 +310,30 @@ router.put('/:gameId/:eventId', [
   }
 
   const { gameId, eventId } = req.params;
+  // Verify game exists and check trainer access
+  const gameResult = await db.query(
+    'SELECT home_club_id, away_club_id FROM games WHERE id = $1',
+    [gameId]
+  );
+
+  if (gameResult.rows.length === 0) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+
+  const game = gameResult.rows[0];
+
+  // Check trainer access for coaches
+  if (req.user.role === 'coach') {
+    const hasHomeAccess = game.home_club_id ? await hasTrainerAccess(req.user.userId, { clubId: game.home_club_id }) : false;
+    const hasAwayAccess = game.away_club_id ? await hasTrainerAccess(req.user.userId, { clubId: game.away_club_id }) : false;
+      
+    if (!hasHomeAccess && !hasAwayAccess) {
+      return res.status(403).json({ 
+        error: 'You must be assigned as trainer to one of the teams to update events for this game'
+      });
+    }
+  }
+
   const { event_type, player_id, club_id, period, time_remaining, details } = req.body;
 
   try {
@@ -380,6 +433,30 @@ router.delete('/:gameId/:eventId', [
   const { gameId, eventId } = req.params;
 
   try {
+    // Verify game exists and check trainer access
+    const gameResult = await db.query(
+      'SELECT home_club_id, away_club_id FROM games WHERE id = $1',
+      [gameId]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    const game = gameResult.rows[0];
+
+    // Check trainer access for coaches
+    if (req.user.role === 'coach') {
+      const hasHomeAccess = game.home_club_id ? await hasTrainerAccess(req.user.userId, { clubId: game.home_club_id }) : false;
+      const hasAwayAccess = game.away_club_id ? await hasTrainerAccess(req.user.userId, { clubId: game.away_club_id }) : false;
+
+      if (!hasHomeAccess && !hasAwayAccess) {
+        return res.status(403).json({
+          error: 'You must be assigned as trainer to one of the teams to delete events for this game'
+        });
+      }
+    }
+
     // Verify event exists
     const eventResult = await db.query(
       'SELECT * FROM game_events WHERE id = $1 AND game_id = $2',

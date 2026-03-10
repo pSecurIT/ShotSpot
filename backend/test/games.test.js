@@ -845,6 +845,140 @@ describe('🎮 Games API', () => {
       }
     });
   });
+
+  describe('🏀 Practice Match Support', () => {
+    let team1, team2;
+
+    beforeAll(async () => {
+      try {
+        // Create teams for practice match testing
+        const team1Result = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          ['Practice Team A', club1.id]
+        );
+        team1 = team1Result.rows[0];
+
+        const team2Result = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          ['Practice Team B', club1.id]
+        );
+        team2 = team2Result.rows[0];
+      } catch (error) {
+        console.error('⚠️ Practice match test setup failed:', error.message);
+        throw error;
+      }
+    });
+
+    afterAll(async () => {
+      try {
+        await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [team1.id, team2.id]);
+      } catch (error) {
+        console.error('⚠️ Practice match test cleanup failed:', error.message);
+      }
+    });
+
+    it('✅ should allow creating practice match with same club (team-level)', async () => {
+      try {
+        const gameData = {
+          home_club_id: club1.id,
+          away_club_id: club1.id, // Same club
+          home_team_id: team1.id,
+          away_team_id: team2.id,
+          date: new Date('2026-03-15T14:00:00Z').toISOString()
+        };
+
+        const response = await request(app)
+          .post('/api/games')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(gameData);
+
+        expect(response.status).toBe(201);
+        expect(response.body.home_club_id).toBe(club1.id);
+        expect(response.body.away_club_id).toBe(club1.id);
+        expect(response.body.home_team_id).toBe(team1.id);
+        expect(response.body.away_team_id).toBe(team2.id);
+        console.log('      ✅ Practice match created successfully with same club');
+      } catch (error) {
+        console.log('      ❌ Practice match creation test failed:', error.message);
+        global.testContext.logTestError(error, 'Practice match creation failed');
+        throw error;
+      }
+    });
+
+    it('✅ should allow practice match with same team (home vs away)', async () => {
+      try {
+        const gameData = {
+          home_club_id: club1.id,
+          away_club_id: club1.id,
+          home_team_id: team1.id,
+          away_team_id: team1.id, // Same team!
+          date: new Date('2026-03-16T14:00:00Z').toISOString()
+        };
+
+        const response = await request(app)
+          .post('/api/games')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(gameData);
+
+        expect(response.status).toBe(201);
+        expect(response.body.home_team_id).toBe(team1.id);
+        expect(response.body.away_team_id).toBe(team1.id);
+        console.log('      ✅ Same team practice match created successfully');
+      } catch (error) {
+        console.log('      ❌ Same team practice match test failed:', error.message);
+        global.testContext.logTestError(error, 'Same team practice match failed');
+        throw error;
+      }
+    });
+
+    it('❌ should reject same club without team IDs (club-level)', async () => {
+      try {
+        const gameData = {
+          home_club_id: club1.id,
+          away_club_id: club1.id, // Same club
+          // No team IDs - should fail
+          date: new Date('2026-03-17T14:00:00Z').toISOString()
+        };
+
+        const response = await request(app)
+          .post('/api/games')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(gameData);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('Home and away clubs must be different');
+        console.log('      ✅ Same club without teams correctly rejected');
+      } catch (error) {
+        console.log('      ❌ Same club rejection test failed:', error.message);
+        global.testContext.logTestError(error, 'Same club rejection failed');
+        throw error;
+      }
+    });
+
+    it('✅ should validate club exists for practice matches', async () => {
+      try {
+        const gameData = {
+          home_club_id: club1.id,
+          away_club_id: club1.id,
+          home_team_id: team1.id,
+          away_team_id: team2.id,
+          date: new Date('2026-03-18T14:00:00Z').toISOString()
+        };
+
+        const response = await request(app)
+          .post('/api/games')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(gameData);
+
+        expect(response.status).toBe(201);
+        console.log('      ✅ Practice match club validation working');
+      } catch (error) {
+        console.log('      ❌ Practice match club validation test failed:', error.message);
+        global.testContext.logTestError(error, 'Club validation failed');
+        throw error;
+      }
+    });
+  });
 });
 
 

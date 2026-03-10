@@ -575,7 +575,7 @@ export async function previewTeamsFromTwizzit(credentialId, options = {}) {
     }
 
     try {
-      const group = await apiClient.getGroup(groupId);
+      const group = await apiClient.getGroup(groupId, seasonId ? { seasonId } : {});
       return { total: 1, teams: [mapTwizzitGroupToOption(group)] };
     } catch (e) {
       const err = new Error(`Group not found: ${groupId}`);
@@ -788,7 +788,7 @@ export async function syncClubsFromTwizzit(credentialId, options = {}) {
       }
 
       if (allTeams.length === 0) {
-        const team = await apiClient.getTeam(selectedGroupId);
+        const team = await apiClient.getTeam(selectedGroupId, seasonId ? { seasonId } : {});
         allTeams = [team];
       }
     } else {

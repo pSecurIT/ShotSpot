@@ -173,6 +173,37 @@ describe('Match Templates API', () => {
 
       expect(res.statusCode).toBe(400);
     });
+
+    it('should create template with allow_same_team flag', async () => {
+      const res = await request(app)
+        .post('/api/match-templates')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          name: 'Practice Match Template',
+          description: 'Template for practice matches',
+          number_of_periods: 2,
+          period_duration_minutes: 15,
+          competition_type: 'friendly',
+          allow_same_team: true
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.name).toBe('Practice Match Template');
+      expect(res.body.allow_same_team).toBe(true);
+    });
+
+    it('should default allow_same_team to false when not specified', async () => {
+      const res = await request(app)
+        .post('/api/match-templates')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          name: 'Default Allow Same Team Template',
+          number_of_periods: 4
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.allow_same_team).toBe(false);
+    });
   });
 
   describe('GET /api/match-templates/:id', () => {
@@ -264,6 +295,18 @@ describe('Match Templates API', () => {
         });
 
       expect(res.statusCode).toBe(403);
+    });
+
+    it('should update allow_same_team field', async () => {
+      const res = await request(app)
+        .put(`/api/match-templates/${templateId}`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          allow_same_team: true
+        });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.allow_same_team).toBe(true);
     });
   });
 
@@ -412,6 +455,100 @@ describe('Match Templates API', () => {
       expect(res.statusCode).toBe(404);
     });
   });
-});
 
+  describe('POST /api/match-templates/:id/clone', () => {
+    let templateId;
+    let systemTemplateId;
+
+    beforeAll(async () => {
+      // Create a user template
+      const res = await request(app)
+        .post('/api/match-templates')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          name: 'Clone Source Template',
+          description: 'Template to be cloned',
+          number_of_periods: 3,
+          period_duration_minutes: 12,
+          competition_type: 'friendly',
+          allow_same_team: true
+        });
+      templateId = res.body.id;
+
+      // Get a system template
+      const templatesRes = await request(app)
+        .get('/api/match-templates')
+        .set('Authorization', `Bearer ${coachToken}`);
+      
+      systemTemplateId = templatesRes.body.find(t => t.is_system_template)?.id;
+    });
+
+    afterAll(async () => {
+      // Clean up cloned templates and original
+      await db.query('DELETE FROM match_templates WHERE name LIKE \'%Clone Source Template%\' OR name LIKE \'%Copy%\'');
+    });
+
+    it('should clone a user template as coach', async () => {
+      const res = await request(app)
+        .post(`/api/match-templates/${templateId}/clone`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .set('Content-Type', 'application/json');
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.name).toBe('Clone Source Template (Copy)');
+      expect(res.body.description).toBe('Template to be cloned');
+      expect(res.body.number_of_periods).toBe(3);
+      expect(res.body.period_duration_minutes).toBe(12);
+      expect(res.body.allow_same_team).toBe(true);
+      expect(res.body.is_system_template).toBe(false);
+      expect(res.body.created_by).toBe(coachId);
+    });
+
+    it('should clone a system template', async () => {
+      if (!systemTemplateId) {
+        console.warn('No system template found, skipping test');
+        return;
+      }
+
+      const res = await request(app)
+        .post(`/api/match-templates/${systemTemplateId}/clone`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .set('Content-Type', 'application/json');
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.is_system_template).toBe(false);
+      expect(res.body.created_by).toBe(coachId);
+      expect(res.body.name).toContain('(Copy)');
+    });
+
+    it('should clone with custom name', async () => {
+      const res = await request(app)
+        .post(`/api/match-templates/${templateId}/clone`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({ name: 'My Custom Cloned Template' })
+        .set('Content-Type', 'application/json');
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.name).toBe('My Custom Cloned Template');
+    });
+
+    it('should return 404 for non-existent template', async () => {
+      const res = await request(app)
+        .post('/api/match-templates/99999/clone')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .set('Content-Type', 'application/json');
+
+      expect(res.statusCode).toBe(404);
+    });
+
+    it('should reject clone from regular user', async () => {
+      const res = await request(app)
+        .post(`/api/match-templates/${templateId}/clone`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .set('Content-Type', 'application/json');
+
+      expect(res.statusCode).toBe(403);
+    });
+  });
+});
 
