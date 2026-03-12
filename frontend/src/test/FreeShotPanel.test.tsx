@@ -18,6 +18,8 @@ describe('FreeShotPanel', () => {
     gameId: 1,
     homeTeamId: 1,
     awayTeamId: 2,
+    homeClubId: 100,
+    awayClubId: 101,
     homeTeamName: 'Team Alpha',
     awayTeamName: 'Team Beta',
     currentPeriod: 1,
@@ -26,13 +28,13 @@ describe('FreeShotPanel', () => {
   };
 
   const mockHomePlayers = [
-    { id: 1, team_id: 1, first_name: 'John', last_name: 'Doe', jersey_number: 10, gender: 'M' },
-    { id: 2, team_id: 1, first_name: 'Jane', last_name: 'Smith', jersey_number: 11, gender: 'F' }
+    { id: 1, team_id: 1, club_id: 100, first_name: 'John', last_name: 'Doe', jersey_number: 10, gender: 'M', is_starting: true },
+    { id: 2, team_id: 1, club_id: 100, first_name: 'Jane', last_name: 'Smith', jersey_number: 11, gender: 'F', is_starting: true }
   ];
 
   const mockAwayPlayers = [
-    { id: 3, team_id: 2, first_name: 'Bob', last_name: 'Johnson', jersey_number: 20, gender: 'M' },
-    { id: 4, team_id: 2, first_name: 'Alice', last_name: 'Wilson', jersey_number: 21, gender: 'F' }
+    { id: 3, team_id: 2, club_id: 101, first_name: 'Bob', last_name: 'Johnson', jersey_number: 20, gender: 'M', is_starting: true },
+    { id: 4, team_id: 2, club_id: 101, first_name: 'Alice', last_name: 'Wilson', jersey_number: 21, gender: 'F', is_starting: true }
   ];
 
   beforeEach(() => {
@@ -41,11 +43,8 @@ describe('FreeShotPanel', () => {
     // Mock API responses
     (api.get as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/game-rosters')) {
-        if (url.includes('team_id=1')) {
-          return Promise.resolve({ data: mockHomePlayers });
-        } else if (url.includes('team_id=2')) {
-          return Promise.resolve({ data: mockAwayPlayers });
-        }
+         // Return combined roster from both teams
+         return Promise.resolve({ data: [...mockHomePlayers, ...mockAwayPlayers] });
       } else if (url.includes('/free-shots')) {
         return Promise.resolve({ data: [] });
       }
@@ -82,8 +81,7 @@ describe('FreeShotPanel', () => {
     
     // Wait for players to load
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith(`/game-rosters/1?team_id=1&is_starting=true`);
-      expect(api.get).toHaveBeenCalledWith(`/game-rosters/1?team_id=2&is_starting=true`);
+      expect(api.get).toHaveBeenCalledWith(`/game-rosters/1`);
     });
     
     // Switch to away team
@@ -126,9 +124,10 @@ describe('FreeShotPanel', () => {
     
     // Verify API call
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/free-shots/1', expect.objectContaining({
+      expect(api.post).toHaveBeenCalledWith('/free-shots', expect.objectContaining({
+        game_id: 1,
         player_id: 1,
-        team_id: 1,
+        club_id: 100,
         period: 1,
         time_remaining: '00:08:30',
         free_shot_type: 'free_shot',
@@ -167,9 +166,10 @@ describe('FreeShotPanel', () => {
     
     // Verify API call
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/free-shots/1', expect.objectContaining({
+      expect(api.post).toHaveBeenCalledWith('/free-shots', expect.objectContaining({
+        game_id: 1,
         player_id: 3,
-        team_id: 2,
+        club_id: 101,
         free_shot_type: 'free_shot',
         result: 'miss'
       }));
@@ -201,9 +201,10 @@ describe('FreeShotPanel', () => {
     
     // Verify API call
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/free-shots/1', expect.objectContaining({
+      expect(api.post).toHaveBeenCalledWith('/free-shots', expect.objectContaining({
+        game_id: 1,
         player_id: 2,
-        team_id: 1,
+        club_id: 100,
         free_shot_type: 'penalty',
         result: 'blocked'
       }));

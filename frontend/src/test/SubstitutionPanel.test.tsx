@@ -18,6 +18,8 @@ describe('SubstitutionPanel', () => {
   const mockGameId = 1;
   const mockHomeTeamId = 10;
   const mockAwayTeamId = 20;
+  const mockHomeClubId = 100;
+  const mockAwayClubId = 101;
   const mockHomeTeamName = 'Home Warriors';
   const mockAwayTeamName = 'Away Tigers';
   const mockCurrentPeriod = 2;
@@ -48,7 +50,7 @@ describe('SubstitutionPanel', () => {
     {
       id: 1,
       game_id: 1,
-      team_id: 10,
+      club_id: 100,
       player_in_id: 3,
       player_out_id: 1,
       period: 1,
@@ -60,7 +62,7 @@ describe('SubstitutionPanel', () => {
       player_out_first_name: 'John',
       player_out_last_name: 'Doe',
       player_out_jersey_number: 10,
-      team_name: 'Home Warriors',
+      club_name: 'Home Warriors',
       created_at: new Date().toISOString()
     }
   ];
@@ -109,6 +111,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -127,9 +131,12 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
+        onSubstitutionRecorded={mockOnSubstitutionRecorded}
       />
     );
 
@@ -145,6 +152,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -166,6 +175,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -193,6 +204,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -214,6 +227,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -235,6 +250,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -264,7 +281,7 @@ describe('SubstitutionPanel', () => {
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith(`/substitutions/${mockGameId}`, {
-        team_id: mockHomeTeamId,
+        club_id: mockHomeClubId,
         player_in_id: 3,
         player_out_id: 1,
         period: mockCurrentPeriod,
@@ -285,6 +302,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -319,6 +338,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -350,6 +371,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -377,6 +400,8 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
@@ -415,9 +440,12 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
+        onSubstitutionRecorded={mockOnSubstitutionRecorded}
       />
     );
 
@@ -440,9 +468,12 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
+        onSubstitutionRecorded={mockOnSubstitutionRecorded}
       />
     );
 
@@ -466,9 +497,12 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
+        onSubstitutionRecorded={mockOnSubstitutionRecorded}
       />
     );
 
@@ -502,9 +536,12 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
+        onSubstitutionRecorded={mockOnSubstitutionRecorded}
       />
     );
 
@@ -521,9 +558,12 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
+        onSubstitutionRecorded={mockOnSubstitutionRecorded}
       />
     );
 
@@ -547,9 +587,12 @@ describe('SubstitutionPanel', () => {
         gameId={mockGameId}
         homeTeamId={mockHomeTeamId}
         awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
         homeTeamName={mockHomeTeamName}
         awayTeamName={mockAwayTeamName}
         currentPeriod={mockCurrentPeriod}
+        onSubstitutionRecorded={mockOnSubstitutionRecorded}
       />
     );
 

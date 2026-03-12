@@ -386,6 +386,12 @@ router.post(
       const result = await twizzitSync.syncClubsFromTwizzit(credentialId, options);
       res.json(result);
     } catch (error) {
+      if (error?.code === 'TWIZZIT_CREDENTIAL_NOT_FOUND') {
+        return res.status(404).json({
+          error: 'Twizzit credential not found',
+          message: error.message
+        });
+      }
       console.error('Failed to sync clubs:', error);
       res.status(500).json({ 
         error: 'Failed to sync clubs',
@@ -424,6 +430,12 @@ router.post(
       const result = await twizzitSync.syncClubsFromTwizzit(credentialId, options);
       res.json(result);
     } catch (error) {
+      if (error?.code === 'TWIZZIT_CREDENTIAL_NOT_FOUND') {
+        return res.status(404).json({
+          error: 'Twizzit credential not found',
+          message: error.message
+        });
+      }
       console.error('Failed to sync teams:', error);
       res.status(500).json({ 
         error: 'Failed to sync teams',
@@ -459,6 +471,12 @@ router.post(
       const result = await twizzitSync.syncPlayersFromTwizzit(credentialId, options);
       res.json(result);
     } catch (error) {
+      if (error?.code === 'TWIZZIT_CREDENTIAL_NOT_FOUND') {
+        return res.status(404).json({
+          error: 'Twizzit credential not found',
+          message: error.message
+        });
+      }
       console.error('Failed to sync players:', error);
       res.status(500).json({ 
         error: 'Failed to sync players',

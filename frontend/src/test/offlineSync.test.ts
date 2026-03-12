@@ -231,7 +231,7 @@ describe('Offline Sync Manager', () => {
 
     it('should correctly handle object data without double-encoding', async () => {
       const data = { username: 'admin', password: 'testpass' };
-      await queueAction('POST', '/api/auth/login', data);
+      await queueAction('POST', '/api/games', data);
       
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
@@ -258,7 +258,7 @@ describe('Offline Sync Manager', () => {
       const stringifiedData = JSON.stringify(data);
       
       // Simulate data that's already been stringified (edge case)
-      await queueAction('POST', '/api/auth/login', stringifiedData as unknown as object);
+      await queueAction('POST', '/api/games', stringifiedData as unknown as object);
       
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
@@ -279,6 +279,20 @@ describe('Offline Sync Manager', () => {
       // Parse it back to verify it's valid JSON
       const parsed = JSON.parse(body);
       expect(parsed).toEqual(data);
+    });
+
+    it('should discard twizzit sync actions from offline replay', async () => {
+      await queueAction('POST', '/api/twizzit/sync/teams/1', { seasonId: '2025' });
+
+      const result = await processQueue();
+
+      expect(result.total).toBe(1);
+      expect(result.successful).toBe(1);
+      expect(result.failed).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+
+      const actions = await getUnsyncedActions();
+      expect(actions).toHaveLength(0);
     });
 
     it('should handle complex nested objects without double-encoding', async () => {

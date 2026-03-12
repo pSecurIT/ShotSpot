@@ -691,6 +691,19 @@ async function logSyncHistory(syncData) {
   }
 }
 
+async function assertCredentialExists(credentialId) {
+  const result = await db.query(
+    'SELECT id FROM twizzit_credentials WHERE id = $1 LIMIT 1',
+    [credentialId]
+  );
+
+  if (result.rows.length === 0) {
+    const error = new Error(`Twizzit credential ${credentialId} not found`);
+    error.code = 'TWIZZIT_CREDENTIAL_NOT_FOUND';
+    throw error;
+  }
+}
+
 /**
  * Update sync history record
  * @param {number} syncId - Sync history ID
@@ -731,6 +744,8 @@ async function updateSyncHistory(syncId, updates) {
  * @returns {Promise<Object>} Sync results
  */
 export async function syncClubsFromTwizzit(credentialId, options = {}) {
+  await assertCredentialExists(credentialId);
+
   const startTime = new Date();
   const syncId = await logSyncHistory({
     credentialId,
@@ -1181,6 +1196,8 @@ async function syncTeamPlayers(credentialId, twizzitTeamId, localTeamId, options
  * @returns {Promise<Object>} Sync results
  */
 export async function syncPlayersFromTwizzit(credentialId, _options = {}) {
+  await assertCredentialExists(credentialId);
+
   const startTime = new Date();
   const syncId = await logSyncHistory({
     credentialId,

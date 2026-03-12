@@ -123,7 +123,18 @@ router.post('/:gameId', [
 
     const player = playerCheck.rows[0];
     if (player.club_id !== club_id) {
-      return res.status(400).json({ error: 'Player does not belong to the specified club' });
+      // Fallback for migrated data: allow if player is explicitly rostered for this game and club.
+      const rosterCheck = await db.query(
+        `SELECT 1
+         FROM game_rosters
+         WHERE game_id = $1 AND player_id = $2 AND club_id = $3
+         LIMIT 1`,
+        [gameId, player_id, club_id]
+      );
+
+      if (rosterCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Player does not belong to the specified club' });
+      }
     }
 
     // Verify club is participating in this game
