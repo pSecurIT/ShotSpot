@@ -117,6 +117,8 @@ describe('Period End Functionality', () => {
           gameId={123}
           homeTeamId={1}
           awayTeamId={2}
+          homeClubId={100}
+          awayClubId={101}
           homeTeamName="Home Team"
           awayTeamName="Away Team"
           currentPeriod={1}
@@ -135,7 +137,15 @@ describe('Period End Functionality', () => {
             role: 'player',
             is_active: true
           }]}
-          awayPlayers={[]}
+          awayPlayers={[{
+            id: 2,
+            team_id: 2,
+            first_name: 'Jane',
+            last_name: 'Roe',
+            jersey_number: 2,
+            role: 'player',
+            is_active: true
+          }]}
         />
       );
 
@@ -160,11 +170,11 @@ describe('Period End Functionality', () => {
 
       // Try to record a shot - button should be enabled now
       await waitFor(() => {
-        const goalButton = screen.getByText('⚽ Goal');
+        const goalButton = screen.getByRole('button', { name: '⚽ Goal' });
         expect(goalButton).not.toHaveAttribute('disabled');
       }, { timeout: 3000 });
 
-      const goalButton = screen.getByText('⚽ Goal');
+      const goalButton = screen.getByRole('button', { name: '⚽ Goal' });
       fireEvent.click(goalButton);
 
       // Should call canAddEvents when trying to record, but not proceed with onShotRecorded
@@ -205,6 +215,8 @@ describe('Period End Functionality', () => {
           gameId={123}
           homeTeamId={1}
           awayTeamId={2}
+          homeClubId={100}
+          awayClubId={101}
           homeTeamName="Home Team"
           awayTeamName="Away Team"
           currentPeriod={1}
@@ -223,7 +235,15 @@ describe('Period End Functionality', () => {
             role: 'player',
             is_active: true
           }]}
-          awayPlayers={[]}
+          awayPlayers={[{
+            id: 2,
+            team_id: 2,
+            first_name: 'Jane',
+            last_name: 'Roe',
+            jersey_number: 2,
+            role: 'player',
+            is_active: true
+          }]}
         />
       );
 
@@ -248,12 +268,12 @@ describe('Period End Functionality', () => {
 
       // Wait for button to be enabled
       await waitFor(() => {
-        const goalButton = screen.getByText('⚽ Goal');
+        const goalButton = screen.getByRole('button', { name: '⚽ Goal' });
         expect(goalButton).not.toHaveAttribute('disabled');
       }, { timeout: 3000 });
 
       // Try to record a shot
-      const goalButton = screen.getByText('⚽ Goal');
+      const goalButton = screen.getByRole('button', { name: '⚽ Goal' });
       fireEvent.click(goalButton);
 
       await waitFor(() => {
@@ -282,6 +302,8 @@ describe('Period End Functionality', () => {
           gameId={123}
           homeTeamId={1}
           awayTeamId={2}
+          homeClubId={100}
+          awayClubId={101}
           homeTeamName="Home Team"
           awayTeamName="Away Team"
           currentPeriod={1}
