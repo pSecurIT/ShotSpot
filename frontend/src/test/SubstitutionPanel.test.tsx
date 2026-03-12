@@ -612,4 +612,45 @@ describe('SubstitutionPanel', () => {
       expect(playerOutSelect.value).toBe('');
     });
   });
+
+  it('disables substitution details for team without roster configuration', async () => {
+    const mockGet = api.get as unknown as ReturnType<typeof vi.fn>;
+    mockGet.mockImplementation((url: string) => {
+      if (url.includes('/active-players')) {
+        return Promise.resolve({
+          data: {
+            home_team: mockActivePlayers.home_team,
+            away_team: { active: [], bench: [] }
+          }
+        });
+      }
+
+      if (url.includes('/substitutions')) {
+        return Promise.resolve({ data: [] });
+      }
+
+      return Promise.reject(new Error('Unknown endpoint'));
+    });
+
+    render(
+      <SubstitutionPanel
+        gameId={mockGameId}
+        homeTeamId={mockHomeTeamId}
+        awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
+        homeTeamName={mockHomeTeamName}
+        awayTeamName={mockAwayTeamName}
+        currentPeriod={mockCurrentPeriod}
+      />
+    );
+
+    await waitFor(() => {
+      const homeButton = screen.getByRole('button', { name: mockHomeTeamName });
+      const awayButton = screen.getByRole('button', { name: mockAwayTeamName });
+      expect(homeButton).not.toBeDisabled();
+      expect(awayButton).toBeDisabled();
+      expect(screen.queryByText(/Lineup details required/i)).not.toBeInTheDocument();
+    });
+  });
 });
