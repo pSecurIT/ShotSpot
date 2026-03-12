@@ -20,6 +20,8 @@ describe('TimeoutManagement', () => {
     gameId: 1,
     homeTeamId: 1,
     awayTeamId: 2,
+    homeClubId: 100,
+    awayClubId: 101,
     homeTeamName: 'Team Alpha',
     awayTeamName: 'Team Beta',
     currentPeriod: 1,
@@ -131,8 +133,9 @@ describe('TimeoutManagement', () => {
     
     // Verify API call
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/timeouts/1', expect.objectContaining({
-        team_id: 1,
+      expect(api.post).toHaveBeenCalledWith('/timeouts', expect.objectContaining({
+        game_id: 1,
+        club_id: 100,
         timeout_type: 'team',
         period: 1,
         time_remaining: '00:08:30',
@@ -165,8 +168,8 @@ describe('TimeoutManagement', () => {
     
     // Verify API call with injury timeout
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/timeouts/1', expect.objectContaining({
-        team_id: null,
+      expect(api.post).toHaveBeenCalledWith('/timeouts', expect.objectContaining({
+        game_id: 1,
         timeout_type: 'injury',
         called_by: 'Team Doctor'
       }));

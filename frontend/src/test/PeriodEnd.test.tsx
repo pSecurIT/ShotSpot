@@ -310,6 +310,8 @@ describe('Period End Functionality', () => {
       vi.mocked(mockApi.default.get).mockResolvedValue({ data: [{
         id: 1,
         team_id: 1,
+        club_id: 100,
+        is_starting: true,
         first_name: 'John',
         last_name: 'Doe',
         jersey_number: 1
@@ -321,6 +323,8 @@ describe('Period End Functionality', () => {
           gameId={123}
           homeTeamId={1}
           awayTeamId={2}
+          homeClubId={100}
+          awayClubId={101}
           homeTeamName="Home Team"
           awayTeamName="Away Team"
           currentPeriod={1}
@@ -377,6 +381,8 @@ describe('Period End Functionality', () => {
           gameId={123}
           homeTeamId={1}
           awayTeamId={2}
+          homeClubId={100}
+          awayClubId={101}
           homeTeamName="Home Team"
           awayTeamName="Away Team"
           currentPeriod={1}

@@ -86,6 +86,7 @@ const LiveMatchWrapper = () => (
 describe('LiveMatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     
     mockApi.get.mockImplementation((url: string) => {
       if (url === '/games/1') {
@@ -450,6 +451,84 @@ describe('LiveMatch', () => {
         expect(screen.getByText(/This game is not in progress/)).toBeInTheDocument();
         expect(screen.getByText(/not_started/)).toBeInTheDocument();
       });
+    });
+
+    it('limits trainers to their assigned team in pre-match setup', async () => {
+      localStorage.setItem('user', JSON.stringify({ id: 2, role: 'coach' }));
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === '/games/1') {
+          return Promise.resolve({
+            data: {
+              ...mockGame,
+              status: 'scheduled',
+              home_team_id: 1,
+              away_team_id: 2,
+              home_team_name: 'Home Team',
+              away_team_name: 'Away Team'
+            }
+          });
+        }
+        if (url === '/users/me/assignable-teams') {
+          return Promise.resolve({ data: [{ id: 1 }] });
+        }
+        if (url === '/players?team_id=1' || url === '/players?team_id=2') {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
+      render(<LiveMatchWrapper />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Pre-Match Setup')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('Setup Scope')).not.toBeInTheDocument();
+      expect(screen.getByText('Home Team (Home)')).toBeInTheDocument();
+      expect(screen.queryByText('Away Team (Away)')).not.toBeInTheDocument();
+    });
+
+    it('allows admins to switch to one-team mode and validates only the selected team', async () => {
+      localStorage.setItem('user', JSON.stringify({ id: 1, role: 'admin' }));
+      const user = userEvent.setup();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === '/games/1') {
+          return Promise.resolve({
+            data: {
+              ...mockGame,
+              status: 'scheduled',
+              home_team_id: 1,
+              away_team_id: 2,
+              home_team_name: 'Home Team',
+              away_team_name: 'Away Team'
+            }
+          });
+        }
+        if (url === '/users/me/assignable-teams') {
+          return Promise.resolve({ data: [] });
+        }
+        if (url === '/players?team_id=1' || url === '/players?team_id=2') {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
+      render(<LiveMatchWrapper />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Setup Scope')).toBeInTheDocument();
+      });
+
+      await user.selectOptions(screen.getByLabelText(/Pre-match setup mode/i), 'single_team');
+      await user.selectOptions(screen.getByLabelText(/Team to configure/i), 'away');
+
+      await waitFor(() => {
+        expect(screen.getByText(/Away Team needs at least 8 players selected/i)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/Home Team needs at least 8 players selected/i)).not.toBeInTheDocument();
     });
   });
 

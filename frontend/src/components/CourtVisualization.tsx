@@ -56,7 +56,7 @@ interface Player {
 interface Shot {
   id: number;
   game_id: number;
-  team_id: number;
+  club_id: number;
   player_id: number;
   x_coord: number;
   y_coord: number;
@@ -76,18 +76,20 @@ interface Shot {
 interface Possession {
   id: number;
   game_id: number;
-  team_id: number;
+  club_id: number;
   period: number;
   started_at: string;
   ended_at: string | null;
   shots_taken: number;
-  team_name?: string;
+  club_name?: string;
 }
 
 interface CourtVisualizationProps {
   gameId: number;
   homeTeamId: number;
   awayTeamId: number;
+  homeClubId: number;
+  awayClubId: number;
   homeTeamName: string;
   awayTeamName: string;
   currentPeriod: number;
@@ -109,6 +111,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   gameId,
   homeTeamId,
   awayTeamId,
+  homeClubId,
+  awayClubId,
   homeTeamName,
   awayTeamName,
   currentPeriod,
@@ -204,11 +208,16 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const rosterPlayers = rosterResponse.data;
       
       // Separate by team and include starting_position
+      const homeRosterClubId = rosterPlayers.find((p: { club_id?: number; team_id?: number }) => p.team_id === homeTeamId)?.club_id
+        ?? rosterPlayers[0]?.club_id;
+      const awayRosterClubId = rosterPlayers.find((p: { club_id?: number; team_id?: number }) => p.team_id === awayTeamId)?.club_id
+        ?? rosterPlayers.find((p: { club_id?: number }) => p.club_id !== homeRosterClubId)?.club_id;
+
       const homePlayers = rosterPlayers
-        .filter((p: Player & { is_starting: boolean; player_id: number }) => p.team_id === homeTeamId && p.is_starting)
-        .map((p: Player & { is_starting: boolean; player_id: number }) => ({
+        .filter((p: Player & { is_starting: boolean; player_id: number; club_id?: number }) => p.club_id === homeRosterClubId && p.is_starting)
+        .map((p: Player & { is_starting: boolean; player_id: number; club_id?: number }) => ({
           id: p.player_id,
-          team_id: p.team_id,
+          team_id: homeTeamId,
           first_name: p.first_name,
           last_name: p.last_name,
           jersey_number: p.jersey_number,
@@ -218,10 +227,10 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         }));
       
       const awayPlayers = rosterPlayers
-        .filter((p: Player & { is_starting: boolean; player_id: number }) => p.team_id === awayTeamId && p.is_starting)
-        .map((p: Player & { is_starting: boolean; player_id: number }) => ({
+        .filter((p: Player & { is_starting: boolean; player_id: number; club_id?: number }) => p.club_id === awayRosterClubId && p.is_starting)
+        .map((p: Player & { is_starting: boolean; player_id: number; club_id?: number }) => ({
           id: p.player_id,
-          team_id: p.team_id,
+          team_id: awayTeamId,
           first_name: p.first_name,
           last_name: p.last_name,
           jersey_number: p.jersey_number,
@@ -276,7 +285,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         return teamPlayers;
       }
       
-      const teamGoals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+      const teamClubId = teamId === homeTeamId ? homeClubId : awayClubId;
+      const teamGoals = shots.filter(s => s.club_id === teamClubId && s.result === 'goal').length;
       const switches = Math.floor(teamGoals / 2);
       const positionsSwapped = switches % 2 === 1;
 
@@ -293,7 +303,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       
       return offensivePlayers;
     };
-  }, [homeTeamId, homePlayers, awayPlayers, shots]);
+  }, [homeTeamId, homeClubId, awayClubId, homePlayers, awayPlayers, shots]);
 
   // Update players when props change
   useEffect(() => {
@@ -324,7 +334,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       
       // Calculate current offensive players inline
       const teamPlayers = teamId === homeTeamId ? homePlayers : awayPlayers;
-      const teamGoals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+      const teamGoals = shots.filter(s => s.club_id === (selectedTeam === 'home' ? homeClubId : awayClubId) && s.result === 'goal').length;
       const switches = Math.floor(teamGoals / 2);
       const positionsSwapped = switches % 2 === 1;
       
@@ -337,7 +347,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         setSelectedPlayerId(offensivePlayers[0].id);
       }
     }
-  }, [homePlayers, awayPlayers, shots, selectedPlayerId, selectedTeam, homeTeamId, awayTeamId]);
+  }, [homePlayers, awayPlayers, shots, selectedPlayerId, selectedTeam, homeTeamId, awayTeamId, homeClubId, awayClubId]);
 
   // Calculate distance from a point to the nearest korf in meters - memoize with useCallback
   const calculateDistanceToKorf = useCallback((x: number, y: number): number => {
@@ -429,6 +439,18 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       return;
     }
 
+    const selectedPlayerOnHome = homePlayers.some(player => player.id === selectedPlayerId);
+    const selectedPlayerOnAway = awayPlayers.some(player => player.id === selectedPlayerId);
+    const selectedPlayerTeam = selectedPlayerOnHome ? 'home' : selectedPlayerOnAway ? 'away' : null;
+
+    if (selectedPlayerTeam !== selectedTeam) {
+      const teamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
+      const fallbackPlayers = getCurrentOffensivePlayers(teamId);
+      setSelectedPlayerId(fallbackPlayers.length > 0 ? fallbackPlayers[0].id : null);
+      setError('Selected player does not belong to the selected team. Please select a valid player.');
+      return;
+    }
+
     // Check if user is allowed to record for the selected team
     if (userAssignedTeam && selectedTeam !== userAssignedTeam) {
       setError(`You can only record shots for the ${userAssignedTeam === 'home' ? homeTeamName : awayTeamName}`);
@@ -452,7 +474,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const calculatedDistance = calculateDistanceToKorf(clickedCoords.x, clickedCoords.y);
       
       const shotData = {
-        team_id: selectedTeam === 'home' ? homeTeamId : awayTeamId,
+        club_id: selectedTeam === 'home' ? homeClubId : awayClubId,
         player_id: selectedPlayerId,
         x_coord: clickedCoords.x,
         y_coord: clickedCoords.y,
@@ -466,7 +488,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const optimisticShot: Shot = {
         id: Date.now(), // Temporary ID
         game_id: gameId,
-        team_id: shotData.team_id,
+        club_id: shotData.club_id,
         player_id: shotData.player_id,
         x_coord: shotData.x_coord,
         y_coord: shotData.y_coord,
@@ -513,7 +535,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error recording shot');
     }
-  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers, canAddEvents, userAssignedTeam, homeTeamName, awayTeamName]);
+  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, homeClubId, awayClubId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers, canAddEvents, userAssignedTeam, homeTeamName, awayTeamName, getCurrentOffensivePlayers]);
 
   // Render shot markers on court
   const renderShotMarkers = () => {
@@ -605,7 +627,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
               {/* Active Possession Indicator */}
               {activePossession && (
                 <div className="active-possession-inline">
-                  <span className="possession-team">{activePossession.team_name}</span>
+                  <span className="possession-team">{activePossession.club_name}</span>
                   <span className="possession-duration">{possessionDuration}s</span>
                   <span className="possession-shots">{activePossession.shots_taken} shot{activePossession.shots_taken !== 1 ? 's' : ''}</span>
               </div>
@@ -616,15 +638,15 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <div className="possession-buttons-inline">
             <button 
               onClick={() => onCenterLineCross(homeTeamId)}
-              className={`possession-button-compact home-team ${activePossession?.team_id === homeTeamId ? 'has-possession' : ''}`}
+              className={`possession-button-compact home-team ${activePossession?.club_id === homeClubId ? 'has-possession' : ''}`}
             >
-              {activePossession?.team_id === homeTeamId ? '🏀' : '📍'} {homeTeamName}
+              {activePossession?.club_id === homeClubId ? '🏀' : '📍'} {homeTeamName}
             </button>
             <button 
               onClick={() => onCenterLineCross(awayTeamId)}
-              className={`possession-button-compact away-team ${activePossession?.team_id === awayTeamId ? 'has-possession' : ''}`}
+              className={`possession-button-compact away-team ${activePossession?.club_id === awayClubId ? 'has-possession' : ''}`}
             >
-              {activePossession?.team_id === awayTeamId ? '🏀' : '📍'} {awayTeamName}
+              {activePossession?.club_id === awayClubId ? '🏀' : '📍'} {awayTeamName}
             </button>
           </div>
         </div>
@@ -744,8 +766,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
             </div>
             <small className="helper-text">
               {(() => {
-                const teamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
-                const goals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+                const teamClubId = selectedTeam === 'home' ? homeClubId : awayClubId;
+                const goals = shots.filter(s => s.club_id === teamClubId && s.result === 'goal').length;
                 const nextSwitch = 2 - (goals % 2);
                 return `${nextSwitch} goal${nextSwitch !== 1 ? 's' : ''} until position switch`;
               })()}
@@ -847,7 +869,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <div className="team-stat-section">
             <h5>{homeTeamName}</h5>
             {(() => {
-              const teamShots = shots.filter(s => s.team_id === homeTeamId);
+              const teamShots = shots.filter(s => s.club_id === homeClubId);
               const goals = teamShots.filter(s => s.result === 'goal').length;
               // Calculate average distance only from shots with valid distance values
               const shotsWithDistance = teamShots.filter(s => s.distance != null && s.distance > 0);
@@ -893,7 +915,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <div className="team-stat-section">
             <h5>{awayTeamName}</h5>
             {(() => {
-              const teamShots = shots.filter(s => s.team_id === awayTeamId);
+              const teamShots = shots.filter(s => s.club_id === awayClubId);
               const goals = teamShots.filter(s => s.result === 'goal').length;
               // Calculate average distance only from shots with valid distance values
               const shotsWithDistance = teamShots.filter(s => s.distance != null && s.distance > 0);
