@@ -3,12 +3,12 @@ import api from '../utils/api';
 
 interface Player {
   id: number;
-  team_id: number;
+  club_id: number;
   first_name: string;
   last_name: string;
   jersey_number: number;
   gender?: string;
-  team_name?: string;
+  club_name?: string;
 }
 
 interface ActivePlayersResponse {
@@ -25,7 +25,7 @@ interface ActivePlayersResponse {
 interface Substitution {
   id: number;
   game_id: number;
-  team_id: number;
+  club_id: number;
   player_in_id: number;
   player_out_id: number;
   period: number;
@@ -37,7 +37,7 @@ interface Substitution {
   player_out_first_name: string;
   player_out_last_name: string;
   player_out_jersey_number: number;
-  team_name: string;
+  club_name: string;
   created_at: string;
 }
 
@@ -45,24 +45,32 @@ interface SubstitutionPanelProps {
   gameId: number;
   homeTeamId: number;
   awayTeamId: number;
+  homeClubId: number;
+  awayClubId: number;
   homeTeamName: string;
   awayTeamName: string;
   currentPeriod: number;
   timeRemaining?: string;
   onSubstitutionRecorded?: () => void;
   canAddEvents?: () => boolean; // Period end check function
+  userAssignedTeam?: 'home' | 'away' | null; // Which team the user is assigned to
+  currentUserRole?: string; // 'admin' | 'coach' | 'user'
 }
 
 const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
   gameId,
   homeTeamId,
   awayTeamId,
+  homeClubId,
+  awayClubId,
   homeTeamName,
   awayTeamName,
   currentPeriod,
   timeRemaining,
   onSubstitutionRecorded,
-  canAddEvents
+  canAddEvents,
+  userAssignedTeam,
+  currentUserRole
 }) => {
   const [activePlayers, setActivePlayers] = useState<ActivePlayersResponse | null>(null);
   const [recentSubstitutions, setRecentSubstitutions] = useState<Substitution[]>([]);
@@ -90,9 +98,25 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
   const fetchActivePlayers = useCallback(async () => {
     try {
       const response = await api.get(`/substitutions/${gameId}/active-players`);
-      setActivePlayers(response.data);
+      setActivePlayers(response.data || {
+        home_team: { active: [], bench: [] },
+        away_team: { active: [], bench: [] }
+      });
+      setError(null);
     } catch (err) {
-      console.error('Error fetching active players:', err);
+      const axiosErr = err as { response?: { status?: number } };
+      if (axiosErr?.response?.status === 404) {
+        setActivePlayers({
+          home_team: { active: [], bench: [] },
+          away_team: { active: [], bench: [] }
+        });
+        setError(null);
+        return;
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching active players:', err);
+      }
       setError('Failed to load player status');
     }
   }, [gameId]);
@@ -135,6 +159,12 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
       return;
     }
 
+    // Restrict coaches to their assigned team
+    if (currentUserRole === 'coach' && userAssignedTeam && selectedTeam !== (userAssignedTeam === 'home' ? homeTeamId : awayTeamId)) {
+      setError('You can only record substitutions for your assigned team');
+      return;
+    }
+
     // Check if period has ended and require confirmation
     if (canAddEvents && !canAddEvents()) {
       return; // User cancelled, don't record the substitution
@@ -145,8 +175,11 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
     setSuccess(null);
 
     try {
+      // Map team_id to club_id
+      const clubId = selectedTeam === homeTeamId ? homeClubId : awayClubId;
+      
       await api.post(`/substitutions/${gameId}`, {
-        team_id: selectedTeam,
+        club_id: clubId,
         player_in_id: playerIn,
         player_out_id: playerOut,
         period: currentPeriod,
@@ -225,6 +258,29 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
   };
 
   const teamPlayers = getCurrentTeamPlayers();
+  const hasLoadedPlayerStatus = activePlayers !== null;
+  const homeHasRosterDetails = !hasLoadedPlayerStatus || (activePlayers.home_team.active.length > 0 || activePlayers.home_team.bench.length > 0);
+  const awayHasRosterDetails = !hasLoadedPlayerStatus || (activePlayers.away_team.active.length > 0 || activePlayers.away_team.bench.length > 0);
+  const selectedTeamHasRosterDetails = !hasLoadedPlayerStatus || (selectedTeam === homeTeamId ? homeHasRosterDetails : awayHasRosterDetails);
+
+  useEffect(() => {
+    if (!hasLoadedPlayerStatus) {
+      return;
+    }
+
+    if (selectedTeam === homeTeamId && !homeHasRosterDetails && awayHasRosterDetails) {
+      setSelectedTeam(awayTeamId);
+      setPlayerOut(null);
+      setPlayerIn(null);
+      return;
+    }
+
+    if (selectedTeam === awayTeamId && !awayHasRosterDetails && homeHasRosterDetails) {
+      setSelectedTeam(homeTeamId);
+      setPlayerOut(null);
+      setPlayerIn(null);
+    }
+  }, [hasLoadedPlayerStatus, selectedTeam, homeHasRosterDetails, awayHasRosterDetails, homeTeamId, awayTeamId]);
 
   return (
     <div className="substitution-panel">
@@ -247,6 +303,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
             setPlayerOut(null);
             setPlayerIn(null);
           }}
+          disabled={!homeHasRosterDetails}
         >
           {homeTeamName}
         </button>
@@ -257,10 +314,18 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
             setPlayerOut(null);
             setPlayerIn(null);
           }}
+          disabled={!awayHasRosterDetails}
         >
           {awayTeamName}
         </button>
       </div>
+
+      {hasLoadedPlayerStatus && !selectedTeamHasRosterDetails && (
+        <div className="team-restriction-notice">
+          <strong>Lineup details required</strong>
+          <p className="restriction-text">Substitutions are only available for teams configured in Pre-Match setup.</p>
+        </div>
+      )}
 
       {/* Substitution Form */}
       <div className="substitution-form">
@@ -335,7 +400,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
         <button
           className="submit-substitution-button"
           onClick={handleSubstitution}
-          disabled={loading || !playerOut || !playerIn}
+          disabled={loading || !selectedTeamHasRosterDetails || !playerOut || !playerIn}
         >
           {loading ? 'Recording...' : '✓ Record Substitution'}
         </button>
@@ -380,7 +445,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
             {recentSubstitutions.map((sub) => (
               <div key={sub.id} className="substitution-item">
                 <div className="substitution-details">
-                  <span className="substitution-team">{sub.team_name}</span>
+                  <span className="substitution-team">{sub.club_name}</span>
                   <span className="substitution-change">
                     #{sub.player_out_jersey_number} {sub.player_out_first_name[0]}.{' '}
                     {sub.player_out_last_name}

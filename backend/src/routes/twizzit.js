@@ -386,6 +386,12 @@ router.post(
       const result = await twizzitSync.syncClubsFromTwizzit(credentialId, options);
       res.json(result);
     } catch (error) {
+      if (error?.code === 'TWIZZIT_CREDENTIAL_NOT_FOUND') {
+        return res.status(404).json({
+          error: 'Twizzit credential not found',
+          message: error.message
+        });
+      }
       console.error('Failed to sync clubs:', error);
       res.status(500).json({ 
         error: 'Failed to sync clubs',
@@ -407,6 +413,7 @@ router.post(
     param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID'),
     body('groupId').optional().isString().withMessage('groupId must be a string'),
     body('seasonId').optional().isString().withMessage('seasonId must be a string'),
+    body('organizationId').optional().isString().withMessage('organizationId must be a string'),
     body('createMissing').optional().isBoolean().withMessage('createMissing must be boolean')
   ],
   validate,
@@ -416,12 +423,19 @@ router.post(
       const options = {
         ...(req.body.groupId && { groupId: req.body.groupId }),
         ...(req.body.seasonId && { seasonId: req.body.seasonId }),
+        ...(req.body.organizationId && { organizationId: req.body.organizationId }),
         createMissing: req.body.createMissing !== undefined ? req.body.createMissing : true
       };
 
       const result = await twizzitSync.syncClubsFromTwizzit(credentialId, options);
       res.json(result);
     } catch (error) {
+      if (error?.code === 'TWIZZIT_CREDENTIAL_NOT_FOUND') {
+        return res.status(404).json({
+          error: 'Twizzit credential not found',
+          message: error.message
+        });
+      }
       console.error('Failed to sync teams:', error);
       res.status(500).json({ 
         error: 'Failed to sync teams',
@@ -457,10 +471,53 @@ router.post(
       const result = await twizzitSync.syncPlayersFromTwizzit(credentialId, options);
       res.json(result);
     } catch (error) {
+      if (error?.code === 'TWIZZIT_CREDENTIAL_NOT_FOUND') {
+        return res.status(404).json({
+          error: 'Twizzit credential not found',
+          message: error.message
+        });
+      }
       console.error('Failed to sync players:', error);
       res.status(500).json({ 
         error: 'Failed to sync players',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/twizzit/sync/preview/players/:credentialId
+ * Preview players for a selected Twizzit team/group (admin/coach)
+ */
+router.post(
+  '/sync/preview/players/:credentialId',
+  requireRole(['admin', 'coach']),
+  [
+    param('credentialId').isInt({ min: 1 }).withMessage('Invalid credential ID'),
+    body('groupId').trim().notEmpty().withMessage('groupId is required'),
+    body('seasonId').optional().isString().withMessage('seasonId must be a string'),
+    body('organizationId').optional().isString().withMessage('organizationId must be a string')
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const credentialId = parseInt(req.params.credentialId);
+      const options = {
+        groupId: String(req.body.groupId),
+        ...(req.body.seasonId ? { seasonId: req.body.seasonId } : {}),
+        ...(req.body.organizationId ? { organizationId: req.body.organizationId } : {})
+      };
+
+      const preview = await twizzitSync.previewPlayersFromTwizzit(credentialId, options);
+      res.json(preview);
+    } catch (error) {
+      const status = error?.status || 500;
+      console.error('Failed to preview players:', error);
+      res.status(status).json({
+        error: 'Failed to preview players',
+        message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
+        details: error?.details
       });
     }
   }
@@ -632,14 +689,14 @@ router.get(
         `SELECT 
           tm.id,
           tm.local_club_id,
-          t.name as local_club_name,
+          t.name as local_team_name,
           tm.twizzit_team_id,
           tm.twizzit_team_name,
           tm.last_synced_at,
           tm.sync_status,
           tm.sync_error
          FROM twizzit_team_mappings tm
-         JOIN clubs t ON tm.local_club_id = t.id
+         JOIN teams t ON tm.local_club_id = t.id
          ORDER BY tm.last_synced_at DESC`
       );
 
@@ -647,7 +704,7 @@ router.get(
       const mappings = result.rows.map(row => ({
         id: row.id,
         internalTeamId: row.local_club_id,
-        internalTeamName: row.local_club_name,
+        internalTeamName: row.local_team_name,
         twizzitTeamId: row.twizzit_team_id,
         twizzitTeamName: row.twizzit_team_name,
         lastSyncedAt: row.last_synced_at,
@@ -692,11 +749,11 @@ router.get(
           pm.sync_status,
           pm.sync_error,
           tm.local_club_id,
-          t.name as club_name
+          t.name as team_name
         FROM twizzit_player_mappings pm
         JOIN players p ON pm.local_player_id = p.id
         JOIN twizzit_team_mappings tm ON pm.team_mapping_id = tm.id
-        JOIN clubs t ON tm.local_club_id = t.id`;
+        JOIN teams t ON tm.local_club_id = t.id`;
 
       const params = [];
       if (req.query.teamId) {
@@ -719,7 +776,7 @@ router.get(
         twizzitPlayerId: row.twizzit_player_id,
         twizzitPlayerName: row.twizzit_player_name,
         internalTeamId: row.local_club_id,
-        internalTeamName: row.club_name,
+        internalTeamName: row.team_name,
         lastSyncedAt: row.last_synced_at,
         syncStatus: row.sync_status,
         syncError: row.sync_error

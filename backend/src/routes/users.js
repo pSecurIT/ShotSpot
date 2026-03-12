@@ -52,6 +52,50 @@ router.get('/me', async (req, res) => {
   }
 });
 
+// Get current user's assignable teams (for game registration)
+// For admins: all teams across all clubs
+// For coaches: only teams they have active trainer assignments for
+router.get('/me/assignable-teams', async (req, res) => {
+  try {
+    let query;
+    const params = [];
+
+    if (req.user.role === 'admin') {
+      // Admins can see all teams
+      query = `
+        SELECT DISTINCT t.id, t.name, c.id AS club_id, c.name AS club_name
+        FROM teams t
+        JOIN clubs c ON t.club_id = c.id
+        WHERE t.is_active = true
+        ORDER BY c.name, t.name
+      `;
+    } else if (req.user.role === 'coach') {
+      // Coaches see only teams they're assigned to
+      query = `
+        SELECT DISTINCT t.id, t.name, c.id AS club_id, c.name AS club_name
+        FROM teams t
+        JOIN clubs c ON t.club_id = c.id
+        JOIN trainer_assignments ta ON (ta.club_id = c.id OR ta.team_id = t.id)
+        WHERE ta.user_id = $1
+          AND ta.is_active = true
+          AND ta.active_from <= CURRENT_DATE
+          AND (ta.active_to IS NULL OR ta.active_to >= CURRENT_DATE)
+          AND t.is_active = true
+        ORDER BY c.name, t.name
+      `;
+      params.push(req.user.userId);
+    } else {
+      // Regular users cannot register players
+      return res.status(403).json({ error: 'Only coaches and admins can register players' });
+    }
+
+    const result = await db.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
 // Get login history for a user (admin can view any, users can view their own)
 router.get('/:userId/login-history', async (req, res) => {
   const { userId } = req.params;

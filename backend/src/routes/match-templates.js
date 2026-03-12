@@ -99,7 +99,11 @@ router.post('/', [
   body('competition_type')
     .optional()
     .isIn(['league', 'cup', 'friendly', 'tournament'])
-    .withMessage('Competition type must be league, cup, friendly, or tournament')
+    .withMessage('Competition type must be league, cup, friendly, or tournament'),
+  body('allow_same_team')
+    .optional()
+    .isBoolean()
+    .withMessage('Allow same team must be a boolean')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -111,7 +115,8 @@ router.post('/', [
     description,
     number_of_periods = 4,
     period_duration_minutes = 10,
-    competition_type
+    competition_type,
+    allow_same_team = false
   } = req.body;
 
   const userId = req.user.userId;
@@ -120,12 +125,12 @@ router.post('/', [
     const result = await pool.query(
       `INSERT INTO match_templates (
         name, description, number_of_periods, period_duration_minutes,
-        competition_type, created_by, is_system_template
-      ) VALUES ($1, $2, $3, $4, $5, $6, false)
+        competition_type, created_by, is_system_template, allow_same_team
+      ) VALUES ($1, $2, $3, $4, $5, $6, false, $7)
       RETURNING *`,
       [
         name, description, number_of_periods, period_duration_minutes,
-        competition_type, userId
+        competition_type, userId, allow_same_team
       ]
     );
 
@@ -171,7 +176,11 @@ router.put('/:id', [
   body('competition_type')
     .optional()
     .isIn(['league', 'cup', 'friendly', 'tournament'])
-    .withMessage('Competition type must be league, cup, friendly, or tournament')
+    .withMessage('Competition type must be league, cup, friendly, or tournament'),
+  body('allow_same_team')
+    .optional()
+    .isBoolean()
+    .withMessage('Allow same team must be a boolean')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -212,7 +221,7 @@ router.put('/:id', [
 
     const fields = [
       'name', 'description', 'number_of_periods', 'period_duration_minutes',
-      'competition_type'
+      'competition_type', 'allow_same_team'
     ];
 
     for (const field of fields) {
@@ -378,6 +387,76 @@ router.post('/:id/apply-to-game/:gameId', [
   } catch (error) {
     console.error('Error applying template to game:', error);
     res.status(500).json({ error: 'Failed to apply template to game' });
+  }
+});
+
+/**
+ * POST /api/match-templates/:id/clone
+ * Clone a match template (including system templates)
+ */
+router.post('/:id/clone', [
+  requireRole(['admin', 'coach']),
+  param('id').isInt({ min: 1 }).withMessage('Template ID must be a positive integer'),
+  body('name')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Template name cannot be empty')
+    .isLength({ max: 100 })
+    .withMessage('Template name must be at most 100 characters')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const { id } = req.params;
+  const userId = req.user.userId;
+  const customName = req.body?.name;
+
+  try {
+    // Get the template to clone
+    const templateResult = await pool.query(
+      'SELECT * FROM match_templates WHERE id = $1',
+      [id]
+    );
+
+    if (templateResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Match template not found' });
+    }
+
+    const template = templateResult.rows[0];
+
+    // Create a new name for the cloned template
+    const clonedName = customName || `${template.name} (Copy)`;
+
+    // Insert the cloned template as a user template (not system template)
+    const result = await pool.query(
+      `INSERT INTO match_templates (
+        name, description, number_of_periods, period_duration_minutes,
+        competition_type, created_by, is_system_template, allow_same_team
+      ) VALUES ($1, $2, $3, $4, $5, $6, false, $7)
+      RETURNING *`,
+      [
+        clonedName,
+        template.description,
+        template.number_of_periods,
+        template.period_duration_minutes,
+        template.competition_type,
+        userId,
+        template.allow_same_team
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error cloning match template:', error);
+    
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'A template with this name already exists' });
+    }
+    
+    res.status(500).json({ error: 'Failed to clone match template' });
   }
 });
 

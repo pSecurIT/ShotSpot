@@ -3,7 +3,7 @@ import api from '../utils/api';
 
 interface Player {
   id: number;
-  team_id: number;
+  club_id: number;
   first_name: string;
   last_name: string;
   jersey_number: number;
@@ -14,26 +14,30 @@ interface FaultManagementProps {
   gameId: number;
   homeTeamId: number;
   awayTeamId: number;
+  homeClubId: number;
+  awayClubId: number;
   homeTeamName: string;
   awayTeamName: string;
   currentPeriod: number;
   timeRemaining?: string;
   onFaultRecorded?: () => void;
   canAddEvents?: () => boolean; // Period end check function
+  userAssignedTeam?: 'home' | 'away' | null; // Which team the user can record events for
+  currentUserRole?: string; // 'admin' | 'coach' | 'user'
 }
 
 interface Fault {
   id: number;
   game_id: number;
   event_type: string;
-  team_id: number;
+  club_id: number;
   player_id?: number;
   period: number;
   time_remaining?: string;
   details?: {
     reason?: string;
   };
-  team_name: string;
+  club_name: string;
   first_name?: string;
   last_name?: string;
   jersey_number?: number;
@@ -44,12 +48,15 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
   gameId,
   homeTeamId,
   awayTeamId,
+  homeClubId,
+  awayClubId,
   homeTeamName,
   awayTeamName,
   currentPeriod,
   timeRemaining,
   onFaultRecorded,
-  canAddEvents
+  canAddEvents,
+  userAssignedTeam
 }) => {
   const [players, setPlayers] = useState<{ home: Player[]; away: Player[] }>({ home: [], away: [] });
   const [recentFaults, setRecentFaults] = useState<Fault[]>([]);
@@ -65,6 +72,23 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
 
   // Ref to track mounted state for cleanup
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-select the user's assigned team
+  useEffect(() => {
+    if (userAssignedTeam === 'home') {
+      setSelectedTeam(homeTeamId);
+    } else if (userAssignedTeam === 'away') {
+      setSelectedTeam(awayTeamId);
+    }
+  }, [userAssignedTeam, homeTeamId, awayTeamId]);
+
+  const getTeamPlayers = (teamId: number): Player[] => {
+    return teamId === homeTeamId ? players.home : players.away;
+  };
+
+  const selectedTeamPlayers = getTeamPlayers(selectedTeam);
+  const selectedTeamRequiresPlayerDetails = selectedTeamPlayers.length > 0;
+  const faultTypeRequiresPlayer = faultType === 'fault_offensive' || faultType === 'fault_defensive';
 
   useEffect(() => {
     fetchPlayers();
@@ -82,14 +106,16 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
 
   const fetchPlayers = async () => {
     try {
-      const [homeResponse, awayResponse] = await Promise.all([
-        api.get(`/game-rosters/${gameId}?team_id=${homeTeamId}&is_starting=true`),
-        api.get(`/game-rosters/${gameId}?team_id=${awayTeamId}&is_starting=true`)
-      ]);
+      const response = await api.get(`/game-rosters/${gameId}`);
+      const allRosterPlayers = response.data || [];
+      
+      // Filter by club_id locally
+      const homePlayers = allRosterPlayers.filter((p: { club_id?: number; is_starting?: boolean }) => p.club_id === homeClubId && p.is_starting);
+      const awayPlayers = allRosterPlayers.filter((p: { club_id?: number; is_starting?: boolean }) => p.club_id === awayClubId && p.is_starting);
 
       setPlayers({
-        home: homeResponse.data || [],
-        away: awayResponse.data || []
+        home: homePlayers || [],
+        away: awayPlayers || []
       });
     } catch (err) {
       console.error('Error fetching players:', err);
@@ -112,8 +138,14 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
       return;
     }
 
-    // For out of bounds, player selection is optional
-    if ((faultType === 'fault_offensive' || faultType === 'fault_defensive') && !selectedPlayer) {
+    // Check if user is allowed to record faults for the selected team
+    const selectedTeamType = selectedTeam === homeTeamId ? 'home' : 'away';
+    if (userAssignedTeam && selectedTeamType !== userAssignedTeam) {
+      setError(`You can only record faults for the ${userAssignedTeam === 'home' ? homeTeamName : awayTeamName}`);
+      return;
+    }
+
+    if (faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && !selectedPlayer) {
       setError('Please select a player for this fault type');
       return;
     }
@@ -127,16 +159,17 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
     setError(null);
 
     try {
+      const clubId = selectedTeam === homeTeamId ? homeClubId : awayClubId;
       const faultData = {
         event_type: faultType,
-        team_id: selectedTeam,
-        player_id: selectedPlayer || null,
+        club_id: clubId,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
         details: {
           reason: faultReason || null,
           fault_type: faultType
-        }
+        },
+        ...(faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && selectedPlayer ? { player_id: selectedPlayer } : {})
       };
 
       await api.post(`/events/${gameId}`, faultData);
@@ -198,10 +231,6 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
     }
   };
 
-  const getTeamPlayers = (teamId: number): Player[] => {
-    return teamId === homeTeamId ? players.home : players.away;
-  };
-
   const undoFault = async (faultId: number) => {
     try {
       await api.delete(`/events/${gameId}/${faultId}`);
@@ -259,33 +288,47 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
         {/* Team Selection */}
         <div className="form-group">
           <label>Team:</label>
-          <select
-            value={selectedTeam}
-            onChange={(e) => {
-              setSelectedTeam(parseInt(e.target.value));
-              setSelectedPlayer(null); // Reset player selection when team changes
-            }}
-          >
-            <option value={homeTeamId}>{homeTeamName} (Home)</option>
-            <option value={awayTeamId}>{awayTeamName} (Away)</option>
-          </select>
+          {userAssignedTeam ? (
+            <div className="team-restriction-notice">
+              <strong>📍 Your Team:</strong> {userAssignedTeam === 'home' ? homeTeamName : awayTeamName}
+              <p className="restriction-text">You can only record faults for your assigned team</p>
+            </div>
+          ) : (
+            <select
+              value={selectedTeam}
+              onChange={(e) => {
+                setSelectedTeam(parseInt(e.target.value));
+                setSelectedPlayer(null); // Reset player selection when team changes
+              }}
+            >
+              <option value={homeTeamId}>{homeTeamName} (Home)</option>
+              <option value={awayTeamId}>{awayTeamName} (Away)</option>
+            </select>
+          )}
         </div>
 
         {/* Player Selection */}
-        {(faultType === 'fault_offensive' || faultType === 'fault_defensive') && (
+        {faultTypeRequiresPlayer && (
           <div className="form-group">
             <label>Player:</label>
-            <select
-              value={selectedPlayer || ''}
-              onChange={(e) => setSelectedPlayer(e.target.value ? parseInt(e.target.value) : null)}
-            >
-              <option value="">Select player</option>
-              {getTeamPlayers(selectedTeam).map((player) => (
-                <option key={player.id} value={player.id}>
-                  #{player.jersey_number} {player.first_name} {player.last_name}
-                </option>
-              ))}
-            </select>
+            {selectedTeamRequiresPlayerDetails ? (
+              <select
+                value={selectedPlayer || ''}
+                onChange={(e) => setSelectedPlayer(e.target.value ? parseInt(e.target.value) : null)}
+              >
+                <option value="">Select player</option>
+                {selectedTeamPlayers.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    #{player.jersey_number} {player.first_name} {player.last_name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="team-restriction-notice">
+                <strong>Team-only mode</strong>
+                <p className="restriction-text">No lineup details were configured for this team. Fault is recorded without selecting a player.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -304,7 +347,7 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
         {/* Submit Button */}
         <button
           onClick={handleRecordFault}
-          disabled={loading || !selectedTeam || ((faultType === 'fault_offensive' || faultType === 'fault_defensive') && !selectedPlayer)}
+          disabled={loading || !selectedTeam || (faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && !selectedPlayer)}
           className="primary-button"
         >
           {loading ? 'Recording...' : `Record ${getFaultDisplayName(faultType)}`}
@@ -320,7 +363,7 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
               <div key={fault.id} className="fault-item">
                 <div className="fault-info">
                   <span className="fault-type">{getFaultDisplayName(fault.event_type)}</span>
-                  <span className="team-name">{fault.team_name}</span>
+                  <span className="team-name">{fault.club_name}</span>
                   {fault.first_name && (
                     <span className="player-name">
                       #{fault.jersey_number} {fault.first_name} {fault.last_name}

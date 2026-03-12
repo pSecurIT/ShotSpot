@@ -30,6 +30,11 @@ describe('Twizzit API Client', () => {
       username: 'test_user',
       password: 'test_password'
     });
+
+    // Default auth mock so data-fetch tests can pass through ensureAuthenticated.
+    mockAxiosInstance.post.mockResolvedValue({
+      data: { token: 'test-token', expires_in: 3600 }
+    });
   });
 
   afterEach(() => {
@@ -168,7 +173,7 @@ describe('Twizzit API Client', () => {
       const result = await client.getGroups({ 'organization-ids[]': 123 });
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/groups', {
-        params: { 'organization-ids[]': 123 }
+        params: { 'organization-ids': [123] }
       });
       expect(result.groups).toEqual(mockGroups);
       expect(result.total).toBe(2);
@@ -329,7 +334,7 @@ describe('Twizzit API Client', () => {
       await client.getGroupContacts('group-test');
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/group-contacts', {
-        params: { 'group-ids[]': 'group-test', 'organization-ids[]': 'org-test' }
+        params: { 'group-ids[]': 'group-test', 'organization-ids': ['org-test'] }
       });
     });
   });
@@ -356,7 +361,7 @@ describe('Twizzit API Client', () => {
       await client.getContacts({ filters: { 'organization-ids[]': 123 } });
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/contacts', {
-        params: { 'organization-ids[]': 123 }
+        params: { 'organization-ids': [123] }
       });
     });
   });
@@ -387,7 +392,7 @@ describe('Twizzit API Client', () => {
       const result = await client.getTeams({ 'organization-ids[]': 123 });
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/groups', {
-        params: { 'organization-ids[]': 123 }
+        params: { 'organization-ids': [123] }
       });
       expect(result).toHaveProperty('teams');
       expect(result).toHaveProperty('groups');
@@ -433,7 +438,7 @@ describe('Twizzit API Client', () => {
 
       await expect(client.getGroups({ organization_id: 123 })).rejects.toThrow();
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/groups', {
-        params: { 'organization-ids[]': 123 }
+        params: { 'organization-ids': [123] }
       });
     });
 

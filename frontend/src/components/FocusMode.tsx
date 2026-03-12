@@ -18,12 +18,12 @@ interface Player {
 interface Possession {
   id: number;
   game_id: number;
-  team_id: number;
+  club_id: number;
   period: number;
   started_at: string;
   ended_at: string | null;
   shots_taken: number;
-  team_name?: string;
+  club_name?: string;
 }
 
 interface FocusModeProps {
@@ -31,6 +31,8 @@ interface FocusModeProps {
   gameId: number;
   homeTeamId: number;
   awayTeamId: number;
+  homeClubId: number;
+  awayClubId: number;
   homeTeamName: string;
   awayTeamName: string;
   homeScore: number;
@@ -71,6 +73,8 @@ const FocusMode: React.FC<FocusModeProps> = ({
   gameId,
   homeTeamId,
   awayTeamId,
+  homeClubId,
+  awayClubId,
   homeTeamName,
   awayTeamName,
   homeScore,
@@ -99,12 +103,12 @@ const FocusMode: React.FC<FocusModeProps> = ({
   // Get team names for left and right sides
   const leftTeamName = homeAttackingSide === 'left' ? homeTeamName : awayTeamName;
   const rightTeamName = homeAttackingSide === 'right' ? homeTeamName : awayTeamName;
-  const leftTeamId = homeAttackingSide === 'left' ? homeTeamId : awayTeamId;
-  const rightTeamId = homeAttackingSide === 'right' ? homeTeamId : awayTeamId;
+  const leftClubId = homeAttackingSide === 'left' ? homeClubId : awayClubId;
+  const rightClubId = homeAttackingSide === 'right' ? homeClubId : awayClubId;
 
-  // Check if left or right side has possession
-  const leftHasPossession = activePossession?.team_id === leftTeamId;
-  const rightHasPossession = activePossession?.team_id === rightTeamId;
+  // Check if left or right side has possession (compare by club_id)
+  const leftHasPossession = activePossession?.club_id === leftClubId;
+  const rightHasPossession = activePossession?.club_id === rightClubId;
 
   return (
     <div className="focus-mode">
@@ -154,6 +158,8 @@ const FocusMode: React.FC<FocusModeProps> = ({
             gameId={gameId}
             homeTeamId={homeTeamId}
             awayTeamId={awayTeamId}
+            homeClubId={homeClubId}
+            awayClubId={awayClubId}
             homeTeamName={homeTeamName}
             awayTeamName={awayTeamName}
             currentPeriod={currentPeriod}
@@ -221,7 +227,7 @@ const FocusMode: React.FC<FocusModeProps> = ({
         {/* Possession info */}
         {activePossession && (
           <div className="control-group possession-info">
-            <div className="possession-team">{activePossession.team_name}</div>
+            <div className="possession-team">{activePossession.club_name}</div>
             <div className="possession-stats">
               <span className="stat">
                 <span className="icon">⏱️</span>
@@ -254,6 +260,8 @@ const FocusMode: React.FC<FocusModeProps> = ({
           gameId={gameId}
           homeTeamId={homeTeamId}
           awayTeamId={awayTeamId}
+          homeClubId={homeClubId}
+          awayClubId={awayClubId}
           homeTeamName={homeTeamName}
           awayTeamName={awayTeamName}
           currentPeriod={currentPeriod}
