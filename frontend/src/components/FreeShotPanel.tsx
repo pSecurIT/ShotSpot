@@ -28,7 +28,7 @@ interface FreeShotPanelProps {
 interface FreeShot {
   id: number;
   game_id: number;
-  player_id: number;
+  player_id: number | null;
   club_id: number;
   period: number;
   time_remaining?: string;
@@ -60,6 +60,7 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
   currentUserRole
 }) => {
   const [players, setPlayers] = useState<{ home: Player[]; away: Player[] }>({ home: [], away: [] });
+  const [hasLoadedRoster, setHasLoadedRoster] = useState(false);
   const [recentFreeShots, setRecentFreeShots] = useState<FreeShot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +107,8 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
     } catch (err) {
       console.error('Error fetching players:', err);
       setError('Failed to load players');
+    } finally {
+      setHasLoadedRoster(true);
     }
   };
 
@@ -119,8 +122,13 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
   };
 
   const handleRecordFreeShot = async () => {
-    if (!selectedTeam || !selectedPlayer) {
-      setError('Please select a team and player');
+    if (!selectedTeam) {
+      setError('Please select a team');
+      return;
+    }
+
+    if (selectedTeamRequiresPlayerDetails && !selectedPlayer) {
+      setError('Please select a player');
       return;
     }
 
@@ -138,7 +146,6 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
       const clubId = selectedTeam === homeTeamId ? homeClubId : awayClubId;
       const freeShotData = {
         game_id: gameId,
-        player_id: selectedPlayer,
         club_id: clubId,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
@@ -148,7 +155,8 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
         distance: distance ? parseFloat(distance) : null,
         // For now, we don't collect coordinates - could be added later
         x_coord: null,
-        y_coord: null
+        y_coord: null,
+        ...(selectedTeamRequiresPlayerDetails && selectedPlayer ? { player_id: selectedPlayer } : {})
       };
 
       await api.post(`/free-shots`, freeShotData);
@@ -258,6 +266,9 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
     return teamId === homeTeamId ? players.home : players.away;
   };
 
+  const selectedTeamPlayers = getTeamPlayers(selectedTeam);
+  const selectedTeamRequiresPlayerDetails = !hasLoadedRoster || selectedTeamPlayers.length > 0;
+
   return (
     <div className="free-shot-panel">
       <h4>Record Free Shot / Penalty</h4>
@@ -308,17 +319,24 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
         {/* Player Selection */}
         <div className="form-group">
           <label>Player:</label>
-          <select
-            value={selectedPlayer || ''}
-            onChange={(e) => setSelectedPlayer(e.target.value ? parseInt(e.target.value) : null)}
-          >
-            <option value="">Select player</option>
-            {getTeamPlayers(selectedTeam).map((player) => (
-              <option key={player.id} value={player.id}>
-                #{player.jersey_number} {player.first_name} {player.last_name}
-              </option>
-            ))}
-          </select>
+          {selectedTeamRequiresPlayerDetails ? (
+            <select
+              value={selectedPlayer || ''}
+              onChange={(e) => setSelectedPlayer(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">Select player</option>
+              {selectedTeamPlayers.map((player) => (
+                <option key={player.id} value={player.id}>
+                  #{player.jersey_number} {player.first_name} {player.last_name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="team-restriction-notice">
+              <strong>Team-only mode</strong>
+              <p className="restriction-text">No lineup details were configured for this team. {getFreeShotDisplayName(freeShotType)} is recorded without selecting a player.</p>
+            </div>
+          )}
         </div>
 
         {/* Result Selection */}
@@ -384,7 +402,7 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
         {/* Submit Button */}
         <button
           onClick={handleRecordFreeShot}
-          disabled={loading || !selectedTeam || !selectedPlayer}
+          disabled={loading || !selectedTeam || (selectedTeamRequiresPlayerDetails && !selectedPlayer)}
           className="primary-button"
         >
           {loading ? 'Recording...' : `Record ${getFreeShotDisplayName(freeShotType)}`}

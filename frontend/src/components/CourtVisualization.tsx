@@ -57,7 +57,7 @@ interface Shot {
   id: number;
   game_id: number;
   club_id: number;
-  player_id: number;
+  player_id: number | null;
   x_coord: number;
   y_coord: number;
   result: 'goal' | 'miss' | 'blocked';
@@ -434,7 +434,11 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       return;
     }
 
-    if (!selectedPlayerId) {
+    const selectedTeamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
+    const selectedTeamOffensivePlayers = getCurrentOffensivePlayers(selectedTeamId);
+    const selectedTeamHasPlayerDetails = selectedTeamOffensivePlayers.length > 0;
+
+    if (selectedTeamHasPlayerDetails && !selectedPlayerId) {
       setError('Please select a player');
       return;
     }
@@ -443,18 +447,20 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     const selectedPlayerOnAway = awayPlayers.some(player => player.id === selectedPlayerId);
     const selectedPlayerTeam = selectedPlayerOnHome ? 'home' : selectedPlayerOnAway ? 'away' : null;
 
-    let playerIdForShot = selectedPlayerId;
-    if (selectedPlayerTeam !== selectedTeam) {
-      const teamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
-      const fallbackPlayers = getCurrentOffensivePlayers(teamId);
-      if (fallbackPlayers.length === 0) {
-        setSelectedPlayerId(null);
-        setError('No valid offensive player found for the selected team.');
-        return;
-      }
+    let playerIdForShot: number | null = selectedPlayerId;
+    if (selectedTeamHasPlayerDetails) {
+      if (selectedPlayerTeam !== selectedTeam) {
+        if (selectedTeamOffensivePlayers.length === 0) {
+          setSelectedPlayerId(null);
+          setError('No valid offensive player found for the selected team.');
+          return;
+        }
 
-      playerIdForShot = fallbackPlayers[0].id;
-      setSelectedPlayerId(playerIdForShot);
+        playerIdForShot = selectedTeamOffensivePlayers[0].id;
+        setSelectedPlayerId(playerIdForShot);
+      }
+    } else {
+      playerIdForShot = null;
     }
 
     // Check if user is allowed to record for the selected team
@@ -481,13 +487,13 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       
       const shotData = {
         club_id: selectedTeam === 'home' ? homeClubId : awayClubId,
-        player_id: playerIdForShot,
         x_coord: clickedCoords.x,
         y_coord: clickedCoords.y,
         result: result,
         period: currentPeriod,
         distance: calculatedDistance,
-        shot_type: shotType // Always include shot_type (defaults to running_shot)
+        shot_type: shotType, // Always include shot_type (defaults to running_shot)
+        ...(playerIdForShot !== null ? { player_id: playerIdForShot } : {})
       };
 
       // 🔥 OPTIMISTIC UPDATE: Add shot to UI immediately
@@ -495,7 +501,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         id: Date.now(), // Temporary ID
         game_id: gameId,
         club_id: shotData.club_id,
-        player_id: shotData.player_id,
+        player_id: playerIdForShot,
         x_coord: shotData.x_coord,
         y_coord: shotData.y_coord,
         result: shotData.result,
@@ -504,8 +510,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         period: shotData.period,
         time_remaining: null,
         created_at: new Date().toISOString(),
-        player_first_name: homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.first_name,
-        player_last_name: homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.last_name
+        player_first_name: playerIdForShot !== null ? homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.first_name : 'Unknown',
+        player_last_name: playerIdForShot !== null ? homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.last_name : 'Scorer'
       };
       setShots(prev => [...prev, optimisticShot]);
       
@@ -513,7 +519,9 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       setTimeout(() => setSuccess(null), 2000);
       
       // Remember the selected player for next shot
-      setLastSelectedPlayerId(playerIdForShot);
+      if (playerIdForShot !== null) {
+        setLastSelectedPlayerId(playerIdForShot);
+      }
       
       // Reset form but keep player and shot type
       setClickedCoords(null);
@@ -610,6 +618,10 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       </>
     );
   };
+
+  const selectedTeamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
+  const selectedTeamOffensivePlayers = getCurrentOffensivePlayers(selectedTeamId);
+  const selectedTeamRequiresPlayerDetails = selectedTeamOffensivePlayers.length > 0;
 
   return (
     <div className="court-visualization">
@@ -753,23 +765,29 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           {/* Solution 3: Mobile Player Grid - Touch-friendly player selection */}
           <div className="form-group player-selection-group">
             <label>Offensive Player:</label>
-            <div className="player-grid">
-              {/* eslint-disable-next-line react-hooks/refs */}
-              {getCurrentOffensivePlayers(selectedTeam === 'home' ? homeTeamId : awayTeamId).map((player) => (
-                <button
-                  key={player.id}
-                  className={`player-card ${selectedPlayerId === player.id ? 'selected' : ''}`}
-                  onClick={() => {
-                    setSelectedPlayerId(player.id);
-                    setLastSelectedPlayerId(player.id);
-                  }}
-                  title={`Select ${player.first_name} ${player.last_name}`}
-                >
-                  <span className="jersey-large">#{player.jersey_number}</span>
-                  <span className="name-compact">{player.first_name[0]}. {player.last_name}</span>
-                </button>
-              ))}
-            </div>
+            {selectedTeamRequiresPlayerDetails ? (
+              <div className="player-grid">
+                {selectedTeamOffensivePlayers.map((player) => (
+                  <button
+                    key={player.id}
+                    className={`player-card ${selectedPlayerId === player.id ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSelectedPlayerId(player.id);
+                      setLastSelectedPlayerId(player.id);
+                    }}
+                    title={`Select ${player.first_name} ${player.last_name}`}
+                  >
+                    <span className="jersey-large">#{player.jersey_number}</span>
+                    <span className="name-compact">{player.first_name[0]}. {player.last_name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="team-restriction-notice">
+                <strong>Team-only mode</strong>
+                <p className="restriction-text">No lineup details were configured for this team. Shots are recorded without selecting a player.</p>
+              </div>
+            )}
             <small className="helper-text">
               {(() => {
                 const teamClubId = selectedTeam === 'home' ? homeClubId : awayClubId;
@@ -796,21 +814,21 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <button
             onClick={() => handleRecordShot('goal')}
             className="primary-button goal-button"
-            disabled={!clickedCoords || !selectedPlayerId}
+            disabled={!clickedCoords || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
           >
             ⚽ Goal
           </button>
           <button
             onClick={() => handleRecordShot('miss')}
             className="secondary-button miss-button"
-            disabled={!clickedCoords || !selectedPlayerId}
+            disabled={!clickedCoords || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
           >
             ✗ Miss
           </button>
           <button
             onClick={() => handleRecordShot('blocked')}
             className="secondary-button blocked-button"
-            disabled={!clickedCoords || !selectedPlayerId}
+            disabled={!clickedCoords || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
           >
             🛡️ Blocked
           </button>

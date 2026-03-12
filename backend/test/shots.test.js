@@ -112,7 +112,7 @@ describe('🏀 Shot Routes', () => {
       // Clean up test data
       await db.query('DELETE FROM shots WHERE game_id = $1', [testGame.id]);
       await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
-      await db.query('DELETE FROM players WHERE id IN ($1, $2)', [player1.id, player2.id]);
+      await db.query('DELETE FROM players WHERE club_id IN ($1, $2)', [club1.id, club2.id]);
       await db.query('DELETE FROM trainer_assignments WHERE user_id = $1 AND club_id = $2', [coachUser.id, club2.id]);
       await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [club1.id, club2.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
@@ -187,6 +187,33 @@ describe('🏀 Shot Routes', () => {
         expect(gameCheck.rows[0].away_score).toBe(0);
       } catch (error) {
         global.testContext.logTestError(error, 'POST create miss shot as coach failed');
+        throw error;
+      }
+    });
+
+    it('✅ should create a shot without player_id by using fallback player', async () => {
+      try {
+        const shotData = {
+          club_id: club1.id,
+          x_coord: 45.5,
+          y_coord: 30.2,
+          result: 'goal',
+          period: 1
+        };
+
+        const response = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
+
+        expect(response.status).toBe(201);
+        expect(response.body).toHaveProperty('id');
+        expect(response.body.player_id).toBeTruthy();
+        expect(response.body.first_name).toBe('Unknown');
+        expect(response.body.last_name).toBe('Scorer');
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST create shot without player_id failed');
         throw error;
       }
     });

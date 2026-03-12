@@ -393,4 +393,45 @@ describe('FreeShotPanel', () => {
       expect(api.post).toHaveBeenCalled();
     });
   });
+
+  it('records free shot without player details for team with no configured lineup', async () => {
+    const user = userEvent.setup();
+
+    (api.get as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/game-rosters')) {
+        return Promise.resolve({ data: [...mockHomePlayers] });
+      }
+      if (url.includes('/free-shots')) {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<FreeShotPanel {...mockProps} />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/game-rosters/1');
+    });
+
+    const teamSelect = screen.getByDisplayValue('Team Alpha (Home)');
+    await user.selectOptions(teamSelect, '2');
+
+    await waitFor(() => {
+      expect(screen.getByText('Team-only mode')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Record Free Shot' })).toBeEnabled();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Record Free Shot' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/free-shots', expect.objectContaining({
+        game_id: 1,
+        club_id: 101,
+        free_shot_type: 'free_shot'
+      }));
+    });
+
+    const freeShotPayload = (api.post as jest.Mock).mock.calls[0][1];
+    expect(freeShotPayload).not.toHaveProperty('player_id');
+  });
 });
