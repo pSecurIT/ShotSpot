@@ -3,7 +3,7 @@ import api from '../utils/api';
 
 interface Player {
   id: number;
-  team_id: number;
+  club_id: number;
   first_name: string;
   last_name: string;
   jersey_number: number;
@@ -14,6 +14,8 @@ interface FaultManagementProps {
   gameId: number;
   homeTeamId: number;
   awayTeamId: number;
+  homeClubId: number;
+  awayClubId: number;
   homeTeamName: string;
   awayTeamName: string;
   currentPeriod: number;
@@ -21,20 +23,21 @@ interface FaultManagementProps {
   onFaultRecorded?: () => void;
   canAddEvents?: () => boolean; // Period end check function
   userAssignedTeam?: 'home' | 'away' | null; // Which team the user can record events for
+  currentUserRole?: string; // 'admin' | 'coach' | 'user'
 }
 
 interface Fault {
   id: number;
   game_id: number;
   event_type: string;
-  team_id: number;
+  club_id: number;
   player_id?: number;
   period: number;
   time_remaining?: string;
   details?: {
     reason?: string;
   };
-  team_name: string;
+  club_name: string;
   first_name?: string;
   last_name?: string;
   jersey_number?: number;
@@ -45,6 +48,8 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
   gameId,
   homeTeamId,
   awayTeamId,
+  homeClubId,
+  awayClubId,
   homeTeamName,
   awayTeamName,
   currentPeriod,
@@ -93,14 +98,16 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
 
   const fetchPlayers = async () => {
     try {
-      const [homeResponse, awayResponse] = await Promise.all([
-        api.get(`/game-rosters/${gameId}?team_id=${homeTeamId}&is_starting=true`),
-        api.get(`/game-rosters/${gameId}?team_id=${awayTeamId}&is_starting=true`)
-      ]);
+      const response = await api.get(`/game-rosters/${gameId}`);
+      const allRosterPlayers = response.data || [];
+      
+      // Filter by club_id locally
+      const homePlayers = allRosterPlayers.filter((p: { club_id?: number; is_starting?: boolean }) => p.club_id === homeClubId && p.is_starting);
+      const awayPlayers = allRosterPlayers.filter((p: { club_id?: number; is_starting?: boolean }) => p.club_id === awayClubId && p.is_starting);
 
       setPlayers({
-        home: homeResponse.data || [],
-        away: awayResponse.data || []
+        home: homePlayers || [],
+        away: awayPlayers || []
       });
     } catch (err) {
       console.error('Error fetching players:', err);
@@ -145,9 +152,10 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
     setError(null);
 
     try {
+      const clubId = selectedTeam === homeTeamId ? homeClubId : awayClubId;
       const faultData = {
         event_type: faultType,
-        team_id: selectedTeam,
+        club_id: clubId,
         player_id: selectedPlayer || null,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
@@ -345,7 +353,7 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
               <div key={fault.id} className="fault-item">
                 <div className="fault-info">
                   <span className="fault-type">{getFaultDisplayName(fault.event_type)}</span>
-                  <span className="team-name">{fault.team_name}</span>
+                  <span className="team-name">{fault.club_name}</span>
                   {fault.first_name && (
                     <span className="player-name">
                       #{fault.jersey_number} {fault.first_name} {fault.last_name}
