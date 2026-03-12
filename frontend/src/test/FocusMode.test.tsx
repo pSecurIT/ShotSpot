@@ -25,6 +25,8 @@ describe('FocusMode Component', () => {
     gameId: 1,
     homeTeamId: 1,
     awayTeamId: 2,
+    homeClubId: 100,
+    awayClubId: 101,
     homeTeamName: 'Home Team',
     awayTeamName: 'Away Team',
     homeScore: 5,
@@ -39,12 +41,12 @@ describe('FocusMode Component', () => {
     activePossession: {
       id: 1,
       game_id: 1,
-      team_id: 1,
+      club_id: 100,
       period: 2,
       started_at: new Date().toISOString(),
       ended_at: null,
       shots_taken: 3,
-      team_name: 'Home Team'
+      club_name: 'Home Team'
     },
     possessionDuration: 45,
     onShotRecorded: vi.fn(),
@@ -98,8 +100,8 @@ describe('FocusMode Component', () => {
     render(<FocusMode {...mockProps} />);
     
     // Home team has possession (left side)
-    const leftIndicator = screen.getByText('⚽ BALL');
-    expect(leftIndicator).toBeInTheDocument();
+    const indicators = screen.getAllByText('⚽ BALL');
+    expect(indicators).toHaveLength(1);
   });
 
   it('should show correct possession indicator on right side when away team has ball', () => {
@@ -108,8 +110,8 @@ describe('FocusMode Component', () => {
       homeAttackingSide: 'right' as const,
       activePossession: {
         ...mockProps.activePossession,
-        team_id: 2, // Away team
-        team_name: 'Away Team'
+        club_id: 100, // Right side when home attacks right
+        club_name: 'Home Team'
       }
     };
     

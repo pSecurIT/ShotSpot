@@ -19,7 +19,8 @@ const mockTemplates = [
     is_system_template: true,
     created_by: null,
     created_at: '2024-01-01T00:00:00.000Z',
-    updated_at: '2024-01-01T00:00:00.000Z'
+    updated_at: '2024-01-01T00:00:00.000Z',
+    allow_same_team: false
   },
   {
     id: 2,
@@ -31,7 +32,8 @@ const mockTemplates = [
     is_system_template: true,
     created_by: null,
     created_at: '2024-01-01T00:00:00.000Z',
-    updated_at: '2024-01-01T00:00:00.000Z'
+    updated_at: '2024-01-01T00:00:00.000Z',
+    allow_same_team: false
   },
   {
     id: 3,
@@ -44,7 +46,8 @@ const mockTemplates = [
     created_by: 1,
     created_by_username: 'coach',
     created_at: '2024-01-01T00:00:00.000Z',
-    updated_at: '2024-01-01T00:00:00.000Z'
+    updated_at: '2024-01-01T00:00:00.000Z',
+    allow_same_team: false
   }
 ];
 

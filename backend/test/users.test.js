@@ -921,5 +921,205 @@ describe('👥 Users API', () => {
       expect(response.body.limit).toBe(50);
     });
   });
+
+  describe('🎯 GET /api/users/me/assignable-teams', () => {
+    let club1, club2, team1, team2, team3, coachUser, coachToken;
+
+    beforeAll(async () => {
+      try {
+        const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        
+        // Create clubs
+        const club1Result = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+          [`Assignable Club A ${uniqueId}`]
+        );
+        club1 = club1Result.rows[0];
+
+        const club2Result = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+          [`Assignable Club B ${uniqueId}`]
+        );
+        club2 = club2Result.rows[0];
+
+        // Create teams
+        const team1Result = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          [`Assignable Team 1 ${uniqueId}`, club1.id]
+        );
+        team1 = team1Result.rows[0];
+
+        const team2Result = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          [`Assignable Team 2 ${uniqueId}`, club1.id]
+        );
+        team2 = team2Result.rows[0];
+
+        const team3Result = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          [`Assignable Team 3 ${uniqueId}`, club2.id]
+        );
+        team3 = team3Result.rows[0];
+
+        // Create coach user
+        const hashedPassword = await bcrypt.hash('password123', 10);
+        const coachResult = await db.query(
+          'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
+          [`coach_assignable_${uniqueId}`, `coach_assignable_${uniqueId}@test.com`, hashedPassword, 'coach']
+        );
+        coachUser = coachResult.rows[0];
+        coachToken = generateJWT(coachUser);
+
+        // Assign coach to team1 and team2 only (not team3)
+        await db.query(
+          'INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active) VALUES ($1, $2, $3, true)',
+          [coachUser.id, club1.id, team1.id]
+        );
+        await db.query(
+          'INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active) VALUES ($1, $2, $3, true)',
+          [coachUser.id, club1.id, team2.id]
+        );
+
+        console.log('      🔧 Assignable teams test data created');
+      } catch (error) {
+        console.error('⚠️ Assignable teams test setup failed:', error.message);
+        throw error;
+      }
+    });
+
+    afterAll(async () => {
+      try {
+        await db.query('DELETE FROM trainer_assignments WHERE user_id = $1', [coachUser.id]);
+        await db.query('DELETE FROM users WHERE id = $1', [coachUser.id]);
+        await db.query('DELETE FROM teams WHERE id IN ($1, $2, $3)', [team1.id, team2.id, team3.id]);
+        await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [club1.id, club2.id]);
+        console.log('      ✅ Assignable teams test cleanup complete');
+      } catch (error) {
+        console.error('⚠️ Assignable teams test cleanup failed:', error.message);
+      }
+    });
+
+    it('✅ admin should see all teams', async () => {
+      try {
+        const response = await request(app)
+          .get('/api/users/me/assignable-teams')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
+
+        expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body.length).toBeGreaterThanOrEqual(3);
+        
+        // Check structure
+        const team = response.body[0];
+        expect(team).toHaveProperty('id');
+        expect(team).toHaveProperty('name');
+        expect(team).toHaveProperty('club_id');
+        expect(team).toHaveProperty('club_name');
+        
+        console.log('      ✅ Admin sees all teams');
+      } catch (error) {
+        console.log('      ❌ Admin assignable teams test failed:', error.message);
+        throw error;
+      }
+    });
+
+    it('✅ coach should only see assigned teams', async () => {
+      try {
+        const response = await request(app)
+          .get('/api/users/me/assignable-teams')
+          .set('Authorization', `Bearer ${coachToken}`)
+          .expect(200);
+
+        expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body.length).toBe(2);
+        
+        // Should include team1 and team2
+        const teamIds = response.body.map(t => t.id);
+        expect(teamIds).toContain(team1.id);
+        expect(teamIds).toContain(team2.id);
+        expect(teamIds).not.toContain(team3.id);
+        
+        // Check structure
+        response.body.forEach(team => {
+          expect(team).toHaveProperty('id');
+          expect(team).toHaveProperty('name');
+          expect(team).toHaveProperty('club_id');
+          expect(team).toHaveProperty('club_name');
+        });
+        
+        console.log('      ✅ Coach sees only assigned teams');
+      } catch (error) {
+        console.log('      ❌ Coach assignable teams test failed:', error.message);
+        throw error;
+      }
+    });
+
+    it('✅ coach with no assignments should see empty array', async () => {
+      try {
+        // Create coach without any assignments
+        const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        const hashedPassword = await bcrypt.hash('password123', 10);
+        const unassignedCoachResult = await db.query(
+          'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
+          [`coach_unassigned_${uniqueId}`, `coach_unassigned_${uniqueId}@test.com`, hashedPassword, 'coach']
+        );
+        const unassignedCoach = unassignedCoachResult.rows[0];
+        const unassignedCoachToken = generateJWT(unassignedCoach);
+
+        const response = await request(app)
+          .get('/api/users/me/assignable-teams')
+          .set('Authorization', `Bearer ${unassignedCoachToken}`)
+          .expect(200);
+
+        expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body.length).toBe(0);
+        
+        await db.query('DELETE FROM users WHERE id = $1', [unassignedCoach.id]);
+        console.log('      ✅ Unassigned coach sees empty array');
+      } catch (error) {
+        console.log('      ❌ Unassigned coach test failed:', error.message);
+        throw error;
+      }
+    });
+
+    it('❌ should require authentication', async () => {
+      try {
+        await request(app)
+          .get('/api/users/me/assignable-teams')
+          .expect(401);
+        
+        console.log('      ✅ Correctly requires authentication');
+      } catch (error) {
+        console.log('      ❌ Authentication requirement test failed:', error.message);
+        throw error;
+      }
+    });
+
+    it('✅ should order teams by club and team name', async () => {
+      try {
+        const response = await request(app)
+          .get('/api/users/me/assignable-teams')
+          .set('Authorization', `Bearer ${coachToken}`)
+          .expect(200);
+
+        // Check ordering
+        for (let i = 1; i < response.body.length; i++) {
+          const prev = response.body[i - 1];
+          const curr = response.body[i];
+          
+          // Should be ordered by club_name, then team name
+          expect(
+            prev.club_name < curr.club_name ||
+            (prev.club_name === curr.club_name && prev.name <= curr.name)
+          ).toBe(true);
+        }
+        
+        console.log('      ✅ Teams correctly ordered');
+      } catch (error) {
+        console.log('      ❌ Ordering test failed:', error.message);
+        throw error;
+      }
+    });
+  });
 });
 

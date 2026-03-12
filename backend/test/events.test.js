@@ -71,6 +71,17 @@ describe('🎯 Events API', () => {
         [club1.id, club2.id, new Date(), 'in_progress']
       );
       game = gameResult.rows[0];
+
+      // Give coach trainer access to both clubs so existing coach tests pass
+      // (events route now enforces trainer assignments for coaches)
+      await db.query(
+        'INSERT INTO trainer_assignments (user_id, club_id, is_active) VALUES ($1, $2, true)',
+        [coachUser.id, club1.id]
+      );
+      await db.query(
+        'INSERT INTO trainer_assignments (user_id, club_id, is_active) VALUES ($1, $2, true)',
+        [coachUser.id, club2.id]
+      );
     } catch (error) {
       global.testContext.logTestError(error, 'Events API setup failed');
       throw error;
@@ -87,6 +98,7 @@ describe('🎯 Events API', () => {
       await db.query('DELETE FROM game_events WHERE game_id = $1', [game.id]);
       await db.query('DELETE FROM games WHERE id = $1', [game.id]);
       await db.query('DELETE FROM players WHERE id IN ($1, $2)', [player1.id, player2.id]);
+      await db.query('DELETE FROM trainer_assignments WHERE user_id = $1 AND club_id IN ($2, $3)', [coachUser.id, club1.id, club2.id]);
       await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [club1.id, club2.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
     } catch (error) {
@@ -1220,6 +1232,187 @@ describe('🎯 Events API', () => {
       expect(response.body.length).toBe(1);
       expect(response.body[0].period).toBe(1);
     }, 30000);
+  });
+
+  describe('🎯 Team Restriction for Recording Events', () => {
+    let restrictedClub, restrictedTeam, restrictedPlayer, otherClub, otherTeam, otherPlayer, restrictedGame;
+
+    beforeAll(async () => {
+      try {
+        const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+        // Create club and team that coach has access to
+        const restrictedClubResult = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+          [`Event Restricted Club ${uniqueId}`]
+        );
+        restrictedClub = restrictedClubResult.rows[0];
+
+        const restrictedTeamResult = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          [`Event Restricted Team ${uniqueId}`, restrictedClub.id]
+        );
+        restrictedTeam = restrictedTeamResult.rows[0];
+
+        // Assign coach to this team
+        await db.query(
+          'INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active) VALUES ($1, $2, $3, true)',
+          [coachUser.id, restrictedClub.id, restrictedTeam.id]
+        );
+
+        // Create player in assigned team
+        const restrictedPlayerResult = await db.query(
+          'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [restrictedClub.id, restrictedTeam.id, 'Assigned', 'EventPlayer', 99]
+        );
+        restrictedPlayer = restrictedPlayerResult.rows[0];
+
+        // Create another club/team that coach does NOT have access to
+        const otherClubResult = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+          [`Event Other Club ${uniqueId}`]
+        );
+        otherClub = otherClubResult.rows[0];
+
+        const otherTeamResult = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          [`Event Other Team ${uniqueId}`, otherClub.id]
+        );
+        otherTeam = otherTeamResult.rows[0];
+
+        // Create player in other team
+        const otherPlayerResult = await db.query(
+          'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [otherClub.id, otherTeam.id, 'Other', 'EventPlayer', 88]
+        );
+        otherPlayer = otherPlayerResult.rows[0];
+
+        // Create game with both teams
+        const gameResult = await db.query(
+          'INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4, NOW(), \'in_progress\') RETURNING *',
+          [restrictedClub.id, otherClub.id, restrictedTeam.id, otherTeam.id]
+        );
+        restrictedGame = gameResult.rows[0];
+
+        console.log('      🔧 Event restriction test data created');
+      } catch (error) {
+        console.error('⚠️ Event restriction test setup failed:', error.message);
+        throw error;
+      }
+    });
+
+    afterAll(async () => {
+      try {
+        await db.query('DELETE FROM games WHERE id = $1', [restrictedGame.id]);
+        await db.query('DELETE FROM trainer_assignments WHERE user_id = $1 AND club_id = $2', [coachUser.id, restrictedClub.id]);
+        await db.query('DELETE FROM players WHERE id IN ($1, $2)', [restrictedPlayer.id, otherPlayer.id]);
+        await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [restrictedTeam.id, otherTeam.id]);
+        await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [restrictedClub.id, otherClub.id]);
+        console.log('      ✅ Event restriction test cleanup complete');
+      } catch (error) {
+        console.error('⚠️ Event restriction test cleanup failed:', error.message);
+      }
+    });
+
+    it('✅ admin should record events for any team', async () => {
+      try {
+        const eventData = {
+          club_id: otherClub.id,
+          player_id: otherPlayer.id,
+          event_type: 'foul',
+          period: 1
+        };
+
+        const response = await request(app)
+          .post(`/api/events/${restrictedGame.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(eventData);
+
+        expect(response.status).toBe(201);
+        console.log('      ✅ Admin can record events for any team');
+
+        // Clean up
+        await db.query('DELETE FROM game_events WHERE id = $1', [response.body.id]);
+      } catch (error) {
+        console.log('      ❌ Admin event recording test failed:', error.message);
+        global.testContext.logTestError(error, 'Admin event recording failed');
+        throw error;
+      }
+    });
+
+    it('✅ coach should record events only for assigned team', async () => {
+      try {
+        const eventData = {
+          club_id: restrictedClub.id,
+          player_id: restrictedPlayer.id,
+          event_type: 'foul',
+          period: 1
+        };
+
+        const response = await request(app)
+          .post(`/api/events/${restrictedGame.id}`)
+          .set('Authorization', `Bearer ${coachToken}`)
+          .send(eventData);
+
+        expect(response.status).toBe(201);
+        console.log('      ✅ Coach can record events for assigned team');
+
+        // Clean up
+        await db.query('DELETE FROM game_events WHERE id = $1', [response.body.id]);
+      } catch (error) {
+        console.log('      ❌ Coach assigned team event test failed:', error.message);
+        global.testContext.logTestError(error, 'Coach assigned team event failed');
+        throw error;
+      }
+    });
+
+    it('❌ coach should NOT record events for unassigned team', async () => {
+      try {
+        const eventData = {
+          club_id: otherClub.id,
+          player_id: otherPlayer.id,
+          event_type: 'foul',
+          period: 1
+        };
+
+        const response = await request(app)
+          .post(`/api/events/${restrictedGame.id}`)
+          .set('Authorization', `Bearer ${coachToken}`)
+          .send(eventData);
+
+        expect(response.status).toBe(403);
+        expect(response.body.error).toContain('only record events');
+        console.log('      ✅ Coach correctly blocked from unassigned team');
+      } catch (error) {
+        console.log('      ❌ Coach event restriction test failed:', error.message);
+        global.testContext.logTestError(error, 'Coach event restriction failed');
+        throw error;
+      }
+    });
+
+    it('❌ should reject event when team_id does not match player team', async () => {
+      try {
+        const eventData = {
+          club_id: otherClub.id, // Wrong club for this player!
+          player_id: restrictedPlayer.id,
+          event_type: 'foul',
+          period: 1
+        };
+
+        const response = await request(app)
+          .post(`/api/events/${restrictedGame.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(eventData);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('does not belong');
+        console.log('      ✅ Club-player mismatch correctly rejected');
+      } catch (error) {
+        console.log('      ❌ Team-player mismatch test failed:', error.message);
+        global.testContext.logTestError(error, 'Team-player mismatch failed');
+        throw error;
+      }
+    });
   });
 });
 

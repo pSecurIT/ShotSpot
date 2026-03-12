@@ -3,7 +3,7 @@ import api from '../utils/api';
 
 interface Player {
   id: number;
-  team_id: number;
+  club_id: number;
   first_name: string;
   last_name: string;
   jersey_number: number;
@@ -14,18 +14,22 @@ interface FreeShotPanelProps {
   gameId: number;
   homeTeamId: number;
   awayTeamId: number;
+  homeClubId: number;
+  awayClubId: number;
   homeTeamName: string;
   awayTeamName: string;
   currentPeriod: number;
   timeRemaining?: string;
   onFreeShotRecorded?: () => void;
+  userAssignedTeam?: 'home' | 'away' | null;
+  currentUserRole?: string; // 'admin' | 'coach' | 'user'
 }
 
 interface FreeShot {
   id: number;
   game_id: number;
-  player_id: number;
-  team_id: number;
+  player_id: number | null;
+  club_id: number;
   period: number;
   time_remaining?: string;
   free_shot_type: string;
@@ -37,7 +41,7 @@ interface FreeShot {
   first_name: string;
   last_name: string;
   jersey_number: number;
-  team_name: string;
+  club_name: string;
   created_at: string;
 }
 
@@ -45,13 +49,18 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
   gameId,
   homeTeamId,
   awayTeamId,
+  homeClubId,
+  awayClubId,
   homeTeamName,
   awayTeamName,
   currentPeriod,
   timeRemaining,
-  onFreeShotRecorded
+  onFreeShotRecorded,
+  userAssignedTeam,
+  currentUserRole
 }) => {
   const [players, setPlayers] = useState<{ home: Player[]; away: Player[] }>({ home: [], away: [] });
+  const [hasLoadedRoster, setHasLoadedRoster] = useState(false);
   const [recentFreeShots, setRecentFreeShots] = useState<FreeShot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,18 +93,22 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
 
   const fetchPlayers = async () => {
     try {
-      const [homeResponse, awayResponse] = await Promise.all([
-        api.get(`/game-rosters/${gameId}?team_id=${homeTeamId}&is_starting=true`),
-        api.get(`/game-rosters/${gameId}?team_id=${awayTeamId}&is_starting=true`)
-      ]);
+      const response = await api.get(`/game-rosters/${gameId}`);
+      const allRosterPlayers = response.data || [];
+      
+      // Filter by club_id locally
+      const homePlayers = allRosterPlayers.filter((p: { club_id?: number; is_starting?: boolean }) => p.club_id === homeClubId && p.is_starting);
+      const awayPlayers = allRosterPlayers.filter((p: { club_id?: number; is_starting?: boolean }) => p.club_id === awayClubId && p.is_starting);
 
       setPlayers({
-        home: homeResponse.data || [],
-        away: awayResponse.data || []
+        home: homePlayers || [],
+        away: awayPlayers || []
       });
     } catch (err) {
       console.error('Error fetching players:', err);
       setError('Failed to load players');
+    } finally {
+      setHasLoadedRoster(true);
     }
   };
 
@@ -109,8 +122,13 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
   };
 
   const handleRecordFreeShot = async () => {
-    if (!selectedTeam || !selectedPlayer) {
-      setError('Please select a team and player');
+    if (!selectedTeam) {
+      setError('Please select a team');
+      return;
+    }
+
+    if (selectedTeamRequiresPlayerDetails && !selectedPlayer) {
+      setError('Please select a player');
       return;
     }
 
@@ -118,9 +136,17 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
     setError(null);
 
     try {
+      // Restrict coaches to their assigned team
+      if (currentUserRole === 'coach' && userAssignedTeam && selectedTeam !== (userAssignedTeam === 'home' ? homeTeamId : awayTeamId)) {
+        setError('You can only record free shots for your assigned team');
+        setLoading(false);
+        return;
+      }
+
+      const clubId = selectedTeam === homeTeamId ? homeClubId : awayClubId;
       const freeShotData = {
-        player_id: selectedPlayer,
-        team_id: selectedTeam,
+        game_id: gameId,
+        club_id: clubId,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
         free_shot_type: freeShotType,
@@ -129,10 +155,11 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
         distance: distance ? parseFloat(distance) : null,
         // For now, we don't collect coordinates - could be added later
         x_coord: null,
-        y_coord: null
+        y_coord: null,
+        ...(selectedTeamRequiresPlayerDetails && selectedPlayer ? { player_id: selectedPlayer } : {})
       };
 
-      await api.post(`/free-shots/${gameId}`, freeShotData);
+      await api.post(`/free-shots`, freeShotData);
 
       setSuccess(`${getFreeShotDisplayName(freeShotType)} recorded successfully`);
       
@@ -168,7 +195,7 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
 
   const deleteFreeShot = async (freeShotId: number) => {
     try {
-      await api.delete(`/free-shots/${gameId}/${freeShotId}`);
+      await api.delete(`/free-shots/${freeShotId}`, { data: { game_id: gameId } });
       setSuccess('Free shot removed successfully');
       fetchRecentFreeShots();
       if (onFreeShotRecorded) {
@@ -239,6 +266,9 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
     return teamId === homeTeamId ? players.home : players.away;
   };
 
+  const selectedTeamPlayers = getTeamPlayers(selectedTeam);
+  const selectedTeamRequiresPlayerDetails = !hasLoadedRoster || selectedTeamPlayers.length > 0;
+
   return (
     <div className="free-shot-panel">
       <h4>Record Free Shot / Penalty</h4>
@@ -289,17 +319,24 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
         {/* Player Selection */}
         <div className="form-group">
           <label>Player:</label>
-          <select
-            value={selectedPlayer || ''}
-            onChange={(e) => setSelectedPlayer(e.target.value ? parseInt(e.target.value) : null)}
-          >
-            <option value="">Select player</option>
-            {getTeamPlayers(selectedTeam).map((player) => (
-              <option key={player.id} value={player.id}>
-                #{player.jersey_number} {player.first_name} {player.last_name}
-              </option>
-            ))}
-          </select>
+          {selectedTeamRequiresPlayerDetails ? (
+            <select
+              value={selectedPlayer || ''}
+              onChange={(e) => setSelectedPlayer(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">Select player</option>
+              {selectedTeamPlayers.map((player) => (
+                <option key={player.id} value={player.id}>
+                  #{player.jersey_number} {player.first_name} {player.last_name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="team-restriction-notice">
+              <strong>Team-only mode</strong>
+              <p className="restriction-text">No lineup details were configured for this team. {getFreeShotDisplayName(freeShotType)} is recorded without selecting a player.</p>
+            </div>
+          )}
         </div>
 
         {/* Result Selection */}
@@ -365,7 +402,7 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
         {/* Submit Button */}
         <button
           onClick={handleRecordFreeShot}
-          disabled={loading || !selectedTeam || !selectedPlayer}
+          disabled={loading || !selectedTeam || (selectedTeamRequiresPlayerDetails && !selectedPlayer)}
           className="primary-button"
         >
           {loading ? 'Recording...' : `Record ${getFreeShotDisplayName(freeShotType)}`}
@@ -381,7 +418,7 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
               <div key={freeShot.id} className="free-shot-item">
                 <div className="free-shot-info">
                   <span className="shot-type">{getFreeShotDisplayName(freeShot.free_shot_type)}</span>
-                  <span className="team-name">{freeShot.team_name}</span>
+                  <span className="team-name">{freeShot.club_name}</span>
                   <span className="player-name">
                     #{freeShot.jersey_number} {freeShot.first_name} {freeShot.last_name}
                   </span>

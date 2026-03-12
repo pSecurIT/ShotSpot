@@ -5,12 +5,16 @@ interface TimeoutManagementProps {
   gameId: number;
   homeTeamId: number;
   awayTeamId: number;
+  homeClubId: number;
+  awayClubId: number;
   homeTeamName: string;
   awayTeamName: string;
   currentPeriod: number;
   timeRemaining?: string;
   onTimeoutRecorded?: () => void;
   canAddEvents?: () => boolean; // Period end check function
+  userAssignedTeam?: 'home' | 'away' | null; // Which team the user is assigned to
+  currentUserRole?: string; // 'admin' | 'coach' | 'user'
 }
 
 interface Timeout {
@@ -32,6 +36,8 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
   gameId,
   homeTeamId,
   awayTeamId,
+  homeClubId,
+  awayClubId,
   homeTeamName,
   awayTeamName,
   currentPeriod,
@@ -104,8 +110,17 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
     setError(null);
 
     try {
-      const timeoutData = {
-        team_id: timeoutType === 'team' ? selectedTeam : null,
+      const timeoutData: {
+        game_id: number;
+        timeout_type: string;
+        period: number;
+        time_remaining: string | null;
+        duration: string;
+        reason: string | null;
+        called_by: string | null;
+        club_id?: number;
+      } = {
+        game_id: gameId,
         timeout_type: timeoutType,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
@@ -114,7 +129,12 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
         called_by: calledBy || null
       };
 
-      await api.post(`/timeouts/${gameId}`, timeoutData);
+      // Only add club_id for team timeouts
+      if (timeoutType === 'team' && selectedTeam) {
+        timeoutData.club_id = selectedTeam === homeTeamId ? homeClubId : awayClubId;
+      }
+
+      await api.post(`/timeouts`, timeoutData);
 
       setSuccess(`${getTimeoutDisplayName(timeoutType)} started successfully`);
       
@@ -149,7 +169,7 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
 
   const handleEndTimeout = async (timeoutId: number) => {
     try {
-      await api.put(`/timeouts/${gameId}/${timeoutId}/end`);
+      await api.put(`/timeouts/${timeoutId}/end`, { game_id: gameId });
       setSuccess('Timeout ended successfully');
       fetchRecentTimeouts();
       if (onTimeoutRecorded) {
@@ -170,7 +190,7 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
 
   const deleteTimeout = async (timeoutId: number) => {
     try {
-      await api.delete(`/timeouts/${gameId}/${timeoutId}`);
+      await api.delete(`/timeouts/${timeoutId}`, { data: { game_id: gameId } });
       setSuccess('Timeout removed successfully');
       fetchRecentTimeouts();
       if (onTimeoutRecorded) {

@@ -18,11 +18,14 @@ describe('FaultManagement', () => {
     gameId: 1,
     homeTeamId: 1,
     awayTeamId: 2,
+    homeClubId: 100,
+    awayClubId: 101,
     homeTeamName: 'Team Alpha',
     awayTeamName: 'Team Beta',
     currentPeriod: 1,
     timeRemaining: '00:08:30',
-    onFaultRecorded: vi.fn()
+    onFaultRecorded: vi.fn(),
+    currentUserRole: 'admin'
   };
 
   const mockHomePlayers = [
@@ -40,12 +43,12 @@ describe('FaultManagement', () => {
       id: 1,
       game_id: 1,
       event_type: 'fault_offensive',
-      team_id: 1,
+      club_id: 100,
       player_id: 1,
       period: 1,
       time_remaining: '00:09:00',
       details: { reason: 'running_with_ball' },
-      team_name: 'Team Alpha',
+      club_name: 'Team Alpha',
       first_name: 'John',
       last_name: 'Doe',
       jersey_number: 10,
@@ -59,11 +62,13 @@ describe('FaultManagement', () => {
     // Mock API responses
     (api.get as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/game-rosters')) {
-        if (url.includes('team_id=1')) {
-          return Promise.resolve({ data: mockHomePlayers });
-        } else if (url.includes('team_id=2')) {
-          return Promise.resolve({ data: mockAwayPlayers });
-        }
+        // Return full roster with club_id
+        return Promise.resolve({ 
+          data: [
+            ...mockHomePlayers.map(p => ({ ...p, club_id: 100, is_starting: true })),
+            ...mockAwayPlayers.map(p => ({ ...p, club_id: 101, is_starting: true }))
+          ]
+        });
       } else if (url.includes('/events')) {
         return Promise.resolve({ data: mockRecentFaults });
       }
@@ -94,8 +99,7 @@ describe('FaultManagement', () => {
     
     // Wait for players to load
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith(`/game-rosters/1?team_id=1&is_starting=true`);
-      expect(api.get).toHaveBeenCalledWith(`/game-rosters/1?team_id=2&is_starting=true`);
+      expect(api.get).toHaveBeenCalledWith(`/game-rosters/1`);
     });
     
     // Select away team to see players
@@ -157,7 +161,7 @@ describe('FaultManagement', () => {
       expect(api.post).toHaveBeenCalledWith('/events/1', expect.objectContaining({
         event_type: 'fault_offensive',
         player_id: 1,
-        team_id: 1,
+        club_id: 100,
         period: 1,
         time_remaining: '00:08:30',
         details: expect.objectContaining({
@@ -201,7 +205,7 @@ describe('FaultManagement', () => {
       expect(api.post).toHaveBeenCalledWith('/events/1', expect.objectContaining({
         event_type: 'fault_defensive',
         player_id: 3,
-        team_id: 2
+        club_id: 101
       }));
     });
   });
@@ -225,7 +229,7 @@ describe('FaultManagement', () => {
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/events/1', expect.objectContaining({
         event_type: 'fault_out_of_bounds',
-        team_id: 1
+        club_id: 100
       }));
     });
   });
@@ -435,5 +439,49 @@ describe('FaultManagement', () => {
       expect(screen.getByText('Offensive Fault')).toBeInTheDocument();
       expect(screen.getByText('Team Alpha')).toBeInTheDocument();
     });
+  });
+
+  it('records offensive fault without player details for team with no configured lineup', async () => {
+    const user = userEvent.setup();
+
+    (api.get as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/game-rosters')) {
+        return Promise.resolve({
+          data: [
+            ...mockHomePlayers.map(p => ({ ...p, club_id: 100, is_starting: true }))
+          ]
+        });
+      }
+      if (url.includes('/events')) {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<FaultManagement {...mockProps} />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/game-rosters/1');
+    });
+
+    const teamSelect = screen.getByDisplayValue('Team Alpha (Home)');
+    await user.selectOptions(teamSelect, '2');
+
+    await waitFor(() => {
+      expect(screen.getByText('Team-only mode')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Record Offensive Fault' })).toBeEnabled();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Record Offensive Fault' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/events/1', expect.objectContaining({
+        event_type: 'fault_offensive',
+        club_id: 101
+      }));
+    });
+
+    const faultPayload = (api.post as jest.Mock).mock.calls[0][1];
+    expect(faultPayload).not.toHaveProperty('player_id');
   });
 });

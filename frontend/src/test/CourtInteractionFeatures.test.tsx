@@ -92,6 +92,8 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
           gameId={1}
           homeTeamId={1}
           awayTeamId={2}
+          homeClubId={100}
+          awayClubId={101}
           homeTeamName="Home Team"
           awayTeamName="Away Team"
           currentPeriod={1}
@@ -356,6 +358,7 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
         id: 1,
         game_id: 1,
         team_id: 1,
+        club_id: 100,
         period: 1,
         started_at: new Date().toISOString(),
         ended_at: null,
@@ -368,6 +371,8 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
             gameId={1}
             homeTeamId={1}
             awayTeamId={2}
+            homeClubId={100}
+            awayClubId={101}
             homeTeamName="Home Team"
             awayTeamName="Away Team"
             currentPeriod={1}
