@@ -281,8 +281,7 @@ describe('Twizzit API Routes', () => {
     });
   });
 
-  describe.skip('POST /api/twizzit/sync/preview/players/:credentialId', () => {
-    // Route not yet implemented
+  describe('POST /api/twizzit/sync/preview/players/:credentialId', () => {
     it('should validate missing groupId', async () => {
       const response = await request(app)
         .post(`/api/twizzit/sync/preview/players/${credentialId}`)
@@ -412,7 +411,7 @@ describe('Twizzit API Routes', () => {
       expect(row).toBeTruthy();
       expect(row).toMatchObject({
         internalTeamId: mappingsTeamId,
-        internalTeamName: 'Twizzit Mappings Club',
+        internalTeamName: 'Twizzit Mappings Team',
         twizzitTeamId: 'tw-team-1',
         twizzitTeamName: 'Twizzit Team Name',
         syncStatus: 'success'
@@ -506,7 +505,7 @@ describe('Twizzit API Routes', () => {
         twizzitPlayerId: 'tw-player-1',
         twizzitPlayerName: 'Twizzit Player Name',
         internalTeamId: mappingsTeamId,
-        internalTeamName: 'Twizzit Mappings Club',
+        internalTeamName: 'Twizzit Mappings Team',
         syncStatus: 'success'
       });
       expect(row.lastSyncedAt).toBeTruthy();

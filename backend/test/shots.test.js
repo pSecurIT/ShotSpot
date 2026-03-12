@@ -93,6 +93,13 @@ describe('🏀 Shot Routes', () => {
         [club1.id, club2.id, new Date('2025-11-01T14:00:00Z')]
       );
       testGame = gameResult.rows[0];
+
+      // Give coach trainer access to club2 so existing coach tests pass
+      // (shots route now enforces trainer assignments for coaches)
+      await db.query(
+        'INSERT INTO trainer_assignments (user_id, club_id, is_active) VALUES ($1, $2, true)',
+        [coachUser.id, club2.id]
+      );
     } catch (error) {
       global.testContext.logTestError(error, 'Shot Routes setup failed');
       throw error;
@@ -105,7 +112,8 @@ describe('🏀 Shot Routes', () => {
       // Clean up test data
       await db.query('DELETE FROM shots WHERE game_id = $1', [testGame.id]);
       await db.query('DELETE FROM games WHERE id = $1', [testGame.id]);
-      await db.query('DELETE FROM players WHERE id IN ($1, $2)', [player1.id, player2.id]);
+      await db.query('DELETE FROM players WHERE club_id IN ($1, $2)', [club1.id, club2.id]);
+      await db.query('DELETE FROM trainer_assignments WHERE user_id = $1 AND club_id = $2', [coachUser.id, club2.id]);
       await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [club1.id, club2.id]);
       await db.query('DELETE FROM users WHERE id IN ($1, $2, $3)', [adminUser.id, coachUser.id, regularUser.id]);
     } catch (error) {
@@ -179,6 +187,33 @@ describe('🏀 Shot Routes', () => {
         expect(gameCheck.rows[0].away_score).toBe(0);
       } catch (error) {
         global.testContext.logTestError(error, 'POST create miss shot as coach failed');
+        throw error;
+      }
+    });
+
+    it('✅ should create a shot without player_id by using fallback player', async () => {
+      try {
+        const shotData = {
+          club_id: club1.id,
+          x_coord: 45.5,
+          y_coord: 30.2,
+          result: 'goal',
+          period: 1
+        };
+
+        const response = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
+
+        expect(response.status).toBe(201);
+        expect(response.body).toHaveProperty('id');
+        expect(response.body.player_id).toBeTruthy();
+        expect(response.body.first_name).toBe('Unknown');
+        expect(response.body.last_name).toBe('Scorer');
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST create shot without player_id failed');
         throw error;
       }
     });
@@ -646,6 +681,199 @@ describe('🏀 Shot Routes', () => {
         expect(response.status).toBe(403);
       } catch (error) {
         global.testContext.logTestError(error, 'DELETE user authorization rejection failed');
+        throw error;
+      }
+    });
+  });
+
+  describe('🎯 Team Restriction for Recording Shots', () => {
+    let restrictedClub, restrictedTeam, restrictedPlayer, otherClub, otherTeam, otherPlayer, restrictedGame;
+
+    beforeAll(async () => {
+      try {
+        const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+        // Create club and team that coach has access to
+        const restrictedClubResult = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+          [`Shot Restricted Club ${uniqueId}`]
+        );
+        restrictedClub = restrictedClubResult.rows[0];
+
+        const restrictedTeamResult = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          [`Shot Restricted Team ${uniqueId}`, restrictedClub.id]
+        );
+        restrictedTeam = restrictedTeamResult.rows[0];
+
+        // Assign coach to this team
+        await db.query(
+          'INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active) VALUES ($1, $2, $3, true)',
+          [coachUser.id, restrictedClub.id, restrictedTeam.id]
+        );
+
+        // Create player in assigned team
+        const restrictedPlayerResult = await db.query(
+          'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [restrictedClub.id, restrictedTeam.id, 'Assigned', 'Shooter', 99]
+        );
+        restrictedPlayer = restrictedPlayerResult.rows[0];
+
+        // Create another club/team that coach does NOT have access to
+        const otherClubResult = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING *',
+          [`Shot Other Club ${uniqueId}`]
+        );
+        otherClub = otherClubResult.rows[0];
+
+        const otherTeamResult = await db.query(
+          'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
+          [`Shot Other Team ${uniqueId}`, otherClub.id]
+        );
+        otherTeam = otherTeamResult.rows[0];
+
+        // Create player in other team
+        const otherPlayerResult = await db.query(
+          'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [otherClub.id, otherTeam.id, 'Other', 'Shooter', 88]
+        );
+        otherPlayer = otherPlayerResult.rows[0];
+
+        // Create game with both teams
+        const gameResult = await db.query(
+          'INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status) VALUES ($1, $2, $3, $4, NOW(), \'in_progress\') RETURNING *',
+          [restrictedClub.id, otherClub.id, restrictedTeam.id, otherTeam.id]
+        );
+        restrictedGame = gameResult.rows[0];
+
+        console.log('      🔧 Shot restriction test data created');
+      } catch (error) {
+        console.error('⚠️ Shot restriction test setup failed:', error.message);
+        throw error;
+      }
+    });
+
+    afterAll(async () => {
+      try {
+        await db.query('DELETE FROM games WHERE id = $1', [restrictedGame.id]);
+        await db.query('DELETE FROM trainer_assignments WHERE user_id = $1 AND club_id = $2', [coachUser.id, restrictedClub.id]);
+        await db.query('DELETE FROM players WHERE id IN ($1, $2)', [restrictedPlayer.id, otherPlayer.id]);
+        await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [restrictedTeam.id, otherTeam.id]);
+        await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [restrictedClub.id, otherClub.id]);
+        console.log('      ✅ Shot restriction test cleanup complete');
+      } catch (error) {
+        console.error('⚠️ Shot restriction test cleanup failed:', error.message);
+      }
+    });
+
+    it('✅ admin should record shots for any team', async () => {
+      try {
+        const shotData = {
+          player_id: otherPlayer.id,
+          club_id: otherClub.id,
+          period: 1,
+          shot_type: 'regular',
+          result: 'goal',
+          x_coord: 3.0,
+          y_coord: 4.0
+        };
+
+        const response = await request(app)
+          .post(`/api/shots/${restrictedGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(shotData);
+
+        expect(response.status).toBe(201);
+        console.log('      ✅ Admin can record shots for any team');
+
+        // Clean up
+        await db.query('DELETE FROM shots WHERE id = $1', [response.body.id]);
+      } catch (error) {
+        console.log('      ❌ Admin shot recording test failed:', error.message);
+        global.testContext.logTestError(error, 'Admin shot recording failed');
+        throw error;
+      }
+    });
+
+    it('✅ coach should record shots only for assigned team', async () => {
+      try {
+        const shotData = {
+          player_id: restrictedPlayer.id,
+          club_id: restrictedClub.id,
+          period: 1,
+          shot_type: 'regular',
+          result: 'goal',
+          x_coord: 3.0,
+          y_coord: 4.0
+        };
+
+        const response = await request(app)
+          .post(`/api/shots/${restrictedGame.id}`)
+          .set('Authorization', `Bearer ${coachToken}`)
+          .send(shotData);
+
+        expect(response.status).toBe(201);
+        console.log('      ✅ Coach can record shots for assigned team');
+
+        // Clean up
+        await db.query('DELETE FROM shots WHERE id = $1', [response.body.id]);
+      } catch (error) {
+        console.log('      ❌ Coach assigned team shot test failed:', error.message);
+        global.testContext.logTestError(error, 'Coach assigned team shot failed');
+        throw error;
+      }
+    });
+
+    it('❌ coach should NOT record shots for unassigned team', async () => {
+      try {
+        const shotData = {
+          player_id: otherPlayer.id,
+          club_id: otherClub.id,
+          period: 1,
+          shot_type: 'regular',
+          result: 'goal',
+          x_coord: 3.0,
+          y_coord: 4.0
+        };
+
+        const response = await request(app)
+          .post(`/api/shots/${restrictedGame.id}`)
+          .set('Authorization', `Bearer ${coachToken}`)
+          .send(shotData);
+
+        expect(response.status).toBe(403);
+        expect(response.body.error).toContain('assigned team');
+        console.log('      ✅ Coach correctly blocked from unassigned team');
+      } catch (error) {
+        console.log('      ❌ Coach shot restriction test failed:', error.message);
+        global.testContext.logTestError(error, 'Coach shot restriction failed');
+        throw error;
+      }
+    });
+
+    it('❌ should reject shot when team_id does not match player team', async () => {
+      try {
+        const shotData = {
+          player_id: restrictedPlayer.id,
+          club_id: otherClub.id, // Wrong club for this player!
+          period: 1,
+          shot_type: 'regular',
+          result: 'goal',
+          x_coord: 3.0,
+          y_coord: 4.0
+        };
+
+        const response = await request(app)
+          .post(`/api/shots/${restrictedGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(shotData);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('does not belong');
+        console.log('      ✅ Club-player mismatch correctly rejected');
+      } catch (error) {
+        console.log('      ❌ Team-player mismatch test failed:', error.message);
+        global.testContext.logTestError(error, 'Team-player mismatch failed');
         throw error;
       }
     });

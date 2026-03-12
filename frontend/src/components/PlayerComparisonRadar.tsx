@@ -291,8 +291,20 @@ const PlayerComparisonRadar: React.FC<PlayerComparisonRadarProps> = ({
                   borderRadius: '4px',
                   padding: '10px'
                 }}
-                formatter={(value?: number) =>
-                  typeof value === 'number' ? `${value.toFixed(1)}%` : 'N/A'}
+                formatter={(
+                  value: number | string | readonly (number | string)[] | undefined
+                ) => {
+                  const numericValue =
+                    typeof value === 'number'
+                      ? value
+                      : typeof value === 'string'
+                        ? Number(value)
+                        : Array.isArray(value) && value.length > 0
+                          ? Number(value[0])
+                          : NaN;
+
+                  return Number.isFinite(numericValue) ? `${numericValue.toFixed(1)}%` : 'N/A';
+                }}
               />
             </RadarChart>
           </ResponsiveContainer>

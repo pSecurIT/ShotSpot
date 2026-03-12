@@ -18,8 +18,11 @@ describe('🔐 Authentication API', () => {
 
   beforeEach(async () => {
     // Clean up users table before each test to ensure isolation
-    await db.query('DELETE FROM users WHERE username LIKE $1 OR email LIKE $2', 
-      ['test%', 'test%']);
+    // Clean up in correct order due to foreign key constraints
+    await db.query('DELETE FROM trainer_assignments WHERE user_id IN (SELECT id FROM users WHERE username LIKE $1)', ['test%']);
+    await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE $1)', ['test%']);
+    await db.query('DELETE FROM clubs WHERE name LIKE $1', ['test%']);
+    await db.query('DELETE FROM users WHERE username LIKE $1 OR email LIKE $2', ['test%', 'test%']);
     testUsers = [];
   });
 
@@ -27,6 +30,9 @@ describe('🔐 Authentication API', () => {
     // Clean up test data after each test
     if (testUsers.length > 0) {
       const userIds = testUsers.map(u => u.id);
+      await db.query('DELETE FROM trainer_assignments WHERE user_id = ANY($1)', [userIds]);
+      await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE \'test%\')', []);
+      await db.query('DELETE FROM clubs WHERE name LIKE \'test%\'', []);
       await db.query('DELETE FROM users WHERE id = ANY($1)', [userIds]);
     }
   });
@@ -88,13 +94,24 @@ describe('🔐 Authentication API', () => {
         .send(validUserData)
         .expect(201);
 
-      expect(response.body).toHaveProperty('message', 'User registered successfully');
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.message).toContain('User registered successfully');
       expect(response.body).toHaveProperty('user');
       expect(response.body.user).toHaveProperty('id');
       expect(response.body.user).toHaveProperty('username', validUserData.username);
       expect(response.body.user).toHaveProperty('email', validUserData.email);
+      expect(response.body.user).toHaveProperty('role', 'coach');
       expect(response.body.user).not.toHaveProperty('password');
       expect(response.body.user).not.toHaveProperty('password_hash');
+
+      // Verify club and team were created
+      expect(response.body).toHaveProperty('club');
+      expect(response.body.club).toHaveProperty('id');
+      expect(response.body.club.name).toBe(`${validUserData.username}'s Club`);
+      
+      expect(response.body).toHaveProperty('team');
+      expect(response.body.team).toHaveProperty('id');
+      expect(response.body.team.name).toBe(`${validUserData.username}'s Team`);
 
       // Store for cleanup
       testUsers.push(response.body.user);
@@ -102,11 +119,21 @@ describe('🔐 Authentication API', () => {
       // Verify user was created in database with hashed password
       const dbUser = await db.query('SELECT * FROM users WHERE id = $1', [response.body.user.id]);
       expect(dbUser.rows[0]).toHaveProperty('password_hash');
+      expect(dbUser.rows[0].role).toBe('coach');
       expect(dbUser.rows[0].password_hash).not.toBe(validUserData.password);
       
       // Verify password is properly hashed
       const isValidHash = await bcrypt.compare(validUserData.password, dbUser.rows[0].password_hash);
       expect(isValidHash).toBe(true);
+
+      // Verify trainer assignment was created
+      const trainerAssignment = await db.query(
+        'SELECT * FROM trainer_assignments WHERE user_id = $1 AND club_id = $2',
+        [response.body.user.id, response.body.club.id]
+      );
+      expect(trainerAssignment.rows.length).toBe(1);
+      expect(trainerAssignment.rows[0].is_active).toBe(true);
+      expect(trainerAssignment.rows[0].team_id).toBe(response.body.team.id);
     });
 
     it('❌ should reject registration with missing username', async () => {

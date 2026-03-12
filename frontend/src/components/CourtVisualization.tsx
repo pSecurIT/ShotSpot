@@ -56,8 +56,8 @@ interface Player {
 interface Shot {
   id: number;
   game_id: number;
-  team_id: number;
-  player_id: number;
+  club_id: number;
+  player_id: number | null;
   x_coord: number;
   y_coord: number;
   result: 'goal' | 'miss' | 'blocked';
@@ -76,18 +76,20 @@ interface Shot {
 interface Possession {
   id: number;
   game_id: number;
-  team_id: number;
+  club_id: number;
   period: number;
   started_at: string;
   ended_at: string | null;
   shots_taken: number;
-  team_name?: string;
+  club_name?: string;
 }
 
 interface CourtVisualizationProps {
   gameId: number;
   homeTeamId: number;
   awayTeamId: number;
+  homeClubId: number;
+  awayClubId: number;
   homeTeamName: string;
   awayTeamName: string;
   currentPeriod: number;
@@ -102,12 +104,15 @@ interface CourtVisualizationProps {
   onResumeTimer?: () => void; // Resume timer when clicking court
   onPauseTimer?: () => void; // Pause timer when needed
   canAddEvents?: () => boolean; // Period end check function
+  userAssignedTeam?: 'home' | 'away' | null; // Which team the user can record events for
 }
 
 const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   gameId,
   homeTeamId,
   awayTeamId,
+  homeClubId,
+  awayClubId,
   homeTeamName,
   awayTeamName,
   currentPeriod,
@@ -121,7 +126,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   timerState,
   onResumeTimer,
   onPauseTimer: _onPauseTimer, // eslint-disable-line @typescript-eslint/no-unused-vars
-  canAddEvents
+  canAddEvents,
+  userAssignedTeam
 }) => {
   const [homePlayers, setHomePlayers] = useState<Player[]>(homePlayersProps || []);
   const [awayPlayers, setAwayPlayers] = useState<Player[]>(awayPlayersProps || []);
@@ -129,15 +135,19 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // Track if we've logged the "no starting_position" warning to avoid console spam
-  const hasLoggedPositionWarning = useRef({ home: false, away: false });
-  
   // Form state
   const [selectedTeam, setSelectedTeam] = useState<'home' | 'away'>('home');
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [shotType, setShotType] = useState<string>('running_shot'); // Default to most common shot type
   const [clickedCoords, setClickedCoords] = useState<{ x: number; y: number } | null>(null);
   const [lastSelectedPlayerId, setLastSelectedPlayerId] = useState<number | null>(null); // Remember last player
+  
+  // Auto-select the user's assigned team when available
+  useEffect(() => {
+    if (userAssignedTeam) {
+      setSelectedTeam(userAssignedTeam);
+    }
+  }, [userAssignedTeam]);
   
   // Korf (goal) positions on the field - these are constants, no need to recalculate
   const KORF_LEFT = useMemo(() => ({ x: 13, y: 50 }), []);  // Left korf at 13% from left, center height
@@ -195,11 +205,16 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const rosterPlayers = rosterResponse.data;
       
       // Separate by team and include starting_position
+      const homeRosterClubId = rosterPlayers.find((p: { club_id?: number; team_id?: number }) => p.team_id === homeTeamId)?.club_id
+        ?? rosterPlayers[0]?.club_id;
+      const awayRosterClubId = rosterPlayers.find((p: { club_id?: number; team_id?: number }) => p.team_id === awayTeamId)?.club_id
+        ?? rosterPlayers.find((p: { club_id?: number }) => p.club_id !== homeRosterClubId)?.club_id;
+
       const homePlayers = rosterPlayers
-        .filter((p: Player & { is_starting: boolean; player_id: number }) => p.team_id === homeTeamId && p.is_starting)
-        .map((p: Player & { is_starting: boolean; player_id: number }) => ({
+        .filter((p: Player & { is_starting: boolean; player_id: number; club_id?: number }) => p.club_id === homeRosterClubId && p.is_starting)
+        .map((p: Player & { is_starting: boolean; player_id: number; club_id?: number }) => ({
           id: p.player_id,
-          team_id: p.team_id,
+          team_id: homeTeamId,
           first_name: p.first_name,
           last_name: p.last_name,
           jersey_number: p.jersey_number,
@@ -209,10 +224,10 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         }));
       
       const awayPlayers = rosterPlayers
-        .filter((p: Player & { is_starting: boolean; player_id: number }) => p.team_id === awayTeamId && p.is_starting)
-        .map((p: Player & { is_starting: boolean; player_id: number }) => ({
+        .filter((p: Player & { is_starting: boolean; player_id: number; club_id?: number }) => p.club_id === awayRosterClubId && p.is_starting)
+        .map((p: Player & { is_starting: boolean; player_id: number; club_id?: number }) => ({
           id: p.player_id,
-          team_id: p.team_id,
+          team_id: awayTeamId,
           first_name: p.first_name,
           last_name: p.last_name,
           jersey_number: p.jersey_number,
@@ -258,16 +273,11 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       // If no players have starting_position data, return all players as fallback
       const hasPositionData = teamPlayers.some(p => p.starting_position);
       if (!hasPositionData) {
-        // Only log once per team to avoid console spam
-        const teamKey = teamId === homeTeamId ? 'home' : 'away';
-        if (process.env.NODE_ENV === 'development' && teamPlayers.length > 0 && !hasLoggedPositionWarning.current[teamKey]) {
-          console.warn(`[${teamKey === 'home' ? 'Home' : 'Away'} Team] No starting_position data, showing all ${teamPlayers.length} players`);
-          hasLoggedPositionWarning.current[teamKey] = true;
-        }
         return teamPlayers;
       }
       
-      const teamGoals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+      const teamClubId = teamId === homeTeamId ? homeClubId : awayClubId;
+      const teamGoals = shots.filter(s => s.club_id === teamClubId && s.result === 'goal').length;
       const switches = Math.floor(teamGoals / 2);
       const positionsSwapped = switches % 2 === 1;
 
@@ -284,7 +294,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       
       return offensivePlayers;
     };
-  }, [homeTeamId, homePlayers, awayPlayers, shots]);
+  }, [homeTeamId, homeClubId, awayClubId, homePlayers, awayPlayers, shots]);
 
   // Update players when props change
   useEffect(() => {
@@ -315,7 +325,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       
       // Calculate current offensive players inline
       const teamPlayers = teamId === homeTeamId ? homePlayers : awayPlayers;
-      const teamGoals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+      const teamGoals = shots.filter(s => s.club_id === (selectedTeam === 'home' ? homeClubId : awayClubId) && s.result === 'goal').length;
       const switches = Math.floor(teamGoals / 2);
       const positionsSwapped = switches % 2 === 1;
       
@@ -328,7 +338,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         setSelectedPlayerId(offensivePlayers[0].id);
       }
     }
-  }, [homePlayers, awayPlayers, shots, selectedPlayerId, selectedTeam, homeTeamId, awayTeamId]);
+  }, [homePlayers, awayPlayers, shots, selectedPlayerId, selectedTeam, homeTeamId, awayTeamId, homeClubId, awayClubId]);
 
   // Calculate distance from a point to the nearest korf in meters - memoize with useCallback
   const calculateDistanceToKorf = useCallback((x: number, y: number): number => {
@@ -347,7 +357,6 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   }, [KORF_LEFT, KORF_RIGHT]);
 
   // Calculate which players are currently in offense for a team
-  // Offense and defense switch every 2 goals scored by that team
   // Handle court click to record coordinates - memoize with useCallback
   const handleCourtClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!imageRef.current || !courtRef.current) return;
@@ -376,6 +385,12 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       setError('Unable to determine which team shoots from this position');
       return;
     }
+
+    // Check if user is allowed to record for this team
+    if (userAssignedTeam && teamInfo.side !== userAssignedTeam) {
+      setError(`You can only record shots for the ${userAssignedTeam === 'home' ? homeTeamName : awayTeamName}`);
+      return;
+    }
     
     // Auto-select the correct team
     setSelectedTeam(teamInfo.side);
@@ -401,7 +416,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     
     // Team selection is automatic based on possession - no need to show message
     // (Possession buttons already indicate which team is attacking)
-  }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, timerState]);
+  }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, timerState, userAssignedTeam, homeTeamName, awayTeamName]);
 
   // Record shot with specific result - memoize with useCallback
   const handleRecordShot = useCallback(async (result: 'goal' | 'miss' | 'blocked') => {
@@ -410,8 +425,38 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       return;
     }
 
-    if (!selectedPlayerId) {
+    const selectedTeamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
+    const selectedTeamOffensivePlayers = getCurrentOffensivePlayers(selectedTeamId);
+    const selectedTeamHasPlayerDetails = selectedTeamOffensivePlayers.length > 0;
+
+    if (selectedTeamHasPlayerDetails && !selectedPlayerId) {
       setError('Please select a player');
+      return;
+    }
+
+    const selectedPlayerOnHome = homePlayers.some(player => player.id === selectedPlayerId);
+    const selectedPlayerOnAway = awayPlayers.some(player => player.id === selectedPlayerId);
+    const selectedPlayerTeam = selectedPlayerOnHome ? 'home' : selectedPlayerOnAway ? 'away' : null;
+
+    let playerIdForShot: number | null = selectedPlayerId;
+    if (selectedTeamHasPlayerDetails) {
+      if (selectedPlayerTeam !== selectedTeam) {
+        if (selectedTeamOffensivePlayers.length === 0) {
+          setSelectedPlayerId(null);
+          setError('No valid offensive player found for the selected team.');
+          return;
+        }
+
+        playerIdForShot = selectedTeamOffensivePlayers[0].id;
+        setSelectedPlayerId(playerIdForShot);
+      }
+    } else {
+      playerIdForShot = null;
+    }
+
+    // Check if user is allowed to record for the selected team
+    if (userAssignedTeam && selectedTeam !== userAssignedTeam) {
+      setError(`You can only record shots for the ${userAssignedTeam === 'home' ? homeTeamName : awayTeamName}`);
       return;
     }
 
@@ -432,22 +477,22 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const calculatedDistance = calculateDistanceToKorf(clickedCoords.x, clickedCoords.y);
       
       const shotData = {
-        team_id: selectedTeam === 'home' ? homeTeamId : awayTeamId,
-        player_id: selectedPlayerId,
+        club_id: selectedTeam === 'home' ? homeClubId : awayClubId,
         x_coord: clickedCoords.x,
         y_coord: clickedCoords.y,
         result: result,
         period: currentPeriod,
         distance: calculatedDistance,
-        shot_type: shotType // Always include shot_type (defaults to running_shot)
+        shot_type: shotType, // Always include shot_type (defaults to running_shot)
+        ...(playerIdForShot !== null ? { player_id: playerIdForShot } : {})
       };
 
       // 🔥 OPTIMISTIC UPDATE: Add shot to UI immediately
       const optimisticShot: Shot = {
         id: Date.now(), // Temporary ID
         game_id: gameId,
-        team_id: shotData.team_id,
-        player_id: shotData.player_id,
+        club_id: shotData.club_id,
+        player_id: playerIdForShot,
         x_coord: shotData.x_coord,
         y_coord: shotData.y_coord,
         result: shotData.result,
@@ -456,8 +501,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         period: shotData.period,
         time_remaining: null,
         created_at: new Date().toISOString(),
-        player_first_name: homePlayers.concat(awayPlayers).find(p => p.id === selectedPlayerId)?.first_name,
-        player_last_name: homePlayers.concat(awayPlayers).find(p => p.id === selectedPlayerId)?.last_name
+        player_first_name: playerIdForShot !== null ? homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.first_name : 'Unknown',
+        player_last_name: playerIdForShot !== null ? homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.last_name : 'Scorer'
       };
       setShots(prev => [...prev, optimisticShot]);
       
@@ -465,7 +510,9 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       setTimeout(() => setSuccess(null), 2000);
       
       // Remember the selected player for next shot
-      setLastSelectedPlayerId(selectedPlayerId);
+      if (playerIdForShot !== null) {
+        setLastSelectedPlayerId(playerIdForShot);
+      }
       
       // Reset form but keep player and shot type
       setClickedCoords(null);
@@ -493,7 +540,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error recording shot');
     }
-  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers, canAddEvents]);
+  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, homeClubId, awayClubId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers, canAddEvents, userAssignedTeam, homeTeamName, awayTeamName, getCurrentOffensivePlayers]);
 
   // Render shot markers on court
   const renderShotMarkers = () => {
@@ -563,6 +610,10 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     );
   };
 
+  const selectedTeamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
+  const selectedTeamOffensivePlayers = getCurrentOffensivePlayers(selectedTeamId);
+  const selectedTeamRequiresPlayerDetails = selectedTeamOffensivePlayers.length > 0;
+
   return (
     <div className="court-visualization">
       {error && <div className="error-message">{error}</div>}
@@ -585,7 +636,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
               {/* Active Possession Indicator */}
               {activePossession && (
                 <div className="active-possession-inline">
-                  <span className="possession-team">{activePossession.team_name}</span>
+                  <span className="possession-team">{activePossession.club_name}</span>
                   <span className="possession-duration">{possessionDuration}s</span>
                   <span className="possession-shots">{activePossession.shots_taken} shot{activePossession.shots_taken !== 1 ? 's' : ''}</span>
               </div>
@@ -596,15 +647,15 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <div className="possession-buttons-inline">
             <button 
               onClick={() => onCenterLineCross(homeTeamId)}
-              className={`possession-button-compact home-team ${activePossession?.team_id === homeTeamId ? 'has-possession' : ''}`}
+              className={`possession-button-compact home-team ${activePossession?.club_id === homeClubId ? 'has-possession' : ''}`}
             >
-              {activePossession?.team_id === homeTeamId ? '🏀' : '📍'} {homeTeamName}
+              {activePossession?.club_id === homeClubId ? '🏀' : '📍'} {homeTeamName}
             </button>
             <button 
               onClick={() => onCenterLineCross(awayTeamId)}
-              className={`possession-button-compact away-team ${activePossession?.team_id === awayTeamId ? 'has-possession' : ''}`}
+              className={`possession-button-compact away-team ${activePossession?.club_id === awayClubId ? 'has-possession' : ''}`}
             >
-              {activePossession?.team_id === awayTeamId ? '🏀' : '📍'} {awayTeamName}
+              {activePossession?.club_id === awayClubId ? '🏀' : '📍'} {awayTeamName}
             </button>
           </div>
         </div>
@@ -679,46 +730,59 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           {/* Team Selection */}
           <div className="form-group">
             <label>Team:</label>
-            <select
-              value={selectedTeam}
-              onChange={(e) => {
-                const newTeam = e.target.value as 'home' | 'away';
-                setSelectedTeam(newTeam);
-                // Auto-select first offensive player from new team
-                const teamId = newTeam === 'home' ? homeTeamId : awayTeamId;
-                const offensivePlayers = getCurrentOffensivePlayers(teamId);
-                setSelectedPlayerId(offensivePlayers.length > 0 ? offensivePlayers[0].id : null);
-              }}
-            >
-              <option value="home">{homeTeamName} (Home)</option>
-              <option value="away">{awayTeamName} (Away)</option>
-            </select>
+            {userAssignedTeam ? (
+              <div className="team-restriction-notice">
+                <strong>📍 Your Team:</strong> {userAssignedTeam === 'home' ? homeTeamName : awayTeamName}
+                <p className="restriction-text">You can only record events for your assigned team</p>
+              </div>
+            ) : (
+              <select
+                value={selectedTeam}
+                onChange={(e) => {
+                  const newTeam = e.target.value as 'home' | 'away';
+                  setSelectedTeam(newTeam);
+                  // Auto-select first offensive player from new team
+                  const teamId = newTeam === 'home' ? homeTeamId : awayTeamId;
+                  const offensivePlayers = getCurrentOffensivePlayers(teamId);
+                  setSelectedPlayerId(offensivePlayers.length > 0 ? offensivePlayers[0].id : null);
+                }}
+              >
+                <option value="home">{homeTeamName} (Home)</option>
+                <option value="away">{awayTeamName} (Away)</option>
+              </select>
+            )}
           </div>
 
           {/* Solution 3: Mobile Player Grid - Touch-friendly player selection */}
           <div className="form-group player-selection-group">
             <label>Offensive Player:</label>
-            <div className="player-grid">
-              {/* eslint-disable-next-line react-hooks/refs */}
-              {getCurrentOffensivePlayers(selectedTeam === 'home' ? homeTeamId : awayTeamId).map((player) => (
-                <button
-                  key={player.id}
-                  className={`player-card ${selectedPlayerId === player.id ? 'selected' : ''}`}
-                  onClick={() => {
-                    setSelectedPlayerId(player.id);
-                    setLastSelectedPlayerId(player.id);
-                  }}
-                  title={`Select ${player.first_name} ${player.last_name}`}
-                >
-                  <span className="jersey-large">#{player.jersey_number}</span>
-                  <span className="name-compact">{player.first_name[0]}. {player.last_name}</span>
-                </button>
-              ))}
-            </div>
+            {selectedTeamRequiresPlayerDetails ? (
+              <div className="player-grid">
+                {selectedTeamOffensivePlayers.map((player) => (
+                  <button
+                    key={player.id}
+                    className={`player-card ${selectedPlayerId === player.id ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSelectedPlayerId(player.id);
+                      setLastSelectedPlayerId(player.id);
+                    }}
+                    title={`Select ${player.first_name} ${player.last_name}`}
+                  >
+                    <span className="jersey-large">#{player.jersey_number}</span>
+                    <span className="name-compact">{player.first_name[0]}. {player.last_name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="team-restriction-notice">
+                <strong>Team-only mode</strong>
+                <p className="restriction-text">No lineup details were configured for this team. Shots are recorded without selecting a player.</p>
+              </div>
+            )}
             <small className="helper-text">
               {(() => {
-                const teamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
-                const goals = shots.filter(s => s.team_id === teamId && s.result === 'goal').length;
+                const teamClubId = selectedTeam === 'home' ? homeClubId : awayClubId;
+                const goals = shots.filter(s => s.club_id === teamClubId && s.result === 'goal').length;
                 const nextSwitch = 2 - (goals % 2);
                 return `${nextSwitch} goal${nextSwitch !== 1 ? 's' : ''} until position switch`;
               })()}
@@ -741,21 +805,21 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <button
             onClick={() => handleRecordShot('goal')}
             className="primary-button goal-button"
-            disabled={!clickedCoords || !selectedPlayerId}
+            disabled={!clickedCoords || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
           >
             ⚽ Goal
           </button>
           <button
             onClick={() => handleRecordShot('miss')}
             className="secondary-button miss-button"
-            disabled={!clickedCoords || !selectedPlayerId}
+            disabled={!clickedCoords || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
           >
             ✗ Miss
           </button>
           <button
             onClick={() => handleRecordShot('blocked')}
             className="secondary-button blocked-button"
-            disabled={!clickedCoords || !selectedPlayerId}
+            disabled={!clickedCoords || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
           >
             🛡️ Blocked
           </button>
@@ -820,7 +884,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <div className="team-stat-section">
             <h5>{homeTeamName}</h5>
             {(() => {
-              const teamShots = shots.filter(s => s.team_id === homeTeamId);
+              const teamShots = shots.filter(s => s.club_id === homeClubId);
               const goals = teamShots.filter(s => s.result === 'goal').length;
               // Calculate average distance only from shots with valid distance values
               const shotsWithDistance = teamShots.filter(s => s.distance != null && s.distance > 0);
@@ -866,7 +930,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <div className="team-stat-section">
             <h5>{awayTeamName}</h5>
             {(() => {
-              const teamShots = shots.filter(s => s.team_id === awayTeamId);
+              const teamShots = shots.filter(s => s.club_id === awayClubId);
               const goals = teamShots.filter(s => s.result === 'goal').length;
               // Calculate average distance only from shots with valid distance values
               const shotsWithDistance = teamShots.filter(s => s.distance != null && s.distance > 0);

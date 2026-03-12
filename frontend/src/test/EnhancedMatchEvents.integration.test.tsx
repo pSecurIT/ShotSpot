@@ -25,6 +25,8 @@ describe('Enhanced Match Events Integration', () => {
     gameId: 1,
     homeTeamId: 1,
     awayTeamId: 2,
+    homeClubId: 100,
+    awayClubId: 101,
     homeTeamName: 'Team Alpha',
     awayTeamName: 'Team Beta',
     currentPeriod: 1,
@@ -32,10 +34,10 @@ describe('Enhanced Match Events Integration', () => {
   };
 
   const mockPlayers = [
-    { id: 1, team_id: 1, first_name: 'John', last_name: 'Doe', jersey_number: 10, gender: 'M' },
-    { id: 2, team_id: 1, first_name: 'Jane', last_name: 'Smith', jersey_number: 11, gender: 'F' },
-    { id: 3, team_id: 2, first_name: 'Bob', last_name: 'Johnson', jersey_number: 20, gender: 'M' },
-    { id: 4, team_id: 2, first_name: 'Alice', last_name: 'Wilson', jersey_number: 21, gender: 'F' }
+    { id: 1, team_id: 1, club_id: 100, is_starting: true, first_name: 'John', last_name: 'Doe', jersey_number: 10, gender: 'M' },
+    { id: 2, team_id: 1, club_id: 100, is_starting: true, first_name: 'Jane', last_name: 'Smith', jersey_number: 11, gender: 'F' },
+    { id: 3, team_id: 2, club_id: 101, is_starting: true, first_name: 'Bob', last_name: 'Johnson', jersey_number: 20, gender: 'M' },
+    { id: 4, team_id: 2, club_id: 101, is_starting: true, first_name: 'Alice', last_name: 'Wilson', jersey_number: 21, gender: 'F' }
   ];
 
   const mockEvents = [
@@ -64,12 +66,8 @@ describe('Enhanced Match Events Integration', () => {
     
     // Mock API responses
     (api.get as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes('/players')) {
-        if (url.includes('team_id=1')) {
-          return Promise.resolve({ data: mockPlayers.filter(p => p.team_id === 1) });
-        } else if (url.includes('team_id=2')) {
-          return Promise.resolve({ data: mockPlayers.filter(p => p.team_id === 2) });
-        }
+      if (url.includes('/game-rosters')) {
+        return Promise.resolve({ data: mockPlayers });
       } else if (url.includes('/events')) {
         return Promise.resolve({ data: mockEvents });
       } else if (url.includes('/timeouts')) {
@@ -186,10 +184,11 @@ describe('Enhanced Match Events Integration', () => {
 
       // Verify timeout was recorded
       await waitFor(() => {
-        expect(api.post).toHaveBeenCalledWith('/timeouts/1', expect.objectContaining({
+        expect(api.post).toHaveBeenCalledWith('/timeouts', expect.objectContaining({
+          game_id: 1,
           timeout_type: 'team',
           called_by: 'Head Coach',
-          team_id: 1
+          club_id: 100
         }));
         expect(mockTimeoutCallback).toHaveBeenCalled();
       });

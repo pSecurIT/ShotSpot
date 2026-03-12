@@ -11,6 +11,32 @@ import {
 } from './indexedDB';
 import { getCsrfToken } from './api';
 
+const NON_SYNCABLE_ENDPOINTS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/csrf',
+  '/twizzit/sync/'
+];
+
+let onlineSyncHandler: (() => void) | null = null;
+
+const normalizeEndpoint = (endpoint: string): string => {
+  // Legacy queue entries may contain a removed preview endpoint.
+  if (endpoint.includes('/twizzit/sync/preview/teams/')) {
+    return endpoint.replace('/twizzit/sync/preview/teams/', '/twizzit/sync/teams/');
+  }
+  return endpoint;
+};
+
+const isNonSyncableEndpoint = (endpoint: string): boolean => {
+  return NON_SYNCABLE_ENDPOINTS.some(path => endpoint.includes(path));
+};
+
+const isUnrecoverableStatus = (status: number): boolean => {
+  // Permanent request failures should not keep retrying forever.
+  return [400, 401, 403, 404, 409, 422].includes(status);
+};
+
 /**
  * Queue an action for later sync when offline
  */
@@ -61,6 +87,15 @@ export const processQueue = async (): Promise<{
 
   for (const action of actions) {
     try {
+      const endpoint = normalizeEndpoint(action.endpoint);
+
+      if (isNonSyncableEndpoint(endpoint)) {
+        await markActionSynced(action.id);
+        successful++;
+        console.warn(`[OfflineSync] Discarded non-syncable action ${action.id}: ${action.type} ${endpoint}`);
+        continue;
+      }
+
       // Ensure data is properly formatted as string
       // If data is already a string, use it directly; otherwise stringify it
       let body: string | undefined;
@@ -86,7 +121,7 @@ export const processQueue = async (): Promise<{
         headers['X-CSRF-Token'] = csrfToken;
       }
 
-      const response = await fetch(action.endpoint, {
+      const response = await fetch(endpoint, {
         method: action.type,
         headers,
         credentials: 'include', // Important: include cookies for session
@@ -96,10 +131,21 @@ export const processQueue = async (): Promise<{
       if (response.ok) {
         await markActionSynced(action.id);
         successful++;
-        console.log(`[OfflineSync] Synced action ${action.id}: ${action.type} ${action.endpoint}`);
+        console.log(`[OfflineSync] Synced action ${action.id}: ${action.type} ${endpoint}`);
       } else {
-        failed++;
-        console.error(`[OfflineSync] Failed to sync action ${action.id}:`, response.status, response.statusText);
+        if (isUnrecoverableStatus(response.status)) {
+          await markActionSynced(action.id);
+          successful++;
+          console.warn(
+            `[OfflineSync] Discarded unrecoverable action ${action.id}:`,
+            response.status,
+            response.statusText,
+            endpoint
+          );
+        } else {
+          failed++;
+          console.error(`[OfflineSync] Failed to sync action ${action.id}:`, response.status, response.statusText);
+        }
       }
     } catch (error) {
       failed++;
@@ -140,13 +186,19 @@ export const getPendingActionsCount = async (): Promise<number> => {
  */
 export const startAutoSync = (): void => {
   if (typeof window !== 'undefined') {
-    window.addEventListener('online', async () => {
+    if (onlineSyncHandler) {
+      window.removeEventListener('online', onlineSyncHandler);
+    }
+
+    onlineSyncHandler = async () => {
       console.log('[OfflineSync] Connection restored, syncing pending actions...');
       await processQueue();
       
       // Notify user via custom event
       window.dispatchEvent(new CustomEvent('offline-sync-complete'));
-    });
+    };
+
+    window.addEventListener('online', onlineSyncHandler);
 
     console.log('[OfflineSync] Auto-sync listener started');
   }
@@ -156,8 +208,9 @@ export const startAutoSync = (): void => {
  * Stop auto-sync listener
  */
 export const stopAutoSync = (): void => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('online', processQueue);
+  if (typeof window !== 'undefined' && onlineSyncHandler) {
+    window.removeEventListener('online', onlineSyncHandler);
+    onlineSyncHandler = null;
     console.log('[OfflineSync] Auto-sync listener stopped');
   }
 };
