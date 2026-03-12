@@ -9,6 +9,30 @@ const router = express.Router();
 // Apply authentication to all routes
 router.use(auth);
 
+const getFallbackShotPlayerId = async (clubId) => {
+  const existingFallback = await db.query(
+    `SELECT id
+     FROM players
+     WHERE club_id = $1 AND first_name = $2 AND last_name = $3
+     ORDER BY id ASC
+     LIMIT 1`,
+    [clubId, 'Unknown', 'Scorer']
+  );
+
+  if (existingFallback.rows.length > 0) {
+    return existingFallback.rows[0].id;
+  }
+
+  const createdFallback = await db.query(
+    `INSERT INTO players (club_id, first_name, last_name, jersey_number, is_active)
+     VALUES ($1, $2, $3, $4, true)
+     RETURNING id`,
+    [clubId, 'Unknown', 'Scorer', null]
+  );
+
+  return createdFallback.rows[0].id;
+};
+
 /**
  * Get all shots for a game
  */
@@ -85,7 +109,7 @@ router.get('/:gameId', [
 router.post('/:gameId', [
   requireRole(['admin', 'coach']),
   param('gameId').isInt().withMessage('Game ID must be an integer'),
-  body('player_id').isInt().withMessage('Player ID is required and must be an integer'),
+  body('player_id').optional({ nullable: true }).isInt().withMessage('Player ID must be an integer'),
   body('club_id').isInt().withMessage('Club ID is required and must be an integer'),
   body('x_coord').isFloat({ min: 0, max: 100 }).withMessage('X coordinate must be between 0 and 100'),
   body('y_coord').isFloat({ min: 0, max: 100 }).withMessage('Y coordinate must be between 0 and 100'),
@@ -102,6 +126,7 @@ router.post('/:gameId', [
 
   const { gameId } = req.params;
   const { player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance } = req.body;
+  let playerIdForShot = player_id ?? null;
 
   try {
     // Verify game exists and is in progress
@@ -115,31 +140,35 @@ router.post('/:gameId', [
       return res.status(400).json({ error: 'Can only record shots for games in progress' });
     }
 
-    // Verify player exists and belongs to the specified club
-    const playerCheck = await db.query('SELECT * FROM players WHERE id = $1', [player_id]);
-    if (playerCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Player not found' });
-    }
-
-    const player = playerCheck.rows[0];
-    if (player.club_id !== club_id) {
-      // Fallback for migrated data: allow if player is explicitly rostered for this game and club.
-      const rosterCheck = await db.query(
-        `SELECT 1
-         FROM game_rosters
-         WHERE game_id = $1 AND player_id = $2 AND club_id = $3
-         LIMIT 1`,
-        [gameId, player_id, club_id]
-      );
-
-      if (rosterCheck.rows.length === 0) {
-        return res.status(400).json({ error: 'Player does not belong to the specified club' });
-      }
-    }
-
     // Verify club is participating in this game
     if (club_id !== game.home_club_id && club_id !== game.away_club_id) {
       return res.status(400).json({ error: 'Club is not participating in this game' });
+    }
+
+    if (playerIdForShot !== null) {
+      // Verify player exists and belongs to the specified club
+      const playerCheck = await db.query('SELECT * FROM players WHERE id = $1', [playerIdForShot]);
+      if (playerCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Player not found' });
+      }
+
+      const player = playerCheck.rows[0];
+      if (player.club_id !== club_id) {
+        // Fallback for migrated data: allow if player is explicitly rostered for this game and club.
+        const rosterCheck = await db.query(
+          `SELECT 1
+           FROM game_rosters
+           WHERE game_id = $1 AND player_id = $2 AND club_id = $3
+           LIMIT 1`,
+          [gameId, playerIdForShot, club_id]
+        );
+
+        if (rosterCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Player does not belong to the specified club' });
+        }
+      }
+    } else {
+      playerIdForShot = await getFallbackShotPlayerId(club_id);
     }
 
     // For coaches: verify they have trainer access to the club they're recording for
@@ -159,7 +188,7 @@ router.post('/:gameId', [
       INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
-    `, [gameId, player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance]);
+    `, [gameId, playerIdForShot, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance]);
 
     const shot = shotResult.rows[0];
 

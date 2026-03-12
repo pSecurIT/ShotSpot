@@ -440,4 +440,48 @@ describe('FaultManagement', () => {
       expect(screen.getByText('Team Alpha')).toBeInTheDocument();
     });
   });
+
+  it('records offensive fault without player details for team with no configured lineup', async () => {
+    const user = userEvent.setup();
+
+    (api.get as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/game-rosters')) {
+        return Promise.resolve({
+          data: [
+            ...mockHomePlayers.map(p => ({ ...p, club_id: 100, is_starting: true }))
+          ]
+        });
+      }
+      if (url.includes('/events')) {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<FaultManagement {...mockProps} />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/game-rosters/1');
+    });
+
+    const teamSelect = screen.getByDisplayValue('Team Alpha (Home)');
+    await user.selectOptions(teamSelect, '2');
+
+    await waitFor(() => {
+      expect(screen.getByText('Team-only mode')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Record Offensive Fault' })).toBeEnabled();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Record Offensive Fault' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/events/1', expect.objectContaining({
+        event_type: 'fault_offensive',
+        club_id: 101
+      }));
+    });
+
+    const faultPayload = (api.post as jest.Mock).mock.calls[0][1];
+    expect(faultPayload).not.toHaveProperty('player_id');
+  });
 });

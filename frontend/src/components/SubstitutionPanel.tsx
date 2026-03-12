@@ -258,6 +258,29 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
   };
 
   const teamPlayers = getCurrentTeamPlayers();
+  const hasLoadedPlayerStatus = activePlayers !== null;
+  const homeHasRosterDetails = !hasLoadedPlayerStatus || (activePlayers.home_team.active.length > 0 || activePlayers.home_team.bench.length > 0);
+  const awayHasRosterDetails = !hasLoadedPlayerStatus || (activePlayers.away_team.active.length > 0 || activePlayers.away_team.bench.length > 0);
+  const selectedTeamHasRosterDetails = !hasLoadedPlayerStatus || (selectedTeam === homeTeamId ? homeHasRosterDetails : awayHasRosterDetails);
+
+  useEffect(() => {
+    if (!hasLoadedPlayerStatus) {
+      return;
+    }
+
+    if (selectedTeam === homeTeamId && !homeHasRosterDetails && awayHasRosterDetails) {
+      setSelectedTeam(awayTeamId);
+      setPlayerOut(null);
+      setPlayerIn(null);
+      return;
+    }
+
+    if (selectedTeam === awayTeamId && !awayHasRosterDetails && homeHasRosterDetails) {
+      setSelectedTeam(homeTeamId);
+      setPlayerOut(null);
+      setPlayerIn(null);
+    }
+  }, [hasLoadedPlayerStatus, selectedTeam, homeHasRosterDetails, awayHasRosterDetails, homeTeamId, awayTeamId]);
 
   return (
     <div className="substitution-panel">
@@ -280,6 +303,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
             setPlayerOut(null);
             setPlayerIn(null);
           }}
+          disabled={!homeHasRosterDetails}
         >
           {homeTeamName}
         </button>
@@ -290,10 +314,18 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
             setPlayerOut(null);
             setPlayerIn(null);
           }}
+          disabled={!awayHasRosterDetails}
         >
           {awayTeamName}
         </button>
       </div>
+
+      {hasLoadedPlayerStatus && !selectedTeamHasRosterDetails && (
+        <div className="team-restriction-notice">
+          <strong>Lineup details required</strong>
+          <p className="restriction-text">Substitutions are only available for teams configured in Pre-Match setup.</p>
+        </div>
+      )}
 
       {/* Substitution Form */}
       <div className="substitution-form">
@@ -368,7 +400,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
         <button
           className="submit-substitution-button"
           onClick={handleSubstitution}
-          disabled={loading || !playerOut || !playerIn}
+          disabled={loading || !selectedTeamHasRosterDetails || !playerOut || !playerIn}
         >
           {loading ? 'Recording...' : '✓ Record Substitution'}
         </button>

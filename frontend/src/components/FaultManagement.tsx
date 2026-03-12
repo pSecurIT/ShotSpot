@@ -82,6 +82,14 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
     }
   }, [userAssignedTeam, homeTeamId, awayTeamId]);
 
+  const getTeamPlayers = (teamId: number): Player[] => {
+    return teamId === homeTeamId ? players.home : players.away;
+  };
+
+  const selectedTeamPlayers = getTeamPlayers(selectedTeam);
+  const selectedTeamRequiresPlayerDetails = selectedTeamPlayers.length > 0;
+  const faultTypeRequiresPlayer = faultType === 'fault_offensive' || faultType === 'fault_defensive';
+
   useEffect(() => {
     fetchPlayers();
     fetchRecentFaults();
@@ -137,8 +145,7 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
       return;
     }
 
-    // For out of bounds, player selection is optional
-    if ((faultType === 'fault_offensive' || faultType === 'fault_defensive') && !selectedPlayer) {
+    if (faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && !selectedPlayer) {
       setError('Please select a player for this fault type');
       return;
     }
@@ -156,13 +163,13 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
       const faultData = {
         event_type: faultType,
         club_id: clubId,
-        player_id: selectedPlayer || null,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
         details: {
           reason: faultReason || null,
           fault_type: faultType
-        }
+        },
+        ...(faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && selectedPlayer ? { player_id: selectedPlayer } : {})
       };
 
       await api.post(`/events/${gameId}`, faultData);
@@ -222,10 +229,6 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
       default:
         return '';
     }
-  };
-
-  const getTeamPlayers = (teamId: number): Player[] => {
-    return teamId === homeTeamId ? players.home : players.away;
   };
 
   const undoFault = async (faultId: number) => {
@@ -305,20 +308,27 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
         </div>
 
         {/* Player Selection */}
-        {(faultType === 'fault_offensive' || faultType === 'fault_defensive') && (
+        {faultTypeRequiresPlayer && (
           <div className="form-group">
             <label>Player:</label>
-            <select
-              value={selectedPlayer || ''}
-              onChange={(e) => setSelectedPlayer(e.target.value ? parseInt(e.target.value) : null)}
-            >
-              <option value="">Select player</option>
-              {getTeamPlayers(selectedTeam).map((player) => (
-                <option key={player.id} value={player.id}>
-                  #{player.jersey_number} {player.first_name} {player.last_name}
-                </option>
-              ))}
-            </select>
+            {selectedTeamRequiresPlayerDetails ? (
+              <select
+                value={selectedPlayer || ''}
+                onChange={(e) => setSelectedPlayer(e.target.value ? parseInt(e.target.value) : null)}
+              >
+                <option value="">Select player</option>
+                {selectedTeamPlayers.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    #{player.jersey_number} {player.first_name} {player.last_name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="team-restriction-notice">
+                <strong>Team-only mode</strong>
+                <p className="restriction-text">No lineup details were configured for this team. Fault is recorded without selecting a player.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -337,7 +347,7 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
         {/* Submit Button */}
         <button
           onClick={handleRecordFault}
-          disabled={loading || !selectedTeam || ((faultType === 'fault_offensive' || faultType === 'fault_defensive') && !selectedPlayer)}
+          disabled={loading || !selectedTeam || (faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && !selectedPlayer)}
           className="primary-button"
         >
           {loading ? 'Recording...' : `Record ${getFaultDisplayName(faultType)}`}

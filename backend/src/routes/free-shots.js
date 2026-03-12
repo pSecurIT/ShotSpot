@@ -8,6 +8,30 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(auth);
 
+const getFallbackFreeShotPlayerId = async (clubId) => {
+  const existingFallback = await db.query(
+    `SELECT id
+     FROM players
+     WHERE club_id = $1 AND first_name = $2 AND last_name = $3
+     ORDER BY id ASC
+     LIMIT 1`,
+    [clubId, 'Unknown', 'Scorer']
+  );
+
+  if (existingFallback.rows.length > 0) {
+    return existingFallback.rows[0].id;
+  }
+
+  const createdFallback = await db.query(
+    `INSERT INTO players (club_id, first_name, last_name, jersey_number, is_active)
+     VALUES ($1, $2, $3, $4, true)
+     RETURNING id`,
+    [clubId, 'Unknown', 'Scorer', null]
+  );
+
+  return createdFallback.rows[0].id;
+};
+
 /**
  * Get all free shots for a game
  * GET /api/free-shots/:gameId
@@ -57,7 +81,7 @@ router.post('/', [
     .isInt({ min: 1 })
     .withMessage('Game ID must be a positive integer'),
   body('player_id')
-    .notEmpty()
+    .optional({ nullable: true })
     .isInt({ min: 1 })
     .withMessage('Player ID must be a positive integer'),
   body('club_id')
@@ -107,6 +131,7 @@ router.post('/', [
     game_id: gameId, player_id, club_id, period, time_remaining, free_shot_type,
     reason, x_coord, y_coord, result, distance
   } = req.body;
+  let playerIdForFreeShot = player_id ?? null;
 
   try {
     // Verify game exists and is in progress
@@ -132,22 +157,26 @@ router.post('/', [
       });
     }
 
-    // Verify player belongs to the club
-    const playerResult = await db.query(
-      'SELECT club_id FROM players WHERE id = $1',
-      [player_id]
-    );
+    if (playerIdForFreeShot !== null) {
+      // Verify player belongs to the club
+      const playerResult = await db.query(
+        'SELECT club_id FROM players WHERE id = $1',
+        [playerIdForFreeShot]
+      );
 
-    if (playerResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Player not found' });
-    }
+      if (playerResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Player not found' });
+      }
 
-    if (playerResult.rows[0].club_id !== club_id) {
-      return res.status(400).json({ 
-        error: 'Player does not belong to the specified team',
-        playerTeam: playerResult.rows[0].club_id,
-        providedTeam: club_id
-      });
+      if (playerResult.rows[0].club_id !== club_id) {
+        return res.status(400).json({ 
+          error: 'Player does not belong to the specified team',
+          playerTeam: playerResult.rows[0].club_id,
+          providedTeam: club_id
+        });
+      }
+    } else {
+      playerIdForFreeShot = await getFallbackFreeShotPlayerId(club_id);
     }
 
     // Insert the free shot
@@ -161,7 +190,7 @@ router.post('/', [
     `;
 
     const result_query = await db.query(insertQuery, [
-      gameId, player_id, club_id, period, time_remaining || null,
+      gameId, playerIdForFreeShot, club_id, period, time_remaining || null,
       free_shot_type, reason || null, x_coord || null, y_coord || null,
       result, distance || null
     ]);
