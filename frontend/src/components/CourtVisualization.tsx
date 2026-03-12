@@ -135,9 +135,6 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // Track if we've logged the "no starting_position" warning to avoid console spam
-  const hasLoggedPositionWarning = useRef({ home: false, away: false });
-  
   // Form state
   const [selectedTeam, setSelectedTeam] = useState<'home' | 'away'>('home');
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
@@ -276,12 +273,6 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       // If no players have starting_position data, return all players as fallback
       const hasPositionData = teamPlayers.some(p => p.starting_position);
       if (!hasPositionData) {
-        // Only log once per team to avoid console spam
-        const teamKey = teamId === homeTeamId ? 'home' : 'away';
-        if (process.env.NODE_ENV === 'development' && teamPlayers.length > 0 && !hasLoggedPositionWarning.current[teamKey]) {
-          console.warn(`[${teamKey === 'home' ? 'Home' : 'Away'} Team] No starting_position data, showing all ${teamPlayers.length} players`);
-          hasLoggedPositionWarning.current[teamKey] = true;
-        }
         return teamPlayers;
       }
       
