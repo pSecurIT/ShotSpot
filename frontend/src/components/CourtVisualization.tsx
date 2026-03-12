@@ -443,12 +443,18 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     const selectedPlayerOnAway = awayPlayers.some(player => player.id === selectedPlayerId);
     const selectedPlayerTeam = selectedPlayerOnHome ? 'home' : selectedPlayerOnAway ? 'away' : null;
 
+    let playerIdForShot = selectedPlayerId;
     if (selectedPlayerTeam !== selectedTeam) {
       const teamId = selectedTeam === 'home' ? homeTeamId : awayTeamId;
       const fallbackPlayers = getCurrentOffensivePlayers(teamId);
-      setSelectedPlayerId(fallbackPlayers.length > 0 ? fallbackPlayers[0].id : null);
-      setError('Selected player does not belong to the selected team. Please select a valid player.');
-      return;
+      if (fallbackPlayers.length === 0) {
+        setSelectedPlayerId(null);
+        setError('No valid offensive player found for the selected team.');
+        return;
+      }
+
+      playerIdForShot = fallbackPlayers[0].id;
+      setSelectedPlayerId(playerIdForShot);
     }
 
     // Check if user is allowed to record for the selected team
@@ -475,7 +481,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       
       const shotData = {
         club_id: selectedTeam === 'home' ? homeClubId : awayClubId,
-        player_id: selectedPlayerId,
+        player_id: playerIdForShot,
         x_coord: clickedCoords.x,
         y_coord: clickedCoords.y,
         result: result,
@@ -498,8 +504,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         period: shotData.period,
         time_remaining: null,
         created_at: new Date().toISOString(),
-        player_first_name: homePlayers.concat(awayPlayers).find(p => p.id === selectedPlayerId)?.first_name,
-        player_last_name: homePlayers.concat(awayPlayers).find(p => p.id === selectedPlayerId)?.last_name
+        player_first_name: homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.first_name,
+        player_last_name: homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.last_name
       };
       setShots(prev => [...prev, optimisticShot]);
       
@@ -507,7 +513,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       setTimeout(() => setSuccess(null), 2000);
       
       // Remember the selected player for next shot
-      setLastSelectedPlayerId(selectedPlayerId);
+      setLastSelectedPlayerId(playerIdForShot);
       
       // Reset form but keep player and shot type
       setClickedCoords(null);
