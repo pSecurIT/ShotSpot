@@ -122,7 +122,6 @@ async function fetchSeasonData(clubId, startDate, endDate) {
   if (endDate) {
     whereConditions.push(`g.date <= $${paramIndex}`);
     params.push(endDate);
-    paramIndex++;
   }
 
   const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
