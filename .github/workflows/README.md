@@ -8,7 +8,6 @@ This directory contains all CI/CD workflows for ShotSpot.
 |----------|---------|---------|---------|
 | **[node.js.yml](node.js.yml)** | Push, PR | Run backend + frontend tests | ~5 min |
 | **[test-coverage.yml](test-coverage.yml)** | Push, PR | Generate coverage reports | ~7 min |
-| **[coverage-badge.yml](coverage-badge.yml)** | Push to main | Update coverage badges | ~3 min |
 | **[codeql.yml](codeql.yml)** | Push, PR, Schedule | Security scanning | ~10 min |
 | **[docker.yml](docker.yml)** | Push, PR | Build & test Docker images | ~8 min |
 | **[release.yml](release.yml)** | Release, Tag | Build & push multi-platform Docker | ~20 min |
@@ -51,19 +50,7 @@ This directory contains all CI/CD workflows for ShotSpot.
 
 ---
 
-### coverage-badge.yml - Badge Generation
-**Triggers**: Push to `main`
 
-**Jobs**:
-- Calculate coverage percentages
-- Generate SVG badges
-- Commit to repository
-
-**Secrets Required**: None (uses `GITHUB_TOKEN`)
-
-**Output**: Updated badges in README
-
----
 
 ## 🔒 Security Workflows
 
@@ -236,7 +223,6 @@ This directory contains all CI/CD workflows for ShotSpot.
 - `node.js.yml`
 - `codeql.yml`
 - `docker.yml`
-- `coverage-badge.yml`
 - `mobile-ci.yml`
 - `mobile-preview.yml` (optional secret)
 
@@ -368,9 +354,9 @@ Available badges:
 ## 🔄 Workflow Dependencies
 
 ```
-node.js.yml → test-coverage.yml → coverage-badge.yml
-     ↓                                    ↓
-mobile-ci.yml                        README badges
+node.js.yml → test-coverage.yml
+     ↓                                    
+mobile-ci.yml                        
      ↓
 mobile-preview.yml
      ↓

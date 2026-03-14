@@ -2,7 +2,7 @@ name: Docker Build and Test
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
     paths:
       - 'Dockerfile'
       - 'docker-compose.yml'
@@ -10,7 +10,7 @@ on:
       - 'frontend/**'
       - '.github/workflows/docker.yml'
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
     paths:
       - 'Dockerfile'
       - 'docker-compose.yml'
