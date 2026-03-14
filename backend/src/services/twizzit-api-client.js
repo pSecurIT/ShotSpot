@@ -231,7 +231,7 @@ class TwizzitApiClient {
       return this.accessToken;
     } catch (error) {
       if (error.response?.status === 401) {
-        throw new Error('Invalid Twizzit API credentials');
+        throw new Error('Invalid Twizzit API credentials', { cause: error });
       }
       throw TwizzitApiClient._createApiError(error, 'Authentication failed');
     }
@@ -868,7 +868,7 @@ class TwizzitApiClient {
       throw new Error(`Group not found: ${groupId}`);
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new Error(`Group not found: ${groupId}`);
+        throw new Error(`Group not found: ${groupId}`, { cause: error });
       }
       // Don't wrap error messages that already include context
       if (error.message && error.message.includes('Group not found')) {
