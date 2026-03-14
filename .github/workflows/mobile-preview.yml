@@ -9,7 +9,7 @@ on:
       branch:
         description: 'Branch to build from'
         required: false
-        default: 'develop'
+        default: 'main'
 
 jobs:
   # Build preview APK for testing
@@ -21,7 +21,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.branch || 'develop' }}
+          ref: ${{ github.event.inputs.branch || 'main' }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -67,7 +67,7 @@ jobs:
       - name: Rename APK with timestamp
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          BRANCH_NAME=${{ github.event.inputs.branch || 'develop' }}
+          BRANCH_NAME=${{ github.event.inputs.branch || 'main' }}
           mv frontend/android/app/build/outputs/apk/debug/app-debug.apk \
              frontend/android/app/build/outputs/apk/debug/ShotSpot-${BRANCH_NAME}-${TIMESTAMP}.apk
 
@@ -83,7 +83,7 @@ jobs:
           APK_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "## 📱 Android Preview Build Ready" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch**: ${{ github.event.inputs.branch || 'develop' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.event.inputs.branch || 'main' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Download**: [Get APK]($APK_URL)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Installation Instructions" >> $GITHUB_STEP_SUMMARY
@@ -100,7 +100,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.branch || 'develop' }}
+          ref: ${{ github.event.inputs.branch || 'main' }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -163,7 +163,7 @@ jobs:
         run: |
           echo "## 📱 iOS Preview Build Ready" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch**: ${{ github.event.inputs.branch || 'develop' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.event.inputs.branch || 'main' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "1. Download the build artifacts" >> $GITHUB_STEP_SUMMARY
