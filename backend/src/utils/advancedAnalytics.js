@@ -81,7 +81,7 @@ export async function generatePlayerReport(playerId, opponentId = null) {
     };
   } catch (error) {
     console.error('Error generating player report:', error);
-    throw new Error('Failed to generate player report');
+    throw new Error('Failed to generate player report', { cause: error });
   }
 }
 
@@ -132,7 +132,7 @@ export async function generateHighlightReel(gameId, maxClips = 20) {
     };
   } catch (error) {
     console.error('Error generating highlight reel:', error);
-    throw new Error('Failed to generate highlight reel');
+    throw new Error('Failed to generate highlight reel', { cause: error });
   }
 }
 
@@ -182,7 +182,7 @@ export async function generateTeamBenchmarkReport(teamId, position = 'all') {
     };
   } catch (error) {
     console.error('Error generating team benchmark report:', error);
-    throw new Error('Failed to generate team benchmark report');
+    throw new Error('Failed to generate team benchmark report', { cause: error });
   }
 }
 

@@ -56,7 +56,7 @@ export function encryptPassword(password) {
       iv: iv.toString('hex')
     };
   } catch (error) {
-    throw new Error(`Password encryption failed: ${error.message}`);
+    throw new Error(`Password encryption failed: ${error.message}`, { cause: error });
   }
 }
 
@@ -94,7 +94,7 @@ export function decryptPassword(encryptedPassword, ivHex) {
     
     return decrypted;
   } catch (error) {
-    throw new Error(`Password decryption failed: ${error.message}`);
+    throw new Error(`Password decryption failed: ${error.message}`, { cause: error });
   }
 }
 
@@ -137,7 +137,7 @@ export async function storeCredentials(credentials) {
 
     return result.rows[0];
   } catch (error) {
-    throw new Error(`Failed to store credentials: ${error.message}`);
+    throw new Error(`Failed to store credentials: ${error.message}`, { cause: error });
   }
 }
 
@@ -180,7 +180,7 @@ export async function getCredentials(credentialId) {
       updatedAt: credential.updated_at
     };
   } catch (error) {
-    throw new Error(`Failed to retrieve credentials: ${error.message}`);
+    throw new Error(`Failed to retrieve credentials: ${error.message}`, { cause: error });
   }
 }
 
@@ -227,7 +227,7 @@ export async function getCredentialsByOrganization(organizationName) {
       updatedAt: credential.updated_at
     };
   } catch (error) {
-    throw new Error(`Failed to retrieve credentials: ${error.message}`);
+    throw new Error(`Failed to retrieve credentials: ${error.message}`, { cause: error });
   }
 }
 
@@ -255,7 +255,7 @@ export async function listCredentials() {
       updatedAt: row.updated_at
     }));
   } catch (error) {
-    throw new Error(`Failed to list credentials: ${error.message}`);
+    throw new Error(`Failed to list credentials: ${error.message}`, { cause: error });
   }
 }
 
@@ -275,7 +275,7 @@ export async function updateVerificationTimestamp(credentialId) {
       [credentialId]
     );
   } catch (error) {
-    throw new Error(`Failed to update verification timestamp: ${error.message}`);
+    throw new Error(`Failed to update verification timestamp: ${error.message}`, { cause: error });
   }
 }
 
@@ -295,7 +295,7 @@ export async function deactivateCredentials(credentialId) {
       [credentialId]
     );
   } catch (error) {
-    throw new Error(`Failed to deactivate credentials: ${error.message}`);
+    throw new Error(`Failed to deactivate credentials: ${error.message}`, { cause: error });
   }
 }
 
@@ -315,7 +315,7 @@ export async function deleteCredentials(credentialId) {
       [credentialId]
     );
   } catch (error) {
-    throw new Error(`Failed to delete credentials: ${error.message}`);
+    throw new Error(`Failed to delete credentials: ${error.message}`, { cause: error });
   }
 }
 

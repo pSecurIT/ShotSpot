@@ -121,9 +121,9 @@ async function processExportJob(job) {
 
   await ensureExportsDir();
 
-  let fileBuffer = null;
-  let fileName = '';
-  let fileSize = 0;
+  let fileBuffer;
+  let fileName;
+  let fileSize;
 
   // Sanitize all IDs to prevent path traversal attacks
   const safeExportId = sanitizeFilenameComponent(exportId);
