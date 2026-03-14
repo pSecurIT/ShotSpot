@@ -80,7 +80,7 @@ export async function dbHealthCheck() {
     // Use sanitized error to avoid exposing sensitive connection details
     const sanitizedError = sanitizeDbError(err);
     console.error('Database health check failed:', sanitizedError);
-    throw new Error(`Database connection failed: ${sanitizedError.message}`);
+    throw new Error(`Database connection failed: ${sanitizedError.message}`, { cause: err });
   }
 }
 

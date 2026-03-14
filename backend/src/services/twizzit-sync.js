@@ -129,7 +129,7 @@ async function resolveLocalClubIdForSync(apiClient, options = {}) {
     organizations = await apiClient.getOrganizations();
     pickDefaultOrganizationIdForClient(apiClient, organizations);
   } catch {
-    organizations = [];
+    // Keep default empty organizations list when remote lookup fails.
   }
 
   const effectiveOrgId = requestedOrgId || (apiClient.organizationId != null ? String(apiClient.organizationId) : null);
@@ -955,7 +955,7 @@ export async function syncClubsFromTwizzit(credentialId, options = {}) {
       completedAt: new Date()
     });
 
-    throw new Error(`Club sync failed: ${error.message}`);
+    throw new Error(`Club sync failed: ${error.message}`, { cause: error });
   }
 }
 
@@ -1301,7 +1301,7 @@ export async function syncPlayersFromTwizzit(credentialId, _options = {}) {
       completedAt: new Date()
     });
 
-    throw new Error(`Player sync failed: ${error.message}`);
+    throw new Error(`Player sync failed: ${error.message}`, { cause: error });
   }
 }
 
@@ -1334,7 +1334,7 @@ export async function getSyncConfig(credentialId) {
       nextSyncAt: config.next_sync_at
     };
   } catch (error) {
-    throw new Error(`Failed to get sync config: ${error.message}`);
+    throw new Error(`Failed to get sync config: ${error.message}`, { cause: error });
   }
 }
 
@@ -1363,7 +1363,7 @@ export async function ensureSyncConfig(credentialId) {
 
     return await getSyncConfig(credentialId);
   } catch (error) {
-    throw new Error(`Failed to ensure sync config: ${error.message}`);
+    throw new Error(`Failed to ensure sync config: ${error.message}`, { cause: error });
   }
 }
 
@@ -1401,7 +1401,7 @@ export async function updateSyncConfig(credentialId, config) {
 
     return result.rows[0];
   } catch (error) {
-    throw new Error(`Failed to update sync config: ${error.message}`);
+    throw new Error(`Failed to update sync config: ${error.message}`, { cause: error });
   }
 }
 
@@ -1426,7 +1426,7 @@ export async function getSyncHistory(credentialId, options = {}) {
 
     return result.rows;
   } catch (error) {
-    throw new Error(`Failed to get sync history: ${error.message}`);
+    throw new Error(`Failed to get sync history: ${error.message}`, { cause: error });
   }
 }
 
