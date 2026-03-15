@@ -1,6 +1,7 @@
 name: Docker Build and Test
 
 on:
+  # Keep push scoped to docker/app changes for faster, cheaper CI.
   push:
     branches: [ main ]
     paths:
@@ -9,14 +10,9 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - '.github/workflows/docker.yml'
+  # Always run on PRs to ensure required checks are reported.
   pull_request:
     branches: [ main ]
-    paths:
-      - 'Dockerfile'
-      - 'docker-compose.yml'
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/docker.yml'
 
 env:
   REGISTRY: ghcr.io
