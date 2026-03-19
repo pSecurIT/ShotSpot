@@ -36,7 +36,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "csrf": "^3.1.0",
-    "csv-stringify": "^6.6.0",
+    "csv-stringify": "^6.7.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-rate-limit": "^8.3.1",
