@@ -69,9 +69,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Advanced Analytics',
         path: '/advanced-analytics',
         icon: '📈',
-        roles: ['coach', 'admin'],
-        badge: 'Soon',
-        disabled: true
+        roles: ['coach', 'admin']
       },
       {
         label: 'Team Analytics',
