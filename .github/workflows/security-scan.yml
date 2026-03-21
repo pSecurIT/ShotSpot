@@ -51,7 +51,9 @@ jobs:
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
-          category: 'trivy-container-scan'
+          # Keep category compatible with historical baseline config from docker.yml
+          # so PR code scanning can compare against main without "configuration not found".
+          category: '.github/workflows/docker.yml:scan-vulnerabilities'
 
       - name: Fail on critical vulnerabilities
         uses: aquasecurity/trivy-action@v0.35.0
