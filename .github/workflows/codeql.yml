@@ -3,7 +3,7 @@ name: "CodeQL Security Analysis"
 on:
   push:
     branches: [ "main" ]
-  pull_request:
+  pull_request_target:
     branches: [ "main" ]
   pull_request_target:
     branches: [ "main" ]
@@ -35,6 +35,9 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+    # For pull_request_target, scan the PR’s head commit instead of the base branch
+        ref: ${{ github.event.pull_request.head.sha }}
 
     # Add any setup steps before running the `github/codeql-action/init` action.
     # This includes steps like installing compilers or runtimes (`actions/setup-node`
