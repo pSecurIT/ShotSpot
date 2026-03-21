@@ -1,0 +1,151 @@
+.video-link-editor {
+  display: grid;
+  gap: 16px;
+  background: #f8fbff;
+  border: 1px solid #d6e0ee;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.video-link-editor__header h2 {
+  margin: 0;
+  color: #0f2f4f;
+}
+
+.video-link-editor__header p {
+  margin: 4px 0 0;
+  color: #506782;
+}
+
+.video-link-editor__form {
+  display: grid;
+  gap: 10px;
+}
+
+.video-link-editor__form label {
+  font-weight: 600;
+  color: #1f3b5a;
+}
+
+.video-link-editor__form input,
+.video-link-editor__form select,
+.video-link-editor__form button {
+  border: 1px solid #bfcde0;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.video-link-editor__timestamps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.video-link-editor__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.video-link-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.video-link-editor__actions button {
+  background: #edf3fb;
+  color: #14355a;
+  cursor: pointer;
+}
+
+.video-link-editor__actions button:hover:not(:disabled) {
+  background: #dde9f8;
+}
+
+.video-link-editor__error {
+  margin: 0;
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.video-link-editor__success {
+  margin: 0;
+  color: #067647;
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.video-player {
+  border: 1px solid #d6e0ee;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.video-player__title {
+  margin: 0;
+  color: #14355a;
+}
+
+.video-player__frame-wrap {
+  position: relative;
+  padding-top: 56.25%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.video-player__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.video-player__clip-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.video-player__clip {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #d6e0ee;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f9fbff;
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.video-player__clip.is-active {
+  border-color: #4e7eb5;
+  background: #edf4ff;
+}
+
+.video-player__selected {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.video-player__empty {
+  margin: 0;
+  color: #64748b;
+}
