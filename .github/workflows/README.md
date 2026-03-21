@@ -9,6 +9,7 @@ This directory contains all CI/CD workflows for ShotSpot.
 | **[node.js.yml](node.js.yml)** | Push, PR | Run backend + frontend tests | ~5 min |
 | **[test-coverage.yml](test-coverage.yml)** | Push, PR | Generate coverage reports | ~7 min |
 | **[codeql.yml](codeql.yml)** | Push, PR, Schedule | Security scanning | ~10 min |
+| **[security-scan.yml](security-scan.yml)** | Push, PR, Schedule | Trivy vulnerability scanning | ~12 min |
 | **[docker.yml](docker.yml)** | Push, PR | Build & test Docker images | ~8 min |
 | **[release.yml](release.yml)** | Release, Tag | Build & push multi-platform Docker | ~20 min |
 | **[mobile-ci.yml](mobile-ci.yml)** | Push, PR | Build & test mobile apps | ~15 min |
@@ -57,11 +58,12 @@ This directory contains all CI/CD workflows for ShotSpot.
 ### codeql.yml - Security Scanning
 **Triggers**:
 - Push/PR to `main`
-- Weekly schedule (Mondays at 6am UTC)
+- `pull_request_target` to `main` (same-repo PRs only, for fork PR support)
+- Weekly schedule (Sundays at midnight UTC)
 
 **Jobs**:
 - Scan JavaScript/TypeScript code
-- Detect security vulnerabilities
+- Detect security vulnerabilities in GitHub Actions workflows
 - Generate SARIF reports
 
 **Secrets Required**: None
@@ -69,6 +71,23 @@ This directory contains all CI/CD workflows for ShotSpot.
 **Output**: Security alerts in Security tab
 
 **Status**: "Neutral" result is normal when no issues found
+
+---
+
+### security-scan.yml - Trivy Vulnerability Scanning
+**Triggers**:
+- Push/PR to `main`
+- Weekly schedule (Mondays at 2am UTC)
+
+**Jobs**:
+- Build Docker image and scan for OS & app vulnerabilities (container scan)
+- Scan filesystem/dependency files for known vulnerabilities and secrets
+
+**Secrets Required**: None
+
+**Output**: SARIF reports in Security tab, step summary with severity counts
+
+**Fail Conditions**: Workflow fails on CRITICAL vulnerabilities; warns on HIGH
 
 ---
 
@@ -405,12 +424,12 @@ jobs:
 | Category | Count | Total Runtime |
 |----------|-------|---------------|
 | Testing | 3 | ~15 min |
-| Security | 1 | ~10 min |
+| Security | 2 | ~22 min |
 | Docker | 2 | ~28 min |
 | Mobile | 3 | ~50 min |
-| **Total** | **9** | **~103 min** |
+| **Total** | **10** | **~115 min** |
 
-**All workflows combined**: ~103 minutes of compute time per full CI/CD cycle
+**All workflows combined**: ~115 minutes of compute time per full CI/CD cycle
 
 **Optimization**: Workflows run in parallel, so total wall-clock time is much lower (~25 minutes for full pipeline)
 
