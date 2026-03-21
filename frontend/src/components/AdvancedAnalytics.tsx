@@ -20,11 +20,11 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import api from '../utils/api';
 import { advancedAnalyticsApi } from '../services/advancedAnalyticsApi';
+import FormTrends from './FormTrends';
 import type {
   AnalyticsPlayerOption,
   FatigueGameAnalysis,
   FatigueResponse,
-  FormTrendGame,
   FormTrendsResponse,
   NextGamePredictionResponse,
   PlayerComparisonResponse,
@@ -49,23 +49,6 @@ const formatDate = (value: string): string => {
 };
 
 const toInputDate = (value: Date): string => value.toISOString().slice(0, 10);
-
-const isWithinRange = (value: string, from: string, to: string): boolean => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return true;
-
-  if (from) {
-    const fromDate = new Date(`${from}T00:00:00`);
-    if (date < fromDate) return false;
-  }
-
-  if (to) {
-    const toDate = new Date(`${to}T23:59:59.999`);
-    if (date > toDate) return false;
-  }
-
-  return true;
-};
 
 const playerLabel = (player: AnalyticsPlayerOption): string => {
   const jersey = Number.isFinite(player.jersey_number) ? `#${player.jersey_number}` : '#-';
@@ -181,13 +164,13 @@ const AdvancedAnalytics: React.FC = () => {
     };
   }, [dateFrom, dateTo, selectedPlayerId]);
 
-  const filteredFormGames = useMemo<FormTrendGame[]>(() => {
-    return (formTrends?.recent_games || []).filter((game) => isWithinRange(game.game_date, dateFrom, dateTo));
-  }, [dateFrom, dateTo, formTrends]);
+  const filteredFormGames = useMemo(() => {
+    return formTrends?.recent_games || [];
+  }, [formTrends]);
 
   const filteredFatigueGames = useMemo<FatigueGameAnalysis[]>(() => {
-    return (fatigue?.fatigue_analysis || []).filter((game) => isWithinRange(game.game_date, dateFrom, dateTo));
-  }, [dateFrom, dateTo, fatigue]);
+    return fatigue?.fatigue_analysis || [];
+  }, [fatigue]);
 
   const availableVideoGameIds = useMemo<number[]>(() => {
     const values = new Set<number>();
@@ -252,18 +235,6 @@ const AdvancedAnalytics: React.FC = () => {
   const selectedPlayer = useMemo(() => {
     return players.find((player) => player.id === selectedPlayerId) ?? null;
   }, [players, selectedPlayerId]);
-
-  const formChartData = useMemo(() => {
-    return filteredFormGames
-      .slice()
-      .reverse()
-      .map((game) => ({
-        label: formatDate(game.game_date),
-        fg_percentage: game.fg_percentage,
-        shots: game.shots,
-        goals: game.goals,
-      }));
-  }, [filteredFormGames]);
 
   const fatigueChartData = useMemo(() => {
     return filteredFatigueGames
@@ -507,48 +478,7 @@ const AdvancedAnalytics: React.FC = () => {
 
           {activeTab === 'form' && (
             <section className="advanced-analytics__tab-panel" aria-label="Form trends panel">
-              <h3>Form Trends</h3>
-              {filteredFormGames.length === 0 ? (
-                <p className="advanced-analytics__empty">No form-trend games match the selected date range.</p>
-              ) : (
-                <div className="advanced-analytics__chart-grid">
-                  <article className="advanced-analytics__chart-card">
-                    <h3>Field Goal Trend</h3>
-                    <div className="advanced-analytics__chart-shell">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={formChartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="label" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line type="monotone" dataKey="fg_percentage" stroke="#1f6f78" strokeWidth={3} name="FG%" />
-                          <Line type="monotone" dataKey="shots" stroke="#f6bd60" strokeWidth={2} name="Shots" />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </article>
-
-                  <article className="advanced-analytics__list-card">
-                    <h3>Recent Games</h3>
-                    <ul className="advanced-analytics__list">
-                      {filteredFormGames.map((game) => (
-                        <li key={game.game_id}>
-                          <div className="advanced-analytics__list-title">
-                            <strong>{formatDate(game.game_date)}</strong>
-                            <span>{game.fg_percentage}% FG</span>
-                          </div>
-                          <div>{game.goals} goals from {game.shots} shots</div>
-                          <div className="advanced-analytics__tag-row">
-                            <span className="advanced-analytics__tag">Avg distance {game.avg_distance}m</span>
-                            <span className="advanced-analytics__tag">Game #{game.game_id}</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </article>
-                </div>
-              )}
+              <FormTrends games={filteredFormGames} />
             </section>
           )}
 

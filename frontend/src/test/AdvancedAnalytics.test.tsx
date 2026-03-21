@@ -71,6 +71,7 @@ vi.mock('recharts', () => {
     PolarAngleAxis: passthrough('PolarAngleAxis'),
     PolarRadiusAxis: passthrough('PolarRadiusAxis'),
     CartesianGrid: passthrough('CartesianGrid'),
+    ReferenceArea: passthrough('ReferenceArea'),
     XAxis: passthrough('XAxis'),
     YAxis: passthrough('YAxis'),
     Tooltip: passthrough('Tooltip'),
@@ -244,15 +245,11 @@ describe('AdvancedAnalytics', () => {
     const user = userEvent.setup();
     render(<AdvancedAnalytics />);
 
-    await screen.findByText('Recent Games');
-
-    expect(screen.getByText(/Game #300/)).toBeInTheDocument();
+    await screen.findByRole('button', { name: 'Form Trends' });
+    expect(screen.getByRole('heading', { name: 'Form Trends' })).toBeInTheDocument();
 
     await user.clear(screen.getByLabelText('Date from'));
     await user.type(screen.getByLabelText('Date from'), '2026-03-01');
-
-    expect(screen.queryByText(/Game #300/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Game #301/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Video' }));
 
