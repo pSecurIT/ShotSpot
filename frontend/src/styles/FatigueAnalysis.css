@@ -1,0 +1,578 @@
+/* ========================================
+   Fatigue Gauge Component
+   ======================================== */
+
+.fatigue-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.fatigue-gauge--small {
+  /* Inherits base styles */
+}
+
+.fatigue-gauge--medium {
+  /* Inherits base styles */
+}
+
+.fatigue-gauge--large {
+  /* Inherits base styles */
+}
+
+.fatigue-gauge__svg {
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.fatigue-gauge__progress {
+  transform-origin: center;
+  transform: rotate(-90deg);
+}
+
+.fatigue-gauge__score {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.fatigue-gauge__unit {
+  font-size: 0.875rem;
+}
+
+.fatigue-gauge__info {
+  text-align: center;
+}
+
+.fatigue-gauge__label {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fatigue-gauge__status {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.fatigue-gauge__status--fresh {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #2e7d32;
+}
+
+.fatigue-gauge__status--moderate {
+  background-color: rgba(255, 193, 7, 0.1);
+  color: #f57f17;
+}
+
+.fatigue-gauge__status--tired {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: #e65100;
+}
+
+.fatigue-gauge__status--exhausted {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #c62828;
+}
+
+/* ========================================
+   Fatigue Analysis Component
+   ======================================== */
+
+.fatigue-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.fatigue-analysis__header {
+  margin-bottom: 1rem;
+}
+
+.fatigue-analysis__title {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fatigue-analysis__subtitle {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+/* Alert Banner */
+.fatigue-analysis__alert {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border-left: 4px solid;
+  margin-bottom: 1.5rem;
+}
+
+.fatigue-analysis__alert--success {
+  background-color: rgba(76, 175, 80, 0.1);
+  border-left-color: #4CAF50;
+}
+
+.fatigue-analysis__alert--warning {
+  background-color: rgba(255, 193, 7, 0.1);
+  border-left-color: #FFC107;
+}
+
+.fatigue-analysis__alert--critical {
+  background-color: rgba(244, 67, 54, 0.1);
+  border-left-color: #F44336;
+}
+
+.fatigue-analysis__alert-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
+.fatigue-analysis__alert-content {
+  flex: 1;
+}
+
+.fatigue-analysis__alert-title {
+  display: block;
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.fatigue-analysis__alert-message {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Grid Layout */
+.fatigue-analysis__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.fatigue-analysis__gauge-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+}
+
+/* Injury Risk */
+.fatigue-analysis__injury-risk {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fatigue-analysis__risk-meter {
+  width: 100%;
+  height: 24px;
+  background-color: var(--hover-bg);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.fatigue-analysis__risk-bar {
+  height: 100%;
+  border-radius: 12px;
+  transition: width 0.5s ease, background-color 0.3s ease;
+}
+
+.fatigue-analysis__risk-bar--low {
+  background-color: #4CAF50;
+}
+
+.fatigue-analysis__risk-bar--medium {
+  background-color: #FFC107;
+}
+
+.fatigue-analysis__risk-bar--high {
+  background-color: #F44336;
+}
+
+.fatigue-analysis__risk-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fatigue-analysis__risk-label {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.fatigue-analysis__risk-percentage {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fatigue-analysis__risk-reason {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Rest Recommendation */
+.fatigue-analysis__recommendation {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid;
+}
+
+.fatigue-analysis__recommendation--high {
+  background-color: rgba(244, 67, 54, 0.05);
+  border-left-color: #F44336;
+}
+
+.fatigue-analysis__recommendation--medium {
+  background-color: rgba(255, 193, 7, 0.05);
+  border-left-color: #FFC107;
+}
+
+.fatigue-analysis__recommendation--low {
+  background-color: rgba(76, 175, 80, 0.05);
+  border-left-color: #4CAF50;
+}
+
+.fatigue-analysis__rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.fatigue-analysis__rec-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.fatigue-analysis__rec-days {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.fatigue-analysis__rec-reason {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.fatigue-analysis__rec-activities {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fatigue-analysis__rec-activities-label {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.fatigue-analysis__rec-list {
+  margin: 0;
+  padding-left: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  list-style-type: disc;
+}
+
+.fatigue-analysis__rec-list li {
+  margin-bottom: 0.25rem;
+}
+
+/* Workload Comparison */
+.fatigue-analysis__workload-comparison {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fatigue-analysis__comparison-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fatigue-analysis__comparison-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fatigue-analysis__comparison-item label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.fatigue-analysis__bar-container {
+  width: 100%;
+  height: 32px;
+  background-color: var(--hover-bg);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.fatigue-analysis__bar {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  transition: width 0.5s ease;
+}
+
+.fatigue-analysis__bar--player {
+  background: linear-gradient(90deg, #2196F3, #1976D2);
+}
+
+.fatigue-analysis__bar--team {
+  background: linear-gradient(90deg, #4CAF50, #388E3C);
+}
+
+.fatigue-analysis__comparison-result {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.fatigue-analysis__comparison-result--above {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #c62828;
+}
+
+.fatigue-analysis__comparison-result--below {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #2e7d32;
+}
+
+.fatigue-analysis__comparison-result--average {
+  background-color: rgba(255, 193, 7, 0.1);
+  color: #f57f17;
+}
+
+/* Chart Container */
+.fatigue-analysis__chart-container {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+}
+
+.fatigue-analysis__no-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 2rem;
+  background-color: var(--hover-bg);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Period Details */
+.fatigue-analysis__period-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.fatigue-analysis__game-card {
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--hover-bg);
+}
+
+.fatigue-analysis__game-date {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.fatigue-analysis__game-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .fatigue-analysis__game-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.fatigue-analysis__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fatigue-analysis__stat-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.fatigue-analysis__stat-value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fatigue-analysis__fatigue-level--fresh {
+  color: #2e7d32;
+}
+
+.fatigue-analysis__fatigue-level--normal {
+  color: #f57f17;
+}
+
+.fatigue-analysis__fatigue-level--tired {
+  color: #e65100;
+}
+
+.fatigue-analysis__fatigue-level--exhausted {
+  color: #c62828;
+}
+
+/* Period Performance */
+.fatigue-analysis__periods {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.fatigue-analysis__periods-label {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.fatigue-analysis__periods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 0.5rem;
+}
+
+.fatigue-analysis__period-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-light);
+  text-align: center;
+}
+
+.fatigue-analysis__period-num {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.fatigue-analysis__period-fg {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fatigue-analysis__period-shots {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .fatigue-analysis {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .fatigue-analysis__grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .fatigue-analysis__title {
+    font-size: 1.5rem;
+  }
+
+  .fatigue-analysis__alert {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .fatigue-analysis__rec-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .fatigue-gauge__progress,
+  .fatigue-analysis__bar,
+  .fatigue-analysis__risk-bar {
+    transition: none;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .fatigue-gauge__status,
+  .fatigue-analysis__game-card,
+  .fatigue-analysis__period-box {
+    background-color: var(--hover-bg);
+  }
+}
