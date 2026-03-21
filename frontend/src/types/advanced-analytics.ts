@@ -103,6 +103,69 @@ export interface PlayerComparisonResponse {
   message?: string;
 }
 
+export interface LeagueAveragesResponse {
+  competition: string;
+  season: string;
+  position: 'offense' | 'defense' | 'all';
+  league_averages: {
+    total_games: number;
+    total_players: number;
+    avg_shots_per_game: number;
+    avg_goals_per_game: number;
+    avg_fg_percentage: number;
+    avg_shot_distance: number;
+  };
+  position_averages?: {
+    position: 'offense' | 'defense' | 'all';
+    total_players: number;
+    avg_shots_per_game: number;
+    avg_goals_per_game: number;
+    avg_fg_percentage: number;
+  };
+}
+
+export interface HistoricalBenchmarkEntry {
+  period: string;
+  games_played: number;
+  total_shots: number;
+  total_goals: number;
+  avg_fg_percentage: number;
+  avg_distance: number;
+  avg_shots_per_game: number;
+  avg_goals_per_game: number;
+}
+
+export interface HistoricalBenchmarksResponse {
+  entity_type: 'player' | 'team';
+  entity_id: number;
+  historical_benchmarks: HistoricalBenchmarkEntry[];
+}
+
+export interface VideoLinkEventPayload {
+  game_id: number;
+  event_type: string;
+  event_id?: number;
+  video_url?: string | null;
+  timestamp_start: number;
+  timestamp_end?: number | null;
+  description?: string | null;
+  is_highlight?: boolean;
+  tags?: string[];
+}
+
+export interface VideoLinkEventResponse {
+  id: number;
+  game_id: number;
+  event_type: string;
+  event_id?: number | null;
+  video_url?: string | null;
+  timestamp_start: number;
+  timestamp_end?: number | null;
+  description?: string | null;
+  is_highlight: boolean;
+  tags: string[];
+}
+
 export interface VideoEvent {
   id?: number;
   game_id: number;
@@ -136,5 +199,16 @@ export interface VideoHighlightsResponse {
     suggested_total_duration: number;
     clip_ordering: string;
     include_transitions: boolean;
+  };
+}
+
+export interface VideoReportDataResponse {
+  game_id: number;
+  video_events: Array<VideoEvent & { event_details?: Record<string, unknown> | null }>;
+  report_metadata: {
+    includes_video_links: boolean;
+    total_tagged_events: number;
+    highlights_count: number;
+    event_types: string[];
   };
 }
