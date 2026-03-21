@@ -37,6 +37,11 @@ type AnalyticsTab = 'form' | 'fatigue' | 'predictions' | 'video';
 
 const RECENT_GAME_LIMIT = 20;
 
+const buildDateFilters = (startDate: string, endDate: string) => ({
+  startDate,
+  endDate,
+});
+
 const formatDate = (value: string): string => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
@@ -146,10 +151,10 @@ const AdvancedAnalytics: React.FC = () => {
 
       try {
         const [formData, fatigueData, nextGameData, comparisonData] = await Promise.all([
-          advancedAnalyticsApi.formTrends(selectedPlayerId, RECENT_GAME_LIMIT),
-          advancedAnalyticsApi.fatigue(selectedPlayerId),
-          advancedAnalyticsApi.nextGame(selectedPlayerId),
-          advancedAnalyticsApi.playerComparison(selectedPlayerId, RECENT_GAME_LIMIT),
+          advancedAnalyticsApi.formTrends(selectedPlayerId, RECENT_GAME_LIMIT, buildDateFilters(dateFrom, dateTo)),
+          advancedAnalyticsApi.fatigue(selectedPlayerId, buildDateFilters(dateFrom, dateTo)),
+          advancedAnalyticsApi.nextGame(selectedPlayerId, buildDateFilters(dateFrom, dateTo)),
+          advancedAnalyticsApi.playerComparison(selectedPlayerId, RECENT_GAME_LIMIT, buildDateFilters(dateFrom, dateTo)),
         ]);
 
         if (cancelled) return;
@@ -174,7 +179,7 @@ const AdvancedAnalytics: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedPlayerId]);
+  }, [dateFrom, dateTo, selectedPlayerId]);
 
   const filteredFormGames = useMemo<FormTrendGame[]>(() => {
     return (formTrends?.recent_games || []).filter((game) => isWithinRange(game.game_date, dateFrom, dateTo));
@@ -394,8 +399,8 @@ const AdvancedAnalytics: React.FC = () => {
         <div>
           <h2>Advanced Analytics Dashboard</h2>
           <p>
-            Track player form, fatigue, and upcoming performance in one place. Date filters apply to time-series views,
-            while predictive endpoints continue to use the backend model&apos;s current historical window.
+            Track player form, fatigue, and upcoming performance in one place. Date filters are sent to the analytics
+            endpoints so every chart and benchmark reflects the selected analysis window.
           </p>
         </div>
         <div className="advanced-analytics__actions">

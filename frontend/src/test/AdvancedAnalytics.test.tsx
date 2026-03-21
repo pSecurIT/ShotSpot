@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
@@ -45,12 +46,21 @@ vi.mock('jspdf', () => ({
 }));
 
 vi.mock('recharts', () => {
-  const React = require('react') as typeof import('react');
-  const passthrough = (name: string) => ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': name }, children);
+  const passthrough = (name: string) => {
+    const MockChartComponent = ({ children }: { children?: React.ReactNode }) =>
+      React.createElement('div', { 'data-testid': name }, children);
+
+    MockChartComponent.displayName = name;
+    return MockChartComponent;
+  };
+
+  const ResponsiveContainer = ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'ResponsiveContainer' }, children);
+
+  ResponsiveContainer.displayName = 'ResponsiveContainer';
 
   return {
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => React.createElement('div', { 'data-testid': 'ResponsiveContainer' }, children),
+    ResponsiveContainer,
     LineChart: passthrough('LineChart'),
     Line: passthrough('Line'),
     BarChart: passthrough('BarChart'),
@@ -216,7 +226,10 @@ describe('AdvancedAnalytics', () => {
     render(<AdvancedAnalytics />);
 
     await waitFor(() => {
-      expect(formTrendsMock).toHaveBeenCalledWith(2, 20);
+      expect(formTrendsMock).toHaveBeenCalledWith(2, 20, expect.objectContaining({
+        startDate: expect.any(String),
+        endDate: expect.any(String),
+      }));
       expect(screen.getByText('Advanced Analytics Dashboard')).toBeInTheDocument();
     });
 
@@ -244,6 +257,10 @@ describe('AdvancedAnalytics', () => {
     await user.click(screen.getByRole('button', { name: 'Video' }));
 
     await waitFor(() => {
+      expect(formTrendsMock).toHaveBeenLastCalledWith(2, 20, expect.objectContaining({
+        startDate: '2026-03-01',
+        endDate: expect.any(String),
+      }));
       expect(videoEventsMock).toHaveBeenCalledWith(301);
       expect(screen.getAllByText('Goal from the left wing').length).toBeGreaterThan(0);
     });

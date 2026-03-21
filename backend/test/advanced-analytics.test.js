@@ -222,6 +222,17 @@ describe('📊 Advanced Analytics Routes', () => {
         expect(response.body.games_analyzed).toBeGreaterThanOrEqual(2);
       });
 
+      it('✅ should filter form trends by date range', async () => {
+        const response = await request(app)
+          .get(`/api/advanced-analytics/predictions/form-trends/${player1.id}`)
+          .query({ start_date: '2099-01-01', end_date: '2099-01-31' })
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(response.body).toHaveProperty('form_trend', 'insufficient_data');
+        expect(response.body).toHaveProperty('games_analyzed', 0);
+      });
+
       it('❌ should return insufficient data message for player with few games', async () => {
         const response = await request(app)
           .get(`/api/advanced-analytics/predictions/form-trends/${player2.id}`)
@@ -273,6 +284,17 @@ describe('📊 Advanced Analytics Routes', () => {
         expect(response.body.fatigue_analysis).toHaveLength(1);
         expect(response.body.fatigue_analysis[0].game_id).toBe(game1.id);
       });
+
+      it('✅ should filter fatigue analysis by date range', async () => {
+        const response = await request(app)
+          .get(`/api/advanced-analytics/predictions/fatigue/${player1.id}`)
+          .query({ start_date: '2099-01-01', end_date: '2099-01-31' })
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(response.body).toHaveProperty('games_analyzed', 0);
+        expect(response.body.fatigue_analysis).toHaveLength(0);
+      });
     });
 
     describe('GET /api/advanced-analytics/predictions/next-game/:playerId', () => {
@@ -302,6 +324,16 @@ describe('📊 Advanced Analytics Routes', () => {
 
         expect(response.body).toHaveProperty('opponent_id', club2.id);
         expect(response.body.adjustments).toHaveProperty('matchup_adjustment');
+      });
+
+      it('✅ should filter next-game prediction history by date range', async () => {
+        const response = await request(app)
+          .get(`/api/advanced-analytics/predictions/next-game/${player1.id}`)
+          .query({ start_date: '2099-01-01', end_date: '2099-01-31' })
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(response.body).toHaveProperty('prediction', 'insufficient_data');
       });
     });
   });
@@ -363,6 +395,16 @@ describe('📊 Advanced Analytics Routes', () => {
           .expect(200);
 
         expect(response.body).toHaveProperty('message');
+      });
+
+      it('✅ should filter player comparison by date range', async () => {
+        const response = await request(app)
+          .get(`/api/advanced-analytics/benchmarks/player-comparison/${player1.id}`)
+          .query({ start_date: '2099-01-01', end_date: '2099-01-31' })
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(response.body).toHaveProperty('message', 'No game data available for this player');
       });
     });
 
@@ -557,6 +599,16 @@ describe('📊 Advanced Analytics Routes', () => {
       const response = await request(app)
         .get(`/api/advanced-analytics/predictions/form-trends/${player1.id}`)
         .query({ games: 'invalid' })
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+    });
+
+    it('❌ should validate date query parameters', async () => {
+      const response = await request(app)
+        .get(`/api/advanced-analytics/predictions/form-trends/${player1.id}`)
+        .query({ start_date: 'not-a-date', end_date: 'still-not-a-date' })
         .set('Authorization', `Bearer ${authToken}`)
         .expect(400);
 
