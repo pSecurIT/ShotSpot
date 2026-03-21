@@ -3,7 +3,7 @@ name: "CodeQL Security Analysis"
 on:
   push:
     branches: [ "main" ]
-  pull_request:
+  pull_request_target:
     branches: [ "main" ]
   schedule:
     - cron: '0 0 * * 0'  # Run weekly at midnight on Sunday
@@ -13,6 +13,13 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+
+    # Guard: only run pull_request_target for PRs coming from the same repository
+    # (prevents executing untrusted fork code with base-repo permissions)
+    if: >
+      github.event_name != 'pull_request_target' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+
     permissions:
       security-events: write
       contents: read
@@ -28,6 +35,9 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+    # For pull_request_target, scan the PR’s head commit instead of the base branch
+        ref: ${{ github.event.pull_request.head.sha }}
 
     # Add any setup steps before running the `github/codeql-action/init` action.
     # This includes steps like installing compilers or runtimes (`actions/setup-node`
