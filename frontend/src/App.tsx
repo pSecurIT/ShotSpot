@@ -29,6 +29,7 @@ const MyAchievements = React.lazy(() => import('./components/MyAchievements'));
 const CompetitionManagement = React.lazy(() => import('./components/CompetitionManagement'));
 const CompetitionBracketView = React.lazy(() => import('./components/CompetitionBracketView'));
 const CompetitionStandingsView = React.lazy(() => import('./components/CompetitionStandingsView'));
+const AdvancedAnalytics = React.lazy(() => import('./components/AdvancedAnalytics'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
@@ -184,7 +185,7 @@ const App: React.FC = () => {
                 path="/advanced-analytics"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <ComingSoon title="Advanced Analytics" />
+                    <RouteLoader><AdvancedAnalytics /></RouteLoader>
                   </ProtectedRoute>
                 }
               />

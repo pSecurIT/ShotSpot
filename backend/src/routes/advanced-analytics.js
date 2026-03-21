@@ -18,7 +18,9 @@ router.use(auth);
  */
 router.get('/predictions/form-trends/:playerId', [
   param('playerId').isInt().withMessage('Player ID must be an integer'),
-  query('games').optional().isInt({ min: 3, max: 20 }).withMessage('Games must be between 3 and 20')
+  query('games').optional().isInt({ min: 3, max: 20 }).withMessage('Games must be between 3 and 20'),
+  query('start_date').optional().isISO8601().withMessage('Start date must be a valid ISO 8601 date'),
+  query('end_date').optional().isISO8601().withMessage('End date must be a valid ISO 8601 date')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -29,7 +31,9 @@ router.get('/predictions/form-trends/:playerId', [
   if (isNaN(playerId)) {
     return res.status(400).json({ error: 'Invalid player ID' });
   }
-  const { games = 5 } = req.query;
+  const games = parseInt(req.query.games || '5', 10);
+  const startDate = req.query.start_date || null;
+  const endDate = req.query.end_date || null;
 
   try {
     // Get recent game performance
@@ -48,10 +52,12 @@ router.get('/predictions/form-trends/:playerId', [
       FROM shots s
       JOIN games g ON s.game_id = g.id
       WHERE s.player_id = $1
+        AND ($3::date IS NULL OR g.date >= $3::date)
+        AND ($4::date IS NULL OR g.date < ($4::date + INTERVAL '1 day'))
       GROUP BY g.id, g.date
       ORDER BY g.date DESC
       LIMIT $2
-    `, [playerId, games]);
+    `, [playerId, games, startDate, endDate]);
 
     if (recentGames.rows.length < 3) {
       return res.json({
@@ -138,7 +144,9 @@ router.get('/predictions/form-trends/:playerId', [
  */
 router.get('/predictions/fatigue/:playerId', [
   param('playerId').isInt().withMessage('Player ID must be an integer'),
-  query('game_id').optional().isInt().withMessage('Game ID must be an integer')
+  query('game_id').optional().isInt().withMessage('Game ID must be an integer'),
+  query('start_date').optional().isISO8601().withMessage('Start date must be a valid ISO 8601 date'),
+  query('end_date').optional().isISO8601().withMessage('End date must be a valid ISO 8601 date')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -150,6 +158,8 @@ router.get('/predictions/fatigue/:playerId', [
     return res.status(400).json({ error: 'Invalid player ID' });
   }
   const gameId = req.query.game_id ? parseInt(req.query.game_id, 10) : null;
+  const startDate = req.query.start_date || null;
+  const endDate = req.query.end_date || null;
   if (gameId !== null && isNaN(gameId)) {
     return res.status(400).json({ error: 'Invalid game ID' });
   }
@@ -172,10 +182,12 @@ router.get('/predictions/fatigue/:playerId', [
         FROM games g
         JOIN shots s ON g.id = s.game_id
         WHERE s.player_id = $1
+          AND ($2::date IS NULL OR g.date >= $2::date)
+          AND ($3::date IS NULL OR g.date < ($3::date + INTERVAL '1 day'))
         ORDER BY g.date DESC
         LIMIT 5
       `;
-      gamesParams = [playerId];
+      gamesParams = [playerId, startDate, endDate];
     }
 
     const games = await db.query(gamesQuery, gamesParams);
@@ -345,7 +357,9 @@ router.get('/predictions/fatigue/:playerId', [
  */
 router.get('/predictions/next-game/:playerId', [
   param('playerId').isInt().withMessage('Player ID must be an integer'),
-  query('opponent_id').optional().isInt().withMessage('Opponent ID must be an integer')
+  query('opponent_id').optional().isInt().withMessage('Opponent ID must be an integer'),
+  query('start_date').optional().isISO8601().withMessage('Start date must be a valid ISO 8601 date'),
+  query('end_date').optional().isISO8601().withMessage('End date must be a valid ISO 8601 date')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -357,6 +371,8 @@ router.get('/predictions/next-game/:playerId', [
     return res.status(400).json({ error: 'Invalid player ID' });
   }
   const opponentId = req.query.opponent_id ? parseInt(req.query.opponent_id, 10) : null;
+  const startDate = req.query.start_date || null;
+  const endDate = req.query.end_date || null;
   if (opponentId !== null && isNaN(opponentId)) {
     return res.status(400).json({ error: 'Invalid opponent ID' });
   }
@@ -383,11 +399,13 @@ router.get('/predictions/next-game/:playerId', [
         FROM shots s
         JOIN games g ON s.game_id = g.id
         WHERE s.player_id = $1
+          AND ($2::date IS NULL OR g.date >= $2::date)
+          AND ($3::date IS NULL OR g.date < ($3::date + INTERVAL '1 day'))
         GROUP BY g.id, g.date
         ORDER BY g.date DESC
         LIMIT 10
       ) subquery
-    `, [playerId]);
+    `, [playerId, startDate, endDate]);
 
     const avgStats = recentPerf.rows[0];
 
@@ -438,9 +456,11 @@ router.get('/predictions/next-game/:playerId', [
             AND (
               (g.home_club_id = $2 OR g.away_club_id = $2)
             )
+            AND ($3::date IS NULL OR g.date >= $3::date)
+            AND ($4::date IS NULL OR g.date < ($4::date + INTERVAL '1 day'))
           GROUP BY g.id
         ) matchup_games
-      `, [playerId, opponentId]);
+      `, [playerId, opponentId, startDate, endDate]);
 
       if (matchupResult.rows[0]?.matchup_fg_percentage) {
         const matchupFG = parseFloat(matchupResult.rows[0].matchup_fg_percentage);
@@ -645,15 +665,19 @@ router.get('/benchmarks/league-averages', [
  */
 router.get('/benchmarks/player-comparison/:playerId', [
   param('playerId').isInt().withMessage('Player ID must be an integer'),
-  query('games').optional().isInt({ min: 1, max: 50 }).withMessage('Games must be between 1 and 50')
+  query('games').optional().isInt({ min: 1, max: 50 }).withMessage('Games must be between 1 and 50'),
+  query('start_date').optional().isISO8601().withMessage('Start date must be a valid ISO 8601 date'),
+  query('end_date').optional().isISO8601().withMessage('End date must be a valid ISO 8601 date')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const playerId = parseInt(req.params.playerId);
-  const { games = 10 } = req.query;
+  const playerId = parseInt(req.params.playerId, 10);
+  const games = parseInt(req.query.games || '10', 10);
+  const startDate = req.query.start_date || null;
+  const endDate = req.query.end_date || null;
 
   try {
     // Get player stats
@@ -679,11 +703,13 @@ router.get('/benchmarks/player-comparison/:playerId', [
         FROM shots s
         JOIN games g ON s.game_id = g.id
         WHERE s.player_id = $1
+          AND ($3::date IS NULL OR g.date >= $3::date)
+          AND ($4::date IS NULL OR g.date < ($4::date + INTERVAL '1 day'))
         GROUP BY s.game_id, g.date
         ORDER BY g.date DESC
         LIMIT $2
       ) player_games
-    `, [playerId, games]);
+    `, [playerId, games, startDate, endDate]);
 
     if (parseInt(playerStats.rows[0].games_played) === 0) {
       return res.json({
@@ -712,10 +738,13 @@ router.get('/benchmarks/player-comparison/:playerId', [
           ) as fg_percentage,
           ROUND(AVG(s.distance), 2) as avg_distance
         FROM shots s
+        JOIN games g ON s.game_id = g.id
         WHERE s.player_id != $1
+          AND ($2::date IS NULL OR g.date >= $2::date)
+          AND ($3::date IS NULL OR g.date < ($3::date + INTERVAL '1 day'))
         GROUP BY s.player_id, s.game_id
       ) other_players
-    `, [playerId]);
+    `, [playerId, startDate, endDate]);
 
     const player = playerStats.rows[0];
     const league = leagueAvg.rows[0];
@@ -746,7 +775,7 @@ router.get('/benchmarks/player-comparison/:playerId', [
         distance_vs_league: parseFloat((player.avg_shot_distance - league.avg_shot_distance).toFixed(2))
       },
       percentile_rank: {
-        fg_percentage: await calculatePercentile(playerId, 'fg_percentage', player.avg_fg_percentage)
+        fg_percentage: await calculatePercentile(playerId, 'fg_percentage', player.avg_fg_percentage, startDate, endDate)
       }
     };
 
@@ -1148,7 +1177,7 @@ function parsePeriodDuration(periodDuration) {
 }
 
 // Helper function to calculate percentile rank
-async function calculatePercentile(playerId, metric, value) {
+async function calculatePercentile(playerId, metric, value, startDate = null, endDate = null) {
   try {
     const result = await db.query(`
       WITH player_averages AS (
@@ -1160,13 +1189,16 @@ async function calculatePercentile(playerId, metric, value) {
             2
           ) as avg_metric
         FROM shots s
+        JOIN games g ON s.game_id = g.id
+        WHERE ($2::date IS NULL OR g.date >= $2::date)
+          AND ($3::date IS NULL OR g.date < ($3::date + INTERVAL '1 day'))
         GROUP BY s.player_id
         HAVING COUNT(*) >= 10
       )
       SELECT 
-        COUNT(*) FILTER (WHERE avg_metric < $1)::numeric / COUNT(*)::numeric * 100 as percentile
+        COUNT(*) FILTER (WHERE avg_metric < $1)::numeric / NULLIF(COUNT(*)::numeric, 0) * 100 as percentile
       FROM player_averages
-    `, [value]);
+    `, [value, startDate, endDate]);
 
     const percentile = result.rows[0]?.percentile;
     return percentile !== null && percentile !== undefined ? parseFloat(parseFloat(percentile).toFixed(1)) : 50;
