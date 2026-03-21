@@ -17,6 +17,7 @@ import api from '../utils/api';
 import { advancedAnalyticsApi } from '../services/advancedAnalyticsApi';
 import FormTrends from './FormTrends';
 import PredictionsPanel from './PredictionsPanel';
+import VideoLinkEditor from './VideoLinkEditor';
 import type {
   AnalyticsPlayerOption,
   FatigueGameAnalysis,
@@ -550,6 +551,10 @@ const AdvancedAnalytics: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {selectedVideoGameId && (
+                <VideoLinkEditor gameId={selectedVideoGameId} />
+              )}
 
               {videoLoading ? (
                 <div className="advanced-analytics__status">Loading video insights…</div>
