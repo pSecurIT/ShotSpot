@@ -8,27 +8,50 @@ import type {
   VideoHighlightsResponse,
 } from '../types/advanced-analytics';
 
+type DateFilterParams = {
+  startDate?: string;
+  endDate?: string;
+};
+
+const buildDateParams = (filters?: DateFilterParams): Record<string, string> => {
+  const params: Record<string, string> = {};
+
+  if (filters?.startDate) {
+    params.start_date = filters.startDate;
+  }
+
+  if (filters?.endDate) {
+    params.end_date = filters.endDate;
+  }
+
+  return params;
+};
+
 export const advancedAnalyticsApi = {
-  formTrends: async (playerId: number, games: number = 20): Promise<FormTrendsResponse> => {
+  formTrends: async (playerId: number, games: number = 20, filters?: DateFilterParams): Promise<FormTrendsResponse> => {
     const response = await api.get<FormTrendsResponse>(`/advanced-analytics/predictions/form-trends/${playerId}`, {
-      params: { games },
+      params: { games, ...buildDateParams(filters) },
     });
     return response.data;
   },
 
-  fatigue: async (playerId: number): Promise<FatigueResponse> => {
-    const response = await api.get<FatigueResponse>(`/advanced-analytics/predictions/fatigue/${playerId}`);
+  fatigue: async (playerId: number, filters?: DateFilterParams): Promise<FatigueResponse> => {
+    const response = await api.get<FatigueResponse>(`/advanced-analytics/predictions/fatigue/${playerId}`, {
+      params: buildDateParams(filters),
+    });
     return response.data;
   },
 
-  nextGame: async (playerId: number): Promise<NextGamePredictionResponse> => {
-    const response = await api.get<NextGamePredictionResponse>(`/advanced-analytics/predictions/next-game/${playerId}`);
+  nextGame: async (playerId: number, filters?: DateFilterParams): Promise<NextGamePredictionResponse> => {
+    const response = await api.get<NextGamePredictionResponse>(`/advanced-analytics/predictions/next-game/${playerId}`, {
+      params: buildDateParams(filters),
+    });
     return response.data;
   },
 
-  playerComparison: async (playerId: number, games: number = 20): Promise<PlayerComparisonResponse> => {
+  playerComparison: async (playerId: number, games: number = 20, filters?: DateFilterParams): Promise<PlayerComparisonResponse> => {
     const response = await api.get<PlayerComparisonResponse>(`/advanced-analytics/benchmarks/player-comparison/${playerId}`, {
-      params: { games },
+      params: { games, ...buildDateParams(filters) },
     });
     return response.data;
   },
