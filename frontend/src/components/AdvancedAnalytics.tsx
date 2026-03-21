@@ -6,11 +6,6 @@ import {
   Legend,
   Line,
   LineChart,
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  Radar,
-  RadarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -21,6 +16,7 @@ import { jsPDF } from 'jspdf';
 import api from '../utils/api';
 import { advancedAnalyticsApi } from '../services/advancedAnalyticsApi';
 import FormTrends from './FormTrends';
+import PredictionsPanel from './PredictionsPanel';
 import type {
   AnalyticsPlayerOption,
   FatigueGameAnalysis,
@@ -256,35 +252,6 @@ const AdvancedAnalytics: React.FC = () => {
       shots: period.shots,
     }));
   }, [latestFatigueGame]);
-
-  const comparisonRadarData = useMemo(() => {
-    if (!comparison?.player_stats || !comparison.league_averages) {
-      return [];
-    }
-
-    return [
-      {
-        metric: 'Shots',
-        player: comparison.player_stats.avg_shots_per_game,
-        league: comparison.league_averages.avg_shots_per_game,
-      },
-      {
-        metric: 'Goals',
-        player: comparison.player_stats.avg_goals_per_game,
-        league: comparison.league_averages.avg_goals_per_game,
-      },
-      {
-        metric: 'FG%',
-        player: comparison.player_stats.avg_fg_percentage,
-        league: comparison.league_averages.avg_fg_percentage,
-      },
-      {
-        metric: 'Distance',
-        player: comparison.player_stats.avg_shot_distance,
-        league: comparison.league_averages.avg_shot_distance,
-      },
-    ];
-  }, [comparison]);
 
   const videoEventChartData = useMemo(() => {
     const counts = new Map<string, number>();
@@ -552,67 +519,11 @@ const AdvancedAnalytics: React.FC = () => {
 
           {activeTab === 'predictions' && (
             <section className="advanced-analytics__tab-panel" aria-label="Predictions panel">
-              <h3>Predictions and Benchmarks</h3>
-              <p className="advanced-analytics__insight-note">
-                Prediction and comparison cards are generated from the backend prediction model and the current historical window.
-              </p>
-
-              <div className="advanced-analytics__comparison-grid">
-                <article className="advanced-analytics__chart-card">
-                  <h3>Player vs League Radar</h3>
-                  {comparisonRadarData.length === 0 ? (
-                    <p className="advanced-analytics__empty">League comparison data is unavailable for this player.</p>
-                  ) : (
-                    <div className="advanced-analytics__chart-shell">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={comparisonRadarData}>
-                          <PolarGrid />
-                          <PolarAngleAxis dataKey="metric" />
-                          <PolarRadiusAxis />
-                          <Radar dataKey="player" stroke="#1f6f78" fill="#1f6f78" fillOpacity={0.35} name="Player" />
-                          <Radar dataKey="league" stroke="#d1495b" fill="#d1495b" fillOpacity={0.2} name="League" />
-                          <Legend />
-                          <Tooltip />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </article>
-
-                <article className="advanced-analytics__list-card">
-                  <h3>Prediction Summary</h3>
-                  {prediction?.prediction === 'insufficient_data' ? (
-                    <p className="advanced-analytics__empty">{prediction.message || 'Not enough data for prediction.'}</p>
-                  ) : (
-                    <ul className="advanced-analytics__list">
-                      <li>
-                        <div className="advanced-analytics__list-title">
-                          <strong>Next game output</strong>
-                          <span>{prediction?.predicted_fg_percentage ?? 0}% FG</span>
-                        </div>
-                        <div>{prediction?.predicted_goals ?? 0} projected goals from {prediction?.predicted_shots ?? 0} shots</div>
-                      </li>
-                      <li>
-                        <div className="advanced-analytics__list-title">
-                          <strong>Historical baseline</strong>
-                          <span>{prediction?.historical_avg?.fg_percentage ?? 0}% FG</span>
-                        </div>
-                        <div>{prediction?.historical_avg?.goals_per_game ?? 0} goals per game</div>
-                      </li>
-                      <li>
-                        <div className="advanced-analytics__list-title">
-                          <strong>Model adjustments</strong>
-                          <span>{prediction?.confidence_score ?? 0}% confidence</span>
-                        </div>
-                        <div className="advanced-analytics__tag-row">
-                          <span className="advanced-analytics__tag">Form {prediction?.adjustments?.form_adjustment ?? 0}%</span>
-                          <span className="advanced-analytics__tag">Matchup {prediction?.adjustments?.matchup_adjustment ?? 0}%</span>
-                        </div>
-                      </li>
-                    </ul>
-                  )}
-                </article>
-              </div>
+              <PredictionsPanel
+                prediction={prediction}
+                comparison={comparison}
+                latestFatigue={latestFatigueGame}
+              />
             </section>
           )}
 
