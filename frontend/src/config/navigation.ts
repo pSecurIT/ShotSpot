@@ -143,9 +143,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Scheduled Reports',
         path: '/scheduled-reports',
         icon: '⏰',
-        roles: ['coach', 'admin'],
-        badge: 'Soon',
-        disabled: true
+        roles: ['coach', 'admin']
       },
       {
         label: 'Export Settings',
