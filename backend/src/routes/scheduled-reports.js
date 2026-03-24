@@ -8,6 +8,89 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(auth);
 
+const parseScheduleOptions = (gameFilters = {}) => {
+  const scheduleOptions = gameFilters?.schedule_options;
+  if (!scheduleOptions || typeof scheduleOptions !== 'object') {
+    return {
+      weeklyDay: 1,
+      monthlyDay: 1,
+      hour: 9,
+      minute: 0,
+    };
+  }
+
+  const weeklyDay = Number.isInteger(scheduleOptions.weeklyDay) && scheduleOptions.weeklyDay >= 0 && scheduleOptions.weeklyDay <= 6
+    ? scheduleOptions.weeklyDay
+    : 1;
+  const monthlyDay = Number.isInteger(scheduleOptions.monthlyDay) && scheduleOptions.monthlyDay >= 1 && scheduleOptions.monthlyDay <= 31
+    ? scheduleOptions.monthlyDay
+    : 1;
+  const hour = Number.isInteger(scheduleOptions.hour) && scheduleOptions.hour >= 0 && scheduleOptions.hour <= 23
+    ? scheduleOptions.hour
+    : 9;
+  const minute = Number.isInteger(scheduleOptions.minute) && scheduleOptions.minute >= 0 && scheduleOptions.minute <= 59
+    ? scheduleOptions.minute
+    : 0;
+
+  return { weeklyDay, monthlyDay, hour, minute };
+};
+
+const calculateNextRunAt = (scheduleType, gameFilters = {}, fromDate = new Date()) => {
+  const now = new Date(fromDate);
+  const options = parseScheduleOptions(gameFilters);
+
+  if (scheduleType === 'after_match') {
+    return null;
+  }
+
+  if (scheduleType === 'weekly') {
+    const next = new Date(now);
+    const currentDay = next.getDay();
+    const diff = (options.weeklyDay - currentDay + 7) % 7;
+    next.setDate(next.getDate() + diff);
+    next.setHours(options.hour, options.minute, 0, 0);
+
+    if (next <= now) {
+      next.setDate(next.getDate() + 7);
+    }
+
+    return next;
+  }
+
+  if (scheduleType === 'monthly') {
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const lastDayThisMonth = new Date(year, month + 1, 0).getDate();
+    const desiredDayThisMonth = Math.min(options.monthlyDay, lastDayThisMonth);
+
+    const candidate = new Date(year, month, desiredDayThisMonth, options.hour, options.minute, 0, 0);
+
+    if (candidate > now) {
+      return candidate;
+    }
+
+    const nextMonthDate = new Date(year, month + 1, 1);
+    const nextMonth = nextMonthDate.getMonth();
+    const nextYear = nextMonthDate.getFullYear();
+    const lastDayNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+    const desiredDayNextMonth = Math.min(options.monthlyDay, lastDayNextMonth);
+
+    return new Date(nextYear, nextMonth, desiredDayNextMonth, options.hour, options.minute, 0, 0);
+  }
+
+  if (scheduleType === 'season_end') {
+    const seasonEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 0, 0);
+    if (seasonEnd <= now) {
+      seasonEnd.setFullYear(seasonEnd.getFullYear() + 1);
+    }
+    return seasonEnd;
+  }
+
+  return null;
+};
+
+const canAccessScheduledReport = (report, user) => user.role === 'admin' || report.created_by === user.userId;
+
 /**
  * Get all scheduled reports
  * Coaches see their own, admins see all
@@ -204,12 +287,14 @@ router.post('/', [
       }
     }
 
+    const nextRunAt = calculateNextRunAt(schedule_type, game_filters);
+
     const result = await db.query(`
       INSERT INTO scheduled_reports (
         name, created_by, template_id, schedule_type, is_active,
         team_id, game_filters, send_email, email_recipients,
-        email_subject, email_body
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        email_subject, email_body, next_run_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `, [
       name,
@@ -222,7 +307,8 @@ router.post('/', [
       send_email,
       JSON.stringify(email_recipients),
       email_subject || null,
-      email_body || null
+      email_body || null,
+      nextRunAt
     ]);
 
     res.status(201).json(result.rows[0]);
@@ -330,9 +416,9 @@ router.put('/:id', [
 
     // If team_id is being updated, verify it exists
     if (req.body.team_id !== undefined && req.body.team_id !== null) {
-      const teamCheck = await db.query('SELECT id FROM clubs WHERE id = $1', [req.body.team_id]);
+      const teamCheck = await db.query('SELECT id FROM teams WHERE id = $1', [req.body.team_id]);
       if (teamCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Club not found' });
+        return res.status(404).json({ error: 'Team not found' });
       }
     }
 
@@ -371,6 +457,15 @@ router.put('/:id', [
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
+
+    const nextScheduleType = req.body.schedule_type ?? report.schedule_type;
+    const nextGameFilters = req.body.game_filters ?? report.game_filters;
+    const nextIsActive = req.body.is_active ?? report.is_active;
+    const nextRunAt = nextIsActive ? calculateNextRunAt(nextScheduleType, nextGameFilters) : null;
+
+    updates.push(`next_run_at = $${paramIndex}`);
+    values.push(nextRunAt);
+    paramIndex++;
 
     values.push(id);
 
@@ -427,6 +522,146 @@ router.delete('/:id', [
   } catch (err) {
     console.error('Error deleting scheduled report:', err);
     res.status(500).json({ error: 'Failed to delete scheduled report' });
+  }
+});
+
+/**
+ * Manually run a scheduled report
+ * Creates a report export record and updates execution metadata
+ */
+router.post('/:id/run', [
+  requireRole(['admin', 'coach']),
+  param('id').isInt().withMessage('Scheduled report ID must be an integer')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const { id } = req.params;
+
+  try {
+    const reportCheck = await db.query(
+      'SELECT * FROM scheduled_reports WHERE id = $1',
+      [id]
+    );
+
+    if (reportCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Scheduled report not found' });
+    }
+
+    const report = reportCheck.rows[0];
+
+    if (!canAccessScheduledReport(report, req.user)) {
+      return res.status(403).json({ error: 'You do not have permission to run this scheduled report' });
+    }
+
+    const reportType = report.team_id ? 'team' : 'season';
+    const now = new Date();
+    const generatedName = `${report.name} - ${now.toISOString()}`;
+
+    const executionResult = await db.query(`
+      INSERT INTO report_exports (
+        template_id,
+        scheduled_report_id,
+        generated_by,
+        report_name,
+        report_type,
+        format,
+        team_id,
+        date_range
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id, report_name, report_type, format, created_at
+    `, [
+      report.template_id,
+      report.id,
+      req.user.userId,
+      generatedName,
+      reportType,
+      'json',
+      report.team_id || null,
+      report.game_filters ? JSON.stringify(report.game_filters) : null
+    ]);
+
+    const nextRunAt = report.is_active
+      ? calculateNextRunAt(report.schedule_type, report.game_filters, now)
+      : null;
+
+    await db.query(
+      `UPDATE scheduled_reports
+       SET last_run_at = CURRENT_TIMESTAMP,
+           run_count = run_count + 1,
+           next_run_at = $1
+       WHERE id = $2`,
+      [nextRunAt, report.id]
+    );
+
+    res.json({
+      message: 'Scheduled report triggered successfully',
+      execution: executionResult.rows[0],
+      next_run_at: nextRunAt,
+    });
+  } catch (err) {
+    console.error('Error triggering scheduled report:', err);
+    res.status(500).json({ error: 'Failed to trigger scheduled report' });
+  }
+});
+
+/**
+ * Get execution history for a scheduled report
+ */
+router.get('/:id/history', [
+  param('id').isInt().withMessage('Scheduled report ID must be an integer'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const { id } = req.params;
+  const limit = Number(req.query.limit || 20);
+
+  try {
+    const reportCheck = await db.query(
+      'SELECT * FROM scheduled_reports WHERE id = $1',
+      [id]
+    );
+
+    if (reportCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Scheduled report not found' });
+    }
+
+    const report = reportCheck.rows[0];
+
+    if (!canAccessScheduledReport(report, req.user)) {
+      return res.status(403).json({ error: 'You do not have permission to view this scheduled report history' });
+    }
+
+    const historyResult = await db.query(`
+      SELECT
+        re.id,
+        re.report_name,
+        re.report_type,
+        re.format,
+        re.file_path,
+        re.file_size_bytes,
+        re.access_count,
+        re.created_at,
+        re.generated_by,
+        u.username AS generated_by_username,
+        CASE WHEN re.file_path IS NULL THEN 'queued' ELSE 'completed' END AS status
+      FROM report_exports re
+      LEFT JOIN users u ON u.id = re.generated_by
+      WHERE re.scheduled_report_id = $1
+      ORDER BY re.created_at DESC
+      LIMIT $2
+    `, [id, limit]);
+
+    res.json({ history: historyResult.rows });
+  } catch (err) {
+    console.error('Error fetching scheduled report history:', err);
+    res.status(500).json({ error: 'Failed to fetch scheduled report history' });
   }
 });
 
