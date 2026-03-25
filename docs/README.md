@@ -1,125 +1,49 @@
-# ShotSpot Documentation
+# ShotSpot Documentation Index
 
-This directory contains comprehensive documentation for specialized features and integrations.
+This directory collects feature-specific, domain-specific, and maintenance documentation that supports the main project guides in the repository root.
 
-## Available Documentation
+## What Lives Here
 
-### 📡 Twizzit Integration
+- Product domain references that are too detailed for the root README
+- Integration docs for external systems such as Twizzit
+- Migration and data-structure conventions
+- Repository-profile and documentation support assets
 
-**File**: `TWIZZIT_INTEGRATION.md`
+## Quick Links
 
-Complete guide for integrating ShotSpot with the Belgian Korfball Federation API (Twizzit). Includes:
+- [DOMAIN.md](DOMAIN.md): domain concepts and terminology
+- [MIGRATIONS.md](MIGRATIONS.md): migration structure and operational rules
+- [NAVIGATION_ROLE_MATRIX.md](NAVIGATION_ROLE_MATRIX.md): navigation and permissions mapping
+- [TWIZZIT_INTEGRATION.md](TWIZZIT_INTEGRATION.md): Twizzit setup, sync flows, and security notes
+- [TWIZZIT_FRONTEND.md](TWIZZIT_FRONTEND.md): frontend considerations for Twizzit-connected flows
+- [REPOSITORY_PROFILE_CHECKLIST.md](REPOSITORY_PROFILE_CHECKLIST.md): manual GitHub settings to update outside the codebase
 
-- Architecture overview and data flow diagrams
-- Step-by-step setup instructions
-- Complete API reference with examples
-- Security best practices (AES-256-CBC encryption)
-- Troubleshooting guide
-- Performance optimization tips
-- Database schema documentation
+## Twizzit References
 
-**Quick Links**:
-- [Setup Guide](TWIZZIT_INTEGRATION.md#setup-guide)
-- [API Reference](TWIZZIT_INTEGRATION.md#api-reference)
-- [Security](TWIZZIT_INTEGRATION.md#security-considerations)
-- [Troubleshooting](TWIZZIT_INTEGRATION.md#troubleshooting)
+- [TWIZZIT_INTEGRATION.md](TWIZZIT_INTEGRATION.md)
+- [TWIZZIT_API.json](TWIZZIT_API.json)
 
-**API Structure**: `TWIZZIT_API.json`
+## Related Root-Level Docs
 
-Reference JSON document describing the Twizzit API structure, endpoints, authentication, and data formats.
-
----
-
-## Quick Start by Feature
-
-### Setting Up Twizzit Integration
-
-```bash
-# 1. Generate encryption key
-openssl rand -hex 32
-
-# 2. Add to .env
-echo "TWIZZIT_ENCRYPTION_KEY=<your-key>" >> backend/.env
-
-# 3. Run database migrations
-cd backend
-npm run setup-db
-
-# 4. Store API credentials
-curl -X POST http://localhost:3001/api/twizzit/credentials \
-  -H "Authorization: Bearer <admin-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "organizationName": "Your Organization",
-    "apiUsername": "your-username",
-    "apiPassword": "your-password"
-  }'
-
-# 5. Sync data
-curl -X POST http://localhost:3001/api/twizzit/sync/teams/<credential-id> \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"includePlayers": true}'
-```
-
----
+- [../README.md](../README.md)
+- [../QUICKSTART.md](../QUICKSTART.md)
+- [../INSTALLATION.md](../INSTALLATION.md)
+- [../BUILD.md](../BUILD.md)
+- [../OFFLINE.md](../OFFLINE.md)
+- [../SECURITY.md](../SECURITY.md)
+- [../REPORTS_API.md](../REPORTS_API.md)
 
 ## Documentation Standards
 
-When adding new documentation to this directory:
+When you add or revise documentation:
 
-1. **File Naming**: Use `UPPERCASE_WITH_UNDERSCORES.md` for main docs
-2. **Structure**: Include these sections:
-   - Overview
-   - Setup/Installation
-   - Usage Examples
-   - API Reference (if applicable)
-   - Troubleshooting
-   - Security Considerations
-3. **Code Examples**: Provide complete, runnable examples
-4. **Diagrams**: Use ASCII art or link to external images
-5. **Cross-Reference**: Link to related documentation
+- Keep commands copy-pasteable.
+- Prefer examples over abstract descriptions.
+- Cross-link related docs when a reader is likely to need the next step.
+- Update this index if you add a new document in `docs/`.
 
----
+## Support Path
 
-## Related Documentation
+If you spot outdated documentation, open an issue or submit a pull request with the affected files listed explicitly.
 
-- **Root Level**:
-  - `../QUICKSTART.md` - 5-minute project setup
-  - `../INSTALLATION.md` - Complete installation guide
-  - `../BUILD.md` - Build commands reference
-  - `../SECURITY.md` - Security architecture
-  - `../OFFLINE.md` - Offline mode implementation
-  - `../REPORTS_API.md` - Analytics and reporting API
-  - `../DOCKER.md` - Container deployment
-
-- **Mobile**:
-  - `../MOBILE_DEPLOYMENT.md` - iOS/Android app store releases
-  - `../MOBILE_ARCHITECTURE.md` - Native app architecture
-
----
-
-## Contributing Documentation
-
-When documenting new features:
-
-1. Create a comprehensive guide in this directory
-2. Add entry to this README
-3. Link from relevant root-level docs
-4. Include API examples in both curl and JavaScript
-5. Add troubleshooting section with common issues
-6. Document security implications
-7. Provide performance optimization tips
-
----
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/pSecurIT/Korfball-game-statistics/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/pSecurIT/Korfball-game-statistics/discussions)
-- **Email**: Contact project maintainers
-
----
-
-**Last Updated**: December 2025  
-**Status**: Production Ready
+For repository profile updates that cannot be set in code, use [REPOSITORY_PROFILE_CHECKLIST.md](REPOSITORY_PROFILE_CHECKLIST.md).
