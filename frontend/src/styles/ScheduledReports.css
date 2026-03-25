@@ -174,6 +174,30 @@
   gap: 0.4rem;
 }
 
+.scheduled-reports-form__radio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.scheduled-reports-form__radio-item {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  border: 1px solid #d3deec;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  background: #f9fbfe;
+}
+
+.scheduled-reports-form__preview {
+  border: 1px solid #d4dfec;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 0.55rem 0.7rem;
+  color: #34506b;
+}
+
 .scheduled-reports-form__field input,
 .scheduled-reports-form__field select,
 .scheduled-reports-form__field textarea {
@@ -275,6 +299,10 @@
   }
 
   .scheduled-reports-form__inline-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .scheduled-reports-form__radio-grid {
     grid-template-columns: 1fr;
   }
 }
