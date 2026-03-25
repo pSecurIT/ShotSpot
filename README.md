@@ -1,446 +1,189 @@
 # ShotSpot
 
-[![Security Rating](https://img.shields.io/security-headers?url=https%3A%2F%2Fshotspot-demo.example.com)](https://securityheaders.com)
-[![Code Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot)](https://codecov.io/gh/pSecurIT/ShotSpot)
-[![Frontend Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot/main?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/pSecurIT/ShotSpot)
-[![Backend Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot/main?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/pSecurIT/ShotSpot)
-[![Build Status](https://github.com/pSecurIT/ShotSpot/workflows/Test%20Coverage/badge.svg)](https://github.com/pSecurIT/ShotSpot/actions)
-[![Docker Image](https://img.shields.io/badge/docker-ghcr.io-blue?logo=docker)](https://ghcr.io/psecurit/shotspot)
-[![Docker Pulls](https://img.shields.io/badge/docker-multi--platform-success?logo=docker)](https://github.com/pSecurIT/ShotSpot/pkgs/container/shotspot)
-[![License](https://img.shields.io/github/license/pSecurIT/ShotSpot)](LICENSE)
+[![Node.js CI](https://github.com/pSecurIT/ShotSpot/actions/workflows/node.js.yml/badge.svg)](https://github.com/pSecurIT/ShotSpot/actions/workflows/node.js.yml)
+[![Test Coverage](https://github.com/pSecurIT/ShotSpot/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/pSecurIT/ShotSpot/actions/workflows/test-coverage.yml)
+[![Docker](https://github.com/pSecurIT/ShotSpot/actions/workflows/docker.yml/badge.svg)](https://github.com/pSecurIT/ShotSpot/actions/workflows/docker.yml)
+[![Backend Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot/main?flag=backend&label=backend%20coverage)](https://codecov.io/gh/pSecurIT/ShotSpot)
+[![Frontend Coverage](https://img.shields.io/codecov/c/github/pSecurIT/ShotSpot/main?flag=frontend&label=frontend%20coverage)](https://codecov.io/gh/pSecurIT/ShotSpot)
 
-## ✅ App Summary
+ShotSpot is a korfball match intelligence platform for coaches, analysts, and teams that need fast live event capture, dependable sideline workflows, and post-match reporting that is useful immediately.
 
-- A web-based or cross-platform mobile app for live match event tracking in korfball. The app allows:
-- Pre-match: Input teams, players, bench, lineups.
-- In-match: Real-time event tracking:
-- Shot attempts (location, result: goal/miss/korf hit)
-- Time tracking (game clock)
-- Faults (offensive, defensive, out-of-bounds)
-- Post-match: Data export for analysis or sharing.
+It combines a React and Capacitor frontend, an Express and PostgreSQL backend, live reporting APIs, export tooling, and mobile packaging so the same product can support match-day tracking, coaching review, and broader club workflows.
 
-## 🧱 Core Features (MVP)
-### 1. Team & Player Management
+<p align="center">
+  <img src="frontend/src/img/ShotSpot_logo.png" alt="ShotSpot logo" width="220" />
+</p>
 
-- Add players, assign to teams
-- Set starting lineup and substitutes
-- Edit players’ info
+## Table of Contents
 
-### 2. Live Match Dashboard
+- [ShotSpot](#shotspot)
+  - [Table of Contents](#table-of-contents)
+  - [Why ShotSpot](#why-shotspot)
+  - [Visuals](#visuals)
+    - [Brand mark](#brand-mark)
+    - [Court and tracking context](#court-and-tracking-context)
+    - [Repository social preview asset](#repository-social-preview-asset)
+  - [Core Capabilities](#core-capabilities)
+  - [Architecture](#architecture)
+  - [Quick Start](#quick-start)
+    - [Prerequisites](#prerequisites)
+    - [Install and run locally](#install-and-run-locally)
+    - [Docker path](#docker-path)
+  - [Daily Development Commands](#daily-development-commands)
+  - [Documentation Map](#documentation-map)
+  - [Repository Layout](#repository-layout)
+  - [Contributing](#contributing)
+  - [Licensing](#licensing)
+  - [Contact](#contact)
 
-- Game timer (with periods and pause)
-- Real-time event buttons:
-- Shot attempt → pick player → select location → result (goal/miss/hit korf)
-- Faults → player/team → fault type
-- Substitution → in/out player
-- Visual half-court or full-court map for shot tracking
+## Why ShotSpot
 
-### 3. Event History / Match Log
+ShotSpot is designed for real-world sideline use. The product prioritizes:
 
-- Timeline of all events
-- Ability to edit/delete events in real-time
+- Fast match event capture with minimal input friction
+- Offline-first behavior so tracking does not stop when connectivity does
+- Live analytics and reporting that coaches can use during play
+- Export and review workflows for after-match analysis
+- A path to native mobile delivery through Capacitor for Android and iOS
 
-### 4. Analytics & Export
+## Visuals
 
-- Summarized match stats (per player, team)
-- Download/export CSV or PDF report
+### Brand mark
 
-## 🎯 Target Users
+<p align="center">
+  <img src="frontend/src/img/ShotSpot_icon.png" alt="ShotSpot app icon" width="128" />
+</p>
 
-- Coaches and assistant coaches
-- Team analysts
-- Statisticians for clubs or federations
+### Court and tracking context
 
-## 📱 Tech stack
+<p align="center">
+  <img src="frontend/src/img/Korfbalveld-breed.PNG" alt="Korfball court visual used in ShotSpot" width="720" />
+</p>
 
-- Front-end: 
-  - React.js with TypeScript
-  - Vite (build tool & dev server)
-  - Vitest for unit testing
-  - Cypress for E2E testing
-  - **Capacitor.js** for native mobile apps (iOS & Android)
-- Back-end: Node.js + Express
-- Database: PostgreSQL
+### Repository social preview asset
 
-## 🎨 UX/UI Considerations
+Use the existing ShotSpot logo and icon assets in `frontend/src/img/` when configuring a GitHub social preview image manually.
 
-- Touch-optimized buttons (for tablets on the sideline)     
-- Quick-access event buttons (e.g. drag & drop player to court to log a shot)
-- Court visualization to tap/click shot locations
-- Undo/Edit options for fast corrections during live play
-- **✅ Offline support**: Full functionality without internet connection (see [OFFLINE.md](OFFLINE.md))
-- **📱 Native mobile apps**: Available for iOS and Android (see [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md))
-- **📦 Mobile releases**: Packaged APK/IPA files for easy distribution (see [MOBILE_RELEASE.md](MOBILE_RELEASE.md))
-- **🚀 Automated deployment**: CI/CD pipelines for App Store and Google Play
-- Auto-saving and data persistence
+## Core Capabilities
 
-## 📊 Real-Time Match Reports (NEW!)
+- Team, player, lineup, and bench management before a match starts
+- Real-time event capture for shots, fouls, substitutions, and other match actions
+- Match log editing so operators can correct mistakes without losing context
+- Reporting workflows for live dashboards, period views, momentum, player comparisons, and exports
+- Offline queueing and sync behavior for unstable network conditions
+- Mobile packaging and release workflows for Android and iOS
+- Twizzit integration support for federation-connected workflows
 
-ShotSpot now includes comprehensive real-time match reporting capabilities:
+## Architecture
 
-- **Live Match Dashboard**: Real-time game state snapshots with scores, shot summaries, and top scorers
-- **Period Reports**: Detailed statistics for each game period
-- **Momentum Tracker**: Real-time momentum calculations based on recent performance
-- **Player Comparison**: Side-by-side player performance analysis
-- **Substitution Suggestions**: Data-driven recommendations based on player performance
-- **Downloadable Reports**: Export complete game data in JSON format
+- Frontend: React 19, TypeScript, Vite, Vitest, Cypress, Capacitor
+- Backend: Express 5, PostgreSQL, direct `pg` queries, Jest
+- Security: JWT auth, role-based authorization, CSP, rate limiting, security-focused middleware order
+- Offline: service worker caching plus IndexedDB queueing and background sync patterns
 
-📖 **Full API Documentation**: See [REPORTS_API.md](REPORTS_API.md) for complete endpoint details, examples, and integration guides.
-
-## Next up (features to come)
-
-- Heatmaps & shot charts (partially implemented)
-- Player performance over time (available via reports API)
-
-## 📊 Match Reports
-
-Generate comprehensive PDF reports for post-match analysis:
-
-- **Post-Match Summary**: Game statistics, period-by-period scoring, team comparison, top performers, and shot chart visualization
-- **Player Performance**: Individual stats, zone-based shooting efficiency, substitutions, and season comparison
-- **Coach's Analysis**: Tactical insights, possession stats, substitution patterns, momentum analysis, and custom notes
-
-See [REPORTS_API.md](REPORTS_API.md) for detailed API documentation.
-
-## Next up (features to come)
-
-- ✅ Heatmaps & shot charts (implemented in reports)
-- ✅ Player performance over time (implemented in player report)
-- Sync across multiple devices
-- Video tagging integration
-- Integration with competition platforms or league databases
-
-## 🚀 Quick Start
-
-> **🐳 Docker Users**: See [DOCKER.md](DOCKER.md) for containerized deployment
+## Quick Start
 
 ### Prerequisites
 
-- **Node.js** 18+ and npm ([Download here](https://nodejs.org/))
-- **PostgreSQL** 14+ ([Download here](https://www.postgresql.org/download/))
-- **Git** ([Download here](https://git-scm.com/downloads))
+- Node.js 18+
+- npm 10+
+- PostgreSQL 14+
 
-**OR** use **Docker** for zero-config setup:
-- **Docker** 20.10+ ([Download here](https://docs.docker.com/get-docker/))
-- **Docker Compose** 2.0+ (included with Docker Desktop)
+### Install and run locally
 
-### Docker Installation (Recommended - 2 minutes)
+```bash
+git clone https://github.com/pSecurIT/ShotSpot.git
+cd ShotSpot
+npm run install:all
+```
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/pSecurIT/ShotSpot.git
-   cd ShotSpot
-   ```
+Create your backend environment file:
 
-2. **Configure environment**:
-   ```bash
-   cp .env.docker.example .env
-   # Edit .env and set DB_PASSWORD and JWT_SECRET
-   ```
+```bash
+cp backend/.env.example backend/.env
+```
 
-3. **Start with Docker**:
-   ```bash
-   docker-compose up -d
-   ```
+Set at least these values in `backend/.env`:
 
-**That's it!** Access at http://localhost:3001
+- `DB_PASSWORD`
+- `JWT_SECRET`
+- `TWIZZIT_ENCRYPTION_KEY`
 
-For full Docker documentation, see [DOCKER.md](DOCKER.md)
+Initialize the database:
 
----
+```bash
+npm run setup-db
+```
 
-### Manual Installation (5 minutes)
+Start the development servers:
 
-1. **Clone and install**:
-   ```bash
-   git clone https://github.com/pSecurIT/ShotSpot.git
-   cd ShotSpot
-   npm run install:all
-   ```
-
-2. **Set up environment**:
-   ```bash
-   # Copy example environment file
-   cp backend/.env.example backend/.env
-   
-   # Edit backend/.env and set your PostgreSQL password:
-   # - DB_PASSWORD=your_secure_password
-   # - POSTGRES_PASSWORD=your_postgres_password (if needed)
-   # - JWT_SECRET=generate_a_random_32_character_string
-   ```
-
-3. **Set up database**:
-   ```bash
-   npm run setup-db
-   ```
-
-4. **Start the application**:
-   ```bash
-   npm run dev
-   ```
-
-The app will automatically open at http://localhost:3000 🎉
-
-### Running the Application
-
-**Development mode** (with hot-reload):
 ```bash
 npm run dev
 ```
 
-**Production mode** (optimized):
-```bash
-# Build frontend
-cd frontend && npm run build && cd ..
+Default local endpoints:
 
-# Start backend
-cd backend && npm start
-```
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:3001/api`
 
-Access at:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001/api
-- **Network Access**: http://[your-ip]:3000 (for tablets/phones)
+### Docker path
 
-### Testing
+If you prefer containers, start with [DOCKER.md](DOCKER.md) and [docker-compose.yml](docker-compose.yml).
+
+## Daily Development Commands
 
 ```bash
-# Backend tests
-cd backend && npm test
+# Run both apps in development mode
+npm run dev
+
+# Set up or reset the database
+npm run setup-db
+
+# Lint backend and frontend
+npm run lint
 
 # Frontend tests
-cd frontend && npm test
+npm --prefix frontend run test:run
 
-# Frontend tests with coverage
-cd frontend && npm run coverage
+# Backend tests
+npm --prefix backend run test
 
-# Run linting
-npm run lint
+# Frontend production build
+npm --prefix frontend run build
 ```
 
-## 📖 Documentation
+## Documentation Map
 
-### Quick Navigation
+Start here based on what you are trying to do:
 
-**👋 Getting Started**
-- 🚀 **New User?** Start with [QUICKSTART.md](QUICKSTART.md) (5 minutes)
-- 💻 **Installing for field testing?** See [INSTALLATION.md](INSTALLATION.md) (Complete guide)
-- 🔧 **Need commands?** Check [BUILD.md](BUILD.md) (Command reference)
+- Product and setup: [QUICKSTART.md](QUICKSTART.md), [INSTALLATION.md](INSTALLATION.md), [BUILD.md](BUILD.md)
+- Deployment and operations: [DEPLOYMENT.md](DEPLOYMENT.md), [DOCKER.md](DOCKER.md), [SECURITY.md](SECURITY.md), [SECRETS.md](SECRETS.md)
+- Offline and mobile: [OFFLINE.md](OFFLINE.md), [MOBILE.md](MOBILE.md), [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md), [MOBILE_RELEASE.md](MOBILE_RELEASE.md)
+- Reporting and analytics: [REPORTS_API.md](REPORTS_API.md), [VISUALIZATION.md](VISUALIZATION.md)
+- Twizzit and domain docs: [docs/README.md](docs/README.md), [docs/TWIZZIT_INTEGRATION.md](docs/TWIZZIT_INTEGRATION.md), [docs/DOMAIN.md](docs/DOMAIN.md), [docs/MIGRATIONS.md](docs/MIGRATIONS.md)
 
-**🎯 By Use Case**
-- **Coach/Field Testing**: [INSTALLATION.md](INSTALLATION.md) → Everything you need for match day
-- **Developer**: [BUILD.md](BUILD.md) + [frontend/README.md](frontend/README.md) → Dev workflow
-- **Production Deployment**: [DEPLOYMENT.md](DEPLOYMENT.md) → Server deployment guide
-- **Having Issues?**: [INSTALLATION.md#troubleshooting](INSTALLATION.md#troubleshooting) → 15+ solutions
+## Repository Layout
 
-### All Documentation
-
-📚 **Complete Documentation Set**:
-
-| Document | Purpose | Time to Read |
-|----------|---------|--------------|
-| **[QUICKSTART.md](QUICKSTART.md)** | Get running in 5 minutes | 5 min |
-| **[INSTALLATION.md](INSTALLATION.md)** | Complete installation & troubleshooting | 15 min |
-| **[BUILD.md](BUILD.md)** | Build/run command reference | 10 min |
-| **[DEPLOYMENT.md](DEPLOYMENT.md)** | Production deployment guide | 20 min |
-| **[OFFLINE.md](OFFLINE.md)** | Offline functionality guide | 15 min |
-| **[MOBILE.md](MOBILE.md)** | Mobile app development | 20 min |
-| **[MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md)** | Mobile CI/CD & app store deployment | 30 min |
-| **[SECURITY.md](SECURITY.md)** | Security best practices | 10 min |
-| **[SECRETS.md](SECRETS.md)** | Secrets management | 5 min |
-| **[REPORTS_API.md](REPORTS_API.md)** | Real-Time Match Reports API | 15 min |
-| **[frontend/README.md](frontend/README.md)** | Frontend development | 10 min |
-
-**Total Documentation**: 120 minutes of comprehensive guides
-
-For detailed installation instructions (including troubleshooting), see **[INSTALLATION.md](INSTALLATION.md)**.
-
-## Repository layout & Migration protocol (summary)
-
-- Migrations live under `backend/src/migrations/` with two concepts:
-   - Baseline: `backend/src/migrations/baseline/v0.1.0.sql` — a schema-only dump applied once on fresh installs.
-   - Incremental: `backend/src/migrations/incremental/` — ordered SQL files (use sortable names like `YYYY-MM-DD-description.sql`).
-- Runner & scripts:
-   - Migration runner: `backend/scripts/lib/run-migrations.js`
-   - Setup scripts: `backend/scripts/setup-*.js`
-   - Baseline generator: `backend/scripts/baseline-generate.sh`
-- Developer quick checks (from repo root):
-
-```bash
-cd backend
-npm ci
-npm run check-migrations
-node backend/scripts/setup-test-db.js
+```text
+.
+|- frontend/        React, Vite, Capacitor application
+|- backend/         Express API, migrations, scripts, tests
+|- docs/            Focused feature and integration documentation
+|- scripts/         Release and maintenance helpers
+|- release/         Release deployment helpers
+|- .github/         Workflows, templates, automation metadata
 ```
 
-- CI should validate migrations end-to-end (run `node backend/scripts/setup-test-db.js` and `npm run check-migrations`).
-- See `docs/MIGRATIONS.md` for full protocol and `CONTRIBUTING.md` for authoring guidance.
+## Contributing
 
-## 🔒 Security
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup, quality checks, migration rules, and pull request expectations.
 
-### Authentication & Authorization
+## Licensing
 
-- JWT-based authentication with secure token handling
-- Role-based access control (Admin, Coach, User)
-- Secure password hashing with bcrypt (12 rounds)
-- Session management with secure cookie options
-- Login history tracking with IP address and user agent logging
-- Password strength validation (uppercase, lowercase, number, special character)
-- Forced password change on first login for admin-created users
+ShotSpot is distributed under a source-available license, not a permissive open-source license. See [LICENSE](LICENSE) for the current terms, commercial-use restrictions, and contribution terms.
 
-### API Security
+## Contact
 
-- Rate limiting: 1000 requests per 5 minutes per IP
-- Request throttling for brute force prevention
-- CORS configuration with strict origin validation
-- Request size limits to prevent DoS attacks
-
-### Data Protection
-
-- Input validation on all API endpoints
-- SQL injection prevention with parameterized queries
-- XSS protection via Content Security Policy
-- HTTPS enforced in production
-
-### Headers & Policies
-
-- Strict security headers configuration:
-  - Content Security Policy (CSP)
-  - HSTS preloading
-  - X-Frame-Options
-  - X-Content-Type-Options
-  - Referrer-Policy
-  - Permissions-Policy
-
-### Auditing
-
-- Comprehensive error logging
-- Login history tracking (success/failure, IP, user agent)
-- User activity monitoring (last login timestamps)
-- Authentication attempt tracking
-- Regular security dependency scanning
-- Automated vulnerability testing
-
-### Admin User Management
-
-- **User Creation**: Admin panel for creating new users with role assignment
-- **Role Management**: Change user roles (admin/coach/user) with hierarchy enforcement
-- **User Deactivation**: Soft delete users while preserving data integrity
-- **Bulk Operations**: Select multiple users for bulk role changes
-- **Profile Editing**: Update user details (username, email) with validation
-- **Activity Monitoring**: View login history and last login timestamps
-- **Data Export**: Export user lists to CSV for reporting
-- **Security Controls**: 
-  - Prevent self-demotion/deletion for admins
-  - Prevent deletion of last admin
-  - Audit trail for all user management actions
-
-For detailed security information, see [SECURITY.md](./SECURITY.md).
-
-## 📱 Mobile App Distribution
-
-ShotSpot provides native Android and iOS apps with easy distribution options:
-
-### For End Users (Non-Technical)
-
-**Option 1: App Stores (Recommended)**
-- Download from Google Play Store (Android)
-- Download from Apple App Store (iOS)
-- Automatic updates included
-
-**Option 2: Direct Download (Android)**
-- Download APK file from [GitHub Releases](https://github.com/pSecurIT/Korfball-game-statistics/releases)
-- Enable "Install from Unknown Sources" in Android settings
-- Tap APK file to install
-
-**Option 3: Beta Testing**
-- Join TestFlight beta (iOS)
-- Join Google Play beta program (Android)
-
-### For Developers
-
-**Create Release Packages**:
-```bash
-# Create new release with automated packaging
-npm run release:create
-
-# Or manually build packages
-npm run mobile:build:android  # Creates APK
-npm run mobile:build:ios      # Prepares IPA
-```
-
-**Release Artifacts Generated**:
-- `app-release.apk` - Android install file (~10-20 MB)
-- `app-release.aab` - Google Play bundle (~8-15 MB)
-- `App.ipa` - iOS install file (~15-30 MB)
-
-**Automated CI/CD**:
-- Push a tag (e.g., `v1.0.0`) to trigger GitHub Actions
-- Packages are automatically built and uploaded to releases
-- Takes ~15-20 minutes to complete both platforms
-
-For complete mobile deployment documentation, see:
-- [MOBILE_RELEASE.md](MOBILE_RELEASE.md) - Package creation and distribution guide
-- [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md) - Full deployment setup
-- [MOBILE_DEPLOYMENT_QUICKSTART.md](MOBILE_DEPLOYMENT_QUICKSTART.md) - Quick start guide
-
-## 🔑 Secrets Management
-
-### Environment Variables
-
-#### Security Variables
-```bash
-# Authentication & Session
-JWT_SECRET=your-super-secure-jwt-secret
-SESSION_SECRET=your-super-secure-session-secret
-CSRF_SECRET=your-super-secure-csrf-secret
-
-# API Security
-CORS_ORIGIN=http://localhost:3000
-RATE_LIMIT_WINDOW_MS=300000
-RATE_LIMIT_MAX=1000
-RATE_LIMIT_SKIP_TRUSTED=true
-API_MAX_PAYLOAD_SIZE=10kb
-TRUSTED_IPS=127.0.0.1
-
-# Security Headers
-ENABLE_HSTS=true
-HSTS_MAX_AGE=31536000
-CSP_REPORT_URI=/api/csp-report
-
-# Error Handling & Logging
-LOG_LEVEL=info
-LOG_FORMAT=combined
-LOG_FILE_PATH=logs/app.log
-ENABLE_REQUEST_LOGGING=true
-ENABLE_ERROR_LOGGING=true
-ENABLE_SECURITY_LOGGING=true
-ERROR_NOTIFICATION_WEBHOOK=https://your-webhook
-ERROR_NOTIFICATION_EMAIL=admin@example.com
-```
-
-- Production secrets managed via secure environment variables
-- Local development uses .env files (not committed to git)
-- Required variables documented in .env.example
-- Separate configurations for development/testing/production
-- Regular secret rotation in production
-
-### Sensitive Data
-
-The following files should NEVER be committed to git:
-- .env files (except .env.example)
-- Private keys or certificates
-- Database credentials
-- JWT secrets
-- API keys
-
-### Production Secrets
-
-For production deployment:
-1. Use a secure secrets management service
-2. Rotate credentials regularly
-3. Use least-privilege access principles
-4. Monitor for secret exposure
-5. Implement secret rotation procedures
-
-See [SECRETS.md](./SECRETS.md) for detailed secrets management procedures.
+- Maintainer: [pSecurIT](https://github.com/pSecurIT)
+- Issues: https://github.com/pSecurIT/ShotSpot/issues
+- Pull requests: https://github.com/pSecurIT/ShotSpot/pulls

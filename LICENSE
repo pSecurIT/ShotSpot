@@ -1,0 +1,67 @@
+ShotSpot Source-Available License 1.0
+
+Copyright (c) 2026 pSecurIT
+
+This is a source-available license. It is not an open-source license. Unless a right is explicitly granted below, that right is reserved.
+
+1. Definitions
+
+"Software" means the ShotSpot source code, documentation, configuration, assets, and related repository materials distributed with this license.
+
+"Commercial Use" means use of the Software, directly or indirectly, for commercial advantage, revenue generation, client work, paid services, monetized internal operations, or other monetary compensation. Commercial Use includes selling, sublicensing, licensing, white-labeling, paid support tied to distribution of the Software, providing hosted access to the Software, offering it as SaaS, embedding it in a paid product or service, or using it to deliver paid services to third parties.
+
+"Internal Non-Commercial Use" means use by an individual, school, club, nonprofit, or organization solely for evaluation, research, education, testing, or internal operations where no fee is charged for access to the Software itself and no commercial service is being delivered with it.
+
+2. Limited Permission Grant
+
+Subject to full compliance with this license, you may:
+
+- access, view, and clone the Software
+- run the Software for evaluation, development, testing, education, and Internal Non-Commercial Use
+- modify the Software for your own Internal Non-Commercial Use
+- submit issues, patches, and pull requests to the upstream repository
+
+3. Conditions
+
+You must:
+
+- keep this license and all copyright notices intact
+- clearly mark material modifications in files you change before redistributing them back to the upstream project through a pull request or patch
+- comply with all applicable law and regulations when using the Software
+
+4. Restrictions
+
+Without prior written permission from pSecurIT, you may not:
+
+- use the Software for Commercial Use
+- sell, sublicense, lease, assign, or commercially distribute the Software
+- provide the Software, or a modified version of it, as a hosted or managed service to any third party
+- use the Software in production for a customer, employer, client engagement, or paid service offering
+- redistribute the Software, modified or unmodified, outside normal upstream contribution workflows such as pull requests or patch submissions
+- create or distribute a competing commercial product or service substantially derived from the Software
+- remove or alter copyright, attribution, trademark, or license notices
+- use the ShotSpot name, logo, branding, or trade dress in a way that implies endorsement, partnership, certification, or affiliation
+
+5. Contributions
+
+Unless explicitly agreed otherwise in writing, any contribution intentionally submitted to this repository may be used, relicensed, dual-licensed, or commercially licensed by the maintainer without additional compensation or approval.
+
+6. Ownership
+
+This license does not transfer ownership of the Software or any intellectual property rights. All rights not expressly granted are reserved by pSecurIT.
+
+7. Commercial Licensing
+
+If you need rights beyond this license, including commercial deployment, hosted use, redistribution, or OEM-style embedding, you must obtain separate written permission from the copyright holder.
+
+8. Termination
+
+Any rights granted under this license terminate automatically if you violate its terms. Upon termination, you must stop using the Software and delete copies in your possession or control, unless applicable law requires otherwise. Rights may be reinstated only by explicit written permission from the copyright holder.
+
+9. Warranty Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+
+10. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COPYRIGHT HOLDER AND CONTRIBUTORS SHALL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT, OR OTHERWISE, ARISING FROM OR IN CONNECTION WITH THE SOFTWARE OR THE USE OF OR OTHER DEALINGS IN THE SOFTWARE.

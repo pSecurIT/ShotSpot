@@ -1,7 +1,7 @@
 {
   "name": "shotspot-backend",
   "version": "1.0.0",
-  "description": "Backend for ShotSpot - Korfball Match Statistics app",
+  "description": "Express and PostgreSQL backend for ShotSpot live match capture, reporting, and integrations.",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

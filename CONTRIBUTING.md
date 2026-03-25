@@ -1,52 +1,105 @@
-# Contributing — ShotSpot
+# Contributing to ShotSpot
 
-This file highlights contribution practices for repository structure and database migrations.
+Thanks for contributing. ShotSpot is built for reliability during live korfball workflows, so contributions should optimize for clarity, correctness, and maintainability over cleverness.
 
-## Migrations: Authoring & Validation
+## Before You Start
 
-1. Create incremental migrations under `backend/src/migrations/incremental/` using sortable names, e.g. `2025-12-21-add-match-index.sql`.
-2. Keep data seeds separate and prefix them with `seed_` (e.g. `seed_default_reports.sql`). Seeds must be idempotent.
-3. Run the repository checks before opening a PR:
+- Check open issues and existing pull requests before starting overlapping work.
+- Prefer small, reviewable pull requests with a single clear goal.
+- If your change affects behavior, document the user-facing impact in the pull request.
+- If your change affects docs, security, migrations, or deployment, update the relevant documentation in the same branch.
+
+## Local Setup
+
+From the repository root:
 
 ```bash
-# from repo root
+npm run install:all
+cp backend/.env.example backend/.env
+npm run setup-db
+npm run dev
+```
+
+The standard local endpoints are:
+
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:3001`
+
+## Recommended Workflow
+
+1. Create or pick an issue.
+2. Branch from the current mainline.
+3. Make the smallest change that solves the underlying problem.
+4. Add or update tests when code behavior changes.
+5. Run the relevant checks locally before opening a pull request.
+6. Write a pull request description that explains motivation, approach, and verification.
+
+## Quality Checks
+
+Run these before opening a pull request:
+
+```bash
+npm run lint
+npm --prefix frontend run test:run
+npm --prefix frontend run build
+npm --prefix backend run test
+```
+
+If your change is limited to documentation or repository metadata, state that clearly in the pull request and run the subset of checks that still applies.
+
+## Frontend Expectations
+
+- Use TypeScript and keep component APIs explicit.
+- Preserve loading, error, and offline-aware behavior.
+- Add or update Vitest coverage when component or UI behavior changes.
+- Keep changes aligned with the existing design language unless the issue explicitly calls for a redesign.
+
+## Backend Expectations
+
+- Use parameterized queries through `backend/src/db.js`.
+- Preserve authentication and authorization middleware behavior.
+- Keep request validation and security controls intact.
+- Add or update Jest coverage when route or service behavior changes.
+
+## Migration Rules
+
+Migration changes have extra requirements. Do not skip them.
+
+1. Add SQL files under `backend/src/migrations/` using sortable names.
+2. Keep migration ordering alphabetical and consistent.
+3. If you add a new migration file, update all three setup scripts:
+   - `backend/scripts/setup-db.js`
+   - `backend/scripts/setup-test-db.js`
+   - `backend/scripts/setup-parallel-dbs.js`
+4. Validate migrations before opening a pull request:
+
+```bash
 cd backend
-npm ci
 npm run check-migrations
-node backend/scripts/setup-test-db.js
+npm run setup-test-db
 ```
 
-4. If generating a new baseline for a release, follow:
+5. Update [docs/MIGRATIONS.md](docs/MIGRATIONS.md) if process or structure changes.
 
-```bash
-# Ensure a clean DB has all incrementals applied
-export DATABASE_URL=postgres://user:pass@host:5432/shotspot
-./backend/scripts/baseline-generate.sh
-```
+## Documentation Changes
 
-Commit the generated `backend/src/migrations/baseline/vX.Y.Z.sql` and `manifest.json`, then run `node backend/scripts/setup-test-db.js` to verify fresh-install behavior.
+Documentation contributions are first-class work.
 
-## Pre-commit / Pre-push checks (recommendation)
-Add a lightweight hook that scans for `.sql` files outside of `backend/src/migrations/` and fails the commit if found.
+- Keep the root [README.md](README.md) accurate and approachable.
+- Update feature-specific docs when behavior, APIs, or operational steps change.
+- Prefer concrete commands, short examples, and direct links over vague prose.
 
-Example shell check (for `husky` or CI):
+## Pull Request Guidance
 
-```bash
-#!/usr/bin/env bash
-set -e
-bad=$(git ls-files '*.sql' | grep -vE '^backend/src/migrations/|^backend/src/migrations/baseline/' || true)
-if [ -n "$bad" ]; then
-  echo "SQL files must reside under backend/src/migrations or backend/src/migrations/baseline:"
-  echo "$bad"
-  exit 1
-fi
-```
+Include:
 
-## CI Requirements
-- A job that runs `node backend/scripts/setup-test-db.js` to validate migrations end-to-end.
-- Run `npm run check-migrations` and linting as part of PR validation.
+- What changed
+- Why it changed
+- How you verified it
+- Any follow-up work or known limitations
 
-## Docs & Domain
-- Keep `docs/MIGRATIONS.md` and `docs/DOMAIN.md` up to date when changing migration behavior or domain concepts.
+If screenshots or UI changes are relevant, include before-and-after visuals in the pull request.
 
-Thanks for contributing — please reference issue #175 when updating docs for structure/migrations/domain.
+## Conduct
+
+Contributors are expected to keep discussions respectful, technically constructive, and focused on improving the project.
