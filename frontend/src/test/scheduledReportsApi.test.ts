@@ -79,6 +79,16 @@ describe('scheduledReportsApi', () => {
     });
   });
 
+  it('uses the default history limit when none is provided', async () => {
+    getMock.mockResolvedValueOnce({ data: { history: [] } });
+
+    await scheduledReportsApi.getHistory(4);
+
+    expect(getMock).toHaveBeenCalledWith('/scheduled-reports/4/history', {
+      params: { limit: 20 },
+    });
+  });
+
   it('maps axios server errors to readable messages', async () => {
     getMock.mockRejectedValueOnce({
       isAxiosError: true,
@@ -87,6 +97,16 @@ describe('scheduledReportsApi', () => {
     });
 
     await expect(scheduledReportsApi.getAll()).rejects.toThrow('Server says no');
+  });
+
+  it('falls back to axios message when server payload has no error message', async () => {
+    deleteMock.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { data: {} },
+      message: 'Network exploded',
+    });
+
+    await expect(scheduledReportsApi.remove(4)).rejects.toThrow('Network exploded');
   });
 
   it('falls back to default error message for unknown failures', async () => {
