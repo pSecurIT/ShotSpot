@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation and setup guides
+    url: https://github.com/pSecurIT/ShotSpot/blob/main/README.md
+    about: Start with the README and linked docs before opening a support issue.
+  - name: Security documentation
+    url: https://github.com/pSecurIT/ShotSpot/blob/main/SECURITY.md
+    about: Review the security and deployment guidance for security-sensitive questions.
