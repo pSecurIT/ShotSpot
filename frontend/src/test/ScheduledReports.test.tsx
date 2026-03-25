@@ -116,7 +116,7 @@ describe('ScheduledReports', () => {
 
     await user.type(screen.getByLabelText('Name'), 'Monthly Recap');
     await user.selectOptions(screen.getByLabelText('Template'), '2');
-    await user.selectOptions(screen.getByLabelText('Schedule Type'), 'monthly');
+    await user.click(screen.getByLabelText('Monthly'));
     await user.clear(screen.getByLabelText('Day of Month'));
     await user.type(screen.getByLabelText('Day of Month'), '5');
 
