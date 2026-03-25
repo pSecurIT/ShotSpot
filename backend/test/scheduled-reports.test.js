@@ -1,7 +1,20 @@
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import app from '../src/app.js';
 import db from '../src/db.js';
 import { generateTestToken } from './helpers/testHelpers.js';
+
+const generateOtherCoachToken = () => jwt.sign(
+  {
+    userId: 2,
+    username: 'otheruser',
+    id: 2,
+    role: 'coach',
+    permissions: ['write'],
+  },
+  process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing',
+  { expiresIn: '1h' }
+);
 
 describe('📅 Scheduled Reports Routes', () => {
   let coachToken;
@@ -82,6 +95,38 @@ describe('📅 Scheduled Reports Routes', () => {
       }
     });
 
+    it('✅ should only return reports owned by the coach user', async () => {
+      await db.query(
+        `INSERT INTO scheduled_reports (name, created_by, template_id, schedule_type)
+         VALUES ($1, $2, $3, $4), ($5, $6, $7, $8)`,
+        ['Own Schedule', 1, templateId, 'weekly', 'Other Schedule', 2, templateId, 'monthly']
+      );
+
+      const response = await request(app)
+        .get('/api/scheduled-reports')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].name).toBe('Own Schedule');
+    });
+
+    it('✅ should apply active and schedule type filters', async () => {
+      await db.query(
+        `INSERT INTO scheduled_reports (name, created_by, template_id, schedule_type, is_active)
+         VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10)`,
+        ['Weekly Active', 1, templateId, 'weekly', true, 'Monthly Inactive', 1, templateId, 'monthly', false]
+      );
+
+      const response = await request(app)
+        .get('/api/scheduled-reports?is_active=true&schedule_type=weekly')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].name).toBe('Weekly Active');
+    });
+
     it('❌ should require authentication', async () => {
       try {
         await request(app)
@@ -91,6 +136,15 @@ describe('📅 Scheduled Reports Routes', () => {
         global.testContext.logTestError(error, 'Authentication check failed');
         throw error;
       }
+    });
+
+    it('❌ should validate schedule_type query params', async () => {
+      const response = await request(app)
+        .get('/api/scheduled-reports?schedule_type=bad-type')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .expect(400);
+
+      expect(response.body.error).toBe('Invalid schedule type');
     });
   });
 
@@ -160,6 +214,36 @@ describe('📅 Scheduled Reports Routes', () => {
         throw error;
       }
     });
+
+    it('❌ should validate recipient email addresses', async () => {
+      const response = await request(app)
+        .post('/api/scheduled-reports')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          name: 'Email Validation Report',
+          template_id: templateId,
+          schedule_type: 'weekly',
+          email_recipients: ['not-an-email'],
+        })
+        .expect(400);
+
+      expect(response.body.error).toBe('Invalid email address in recipients list');
+    });
+
+    it('❌ should return 404 when team does not exist', async () => {
+      const response = await request(app)
+        .post('/api/scheduled-reports')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          name: 'Missing Team Report',
+          template_id: templateId,
+          schedule_type: 'weekly',
+          team_id: 999999,
+        })
+        .expect(404);
+
+      expect(response.body.error).toBe('Team not found');
+    });
   });
 
   describe('📝 PUT /api/scheduled-reports/:id', () => {
@@ -210,6 +294,28 @@ describe('📅 Scheduled Reports Routes', () => {
           expect(response.body.error).toBe('Team not found');
         });
     });
+
+    it('❌ should reject updates from a different coach user', async () => {
+      const otherCoachToken = generateOtherCoachToken();
+
+      const response = await request(app)
+        .put(`/api/scheduled-reports/${reportId}`)
+        .set('Authorization', `Bearer ${otherCoachToken}`)
+        .send({ name: 'Unauthorized Update' })
+        .expect(403);
+
+      expect(response.body.error).toBe('You do not have permission to update this scheduled report');
+    });
+
+    it('❌ should reject update requests with no valid fields', async () => {
+      const response = await request(app)
+        .put(`/api/scheduled-reports/${reportId}`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({})
+        .expect(400);
+
+      expect(response.body.error).toBe('No valid fields to update');
+    });
   });
 
   describe('🗑️ DELETE /api/scheduled-reports/:id', () => {
@@ -242,6 +348,17 @@ describe('📅 Scheduled Reports Routes', () => {
         global.testContext.logTestError(error, 'Failed to delete scheduled report');
         throw error;
       }
+    });
+
+    it('❌ should reject deletes from a different coach user', async () => {
+      const otherCoachToken = generateOtherCoachToken();
+
+      const response = await request(app)
+        .delete(`/api/scheduled-reports/${reportId}`)
+        .set('Authorization', `Bearer ${otherCoachToken}`)
+        .expect(403);
+
+      expect(response.body.error).toBe('You do not have permission to delete this scheduled report');
     });
   });
 
@@ -389,6 +506,15 @@ describe('📅 Scheduled Reports Routes', () => {
         .get(`/api/scheduled-reports/${otherReport.rows[0].id}/history`)
         .set('Authorization', `Bearer ${coachToken}`)
         .expect(403);
+    });
+
+    it('❌ should validate history limit bounds', async () => {
+      const response = await request(app)
+        .get(`/api/scheduled-reports/${reportId}/history?limit=101`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .expect(400);
+
+      expect(response.body.error).toBe('Limit must be between 1 and 100');
     });
   });
 });
