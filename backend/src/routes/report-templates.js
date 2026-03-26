@@ -4,6 +4,7 @@ import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
+const allowedTemplateTypes = ['summary', 'detailed', 'coach_focused', 'custom'];
 
 // Apply authentication middleware to all routes
 router.use(auth);
@@ -13,7 +14,7 @@ router.use(auth);
  * Query params: type, is_default, is_active
  */
 router.get('/', [
-  query('type').optional().isIn(['summary', 'detailed', 'coach_focused', 'custom']).withMessage('Invalid template type'),
+  query('type').optional().isIn(allowedTemplateTypes).withMessage('Invalid template type'),
   query('is_default').optional().isBoolean().withMessage('is_default must be boolean'),
   query('is_active').optional().isBoolean().withMessage('is_active must be boolean')
 ], async (req, res) => {
@@ -33,8 +34,10 @@ router.get('/', [
       LEFT JOIN users u ON rt.created_by = u.id
       WHERE 1=1
     `;
-    const queryParams = [];
-    let paramIndex = 1;
+    const queryParams = [allowedTemplateTypes];
+    let paramIndex = 2;
+
+    queryText += ' AND rt.type = ANY($1)';
 
     // Apply filters
     if (type) {
@@ -100,6 +103,10 @@ router.get('/:id', [
     }
 
     const template = result.rows[0];
+
+    if (!allowedTemplateTypes.includes(template.type)) {
+      return res.status(404).json({ error: 'Report template not found' });
+    }
 
     // Non-admin users can only access default templates or their own custom templates
     if (req.user.role !== 'admin' && !template.is_default && template.created_by !== req.user.userId) {
@@ -254,6 +261,10 @@ router.put('/:id', [
 
     const template = templateCheck.rows[0];
 
+    if (!allowedTemplateTypes.includes(template.type)) {
+      return res.status(404).json({ error: 'Report template not found' });
+    }
+
     // Default templates cannot be modified
     if (template.is_default) {
       return res.status(403).json({ error: 'Default templates cannot be modified' });
@@ -333,6 +344,10 @@ router.delete('/:id', [
     }
 
     const template = templateCheck.rows[0];
+
+    if (!allowedTemplateTypes.includes(template.type)) {
+      return res.status(404).json({ error: 'Report template not found' });
+    }
 
     // Default templates cannot be deleted
     if (template.is_default) {
