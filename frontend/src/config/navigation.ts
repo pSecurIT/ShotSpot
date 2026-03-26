@@ -135,9 +135,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Report Templates',
         path: '/report-templates',
         icon: '📄',
-        roles: ['coach', 'admin'],
-        badge: 'Soon',
-        disabled: true
+        roles: ['coach', 'admin']
       },
       {
         label: 'Scheduled Reports',

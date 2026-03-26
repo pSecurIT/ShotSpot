@@ -31,6 +31,7 @@ const CompetitionBracketView = React.lazy(() => import('./components/Competition
 const CompetitionStandingsView = React.lazy(() => import('./components/CompetitionStandingsView'));
 const AdvancedAnalytics = React.lazy(() => import('./components/AdvancedAnalytics'));
 const ScheduledReports = React.lazy(() => import('./components/ScheduledReports'));
+const ReportTemplates = React.lazy(() => import('./components/ReportTemplates'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
@@ -242,7 +243,7 @@ const App: React.FC = () => {
                 path="/report-templates"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <ComingSoon title="Report Templates" />
+                    <RouteLoader><ReportTemplates /></RouteLoader>
                   </ProtectedRoute>
                 }
               />

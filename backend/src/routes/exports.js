@@ -1130,8 +1130,12 @@ router.get('/download/:id', [
     const fileBuffer = await fs.readFile(fullPath);
 
     // Set appropriate headers
-    const ext = exportRecord.format.includes('pdf') ? 'pdf' : 'csv';
-    const contentType = ext === 'pdf' ? 'application/pdf' : 'text/csv';
+    const ext = exportRecord.format === 'json' ? 'json' : exportRecord.format.includes('pdf') ? 'pdf' : 'csv';
+    const contentType = ext === 'pdf'
+      ? 'application/pdf'
+      : ext === 'json'
+        ? 'application/json'
+        : 'text/csv';
     const fileName = `${exportRecord.report_name.replace(/[^a-z0-9]/gi, '_')}.${ext}`;
 
     res.setHeader('Content-Type', contentType);
