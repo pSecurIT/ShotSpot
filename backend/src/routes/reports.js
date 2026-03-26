@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import rateLimit from 'express-rate-limit';
+import { composeReport, writeReportFile } from '../services/reportComposer.js';
 
 const router = express.Router();
 
@@ -157,8 +158,7 @@ router.get('/:id', [
 
 /**
  * Generate a new report
- * This endpoint creates a report export record and returns the generated data
- * In a full implementation, this would trigger PDF/CSV generation
+ * This endpoint creates a report export record, renders the file, and returns the generated data
  */
 router.post('/generate', [
   requireRole(['admin', 'coach']),
@@ -265,23 +265,14 @@ router.post('/generate', [
     // Generate a unique share token
     const shareToken = crypto.randomBytes(32).toString('hex');
 
-    // In a real implementation, this would generate the actual report file
-    // For now, we'll create the record and return report data in JSON format
-    let reportData = {};
-
-    if (report_type === 'game' && game_id) {
-      // Fetch game report data
-      reportData = await generateGameReport(game_id, template, req.user);
-    } else if (report_type === 'player' && player_id) {
-      // Fetch player report data
-      reportData = await generatePlayerReport(player_id, date_range, template, req.user);
-    } else if (report_type === 'team' && club_id) {
-      // Fetch team/club report data
-      reportData = await generateTeamReport(club_id, date_range, template, req.user);
-    } else if (report_type === 'season') {
-      // Fetch season report data
-      reportData = await generateSeasonReport(club_id, date_range, template, req.user);
-    }
+    const reportData = await composeReport({
+      template,
+      reportType: report_type,
+      gameId: game_id || null,
+      clubId: club_id || null,
+      playerId: player_id || null,
+      dateRange: date_range || null,
+    });
 
     // Create report export record
     // Note: team_id is always NULL as we're using club-centric reporting
@@ -305,8 +296,26 @@ router.post('/generate', [
       expiresAt
     ]);
 
+    const storedFile = await writeReportFile({
+      reportId: reportExport.rows[0].id,
+      reportName: report_name,
+      format,
+      reportData,
+    });
+
+    const updatedReportResult = await db.query(`
+      UPDATE report_exports
+      SET file_path = $1, file_size_bytes = $2
+      WHERE id = $3
+      RETURNING *
+    `, [
+      storedFile.filePath,
+      storedFile.fileSizeBytes,
+      reportExport.rows[0].id,
+    ]);
+
     res.status(201).json({
-      report: reportExport.rows[0],
+      report: updatedReportResult.rows[0],
       data: reportData,
       message: 'Report generated successfully'
     });
@@ -357,110 +366,5 @@ router.delete('/:id', [
     res.status(500).json({ error: 'Failed to delete report' });
   }
 });
-
-// Helper functions for generating report data
-
-async function generateGameReport(gameId, template, _user) {
-  // Fetch comprehensive game data based on template sections
-  const gameData = {};
-
-  // Game info
-  const gameResult = await db.query(`
-    SELECT 
-      g.*,
-      hc.name as home_club_name,
-      ac.name as away_club_name
-    FROM games g
-    JOIN clubs hc ON g.home_club_id = hc.id
-    JOIN clubs ac ON g.away_club_id = ac.id
-    WHERE g.id = $1
-  `, [gameId]);
-
-  gameData.game_info = gameResult.rows[0];
-
-  // Include sections based on template
-  const sections = template.sections || [];
-
-  if (sections.includes('shot_chart') || sections.includes('player_stats')) {
-    // Fetch shots data
-    const shotsResult = await db.query(`
-      SELECT 
-        s.*,
-        p.first_name,
-        p.last_name,
-        p.jersey_number,
-        c.name as club_name
-      FROM shots s
-      JOIN players p ON s.player_id = p.id
-      JOIN clubs c ON s.club_id = c.id
-      WHERE s.game_id = $1
-      ORDER BY s.created_at
-    `, [gameId]);
-
-    gameData.shots = shotsResult.rows;
-  }
-
-  if (sections.includes('player_stats')) {
-    // Fetch player statistics (reuse analytics endpoint logic)
-    // This would ideally call a shared service function
-    gameData.player_stats = { message: 'Player stats would be included here' };
-  }
-
-  if (sections.includes('zone_analysis') || sections.includes('hot_cold_zones')) {
-    gameData.zone_analysis = { message: 'Zone analysis would be included here' };
-  }
-
-  return gameData;
-}
-
-async function generatePlayerReport(playerId, _dateRange, _template, _user) {
-  const playerData = {};
-
-  // Player info
-  const playerResult = await db.query(`
-    SELECT 
-      p.*,
-      c.name as club_name
-    FROM players p
-    LEFT JOIN clubs c ON p.club_id = c.id
-    WHERE p.id = $1
-  `, [playerId]);
-
-  playerData.player_info = playerResult.rows[0];
-
-  // Player statistics across games
-  playerData.statistics = { message: 'Player statistics across date range would be included here' };
-
-  return playerData;
-}
-
-async function generateTeamReport(clubId, _dateRange, _template, _user) {
-  const clubData = {};
-
-  // Club info
-  const clubResult = await db.query(
-    'SELECT * FROM clubs WHERE id = $1',
-    [clubId]
-  );
-
-  clubData.club_info = clubResult.rows[0];
-
-  // Club statistics
-  clubData.statistics = { message: 'Club statistics across date range would be included here' };
-
-  return clubData;
-}
-
-async function generateSeasonReport(_teamId, _dateRange, _template, _user) {
-  const seasonData = {};
-
-  // Season overview
-  seasonData.overview = { message: 'Season overview would be included here' };
-
-  // Aggregate statistics
-  seasonData.statistics = { message: 'Season aggregate statistics would be included here' };
-
-  return seasonData;
-}
 
 export default router;

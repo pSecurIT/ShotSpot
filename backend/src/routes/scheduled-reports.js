@@ -2,6 +2,7 @@ import express from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
+import { composeReport, writeReportFile } from '../services/reportComposer.js';
 
 const router = express.Router();
 
@@ -90,6 +91,33 @@ const calculateNextRunAt = (scheduleType, gameFilters = {}, fromDate = new Date(
 };
 
 const canAccessScheduledReport = (report, user) => user.role === 'admin' || report.created_by === user.userId;
+
+const extractReportDateRange = (gameFilters = {}) => {
+  const filters = gameFilters?.filters;
+  if (!filters || typeof filters !== 'object') {
+    return null;
+  }
+
+  if (filters.startDate || filters.endDate) {
+    return {
+      startDate: filters.startDate || null,
+      endDate: filters.endDate || null,
+    };
+  }
+
+  if (typeof filters.last_n_days === 'number' && filters.last_n_days > 0) {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - filters.last_n_days);
+
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    };
+  }
+
+  return null;
+};
 
 /**
  * Get all scheduled reports
@@ -527,7 +555,7 @@ router.delete('/:id', [
 
 /**
  * Manually run a scheduled report
- * Creates a report export record and updates execution metadata
+ * Creates a report export record, generates the file, and updates execution metadata
  */
 router.post('/:id/run', [
   requireRole(['admin', 'coach']),
@@ -556,9 +584,21 @@ router.post('/:id/run', [
       return res.status(403).json({ error: 'You do not have permission to run this scheduled report' });
     }
 
+    const templateResult = await db.query('SELECT * FROM report_templates WHERE id = $1', [report.template_id]);
+    if (templateResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    const template = templateResult.rows[0];
     const reportType = report.team_id ? 'team' : 'season';
     const now = new Date();
     const generatedName = `${report.name} - ${now.toISOString()}`;
+    const reportData = await composeReport({
+      template,
+      reportType,
+      teamId: report.team_id || null,
+      dateRange: extractReportDateRange(report.game_filters),
+    });
 
     const executionResult = await db.query(`
       INSERT INTO report_exports (
@@ -583,6 +623,24 @@ router.post('/:id/run', [
       report.game_filters ? JSON.stringify(report.game_filters) : null
     ]);
 
+    const storedFile = await writeReportFile({
+      reportId: executionResult.rows[0].id,
+      reportName: generatedName,
+      format: 'json',
+      reportData,
+    });
+
+    const finalizedExecution = await db.query(`
+      UPDATE report_exports
+      SET file_path = $1, file_size_bytes = $2
+      WHERE id = $3
+      RETURNING id, report_name, report_type, format, created_at, file_path, file_size_bytes
+    `, [
+      storedFile.filePath,
+      storedFile.fileSizeBytes,
+      executionResult.rows[0].id,
+    ]);
+
     const nextRunAt = report.is_active
       ? calculateNextRunAt(report.schedule_type, report.game_filters, now)
       : null;
@@ -598,7 +656,8 @@ router.post('/:id/run', [
 
     res.json({
       message: 'Scheduled report triggered successfully',
-      execution: executionResult.rows[0],
+      execution: finalizedExecution.rows[0],
+      data: reportData,
       next_run_at: nextRunAt,
     });
   } catch (err) {

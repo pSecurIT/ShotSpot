@@ -1,8 +1,15 @@
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import app from '../src/app.js';
 import db from '../src/db.js';
 import { generateTestToken } from './helpers/testHelpers.js';
+
+const currentFilename = fileURLToPath(import.meta.url);
+const currentDirname = path.dirname(currentFilename);
+const exportsDir = path.join(currentDirname, '../exports');
 
 const generateOtherCoachToken = () => jwt.sign(
   {
@@ -21,6 +28,8 @@ describe('📅 Scheduled Reports Routes', () => {
   let adminToken;
   let templateId;
   let teamId;
+  let clubId;
+  let reportFilePaths;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Scheduled Reports tests...');
@@ -47,18 +56,54 @@ describe('📅 Scheduled Reports Routes', () => {
 
   beforeEach(async () => {
     try {
+      reportFilePaths = [];
+
       // Clear test data
       await db.query('DELETE FROM report_exports');
       await db.query('DELETE FROM scheduled_reports');
-      
-      // Get a template and team for testing
-      const template = await db.query('SELECT id FROM report_templates WHERE is_default = true LIMIT 1');
-      templateId = template.rows[0]?.id;
+      await db.query('DELETE FROM shots WHERE player_id IN (SELECT id FROM players WHERE first_name = \'Schedule\')');
+      await db.query('DELETE FROM players WHERE first_name = \'Schedule\'');
+      await db.query('DELETE FROM report_templates WHERE name = \'Scheduled Structured Template\'');
       
       const clubResult = await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING id', ['Test Club']);
-      const clubId = clubResult.rows[0].id;
+      clubId = clubResult.rows[0].id;
+      const opponentClubResult = await db.query('INSERT INTO clubs (name) VALUES ($1) RETURNING id', ['Opponent Club']);
+      const opponentClubId = opponentClubResult.rows[0].id;
       const teamResult = await db.query('INSERT INTO teams (club_id, name) VALUES ($1, $2) RETURNING id', [clubId, 'Test Team']);
       teamId = teamResult.rows[0].id;
+
+      const playerResult = await db.query(`
+        INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+      `, [clubId, teamId, 'Schedule', 'Shooter', 7]);
+
+      const gameResult = await db.query(`
+        INSERT INTO games (home_club_id, away_club_id, date, status, home_team_id)
+        VALUES ($1, $2, NOW(), 'completed', $3)
+        RETURNING id
+      `, [clubId, opponentClubId, teamId]);
+
+      await db.query(`
+        INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period)
+        VALUES ($1, $2, $3, 12, 18, 'goal', 1), ($1, $2, $3, 8, 20, 'miss', 2)
+      `, [gameResult.rows[0].id, playerResult.rows[0].id, clubId]);
+
+      const template = await db.query(`
+        INSERT INTO report_templates (name, description, type, sections, created_by, is_default, is_active)
+        VALUES ($1, $2, $3, $4, $5, false, true)
+        RETURNING id
+      `, [
+        'Scheduled Structured Template',
+        'Template for scheduled report execution tests',
+        'custom',
+        JSON.stringify([
+          { id: 'summary-1', type: 'summary', title: 'Scheduled Summary', config: { summaryFocus: 'performance' } },
+          { id: 'stats-1', type: 'stats', title: 'Scheduled Metrics', config: { metrics: ['goals', 'shots', 'accuracy'] } },
+        ]),
+        1,
+      ]);
+      templateId = template.rows[0].id;
     } catch (error) {
       global.testContext.logTestError(error, 'Database setup failed');
       throw error;
@@ -67,7 +112,20 @@ describe('📅 Scheduled Reports Routes', () => {
 
   afterEach(async () => {
     try {
+      for (const relativePath of reportFilePaths) {
+        if (!relativePath) {
+          continue;
+        }
+
+        await fs.unlink(path.join(exportsDir, relativePath.replace('/exports/', ''))).catch(() => {});
+      }
+
+      await db.query('DELETE FROM report_templates WHERE name = \'Scheduled Structured Template\'');
+      await db.query('DELETE FROM shots WHERE player_id IN (SELECT id FROM players WHERE first_name = \'Schedule\')');
+      await db.query('DELETE FROM players WHERE first_name = \'Schedule\'');
+      await db.query('DELETE FROM games');
       await db.query('DELETE FROM teams WHERE id = $1', [teamId]);
+      await db.query('DELETE FROM clubs WHERE name = $1', ['Opponent Club']);
       await db.query('DELETE FROM clubs WHERE name = $1', ['Test Club']);
     } catch (error) {
       global.testContext.logTestError(error, 'Database cleanup failed');
@@ -397,6 +455,17 @@ describe('📅 Scheduled Reports Routes', () => {
       expect(response.body).toHaveProperty('execution');
       expect(response.body.execution).toHaveProperty('id');
       expect(response.body.execution.report_name).toContain('Runnable Schedule');
+      expect(response.body.execution.file_path).toMatch(/\.json$/);
+      expect(response.body.execution.file_size_bytes).toBeGreaterThan(0);
+      expect(response.body.data.sections[0].title).toBe('Scheduled Summary');
+      expect(response.body.data.sections[1].data.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: 'Goals', value: 1 }),
+          expect.objectContaining({ label: 'Shots', value: 2 }),
+          expect.objectContaining({ label: 'Accuracy', value: '50%' }),
+        ])
+      );
+      reportFilePaths.push(response.body.execution.file_path);
 
       const updatedSchedule = await db.query(
         'SELECT run_count, last_run_at FROM scheduled_reports WHERE id = $1',
@@ -407,11 +476,12 @@ describe('📅 Scheduled Reports Routes', () => {
       expect(updatedSchedule.rows[0].last_run_at).toBeTruthy();
 
       const exportsResult = await db.query(
-        'SELECT id FROM report_exports WHERE scheduled_report_id = $1',
+        'SELECT id, file_path FROM report_exports WHERE scheduled_report_id = $1',
         [reportId]
       );
 
       expect(exportsResult.rows.length).toBe(1);
+      expect(exportsResult.rows[0].file_path).toMatch(/\.json$/);
     });
 
     it('❌ should forbid running a report owned by another user', async () => {
