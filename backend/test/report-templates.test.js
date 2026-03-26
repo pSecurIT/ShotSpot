@@ -69,6 +69,29 @@ describe('📊 Report Templates Routes', () => {
       }
     });
 
+    it('✅ should exclude export-center templates from report template results', async () => {
+      await db.query(
+        `INSERT INTO report_templates (name, type, is_default, is_active, created_by, sections, metrics)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          'Export Center Template',
+          'pdf-summary',
+          false,
+          true,
+          1,
+          JSON.stringify({ includeCharts: true }),
+          JSON.stringify([]),
+        ]
+      );
+
+      const response = await request(app)
+        .get('/api/report-templates')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .expect(200);
+
+      expect(response.body.find((template) => template.name === 'Export Center Template')).toBeUndefined();
+    });
+
     it('✅ should filter templates by type', async () => {
       try {
         const response = await request(app)
