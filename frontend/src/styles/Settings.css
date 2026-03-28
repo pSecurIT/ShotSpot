@@ -1,0 +1,239 @@
+/* ============================================================
+   Settings Page – styles
+   ============================================================ */
+
+.settings-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.settings-page__header {
+  margin-bottom: 1.5rem;
+}
+
+.settings-page__header h2 {
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  margin: 0 0 0.25rem;
+}
+
+.settings-page__subtitle {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Tab navigation */
+.settings-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border-color, #e2e8f0);
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+}
+
+.settings-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.settings-tab:hover {
+  color: var(--text-primary);
+}
+
+.settings-tab--active {
+  color: var(--primary, #3b82f6);
+  border-bottom-color: var(--primary, #3b82f6);
+}
+
+/* Content area */
+.settings-content {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+/* Section inside a tab panel */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Banners */
+.settings-banner {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.settings-banner--success {
+  background: var(--success-bg, #f0fdf4);
+  color: var(--success, #16a34a);
+  border: 1px solid var(--success-border, #bbf7d0);
+}
+
+.settings-banner--error {
+  background: var(--error-bg, #fff1f2);
+  color: var(--error, #e11d48);
+  border: 1px solid var(--error-border, #fecdd3);
+}
+
+/* Form fields */
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.settings-field label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.settings-field select,
+.settings-field input[type='number'],
+.settings-field input[type='text'] {
+  width: 100%;
+  max-width: 340px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background: var(--input-bg, #fff);
+  color: var(--text-primary);
+}
+
+.settings-field__help {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Checkbox field */
+.settings-field--checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.settings-field--checkbox input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+/* Roles checkboxes */
+.settings-field__roles {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.settings-field__roles label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+/* Action buttons row */
+.settings-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+/* Account settings details list */
+.settings-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.75rem 1.5rem;
+  margin: 0;
+}
+
+.settings-details__row {
+  display: contents;
+}
+
+.settings-details__row dt {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.settings-details__row dd {
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.settings-details__value--role {
+  text-transform: capitalize;
+}
+
+/* Generic info text / link */
+.settings-info {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.settings-info a {
+  color: var(--primary, #3b82f6);
+  text-decoration: underline;
+}
+
+/* System config value */
+.settings-value {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+/* Divider */
+.settings-divider {
+  border: none;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .settings-page {
+    padding: 1rem;
+  }
+
+  .settings-content {
+    padding: 1rem;
+  }
+
+  .settings-tab {
+    padding: 0.6rem 0.9rem;
+    font-size: 0.85rem;
+  }
+
+  .settings-details {
+    grid-template-columns: 1fr;
+    gap: 0.5rem 0;
+  }
+
+  .settings-details__row dt {
+    margin-top: 0.5rem;
+  }
+}

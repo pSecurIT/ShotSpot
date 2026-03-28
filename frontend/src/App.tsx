@@ -33,6 +33,7 @@ const AdvancedAnalytics = React.lazy(() => import('./components/AdvancedAnalytic
 const TeamAnalytics = React.lazy(() => import('./components/TeamAnalytics'));
 const ScheduledReports = React.lazy(() => import('./components/ScheduledReports'));
 const ReportTemplates = React.lazy(() => import('./components/ReportTemplates'));
+const SettingsPage = React.lazy(() => import('./components/SettingsPage'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
@@ -258,9 +259,13 @@ const App: React.FC = () => {
               />
               <Route
                 path="/export-settings"
+                element={<Navigate to="/settings" replace />}
+              />
+              <Route
+                path="/settings"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <ComingSoon title="Export Settings" />
+                    <RouteLoader><SettingsPage /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
