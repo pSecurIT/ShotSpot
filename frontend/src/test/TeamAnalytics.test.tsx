@@ -189,4 +189,35 @@ describe('TeamAnalytics', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Analytics service unavailable');
     });
   });
+
+  it('reloads analytics when the season selection changes', async () => {
+    const user = userEvent.setup();
+    render(<TeamAnalytics />);
+
+    await screen.findByText('Team Analytics Dashboard');
+    await user.selectOptions(screen.getByLabelText('Season'), '11');
+
+    await waitFor(() => {
+      expect(seasonOverviewMock).toHaveBeenLastCalledWith(4, 11);
+      expect(momentumMock).toHaveBeenLastCalledWith(4, 11);
+      expect(strengthsMock).toHaveBeenLastCalledWith(4, 11);
+    });
+  });
+
+  it('shows scope fallback info when overview scope_mode is club_fallback', async () => {
+    seasonOverviewMock.mockResolvedValueOnce({
+      team: { id: 4, name: 'U19 A', club_id: 2, club_name: 'Falcons', season_id: 10 },
+      season: { id: 10, name: '2025-2026', start_date: '2025-09-01', end_date: '2026-05-31', is_active: true },
+      scope_mode: 'club_fallback',
+      record: { games_played: 8, wins: 5, losses: 2, draws: 1, points: 11, win_percentage: 62.5 },
+      scoring: { total_shots: 98, total_goals: 56, fg_percentage: 57.1, goals_for: 83, goals_against: 69, goal_difference: 14, avg_goals_for: 10.38, avg_goals_against: 8.63, avg_goal_difference: 1.75 },
+      top_scorers: [],
+      period_breakdown: [],
+      previous_season_comparison: null,
+    });
+
+    render(<TeamAnalytics />);
+
+    expect(await screen.findByText(/older matches are not linked to team IDs/i)).toBeInTheDocument();
+  });
 });
