@@ -1,0 +1,205 @@
+.team-analytics {
+  --team-analytics-bg: #f8fafc;
+  --team-analytics-panel: #ffffff;
+  --team-analytics-border: #d9e2ec;
+  --team-analytics-ink: #102a43;
+  --team-analytics-muted: #52606d;
+  --team-analytics-accent: #0f766e;
+  --team-analytics-warning: #b45309;
+  --team-analytics-danger: #b91c1c;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(15, 118, 110, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.98));
+  color: var(--team-analytics-ink);
+}
+
+.team-analytics__hero,
+.team-analytics__toolbar,
+.team-analytics__section-heading,
+.team-analytics__comparison-grid,
+.team-analytics__cards,
+.team-analytics__grid {
+  display: grid;
+  gap: 16px;
+}
+
+.team-analytics__hero {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.team-analytics__hero h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.team-analytics__hero p,
+.team-analytics__section-heading p,
+.team-analytics__card span,
+.team-analytics__muted,
+.team-analytics__empty {
+  color: var(--team-analytics-muted);
+}
+
+.team-analytics__toolbar {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 20px;
+}
+
+.team-analytics__field {
+  display: grid;
+  gap: 8px;
+}
+
+.team-analytics__field select,
+.team-analytics__export-button {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--team-analytics-border);
+}
+
+.team-analytics__field select {
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.team-analytics__export-button {
+  padding: 0 18px;
+  background: var(--team-analytics-accent);
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.team-analytics__export-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.team-analytics__content,
+.team-analytics__section {
+  display: grid;
+  gap: 16px;
+}
+
+.team-analytics__section {
+  margin-top: 24px;
+}
+
+.team-analytics__cards {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.team-analytics__card,
+.team-analytics__panel,
+.team-analytics__alert {
+  background: var(--team-analytics-panel);
+  border: 1px solid var(--team-analytics-border);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.team-analytics__card,
+.team-analytics__panel {
+  padding: 18px;
+}
+
+.team-analytics__card {
+  display: grid;
+  gap: 8px;
+}
+
+.team-analytics__card strong {
+  font-size: 1.6rem;
+}
+
+.team-analytics__card-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
+.team-analytics__grid--two-column {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.team-analytics__panel--chart {
+  min-height: 360px;
+}
+
+.team-analytics__table-wrap {
+  overflow-x: auto;
+}
+
+.team-analytics__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.team-analytics__table th,
+.team-analytics__table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(217, 226, 236, 0.9);
+  text-align: left;
+}
+
+.team-analytics__comparison-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.team-analytics__comparison-grid strong {
+  display: block;
+  margin-top: 6px;
+}
+
+.team-analytics__alert {
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.team-analytics__alert--error {
+  border-color: rgba(185, 28, 28, 0.2);
+  color: var(--team-analytics-danger);
+}
+
+.team-analytics__alert--info {
+  border-color: rgba(15, 118, 110, 0.2);
+}
+
+.team-analytics__insight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.team-analytics__insight {
+  border-left: 4px solid transparent;
+  padding-left: 12px;
+}
+
+.team-analytics__insight--strength {
+  border-left-color: var(--team-analytics-accent);
+}
+
+.team-analytics__insight--weakness {
+  border-left-color: var(--team-analytics-warning);
+}
+
+.team-analytics__loading,
+.team-analytics__empty {
+  padding: 32px 0;
+}
+
+@media (max-width: 768px) {
+  .team-analytics {
+    padding: 18px;
+  }
+
+  .team-analytics__hero {
+    grid-template-columns: 1fr;
+  }
+}

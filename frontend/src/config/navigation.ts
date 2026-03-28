@@ -75,9 +75,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Team Analytics',
         path: '/team-analytics',
         icon: '👥',
-        roles: ['coach', 'admin'],
-        badge: 'Soon',
-        disabled: true
+        roles: ['coach', 'admin']
       }
     ]
   },
