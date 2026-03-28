@@ -22,7 +22,7 @@ const UserManagement = React.lazy(() => import('./components/UserManagement'));
 const ExportCenter = React.lazy(() => import('./components/ExportCenter'));
 const MatchTemplates = React.lazy(() => import('./components/MatchTemplates'));
 const TwizzitIntegration = React.lazy(() => import('./components/TwizzitIntegration'));
-const Achievements = React.lazy(() => import('./components/Achievements'));
+const AchievementsPage = React.lazy(() => import('./components/AchievementsPage'));
 const UserProfile = React.lazy(() => import('./components/UserProfile'));
 const MyAchievements = React.lazy(() => import('./components/MyAchievements'));
 const CompetitionManagement = React.lazy(() => import('./components/CompetitionManagement'));
@@ -90,7 +90,7 @@ const App: React.FC = () => {
                 path="/achievements"
                 element={
                   <ProtectedRoute>
-                    <RouteLoader><Achievements /></RouteLoader>
+                    <RouteLoader><AchievementsPage /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
