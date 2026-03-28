@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Player {
   id: number;
@@ -31,12 +32,15 @@ interface Club {
 }
 
 const PlayerManagement: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [selectedClubFilter, setSelectedClubFilter] = useState<string>('');
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>('');
   const [showInactive, setShowInactive] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -55,12 +59,18 @@ const PlayerManagement: React.FC = () => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
 
-  const fetchClubs = async () => {
+  const fetchClubs = useCallback(async () => {
     try {
       const response = await api.get('/clubs');
       const fetchedClubs = (response as { data?: unknown })?.data;
       const clubList = Array.isArray(fetchedClubs) ? (fetchedClubs as Club[]) : [];
       setClubs(clubList);
+
+      // For admins the club filter is mandatory, so keep a club selected.
+      if (isAdmin && clubList.length > 0 && !selectedClubFilter) {
+        setSelectedClubFilter(String(clubList[0].id));
+      }
+
       setNewPlayer((prev) => {
         if (prev.club_id) return prev;
         return {
@@ -72,9 +82,9 @@ const PlayerManagement: React.FC = () => {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       console.error('Error fetching clubs:', err.response?.data?.error || err.message);
     }
-  };
+  }, [isAdmin, selectedClubFilter]);
 
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async () => {
     try {
       const response = await api.get('/teams');
       setTeams(response.data);
@@ -82,9 +92,9 @@ const PlayerManagement: React.FC = () => {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       console.error('Error fetching teams:', err.response?.data?.error || err.message);
     }
-  };
+  }, []);
 
-  const fetchPlayers = async () => {
+  const fetchPlayers = useCallback(async () => {
     try {
       const response = await api.get('/players');
       setPlayers(response.data);
@@ -92,18 +102,22 @@ const PlayerManagement: React.FC = () => {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       console.error('Error fetching players:', err.response?.data?.error || err.message);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchClubs();
     fetchTeams();
     fetchPlayers();
-  }, []);
+  }, [fetchClubs, fetchTeams, fetchPlayers]);
 
   const teamsForSelectedClub = newPlayer.club_id
     ? teams.filter(t => t.club_id === Number(newPlayer.club_id))
     : [];
+
+  const teamsForFilters = isAdmin && selectedClubFilter
+    ? teams.filter(t => t.club_id === Number(selectedClubFilter))
+    : teams;
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -360,6 +374,12 @@ const PlayerManagement: React.FC = () => {
   // Filter and sort players
   const filteredPlayers = players
     .filter(p => {
+      // Club filter (admins only)
+      if (isAdmin) {
+        if (!selectedClubFilter) return false;
+        if (p.club_id.toString() !== selectedClubFilter) return false;
+      }
+
       // Team filter
       if (selectedTeamFilter && p.team_id.toString() !== selectedTeamFilter) return false;
       
@@ -697,6 +717,25 @@ const PlayerManagement: React.FC = () => {
             </div>
             
             <div className="filters-row">
+              {isAdmin && (
+                <div className="filter-group">
+                  <label htmlFor="club_filter">Club:</label>
+                  <select
+                    id="club_filter"
+                    value={selectedClubFilter}
+                    onChange={(e) => {
+                      setSelectedClubFilter(e.target.value);
+                      setSelectedTeamFilter('');
+                    }}
+                    className="filter-select"
+                  >
+                    {clubs.map(club => (
+                      <option key={club.id} value={club.id}>{club.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="filter-group">
                 <label htmlFor="team_filter">Team:</label>
                 <select
@@ -706,7 +745,7 @@ const PlayerManagement: React.FC = () => {
                   className="filter-select"
                 >
                   <option value="">All Teams</option>
-                  {teams.map(team => (
+                  {teamsForFilters.map(team => (
                     <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
                 </select>
