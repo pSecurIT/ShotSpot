@@ -13,12 +13,14 @@ const generateUniqueTeamName = (prefix = 'Team') => {
 
 describe('👥 Age Group Team Routes', () => {
   let authToken;
+  let coachAuthToken;
   let testClubId;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Age Group Team Routes tests...');
     // Generate test auth token
     authToken = generateTestToken('admin');
+    coachAuthToken = generateTestToken('coach');
   });
 
   beforeEach(async () => {
@@ -279,6 +281,139 @@ describe('👥 Age Group Team Routes', () => {
         expect(response.body.error).toContain('not found');
       } catch (error) {
         global.testContext.logTestError(error, 'Failed 404 test for team update');
+        throw error;
+      }
+    });
+
+    it('✅ should allow admins to move a team to another club', async () => {
+      try {
+        const sourceTeamName = generateUniqueTeamName('MoveClub');
+        const secondClubName = `SecondClub_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+        const secondClubResult = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+          [secondClubName]
+        );
+        const secondClubId = secondClubResult.rows[0].id;
+
+        const teamRes = await db.query(
+          'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+          [testClubId, sourceTeamName, 'U17']
+        );
+        const teamId = teamRes.rows[0].id;
+
+        const response = await request(app)
+          .put(`/api/teams/${teamId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send({ name: sourceTeamName, age_group: 'U17', gender: 'mixed', club_id: secondClubId })
+          .expect('Content-Type', /json/)
+          .expect(200);
+
+        expect(response.body.club_id).toBe(secondClubId);
+
+        const dbResponse = await db.query('SELECT club_id FROM teams WHERE id = $1', [teamId]);
+        expect(dbResponse.rows[0].club_id).toBe(secondClubId);
+      } catch (error) {
+        global.testContext.logTestError(error, 'Failed admin club reassignment test for team update');
+        throw error;
+      }
+    });
+
+    it('✅ should allow moving a team when optional fields are null', async () => {
+      try {
+        const sourceTeamName = generateUniqueTeamName('MoveClubNullables');
+        const secondClubName = `SecondClubNull_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+        const secondClubResult = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+          [secondClubName]
+        );
+        const secondClubId = secondClubResult.rows[0].id;
+
+        const teamRes = await db.query(
+          'INSERT INTO teams (club_id, name, age_group, gender) VALUES ($1, $2, $3, $4) RETURNING id',
+          [testClubId, sourceTeamName, null, null]
+        );
+        const teamId = teamRes.rows[0].id;
+
+        const response = await request(app)
+          .put(`/api/teams/${teamId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send({
+            name: sourceTeamName,
+            age_group: null,
+            gender: null,
+            season_id: null,
+            club_id: secondClubId,
+            is_active: true
+          })
+          .expect('Content-Type', /json/)
+          .expect(200);
+
+        expect(response.body.club_id).toBe(secondClubId);
+        expect(response.body.age_group).toBeNull();
+        expect(response.body.gender).toBeNull();
+      } catch (error) {
+        global.testContext.logTestError(error, 'Failed nullable-field club reassignment test');
+        throw error;
+      }
+    });
+
+    it('❌ should reject club reassignment to a non-existent club', async () => {
+      try {
+        const teamName = generateUniqueTeamName('InvalidClubMove');
+
+        const teamRes = await db.query(
+          'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+          [testClubId, teamName, 'U17']
+        );
+        const teamId = teamRes.rows[0].id;
+
+        const response = await request(app)
+          .put(`/api/teams/${teamId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send({ name: teamName, age_group: 'U17', club_id: 999999 })
+          .expect('Content-Type', /json/)
+          .expect(404);
+
+        expect(response.body.error).toBe('Club not found');
+      } catch (error) {
+        global.testContext.logTestError(error, 'Failed invalid club reassignment test for team update');
+        throw error;
+      }
+    });
+
+    it('❌ should block non-admin users from changing team club assignment', async () => {
+      try {
+        const teamName = generateUniqueTeamName('CoachMoveDenied');
+        const secondClubName = `DeniedMoveClub_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+        const secondClubResult = await db.query(
+          'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+          [secondClubName]
+        );
+        const secondClubId = secondClubResult.rows[0].id;
+
+        const teamRes = await db.query(
+          'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+          [testClubId, teamName, 'U17']
+        );
+        const teamId = teamRes.rows[0].id;
+
+        const response = await request(app)
+          .put(`/api/teams/${teamId}`)
+          .set('Authorization', `Bearer ${coachAuthToken}`)
+          .set('Content-Type', 'application/json')
+          .send({ name: teamName, age_group: 'U17', club_id: secondClubId })
+          .expect('Content-Type', /json/)
+          .expect(403);
+
+        expect(response.body.error).toBe('Only admins can change team club assignments');
+      } catch (error) {
+        global.testContext.logTestError(error, 'Failed non-admin club reassignment guard test');
         throw error;
       }
     });
