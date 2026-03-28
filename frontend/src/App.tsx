@@ -8,7 +8,6 @@ import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
 import OfflineIndicator from './components/OfflineIndicator';
-import ComingSoon from './components/ComingSoon';
 import NotFound from './components/NotFound';
 import logo from './img/ShotSpot_logo.png';
 
@@ -237,7 +236,7 @@ const App: React.FC = () => {
                 path="/series"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <ComingSoon title="Series / Divisions" />
+                    <Navigate to="/competitions" replace />
                   </ProtectedRoute>
                 }
               />
