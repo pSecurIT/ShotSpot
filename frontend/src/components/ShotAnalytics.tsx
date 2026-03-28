@@ -6,13 +6,11 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 import { useWebSocket } from '../hooks/useWebSocket';
-import AchievementBadge from './AchievementBadge';
-import Leaderboard from './Leaderboard';
 import AchievementNotification from './AchievementNotification';
 import InteractiveShotChart from './InteractiveShotChart';
 const PlayerComparisonRadar = React.lazy(() => import('./PlayerComparisonRadar'));
 import PossessionFlowDiagram from './PossessionFlowDiagram';
-import { Achievement, LeaderboardPlayer } from '../types/achievements';
+import { Achievement } from '../types/achievements';
 import api from '../utils/api';
 import courtImageUrl from '../img/Korfbalveld-breed.PNG';
 import '../styles/ShotAnalytics.css';
@@ -215,7 +213,7 @@ interface MatchupAnalysis {
   };
 }
 
-type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts' | 'performance' | 'historical' | 'achievements' | 'interactive' | 'comparison' | 'possession';
+type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts' | 'performance' | 'historical' | 'interactive' | 'comparison' | 'possession';
 
 const ShotAnalytics: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -244,12 +242,6 @@ const ShotAnalytics: React.FC = () => {
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [selectedOpponentId, setSelectedOpponentId] = useState<number | null>(null);
 
-  // Phase 6 achievements data states
-  const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
-  const [playerAchievements, setPlayerAchievements] = useState<Achievement[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
-  const [selectedAchievementPlayer, setSelectedAchievementPlayer] = useState<number | null>(null);
-  const [leaderboardType, setLeaderboardType] = useState<'global' | 'team'>('global');
   const [unlockedAchievement, setUnlockedAchievement] = useState<Achievement | null>(null);
 
   // New visualization states
@@ -504,67 +496,6 @@ const ShotAnalytics: React.FC = () => {
     }
   }, [selectedTeam, selectedOpponentId]);
 
-  // Phase 6: Fetch all achievements
-  const fetchAchievements = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await api.get<Achievement[]>('/achievements/list');
-      setAllAchievements(response.data);
-    } catch (err) {
-      const error = err as { response?: { data?: { error?: string } }; message?: string };
-      setError(error.response?.data?.error || 'Failed to load achievements');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Phase 6: Fetch player achievements
-  const fetchPlayerAchievements = useCallback(async () => {
-    if (!selectedAchievementPlayer) return;
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await api.get<{ achievements: Achievement[]; total_points: number }>(`/achievements/player/${selectedAchievementPlayer}`);
-      setPlayerAchievements(response.data.achievements || []);
-    } catch (err) {
-      const error = err as { response?: { data?: { error?: string } }; message?: string };
-      setError(error.response?.data?.error || 'Failed to load player achievements');
-      setPlayerAchievements([]); // Reset to empty array on error
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedAchievementPlayer]);
-
-  // Phase 6: Fetch leaderboard
-  const fetchLeaderboard = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      if (leaderboardType === 'global') {
-        const response = await api.get<{ season: string; leaderboard: LeaderboardPlayer[] }>('/achievements/leaderboard');
-        setLeaderboard(response.data.leaderboard || []);
-      } else if (selectedTeam) {
-        const response = await api.get<{ team_id: number; leaderboard: LeaderboardPlayer[] }>(`/achievements/team/${selectedTeam}/leaderboard`);
-        setLeaderboard(response.data.leaderboard || []);
-      } else {
-        setError('Please select a team for team leaderboard');
-        setLoading(false);
-        return;
-      }
-    } catch (err) {
-      const error = err as { response?: { data?: { error?: string } }; message?: string };
-      setError(error.response?.data?.error || 'Failed to load leaderboard');
-      setLeaderboard([]); // Reset to empty array on error
-    } finally {
-      setLoading(false);
-    }
-  }, [leaderboardType, selectedTeam]);
-
   // New: Fetch possessions data
   const fetchPossessions = useCallback(async () => {
     if (!gameId) return;
@@ -637,11 +568,6 @@ const ShotAnalytics: React.FC = () => {
           if (selectedTeam) fetchTeamTendencies();
           if (selectedTeam && selectedOpponentId) fetchMatchupAnalysis();
           break;
-        case 'achievements':
-          fetchAchievements();
-          if (selectedAchievementPlayer) fetchPlayerAchievements();
-          fetchLeaderboard();
-          break;
       }
     };
 
@@ -651,15 +577,6 @@ const ShotAnalytics: React.FC = () => {
     const handleAchievementUnlocked = (data: { achievement: Achievement; player_id: number }) => {
       console.log('🏆 Achievement unlocked:', data);
       setUnlockedAchievement(data.achievement);
-      
-      // Refresh achievements if viewing achievements tab
-      if (activeView === 'achievements') {
-        fetchAchievements();
-        if (selectedAchievementPlayer === data.player_id) {
-          fetchPlayerAchievements();
-        }
-        fetchLeaderboard();
-      }
     };
 
     socket.on('achievement-unlocked', handleAchievementUnlocked);
@@ -668,7 +585,7 @@ const ShotAnalytics: React.FC = () => {
       socket.off('analytics-update', handleAnalyticsUpdate);
       socket.off('achievement-unlocked', handleAchievementUnlocked);
     };
-  }, [socket, autoRefresh, activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends, fetchPlayerDevelopment, fetchTeamTendencies, fetchMatchupAnalysis, fetchAchievements, fetchPlayerAchievements, fetchLeaderboard, selectedPlayerId, selectedTeam, selectedOpponentId, selectedAchievementPlayer]);
+  }, [socket, autoRefresh, activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends, fetchPlayerDevelopment, fetchTeamTendencies, fetchMatchupAnalysis, selectedPlayerId, selectedTeam, selectedOpponentId]);
 
   // Load data when view changes
   useEffect(() => {
@@ -718,20 +635,8 @@ const ShotAnalytics: React.FC = () => {
         if (selectedTeam) fetchTeamTendencies();
         if (selectedTeam && selectedOpponentId) fetchMatchupAnalysis();
         break;
-      case 'achievements':
-        // Achievements view needs all achievements and leaderboard
-        fetchAchievements();
-        fetchLeaderboard();
-        break;
     }
-  }, [activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends, fetchPlayerDevelopment, fetchTeamTendencies, fetchMatchupAnalysis, fetchAchievements, fetchLeaderboard, fetchPossessions, selectedPlayerId, selectedTeam, selectedOpponentId, teams.length]);
-
-  // Fetch player achievements when player selection changes
-  useEffect(() => {
-    if (activeView === 'achievements' && selectedAchievementPlayer) {
-      fetchPlayerAchievements();
-    }
-  }, [activeView, selectedAchievementPlayer, fetchPlayerAchievements]);
+  }, [activeView, fetchHeatmap, fetchShotChart, fetchPlayerStats, fetchGameSummary, fetchStreaks, fetchZoneAnalysis, fetchTrends, fetchPlayerDevelopment, fetchTeamTendencies, fetchMatchupAnalysis, fetchPossessions, selectedPlayerId, selectedTeam, selectedOpponentId, teams.length]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -747,10 +652,10 @@ const ShotAnalytics: React.FC = () => {
         return;
       }
 
-      // Tab switching with numbers 1-8
-      const views: AnalyticsView[] = ['heatmap', 'shot-chart', 'players', 'summary', 'charts', 'performance', 'historical', 'achievements'];
+      // Tab switching with numbers 1-7
+      const views: AnalyticsView[] = ['heatmap', 'shot-chart', 'players', 'summary', 'charts', 'performance', 'historical'];
       const keyNum = parseInt(e.key);
-      if (keyNum >= 1 && keyNum <= 8) {
+      if (keyNum >= 1 && keyNum <= 7) {
         setActiveView(views[keyNum - 1]);
         return;
       }
@@ -2005,104 +1910,6 @@ const ShotAnalytics: React.FC = () => {
     );
   };
 
-  // Phase 6: Render achievements view
-  const renderAchievements = () => {
-    return (
-      <div className="achievements-view">
-        <div className="filters">
-          <div className="filter-group">
-            <label htmlFor="achievement-player-select">Select Player</label>
-            <select 
-              id="achievement-player-select"
-              value={selectedAchievementPlayer || ''} 
-              onChange={(e) => setSelectedAchievementPlayer(e.target.value ? parseInt(e.target.value) : null)}
-            >
-              <option value="">Select a player...</option>
-              {playerStats.map(p => (
-                <option key={p.player_id} value={p.player_id}>
-                  {p.first_name} {p.last_name} (#{p.jersey_number})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label htmlFor="leaderboard-type-select">Leaderboard Type</label>
-            <select 
-              id="leaderboard-type-select"
-              value={leaderboardType} 
-              onChange={(e) => setLeaderboardType(e.target.value as 'global' | 'team')}
-            >
-              <option value="global">🌍 Global Leaderboard</option>
-              <option value="team">👥 Team Leaderboard</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Player Achievements Section */}
-        {selectedAchievementPlayer && (
-          <div className="achievements-section">
-            <h3>🏆 Player Achievements</h3>
-            {playerAchievements.length > 0 ? (
-              <div className="achievements-grid">
-                {allAchievements.map(achievement => {
-                  const earned = playerAchievements.find(a => a.id === achievement.id);
-                  return (
-                    <AchievementBadge
-                      key={achievement.id}
-                      achievement={earned || achievement}
-                      isLocked={!earned}
-                      size="medium"
-                      showDetails={true}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="no-data">No achievements earned yet. Keep playing to unlock them!</p>
-            )}
-          </div>
-        )}
-
-        {/* All Achievements Section (when no player selected) */}
-        {!selectedAchievementPlayer && allAchievements.length > 0 && (
-          <div className="achievements-section">
-            <h3>🎯 All Available Achievements</h3>
-            <div className="achievements-grid">
-              {allAchievements.map(achievement => (
-                <AchievementBadge
-                  key={achievement.id}
-                  achievement={achievement}
-                  isLocked={true}
-                  size="medium"
-                  showDetails={true}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Leaderboard Section */}
-        <div className="achievements-section">
-          <h3>📊 {leaderboardType === 'global' ? 'Global Leaderboard' : 'Team Leaderboard'}</h3>
-          <Leaderboard
-            players={leaderboard}
-            type={leaderboardType}
-            loading={loading}
-            season="Current Season"
-            teamName={leaderboardType === 'team' && selectedTeam ? teams.find(t => t.id === selectedTeam)?.name : undefined}
-          />
-        </div>
-
-        {allAchievements.length === 0 && (
-          <div className="empty-state">
-            <p>🏆 No achievements available yet</p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="shot-analytics-container">
       <div className="analytics-header">
@@ -2111,6 +1918,9 @@ const ShotAnalytics: React.FC = () => {
             ← Back to Match
           </button>
           <h2>📊 Shot Analytics</h2>
+          <button className="retry-button" onClick={() => navigate('/achievements')}>
+            🏆 Achievements Hub
+          </button>
         </div>
         <div className="view-tabs">
           <button
@@ -2183,17 +1993,10 @@ const ShotAnalytics: React.FC = () => {
           >
             📚 Historical
           </button>
-          <button
-            className={`view-tab ${activeView === 'achievements' ? 'active' : ''}`}
-            onClick={() => setActiveView('achievements')}
-            title="Keyboard: 8"
-          >
-            🏆 Achievements
-          </button>
         </div>
         <div className="analytics-controls-bar">
           <div className="keyboard-hints">
-            <span className="hint">💡 Tip: Use number keys 1-8 to switch views | ESC to close modals</span>
+            <span className="hint">💡 Tip: Use number keys 1-7 to switch views | ESC to close modals</span>
           </div>
           <div className="auto-refresh-toggle">
             <label className="toggle-switch">
@@ -2242,11 +2045,6 @@ const ShotAnalytics: React.FC = () => {
                 if (selectedTeam) fetchTeamTendencies();
                 if (selectedTeam && selectedOpponentId) fetchMatchupAnalysis();
                 break;
-              case 'achievements':
-                fetchAchievements();
-                if (selectedAchievementPlayer) fetchPlayerAchievements();
-                fetchLeaderboard();
-                break;
             }
           }}>
             🔄 Retry
@@ -2266,7 +2064,6 @@ const ShotAnalytics: React.FC = () => {
           {activeView === 'charts' && renderAdvancedCharts()}
           {activeView === 'performance' && renderPerformanceTracking()}
           {activeView === 'historical' && renderHistoricalAnalytics()}
-          {activeView === 'achievements' && renderAchievements()}
         </>
       )}
 
