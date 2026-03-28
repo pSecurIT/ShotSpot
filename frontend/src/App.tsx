@@ -8,7 +8,6 @@ import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
 import OfflineIndicator from './components/OfflineIndicator';
-import ComingSoon from './components/ComingSoon';
 import NotFound from './components/NotFound';
 import logo from './img/ShotSpot_logo.png';
 
@@ -29,11 +28,11 @@ const MyAchievements = React.lazy(() => import('./components/MyAchievements'));
 const CompetitionManagement = React.lazy(() => import('./components/CompetitionManagement'));
 const CompetitionBracketView = React.lazy(() => import('./components/CompetitionBracketView'));
 const CompetitionStandingsView = React.lazy(() => import('./components/CompetitionStandingsView'));
-const SeriesManagement = React.lazy(() => import('./components/SeriesManagement'));
 const AdvancedAnalytics = React.lazy(() => import('./components/AdvancedAnalytics'));
 const TeamAnalytics = React.lazy(() => import('./components/TeamAnalytics'));
 const ScheduledReports = React.lazy(() => import('./components/ScheduledReports'));
 const ReportTemplates = React.lazy(() => import('./components/ReportTemplates'));
+const SettingsPage = React.lazy(() => import('./components/SettingsPage'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
@@ -237,7 +236,7 @@ const App: React.FC = () => {
                 path="/series"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <RouteLoader><SeriesManagement /></RouteLoader>
+                    <Navigate to="/competitions" replace />
                   </ProtectedRoute>
                 }
               />
@@ -259,9 +258,13 @@ const App: React.FC = () => {
               />
               <Route
                 path="/export-settings"
+                element={<Navigate to="/settings" replace />}
+              />
+              <Route
+                path="/settings"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <ComingSoon title="Export Settings" />
+                    <RouteLoader><SettingsPage /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
