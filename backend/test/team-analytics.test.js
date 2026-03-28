@@ -6,6 +6,8 @@ import jwt from 'jsonwebtoken';
 describe('📊 Club Analytics API', () => {
   let authToken;
   let adminUser;
+  let currentSeason;
+  let previousSeason;
   let club1;
   let club2;
   let club3;
@@ -14,6 +16,7 @@ describe('📊 Club Analytics API', () => {
   let game1;
   let game2;
   let game3;
+  let game4;
   let player1;
 
   beforeAll(async () => {
@@ -29,6 +32,20 @@ describe('📊 Club Analytics API', () => {
       );
       adminUser = adminResult.rows[0];
       authToken = jwt.sign({ userId: adminUser.id, role: 'admin' }, process.env.JWT_SECRET);
+
+      const currentSeasonResult = await db.query(
+        `INSERT INTO seasons (name, start_date, end_date, is_active)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [`Current Season ${uniqueId}`, '2025-09-01', '2026-05-31', true]
+      );
+      currentSeason = currentSeasonResult.rows[0];
+
+      const previousSeasonResult = await db.query(
+        `INSERT INTO seasons (name, start_date, end_date, is_active)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [`Previous Season ${uniqueId}`, '2024-09-01', '2025-05-31', false]
+      );
+      previousSeason = previousSeasonResult.rows[0];
 
       // Create test clubs
       const club1Result = await db.query(
@@ -52,40 +69,50 @@ describe('📊 Club Analytics API', () => {
 
       // Create test teams
       const team1Result = await db.query(
-        'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
-        [`Analytics Team 1 ${uniqueId}`, club1.id]
+        'INSERT INTO teams (name, club_id, season_id) VALUES ($1, $2, $3) RETURNING *',
+        [`Analytics Team 1 ${uniqueId}`, club1.id, currentSeason.id]
       );
       _team1 = team1Result.rows[0];
 
       const team2Result = await db.query(
-        'INSERT INTO teams (name, club_id) VALUES ($1, $2) RETURNING *',
-        [`Analytics Team 2 ${uniqueId}`, club2.id]
+        'INSERT INTO teams (name, club_id, season_id) VALUES ($1, $2, $3) RETURNING *',
+        [`Analytics Team 2 ${uniqueId}`, club2.id, currentSeason.id]
       );
       _team2 = team2Result.rows[0];
 
       // Create test games
       const game1Result = await db.query(
-        'INSERT INTO games (home_club_id, away_club_id, home_score, away_score, date, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [club1.id, club2.id, 10, 8, new Date(), 'completed']
+        `INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, season_id, home_score, away_score, date, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [club1.id, club2.id, _team1.id, _team2.id, currentSeason.id, 10, 8, new Date('2026-02-10T12:00:00.000Z'), 'completed']
       );
       game1 = game1Result.rows[0];
 
       const game2Result = await db.query(
-        'INSERT INTO games (home_club_id, away_club_id, home_score, away_score, date, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [club2.id, club1.id, 12, 14, new Date(), 'completed']
+        `INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, season_id, home_score, away_score, date, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [club2.id, club1.id, _team2.id, _team1.id, currentSeason.id, 12, 14, new Date('2026-02-18T12:00:00.000Z'), 'completed']
       );
       game2 = game2Result.rows[0];
 
       const game3Result = await db.query(
-        'INSERT INTO games (home_club_id, away_club_id, home_score, away_score, date, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [club1.id, club3.id, 9, 9, new Date(), 'completed']
+        `INSERT INTO games (home_club_id, away_club_id, home_team_id, season_id, home_score, away_score, date, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [club1.id, club3.id, _team1.id, currentSeason.id, 9, 9, new Date('2026-03-01T12:00:00.000Z'), 'completed']
       );
       game3 = game3Result.rows[0];
 
+      const game4Result = await db.query(
+        `INSERT INTO games (home_club_id, away_club_id, season_id, home_score, away_score, date, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [club1.id, club2.id, previousSeason.id, 8, 11, new Date('2025-02-12T12:00:00.000Z'), 'completed']
+      );
+      game4 = game4Result.rows[0];
+
       // Create a test player first
       const player1Result = await db.query(
-        'INSERT INTO players (club_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4) RETURNING *',
-        [club1.id, 'Test', 'Player', 1]
+        'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [club1.id, _team1.id, 'Test', 'Player', 1]
       );
       player1 = player1Result.rows[0];
 
@@ -99,6 +126,31 @@ describe('📊 Club Analytics API', () => {
         `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance) 
          VALUES ($1, $2, $3, 55, 45, 'miss', 1, 6.0)`,
         [game1.id, player1.id, club1.id]
+      );
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance) 
+         VALUES ($1, $2, $3, 52, 41, 'goal', 2, 4.2)`,
+        [game2.id, player1.id, club1.id]
+      );
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance) 
+         VALUES ($1, $2, $3, 48, 43, 'goal', 3, 5.4)`,
+        [game3.id, player1.id, club1.id]
+      );
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance) 
+         VALUES ($1, $2, $3, 44, 47, 'miss', 4, 6.4)`,
+        [game3.id, player1.id, club1.id]
+      );
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance) 
+         VALUES ($1, $2, $3, 40, 49, 'goal', 2, 5.8)`,
+        [game4.id, player1.id, club1.id]
+      );
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance) 
+         VALUES ($1, $2, $3, 38, 51, 'miss', 3, 6.8)`,
+        [game4.id, player1.id, club1.id]
       );
 
       // Debug logs to verify test data creation
@@ -119,9 +171,11 @@ describe('📊 Club Analytics API', () => {
     try {
       await db.query('DELETE FROM team_rankings WHERE team_id IN ($1, $2, $3)', [club1.id, club2.id, club3.id]);
       await db.query('DELETE FROM head_to_head WHERE team1_id = $1 OR team2_id = $1 OR team1_id = $2 OR team2_id = $2', [club1.id, club2.id]);
-      await db.query('DELETE FROM shots WHERE game_id IN ($1, $2, $3)', [game1.id, game2.id, game3.id]);
-      await db.query('DELETE FROM games WHERE id IN ($1, $2, $3)', [game1.id, game2.id, game3.id]);
+      await db.query('DELETE FROM shots WHERE game_id IN ($1, $2, $3, $4)', [game1.id, game2.id, game3.id, game4.id]);
+      await db.query('DELETE FROM games WHERE id IN ($1, $2, $3, $4)', [game1.id, game2.id, game3.id, game4.id]);
+      await db.query('DELETE FROM teams WHERE id IN ($1, $2)', [_team1.id, _team2.id]);
       await db.query('DELETE FROM players WHERE id = $1', [player1.id]);
+      await db.query('DELETE FROM seasons WHERE id IN ($1, $2)', [currentSeason.id, previousSeason.id]);
       await db.query('DELETE FROM clubs WHERE id IN ($1, $2, $3)', [club1.id, club2.id, club3.id]);
       await db.query('DELETE FROM users WHERE id = $1', [adminUser.id]);
     } catch (error) {
@@ -143,9 +197,9 @@ describe('📊 Club Analytics API', () => {
         expect(response.body).toHaveProperty('draws');
         expect(response.body).toHaveProperty('recent_games');
         
-        expect(response.body.total_games).toBe(2);
+        expect(response.body.total_games).toBe(3);
         expect(response.body.draws).toBe(0);
-        expect(response.body.team1.wins + response.body.team2.wins + response.body.draws).toBe(2);
+        expect(response.body.team1.wins + response.body.team2.wins + response.body.draws).toBe(3);
       } catch (error) {
         global.testContext.logTestError(error, 'GET head-to-head failed');
         throw error;
@@ -414,6 +468,68 @@ describe('📊 Club Analytics API', () => {
         global.testContext.logTestError(error, 'GET compare 404 failed');
         throw error;
       }
+    });
+  });
+
+  describe('📋 TEAM DASHBOARD /api/team-analytics/:teamId/*', () => {
+    it('✅ should return a season overview with leaderboard and previous-season comparison', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/${_team1.id}/season-overview?season_id=${currentSeason.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('team');
+      expect(response.body).toHaveProperty('season');
+      expect(response.body).toHaveProperty('record');
+      expect(response.body).toHaveProperty('scoring');
+      expect(response.body).toHaveProperty('top_scorers');
+      expect(response.body).toHaveProperty('period_breakdown');
+      expect(response.body.team.id).toBe(_team1.id);
+      expect(response.body.record.games_played).toBe(3);
+      expect(response.body.top_scorers[0].player_id).toBe(player1.id);
+      expect(response.body.previous_season_comparison).not.toBeNull();
+    });
+
+    it('✅ should return momentum trend data for charting', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/${_team1.id}/momentum?season_id=${currentSeason.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body.trend)).toBe(true);
+      expect(response.body.trend).toHaveLength(3);
+      expect(response.body.summary.current_streak).toBe('D1');
+      expect(response.body.trend[0]).toHaveProperty('momentum_score');
+      expect(response.body.trend[0]).toHaveProperty('rolling_fg_percentage');
+    });
+
+    it('✅ should return strengths and weaknesses benchmark analysis', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/${_team1.id}/strengths-weaknesses?season_id=${currentSeason.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('benchmarks');
+      expect(Array.isArray(response.body.strengths)).toBe(true);
+      expect(Array.isArray(response.body.weaknesses)).toBe(true);
+      expect(response.body.strengths.length).toBeGreaterThan(0);
+      expect(response.body.weaknesses.length).toBeGreaterThan(0);
+      expect(response.body.benchmarks).toHaveProperty('fg_percentage');
+    });
+
+    it('❌ should require authentication for dashboard endpoints', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/${_team1.id}/season-overview?season_id=${currentSeason.id}`);
+
+      expect(response.status).toBe(401);
+    });
+
+    it('❌ should return 404 for unknown teams on dashboard endpoints', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/99999/season-overview?season_id=${currentSeason.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(404);
     });
   });
 });
