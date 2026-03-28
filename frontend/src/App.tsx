@@ -28,7 +28,6 @@ const MyAchievements = React.lazy(() => import('./components/MyAchievements'));
 const CompetitionManagement = React.lazy(() => import('./components/CompetitionManagement'));
 const CompetitionBracketView = React.lazy(() => import('./components/CompetitionBracketView'));
 const CompetitionStandingsView = React.lazy(() => import('./components/CompetitionStandingsView'));
-const SeriesManagement = React.lazy(() => import('./components/SeriesManagement'));
 const AdvancedAnalytics = React.lazy(() => import('./components/AdvancedAnalytics'));
 const TeamAnalytics = React.lazy(() => import('./components/TeamAnalytics'));
 const ScheduledReports = React.lazy(() => import('./components/ScheduledReports'));
