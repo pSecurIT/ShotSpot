@@ -8,6 +8,7 @@ import 'fake-indexeddb/auto';
 (global as typeof globalThis).IntersectionObserver = class IntersectionObserver {
   root = null;
   rootMargin = '';
+  scrollMargin = '';
   thresholds = [];
   
   constructor() {}

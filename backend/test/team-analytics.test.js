@@ -531,6 +531,58 @@ describe('📊 Club Analytics API', () => {
 
       expect(response.status).toBe(404);
     });
+
+    it('✅ should default to the active season for season-overview', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/${_team1.id}/season-overview`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.season.id).toBe(currentSeason.id);
+      expect(['team', 'club_fallback']).toContain(response.body.scope_mode);
+    });
+
+    it('✅ should default to the active season for momentum', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/${_team1.id}/momentum`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.season.id).toBe(currentSeason.id);
+      expect(response.body.summary).toHaveProperty('last_five_record');
+      expect(response.body.summary).toHaveProperty('average_momentum');
+    });
+
+    it('✅ should include shaped insight fields for strengths and weaknesses', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/${_team1.id}/strengths-weaknesses?season_id=${currentSeason.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+
+      const insight = response.body.strengths[0] || response.body.weaknesses[0];
+      expect(insight).toHaveProperty('title');
+      expect(insight).toHaveProperty('description');
+      expect(insight).toHaveProperty('metric');
+      expect(insight).toHaveProperty('value');
+      expect(insight).toHaveProperty('benchmark');
+      expect(insight).toHaveProperty('delta');
+    });
+
+    it('❌ should require authentication for momentum endpoint', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/${_team1.id}/momentum?season_id=${currentSeason.id}`);
+
+      expect(response.status).toBe(401);
+    });
+
+    it('❌ should return 404 for unknown teams on momentum endpoint', async () => {
+      const response = await request(app)
+        .get(`/api/team-analytics/99999/momentum?season_id=${currentSeason.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(404);
+    });
   });
 });
 
