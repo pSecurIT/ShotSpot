@@ -75,12 +75,14 @@ describe('📊 Series Routes', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             name: 'Eerste Klasse',
-            level: 1
+            level: 1,
+            region: 'National'
           });
 
         expect(response.status).toBe(201);
         expect(response.body.name).toBe('Eerste Klasse');
         expect(response.body.level).toBe(1);
+        expect(response.body.region).toBe('National');
         expect(response.body.id).toBeDefined();
         
         testSeries1 = response.body;
@@ -253,6 +255,23 @@ describe('📊 Series Routes', () => {
         expect(response.body.name).toBe('Eerste Klasse A'); // Unchanged from previous update
       } catch (error) {
         global.testContext.logTestError(error, 'PUT update level failed');
+        throw error;
+      }
+    });
+
+    it('✅ should update series region', async () => {
+      try {
+        const response = await request(app)
+          .put(`/api/series/${testSeries1.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            region: 'Flanders'
+          });
+
+        expect(response.status).toBe(200);
+        expect(response.body.region).toBe('Flanders');
+      } catch (error) {
+        global.testContext.logTestError(error, 'PUT update region failed');
         throw error;
       }
     });

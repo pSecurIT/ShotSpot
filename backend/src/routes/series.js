@@ -105,7 +105,11 @@ router.post('/', [
     .notEmpty().withMessage('Series name is required')
     .isLength({ max: 255 }).withMessage('Series name must be 255 characters or less'),
   body('level')
-    .isInt({ min: 1 }).withMessage('Level must be a positive integer')
+    .isInt({ min: 1 }).withMessage('Level must be a positive integer'),
+  body('region')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 100 }).withMessage('Region must be 100 characters or less')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -113,6 +117,7 @@ router.post('/', [
   }
 
   const { name, level } = req.body;
+  const region = req.body.region ?? null;
 
   try {
     // Check if level already exists
@@ -122,8 +127,8 @@ router.post('/', [
     }
 
     const result = await db.query(
-      'INSERT INTO series (name, level) VALUES ($1, $2) RETURNING *',
-      [name, level]
+      'INSERT INTO series (name, level, region) VALUES ($1, $2, $3) RETURNING *',
+      [name, level, region]
     );
 
     res.status(201).json(result.rows[0]);
@@ -151,7 +156,11 @@ router.put('/:id', [
     .isLength({ max: 255 }).withMessage('Series name must be 255 characters or less'),
   body('level')
     .optional()
-    .isInt({ min: 1 }).withMessage('Level must be a positive integer')
+    .isInt({ min: 1 }).withMessage('Level must be a positive integer'),
+  body('region')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 100 }).withMessage('Region must be 100 characters or less')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -160,6 +169,8 @@ router.put('/:id', [
 
   const { id } = req.params;
   const { name, level } = req.body;
+  const hasRegion = Object.prototype.hasOwnProperty.call(req.body, 'region');
+  const region = hasRegion ? (req.body.region ?? null) : undefined;
 
   try {
     // Check if series exists
@@ -190,6 +201,12 @@ router.put('/:id', [
     if (level !== undefined) {
       updates.push(`level = $${paramIndex}`);
       values.push(level);
+      paramIndex++;
+    }
+
+    if (region !== undefined) {
+      updates.push(`region = $${paramIndex}`);
+      values.push(region);
       paramIndex++;
     }
 
