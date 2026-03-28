@@ -30,6 +30,7 @@ const CompetitionManagement = React.lazy(() => import('./components/CompetitionM
 const CompetitionBracketView = React.lazy(() => import('./components/CompetitionBracketView'));
 const CompetitionStandingsView = React.lazy(() => import('./components/CompetitionStandingsView'));
 const AdvancedAnalytics = React.lazy(() => import('./components/AdvancedAnalytics'));
+const TeamAnalytics = React.lazy(() => import('./components/TeamAnalytics'));
 const ScheduledReports = React.lazy(() => import('./components/ScheduledReports'));
 const ReportTemplates = React.lazy(() => import('./components/ReportTemplates'));
 
@@ -195,7 +196,7 @@ const App: React.FC = () => {
                 path="/team-analytics"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <ComingSoon title="Team Analytics" />
+                    <RouteLoader><TeamAnalytics /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
