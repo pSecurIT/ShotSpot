@@ -142,12 +142,10 @@ export const navigationConfig: NavigationItem[] = [
         roles: ['coach', 'admin']
       },
       {
-        label: 'Export Settings',
-        path: '/export-settings',
+        label: 'Settings',
+        path: '/settings',
         icon: '⚙️',
-        roles: ['coach', 'admin'],
-        badge: 'Soon',
-        disabled: true
+        roles: ['coach', 'admin']
       },
       {
         label: 'settings-divider',
