@@ -112,9 +112,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Series/Divisions',
         path: '/series',
         icon: '🗓️',
-        roles: ['coach', 'admin'],
-        badge: 'Soon',
-        disabled: true
+        roles: ['coach', 'admin']
       }
     ]
   },
