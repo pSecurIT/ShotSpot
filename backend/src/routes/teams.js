@@ -54,16 +54,16 @@ router.post('/', [
     .isLength({ min: 2, max: 100 })
     .withMessage('Team name must be between 2 and 100 characters'),
   body('age_group')
-    .optional()
+    .optional({ values: 'null' })
     .trim()
     .isLength({ max: 20 })
     .withMessage('Age group must be 20 characters or less'),
   body('gender')
-    .optional()
+    .optional({ values: 'null' })
     .isIn(['male', 'female', 'mixed'])
     .withMessage('Gender must be male, female, or mixed'),
   body('season_id')
-    .optional()
+    .optional({ values: 'null' })
     .isInt({ min: 1 })
     .withMessage('Season ID must be a positive integer')
 ], async (req, res) => {
@@ -146,6 +146,10 @@ router.get('/:id/players', async (req, res) => {
 // Update a team (age group)
 router.put('/:id', [
   requireRole(['admin', 'coach']),
+  body('club_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Valid club ID is required'),
   body('name')
     .trim()
     .notEmpty()
@@ -153,12 +157,12 @@ router.put('/:id', [
     .isLength({ min: 2, max: 100 })
     .withMessage('Team name must be between 2 and 100 characters'),
   body('age_group')
-    .optional()
+    .optional({ values: 'null' })
     .trim()
     .isLength({ max: 20 })
     .withMessage('Age group must be 20 characters or less'),
   body('gender')
-    .optional()
+    .optional({ values: 'null' })
     .isIn(['male', 'female', 'mixed'])
     .withMessage('Gender must be male, female, or mixed'),
   body('is_active')
@@ -166,7 +170,7 @@ router.put('/:id', [
     .isBoolean()
     .withMessage('is_active must be a boolean'),
   body('season_id')
-    .optional()
+    .optional({ values: 'null' })
     .isInt({ min: 1 })
     .withMessage('Season ID must be a positive integer')
 ], async (req, res) => {
@@ -177,7 +181,7 @@ router.put('/:id', [
   }
 
   const { id } = req.params;
-  const { name, age_group, gender, is_active, season_id } = req.body;
+  const { name, age_group, gender, is_active, season_id, club_id } = req.body;
   try {
     // Load team to confirm existence and get club for trainer access
     const teamCheck = await db.query('SELECT id, club_id FROM teams WHERE id = $1', [id]);
@@ -185,8 +189,22 @@ router.put('/:id', [
       return res.status(404).json({ error: 'Team not found' });
     }
 
+    const currentClubId = Number(teamCheck.rows[0].club_id);
+    const requestedClubId = club_id ? Number(club_id) : currentClubId;
+
+    if (club_id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can change team club assignments' });
+    }
+
+    if (club_id) {
+      const clubCheck = await db.query('SELECT id FROM clubs WHERE id = $1', [requestedClubId]);
+      if (clubCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Club not found' });
+      }
+    }
+
     if (req.user.role === 'coach') {
-      const allowed = await hasTrainerAccess(req.user.userId, { clubId: Number(teamCheck.rows[0].club_id) });
+      const allowed = await hasTrainerAccess(req.user.userId, { clubId: currentClubId });
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this club' });
       }
@@ -194,11 +212,11 @@ router.put('/:id', [
 
     const result = await db.query(
       `UPDATE teams 
-       SET name = $1, age_group = $2, gender = $3, is_active = COALESCE($4, is_active), 
-           season_id = $5, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $6 
+       SET name = $1, age_group = $2, gender = $3, club_id = $4,
+           is_active = COALESCE($5, is_active), season_id = $6, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $7 
        RETURNING *`,
-      [name, age_group || null, gender || null, is_active, season_id || null, id]
+      [name, age_group || null, gender || null, requestedClubId, is_active, season_id || null, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Team not found' });

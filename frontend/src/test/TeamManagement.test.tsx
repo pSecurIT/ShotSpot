@@ -14,6 +14,11 @@ vi.mock('../utils/api', () => ({
   }
 }));
 
+const mockUseAuth = vi.fn();
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 describe('TeamManagement', () => {
   const apiGetMock = api.get as unknown as Mock;
   const apiPostMock = api.post as unknown as Mock;
@@ -34,6 +39,7 @@ describe('TeamManagement', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: { id: 99, role: 'admin' } });
 
     // Mock successful API responses
     apiGetMock.mockImplementation((url: string) => {
@@ -42,7 +48,7 @@ describe('TeamManagement', () => {
       return Promise.resolve({ data: [] });
     });
     apiPostMock.mockResolvedValue({ data: { id: 3, name: 'New Team', club_id: 1, club_name: 'Alpha Club', age_group: null, gender: null, is_active: true } });
-    apiPutMock.mockResolvedValue({ data: { id: 1, name: 'Team Apex', age_group: 'U19', gender: 'female', is_active: true } });
+    apiPutMock.mockResolvedValue({ data: { id: 1, club_id: 1, name: 'Team Apex', age_group: 'U19', gender: 'female', is_active: true } });
     apiDeleteMock.mockResolvedValue({});
   });
 
@@ -71,10 +77,10 @@ describe('TeamManagement', () => {
     expect(screen.getByText('Team Management')).toBeInTheDocument();
     const createTeamForm = getCreateTeamForm();
     const teamsSection = getTeamsSection();
-    expect(createTeamForm.getByLabelText('Team name')).toBeInTheDocument();
+    expect(createTeamForm.getByLabelText(/team name/i)).toBeInTheDocument();
     expect(createTeamForm.getByRole('button', { name: /^add team$/i })).toBeInTheDocument();
-    expect(createTeamForm.getByLabelText('Club')).toBeInTheDocument();
-    expect(teamsSection.getByLabelText('Club')).toBeInTheDocument();
+    expect(createTeamForm.getByLabelText(/club/i)).toBeInTheDocument();
+    expect(teamsSection.getByLabelText(/club/i)).toBeInTheDocument();
     expect(teamsSection.getByLabelText('Team')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /^add team$/i })).toHaveLength(1);
 
@@ -102,7 +108,7 @@ describe('TeamManagement', () => {
     await screen.findByText('Team Alpha', { selector: 'span.player-name' });
 
     const teamsSection = getTeamsSection();
-    const clubFilter = teamsSection.getByLabelText('Club');
+    const clubFilter = teamsSection.getByLabelText(/club/i);
     await user.selectOptions(clubFilter, '2');
 
     await waitFor(() => {
@@ -125,7 +131,7 @@ describe('TeamManagement', () => {
 
     const teamsSection = getTeamsSection();
     const teamFilter = teamsSection.getByLabelText('Team') as HTMLSelectElement;
-    const clubFilter = teamsSection.getByLabelText('Club');
+    const clubFilter = teamsSection.getByLabelText(/club/i);
 
     await user.selectOptions(teamFilter, '1');
     expect(teamFilter).toHaveValue('1');
@@ -146,7 +152,7 @@ describe('TeamManagement', () => {
 
     const teamsSection = getTeamsSection();
     const user = userEvent.setup();
-    await user.selectOptions(teamsSection.getByLabelText('Club'), '3');
+    await user.selectOptions(teamsSection.getByLabelText(/club/i), '3');
 
     await waitFor(() => {
       expect(screen.getByText('No teams found.')).toBeInTheDocument();
@@ -159,7 +165,7 @@ describe('TeamManagement', () => {
     render(<TeamManagement />);
 
     const createTeamForm = getCreateTeamForm();
-    const input = createTeamForm.getByLabelText('Team name');
+    const input = createTeamForm.getByLabelText(/team name/i);
     const ageGroupInput = createTeamForm.getByLabelText('Age group');
     const genderSelect = createTeamForm.getByLabelText('Gender');
     const submitButton = createTeamForm.getByRole('button', { name: /^add team$/i });
@@ -185,11 +191,11 @@ describe('TeamManagement', () => {
 
     const createTeamForm = getCreateTeamForm();
     await waitFor(() => {
-      expect(createTeamForm.getByLabelText('Club')).toHaveValue('1');
+      expect(createTeamForm.getByLabelText(/club/i)).toHaveValue('1');
     });
 
-    await user.selectOptions(createTeamForm.getByLabelText('Club'), '2');
-    await user.type(createTeamForm.getByLabelText('Team name'), 'Beta Juniors');
+    await user.selectOptions(createTeamForm.getByLabelText(/club/i), '2');
+    await user.type(createTeamForm.getByLabelText(/team name/i), 'Beta Juniors');
     await user.click(createTeamForm.getByRole('button', { name: /^add team$/i }));
 
     await waitFor(() => {
@@ -212,10 +218,12 @@ describe('TeamManagement', () => {
     if (!editForm) throw new Error('Edit Team form container not found');
     const scopedEditForm = within(editForm as HTMLElement);
 
-    const nameInput = scopedEditForm.getByLabelText('Team name');
+    const clubSelect = scopedEditForm.getByLabelText(/club/i);
+    const nameInput = scopedEditForm.getByLabelText(/team name/i);
     const ageGroupInput = scopedEditForm.getByLabelText('Age group');
     const genderSelect = scopedEditForm.getByLabelText('Gender');
 
+    await user.selectOptions(clubSelect, '2');
     await user.clear(nameInput);
     await user.type(nameInput, 'Team Apex');
     await user.clear(ageGroupInput);
@@ -225,6 +233,7 @@ describe('TeamManagement', () => {
 
     await waitFor(() => {
       expect(api.put).toHaveBeenCalledWith('/teams/1', {
+        club_id: 2,
         name: 'Team Apex',
         age_group: 'U19',
         gender: 'female',
@@ -232,6 +241,53 @@ describe('TeamManagement', () => {
       });
       expect(screen.getByText('Team updated successfully!')).toBeInTheDocument();
       expect(screen.getByText('Team Apex', { selector: 'span.player-name' })).toBeInTheDocument();
+      expect(screen.getByText('Beta Club', { selector: 'span.player-team' })).toBeInTheDocument();
+    });
+  });
+
+  it('shows club selection in edit mode for admins', async () => {
+    const user = userEvent.setup();
+    render(<TeamManagement />);
+
+    await user.click(await screen.findByText('Team Alpha', { selector: 'span.player-name' }));
+    const editForm = screen.getByRole('heading', { name: /edit team/i }).closest('.editing-section');
+    if (!editForm) throw new Error('Edit Team form container not found');
+    expect(within(editForm as HTMLElement).getByLabelText(/club/i)).toBeInTheDocument();
+  });
+
+  it('hides club selection in edit mode for non-admin users', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 1, role: 'coach' } });
+    const user = userEvent.setup();
+    render(<TeamManagement />);
+
+    await user.click(await screen.findByText('Team Alpha', { selector: 'span.player-name' }));
+    const editForm = screen.getByRole('heading', { name: /edit team/i }).closest('.editing-section');
+    if (!editForm) throw new Error('Edit Team form container not found');
+    expect(within(editForm as HTMLElement).queryByLabelText(/club/i)).not.toBeInTheDocument();
+  });
+
+  it('does not include club_id in update payload for non-admin users', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 1, role: 'coach' } });
+    const user = userEvent.setup();
+    render(<TeamManagement />);
+
+    await user.click(await screen.findByText('Team Alpha', { selector: 'span.player-name' }));
+
+    const editForm = screen.getByRole('heading', { name: /edit team/i }).closest('.editing-section');
+    if (!editForm) throw new Error('Edit Team form container not found');
+    const scopedEditForm = within(editForm as HTMLElement);
+
+    await user.clear(scopedEditForm.getByLabelText(/team name/i));
+    await user.type(scopedEditForm.getByLabelText(/team name/i), 'Coach Updated Team');
+    await user.click(scopedEditForm.getByRole('button', { name: /update team/i }));
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalledWith('/teams/1', {
+        name: 'Coach Updated Team',
+        age_group: 'U17',
+        gender: 'mixed',
+        is_active: true,
+      });
     });
   });
 
@@ -320,7 +376,7 @@ describe('TeamManagement', () => {
     render(<TeamManagement />);
 
     const createTeamForm = getCreateTeamForm();
-    const input = createTeamForm.getByLabelText('Team name');
+    const input = createTeamForm.getByLabelText(/team name/i);
     const submitButton = createTeamForm.getByRole('button', { name: /^add team$/i });
 
     await user.type(input, 'New Team');
@@ -345,7 +401,7 @@ describe('TeamManagement', () => {
     await waitFor(() => {
       expect(screen.getByText('Create a club first to add teams.')).toBeInTheDocument();
       expect(createTeamForm.getByRole('button', { name: /^add team$/i })).toBeDisabled();
-      expect(createTeamForm.getByLabelText('Club')).toBeDisabled();
+      expect(createTeamForm.getByLabelText(/club/i)).toBeDisabled();
     });
   });
 
@@ -359,5 +415,79 @@ describe('TeamManagement', () => {
 
     // Post should not be called if input is empty
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('rejects whitespace-only team names on create', async () => {
+    const user = userEvent.setup();
+    render(<TeamManagement />);
+
+    const createTeamForm = getCreateTeamForm();
+    const input = createTeamForm.getByLabelText(/team name/i);
+    const submitButton = createTeamForm.getByRole('button', { name: /^add team$/i });
+
+    await user.type(input, '   ');
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Team name is required')).toBeInTheDocument();
+      expect(api.post).not.toHaveBeenCalled();
+    });
+  });
+
+  it('rejects whitespace-only team names on update', async () => {
+    const user = userEvent.setup();
+    render(<TeamManagement />);
+
+    await user.click(await screen.findByText('Team Alpha', { selector: 'span.player-name' }));
+
+    const editForm = screen.getByRole('heading', { name: /edit team/i }).closest('.editing-section');
+    if (!editForm) throw new Error('Edit Team form container not found');
+    const scopedEditForm = within(editForm as HTMLElement);
+
+    const nameInput = scopedEditForm.getByLabelText(/team name/i);
+    await user.clear(nameInput);
+    await user.type(nameInput, '   ');
+    await user.click(scopedEditForm.getByRole('button', { name: /update team/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Team name is required')).toBeInTheDocument();
+      expect(api.put).not.toHaveBeenCalled();
+    });
+  });
+
+  it('normalizes legacy invalid optional values on update so transfer still works', async () => {
+    const user = userEvent.setup();
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/teams') {
+        return Promise.resolve({
+          data: [
+            { id: 1, name: 'Legacy Team', club_id: 1, club_name: 'Alpha Club', age_group: 'VeryLongLegacyAgeGroupNameExceedingLimit', gender: 'boys', is_active: true },
+          ],
+        });
+      }
+      if (url === '/clubs') return Promise.resolve({ data: mockClubs });
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<TeamManagement />);
+
+    await user.click(await screen.findByText('Legacy Team', { selector: 'span.player-name' }));
+
+    const editForm = screen.getByRole('heading', { name: /edit team/i }).closest('.editing-section');
+    if (!editForm) throw new Error('Edit Team form container not found');
+    const scopedEditForm = within(editForm as HTMLElement);
+
+    await user.selectOptions(scopedEditForm.getByLabelText(/club/i), '2');
+    await user.click(scopedEditForm.getByRole('button', { name: /update team/i }));
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalledWith('/teams/1', {
+        club_id: 2,
+        name: 'Legacy Team',
+        age_group: null,
+        gender: null,
+        is_active: true,
+      });
+    });
   });
 });
