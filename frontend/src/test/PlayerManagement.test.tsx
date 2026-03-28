@@ -13,6 +13,11 @@ vi.mock('../utils/api', () => ({
   }
 }));
 
+const mockUseAuth = vi.fn();
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 describe('PlayerManagement', () => {
   const apiGetMock = api.get as unknown as Mock;
   const apiPostMock = api.post as unknown as Mock;
@@ -35,6 +40,7 @@ describe('PlayerManagement', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: { id: 1, role: 'coach' } });
     
     // Mock successful API responses
     apiGetMock.mockImplementation((url: string) => {
@@ -70,6 +76,41 @@ describe('PlayerManagement', () => {
         jersey_number: 10,
         is_active: true
       }
+    });
+  });
+
+  it('shows club filter for admins and hides it for coaches', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 99, role: 'admin' } });
+    const { rerender } = render(<PlayerManagement />);
+
+    await waitFor(() => {
+      expect(document.getElementById('club_filter')).toBeInTheDocument();
+    });
+
+    mockUseAuth.mockReturnValue({ user: { id: 1, role: 'coach' } });
+    rerender(<PlayerManagement />);
+
+    await waitFor(() => {
+      expect(document.getElementById('club_filter')).not.toBeInTheDocument();
+    });
+  });
+
+  it('requires club selection for admins by filtering players to selected club', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 99, role: 'admin' } });
+    render(<PlayerManagement />);
+
+    await waitFor(() => {
+      // First club is selected by default for admins.
+      expect(screen.getByText(/John Doe/)).toBeInTheDocument();
+      expect(screen.queryByText(/Jane Smith/)).not.toBeInTheDocument();
+    });
+
+    const clubFilter = document.getElementById('club_filter') as HTMLSelectElement;
+    await userEvent.selectOptions(clubFilter, '2');
+
+    await waitFor(() => {
+      expect(screen.queryByText(/John Doe/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Jane Smith/)).toBeInTheDocument();
     });
   });
 
