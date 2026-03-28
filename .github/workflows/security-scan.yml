@@ -48,7 +48,7 @@ jobs:
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
           # Keep category compatible with historical baseline config from docker.yml
@@ -57,7 +57,7 @@ jobs:
 
       - name: Upload Trivy results with legacy container category
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
           # Backward-compatible category retained for old code-scanning baselines.
@@ -99,7 +99,7 @@ jobs:
 
       - name: Upload Trivy filesystem results
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: ${{ hashFiles('trivy-fs-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-fs-results.sarif'
           category: 'trivy-filesystem-scan'
