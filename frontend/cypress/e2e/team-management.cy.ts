@@ -5,6 +5,13 @@ const COACH_USER = {
   role: 'coach',
 };
 
+const ADMIN_USER = {
+  id: 1,
+  username: 'cypadmin',
+  email: 'cypadmin@example.com',
+  role: 'admin',
+};
+
 const clubs = [
   { id: 1, name: 'Alpha Club' },
   { id: 2, name: 'Beta Club' },
@@ -28,12 +35,12 @@ const interceptTeamsPage = (teamBody = teams, clubBody = clubs) => {
   cy.intercept('GET', '/api/clubs*', { statusCode: 200, body: clubBody }).as('getClubs');
 };
 
-const visitTeams = () => {
+const visitTeams = (user = COACH_USER) => {
   interceptTeamsPage();
   cy.visit('/teams', {
     onBeforeLoad: (win) => {
       win.localStorage.setItem('token', 'cypress-token');
-      win.localStorage.setItem('user', JSON.stringify(COACH_USER));
+      win.localStorage.setItem('user', JSON.stringify(user));
     },
   });
   cy.wait('@getClubs');
@@ -114,6 +121,16 @@ describe('Team Management: Create, edit, and export', () => {
     cy.contains('.team-card', 'Beta Juniors').should('be.visible');
   });
 
+  it('rejects whitespace-only team names on create', () => {
+    cy.intercept('POST', '/api/teams').as('createAttempt');
+
+    cy.get('#new-team-name').type('   ');
+    cy.contains('button', /^Add Team$/).click();
+
+    cy.contains('Team name is required').should('be.visible');
+    cy.get('@createAttempt.all').should('have.length', 0);
+  });
+
   it('edits a team after clicking its card', () => {
     cy.intercept('PUT', '/api/teams/1', {
       statusCode: 200,
@@ -136,6 +153,55 @@ describe('Team Management: Create, edit, and export', () => {
 
     cy.contains('Team updated successfully!').should('be.visible');
     cy.contains('.team-card', 'Team Apex').should('be.visible');
+  });
+
+  it('allows admins to move a team to another club from edit form', () => {
+    visitTeams(ADMIN_USER);
+
+    cy.intercept('PUT', '/api/teams/1', {
+      statusCode: 200,
+      body: { id: 1, club_id: 2, name: 'Team Alpha', age_group: 'U17', gender: 'mixed', is_active: true },
+    }).as('updateTeamClub');
+
+    cy.contains('.team-card', 'Team Alpha').click();
+    cy.get('#edit-team-club').should('be.visible').select('2');
+    cy.contains('button', 'Update Team').click();
+
+    cy.wait('@updateTeamClub').its('request.body').should('deep.equal', {
+      club_id: 2,
+      name: 'Team Alpha',
+      age_group: 'U17',
+      gender: 'mixed',
+      is_active: true,
+    });
+
+    cy.contains('Team updated successfully!').should('be.visible');
+    cy.contains('.team-card', 'Team Alpha').within(() => {
+      cy.contains('Beta Club').should('be.visible');
+    });
+  });
+
+  it('does not show club selector for coaches when editing', () => {
+    cy.contains('.team-card', 'Team Alpha').click();
+    cy.get('#edit-team-club').should('not.exist');
+  });
+
+  it('sends update payload without club_id for coaches', () => {
+    cy.intercept('PUT', '/api/teams/1', {
+      statusCode: 200,
+      body: { id: 1, club_id: 1, name: 'Coach Team', age_group: 'U17', gender: 'mixed', is_active: true },
+    }).as('coachUpdateTeam');
+
+    cy.contains('.team-card', 'Team Alpha').click();
+    cy.get('#edit-team-name').clear().type('Coach Team');
+    cy.contains('button', 'Update Team').click();
+
+    cy.wait('@coachUpdateTeam').its('request.body').should('deep.equal', {
+      name: 'Coach Team',
+      age_group: 'U17',
+      gender: 'mixed',
+      is_active: true,
+    });
   });
 
   it('opens the export dialog for a team', () => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Team {
   id: number;
@@ -18,6 +19,8 @@ interface Club {
 }
 
 const TeamManagement: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [teams, setTeams] = useState<Team[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null);
@@ -83,13 +86,20 @@ const TeamManagement: React.FC = () => {
       setError('Please select a club first');
       return;
     }
+
+    const trimmedTeamName = newTeamName.trim();
+    if (!trimmedTeamName) {
+      setError('Team name is required');
+      return;
+    }
+
     try {
       setError(null);
       setSuccess(null);
       const selectedClub = clubs.find((club) => club.id === selectedClubId);
       const response = await api.post('/teams', {
         club_id: selectedClubId,
-        name: newTeamName,
+        name: trimmedTeamName,
         age_group: newTeamAgeGroup || null,
         gender: newTeamGender || null,
       });
@@ -115,17 +125,50 @@ const TeamManagement: React.FC = () => {
     e.preventDefault();
     if (!editingTeam) return;
 
+    const trimmedTeamName = editingTeam.name.trim();
+    if (!trimmedTeamName) {
+      setError('Team name is required');
+      return;
+    }
+
+    if (isAdmin && !editingTeam.club_id) {
+      setError('Please select a club first');
+      return;
+    }
+
     try {
       setError(null);
       setSuccess(null);
-      const response = await api.put(`/teams/${editingTeam.id}`, {
-        name: editingTeam.name,
-        age_group: editingTeam.age_group || null,
-        gender: editingTeam.gender || null,
+      const normalizedGender = editingTeam.gender === 'male' || editingTeam.gender === 'female' || editingTeam.gender === 'mixed'
+        ? editingTeam.gender
+        : null;
+      const normalizedAgeGroup = typeof editingTeam.age_group === 'string' && editingTeam.age_group.length <= 20
+        ? editingTeam.age_group
+        : null;
+
+      const updatePayload: {
+        name: string;
+        age_group: string | null;
+        gender: Team['gender'];
+        is_active: boolean;
+        club_id?: number;
+      } = {
+        name: trimmedTeamName,
+        age_group: normalizedAgeGroup,
+        gender: normalizedGender,
         is_active: editingTeam.is_active ?? true,
+      };
+
+      if (isAdmin && editingTeam.club_id) {
+        updatePayload.club_id = editingTeam.club_id;
+      }
+
+      const response = await api.put(`/teams/${editingTeam.id}`, {
+        ...updatePayload,
       });
       const updatedTeam = response.data;
-      setTeams((current) => current.map((team) => (team.id === editingTeam.id ? { ...team, ...updatedTeam, club_name: editingTeam.club_name } : team)));
+      const updatedClubName = clubs.find((club) => club.id === (updatedTeam.club_id ?? editingTeam.club_id))?.name || editingTeam.club_name;
+      setTeams((current) => current.map((team) => (team.id === editingTeam.id ? { ...team, ...updatedTeam, club_name: updatedClubName } : team)));
       setEditingTeam(null);
       setSuccess('Team updated successfully!');
     } catch (error) {
@@ -197,6 +240,146 @@ const TeamManagement: React.FC = () => {
       {success && (
         <div className="success-message" style={{ marginBottom: '1rem' }}>
           {success}
+        </div>
+      )}
+
+      <div className="create-game-form create-team-form">
+        <h3>Create Team</h3>
+        <form onSubmit={handleAddTeam}>
+          <div className="form-field">
+            <label htmlFor="new-team-club">Club <span aria-hidden="true">*</span></label>
+            <select
+              id="new-team-club"
+              value={selectedClubId ?? ''}
+              onChange={(e) => setSelectedClubId(Number(e.target.value))}
+              required
+              disabled={clubs.length === 0}
+            >
+              {clubs.length === 0 ? (
+                <option value="">No clubs available</option>
+              ) : (
+                clubs.map((club) => (
+                  <option key={club.id} value={club.id}>
+                    {club.name}
+                  </option>
+                ))
+              )}
+            </select>
+            {clubs.length === 0 && (
+              <div className="empty-state">Create a club first to add teams.</div>
+            )}
+          </div>
+
+          <div className="form-field">
+            <label htmlFor="new-team-name">Team name <span aria-hidden="true">*</span></label>
+            <input
+              id="new-team-name"
+              type="text"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              placeholder="Enter team name"
+              required
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="new-team-age-group">Age group</label>
+              <input
+                id="new-team-age-group"
+                type="text"
+                value={newTeamAgeGroup}
+                onChange={(e) => setNewTeamAgeGroup(e.target.value)}
+                placeholder="e.g. U17"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="new-team-gender">Gender</label>
+              <select
+                id="new-team-gender"
+                value={newTeamGender}
+                onChange={(e) => setNewTeamGender(e.target.value)}
+              >
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="game-actions">
+            <button type="submit" className="primary-button" disabled={clubs.length === 0}>Add Team</button>
+          </div>
+        </form>
+      </div>
+
+      {editingTeam && (
+        <div className="form-section editing-section">
+          <h3>Edit Team</h3>
+          <form onSubmit={handleUpdateTeam} className="player-form">
+            <div className="form-row">
+              {isAdmin && (
+                <div className="form-group">
+                  <label htmlFor="edit-team-club">Club <span aria-hidden="true">*</span></label>
+                  <select
+                    id="edit-team-club"
+                    value={editingTeam.club_id || ''}
+                    onChange={(e) => setEditingTeam((current) => current ? { ...current, club_id: Number(e.target.value) } : current)}
+                    required
+                  >
+                    {clubs.map((club) => (
+                      <option key={club.id} value={club.id}>{club.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="edit-team-name">Team name <span aria-hidden="true">*</span></label>
+                <input
+                  id="edit-team-name"
+                  type="text"
+                  value={editingTeam.name}
+                  onChange={(e) => setEditingTeam((current) => current ? { ...current, name: e.target.value } : current)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-team-age-group">Age group</label>
+                <input
+                  id="edit-team-age-group"
+                  type="text"
+                  value={editingTeam.age_group || ''}
+                  onChange={(e) => setEditingTeam((current) => current ? { ...current, age_group: e.target.value } : current)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-team-gender">Gender</label>
+                <select
+                  id="edit-team-gender"
+                  value={editingTeam.gender || ''}
+                  onChange={(e) => setEditingTeam((current) => current ? { ...current, gender: (e.target.value || null) as Team['gender'] } : current)}
+                >
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="mixed">Mixed</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button type="submit" className="primary-button">Update Team</button>
+              <button type="button" className="secondary-button" onClick={handleCancelEdit}>Cancel</button>
+              <button type="button" className="archive-button" onClick={() => handleDeleteTeam(editingTeam)}>
+                🗑️ Remove Team
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -281,130 +464,6 @@ const TeamManagement: React.FC = () => {
           )}
         </div>
       </div>
-
-      <div className="create-game-form create-team-form">
-        <h3>Create Team</h3>
-        <form onSubmit={handleAddTeam}>
-          <div className="form-field">
-            <label htmlFor="new-team-club">Club</label>
-            <select
-              id="new-team-club"
-              value={selectedClubId ?? ''}
-              onChange={(e) => setSelectedClubId(Number(e.target.value))}
-              required
-              disabled={clubs.length === 0}
-            >
-              {clubs.length === 0 ? (
-                <option value="">No clubs available</option>
-              ) : (
-                clubs.map((club) => (
-                  <option key={club.id} value={club.id}>
-                    {club.name}
-                  </option>
-                ))
-              )}
-            </select>
-            {clubs.length === 0 && (
-              <div className="empty-state">Create a club first to add teams.</div>
-            )}
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="new-team-name">Team name</label>
-            <input
-              id="new-team-name"
-              type="text"
-              value={newTeamName}
-              onChange={(e) => setNewTeamName(e.target.value)}
-              placeholder="Enter team name"
-              required
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="new-team-age-group">Age group</label>
-              <input
-                id="new-team-age-group"
-                type="text"
-                value={newTeamAgeGroup}
-                onChange={(e) => setNewTeamAgeGroup(e.target.value)}
-                placeholder="e.g. U17"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="new-team-gender">Gender</label>
-              <select
-                id="new-team-gender"
-                value={newTeamGender}
-                onChange={(e) => setNewTeamGender(e.target.value)}
-              >
-                <option value="">Select gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="mixed">Mixed</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="game-actions">
-            <button type="submit" className="primary-button" disabled={clubs.length === 0}>Add Team</button>
-          </div>
-        </form>
-      </div>
-
-      {editingTeam && (
-        <div className="form-section editing-section">
-          <h3>Edit Team</h3>
-          <form onSubmit={handleUpdateTeam} className="player-form">
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="edit-team-name">Team name</label>
-                <input
-                  id="edit-team-name"
-                  type="text"
-                  value={editingTeam.name}
-                  onChange={(e) => setEditingTeam((current) => current ? { ...current, name: e.target.value } : current)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="edit-team-age-group">Age group</label>
-                <input
-                  id="edit-team-age-group"
-                  type="text"
-                  value={editingTeam.age_group || ''}
-                  onChange={(e) => setEditingTeam((current) => current ? { ...current, age_group: e.target.value } : current)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="edit-team-gender">Gender</label>
-                <select
-                  id="edit-team-gender"
-                  value={editingTeam.gender || ''}
-                  onChange={(e) => setEditingTeam((current) => current ? { ...current, gender: (e.target.value || null) as Team['gender'] } : current)}
-                >
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="mixed">Mixed</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-actions">
-              <button type="submit" className="primary-button">Update Team</button>
-              <button type="button" className="secondary-button" onClick={handleCancelEdit}>Cancel</button>
-              <button type="button" className="archive-button" onClick={() => handleDeleteTeam(editingTeam)}>
-                🗑️ Remove Team
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {showExportDialog && selectedTeamId && (
         <ExportDialog
