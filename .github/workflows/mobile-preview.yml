@@ -26,9 +26,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Pin npm version
+        run: npm install -g npm@10.9.2
 
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -102,9 +105,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Pin npm version
+        run: npm install -g npm@10.9.2
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
