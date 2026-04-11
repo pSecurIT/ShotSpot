@@ -172,6 +172,14 @@ describe('Live Match Timer', () => {
     return secondsRemaining;
   });
 
+  const expectTeamGoalCount = (teamName: string, expectedGoals: number) => {
+    cy.contains('.team-stat-section h5', teamName)
+      .parent()
+      .within(() => {
+        cy.contains('.stat-item', 'Goals:').should('contain', String(expectedGoals));
+      });
+  };
+
   const installApiStubs = () => {
     cy.intercept('GET', '/api/auth/csrf', {
       statusCode: 200,
@@ -582,7 +590,7 @@ describe('Live Match Timer', () => {
     cy.wait('@pauseTimer');
     cy.wait('@recordShot');
     cy.get('.scoreboard .timer-status').should('contain', 'paused');
-    cy.get('.scoreboard .team-section.home-team .score').should('contain', '1');
+    expectTeamGoalCount('Home Team', 1);
   });
 
   it('keeps the timer moving through a match-like run of goals and event panels', () => {
@@ -610,8 +618,8 @@ describe('Live Match Timer', () => {
     cy.get('.scoreboard .time-remaining').invoke('text').then((pausedClock) => {
       secondsAfterHomeGoal = parseClock(pausedClock);
     });
-    cy.get('.scoreboard .team-section.home-team .score', { timeout: 10000 }).should('contain', '1');
-    cy.get('.scoreboard .team-section.away-team .score').should('contain', '0');
+    expectTeamGoalCount('Home Team', 1);
+    expectTeamGoalCount('Away Team', 0);
 
     cy.contains('button', '▶️ Resume').click();
     cy.get('.scoreboard .timer-status').should('contain', 'running');
@@ -675,8 +683,8 @@ describe('Live Match Timer', () => {
       const awayGoalPauseSeconds = parseClock(pausedClock);
       expect(awayGoalPauseSeconds).to.be.lessThan(secondsAfterHomeGoal);
     });
-    cy.get('.scoreboard .team-section.home-team .score', { timeout: 10000 }).should('contain', '1');
-    cy.get('.scoreboard .team-section.away-team .score', { timeout: 10000 }).should('contain', '1');
+    expectTeamGoalCount('Home Team', 1);
+    expectTeamGoalCount('Away Team', 1);
     cy.contains('button', '▶️ Resume').should('be.visible');
   });
 });
