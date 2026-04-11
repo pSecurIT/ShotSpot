@@ -10,6 +10,7 @@ vi.mock('../utils/api', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
+    put: vi.fn(),
     delete: vi.fn()
   }
 }));
@@ -99,6 +100,9 @@ describe('SubstitutionPanel', () => {
 
     const mockDelete = api.delete as unknown as ReturnType<typeof vi.fn>;
     mockDelete.mockResolvedValue({ data: { message: 'Substitution deleted successfully' } });
+
+    const mockPut = api.put as unknown as ReturnType<typeof vi.fn>;
+    mockPut.mockResolvedValue({ data: { id: 1, event_status: 'unconfirmed' } });
   });
 
   afterEach(() => {
@@ -282,6 +286,7 @@ describe('SubstitutionPanel', () => {
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith(`/substitutions/${mockGameId}`, {
         club_id: mockHomeClubId,
+        event_status: 'confirmed',
         player_in_id: 3,
         player_out_id: 1,
         period: mockCurrentPeriod,
@@ -293,6 +298,77 @@ describe('SubstitutionPanel', () => {
     await waitFor(() => {
       expect(mockOnSubstitutionRecorded).toHaveBeenCalled();
       expect(screen.getByText(/substitution recorded successfully/i)).toBeInTheDocument();
+    });
+  });
+
+  it('confirms pending substitutions from the recent list', async () => {
+    const user = userEvent.setup();
+    const mockGet = api.get as unknown as ReturnType<typeof vi.fn>;
+    mockGet.mockImplementation((url: string) => {
+      if (url.includes('/active-players')) {
+        return Promise.resolve({ data: mockActivePlayers });
+      }
+      if (url.includes('/substitutions')) {
+        return Promise.resolve({ data: [{ ...mockSubstitutions[0], event_status: 'unconfirmed' }] });
+      }
+      return Promise.reject(new Error('Unknown endpoint'));
+    });
+
+    render(
+      <SubstitutionPanel
+        gameId={mockGameId}
+        homeTeamId={mockHomeTeamId}
+        awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
+        homeTeamName={mockHomeTeamName}
+        awayTeamName={mockAwayTeamName}
+        currentPeriod={mockCurrentPeriod}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pending review')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Confirm/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/substitutions/1/1/confirm');
+    });
+  });
+
+  it('creates unconfirmed substitutions from the form', async () => {
+    const user = userEvent.setup();
+    render(
+      <SubstitutionPanel
+        gameId={mockGameId}
+        homeTeamId={mockHomeTeamId}
+        awayTeamId={mockAwayTeamId}
+        homeClubId={mockHomeClubId}
+        awayClubId={mockAwayClubId}
+        homeTeamName={mockHomeTeamName}
+        awayTeamName={mockAwayTeamName}
+        currentPeriod={mockCurrentPeriod}
+        timeRemaining={mockTimeRemaining}
+      />
+    );
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalled();
+    });
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /player out/i }), '1');
+    await user.selectOptions(screen.getByRole('combobox', { name: /player in/i }), '3');
+    await user.click(screen.getByRole('button', { name: 'Record And Review Later' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/substitutions/1', expect.objectContaining({
+        club_id: 100,
+        player_in_id: 3,
+        player_out_id: 1,
+        event_status: 'unconfirmed'
+      }));
     });
   });
 

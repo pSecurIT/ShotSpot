@@ -364,6 +364,22 @@ describe('📊 Advanced Analytics Routes', () => {
         expect(response.body.position).toBe('offense');
         expect(response.body).toHaveProperty('position_averages');
       });
+
+      it('✅ should ignore unconfirmed shots in league averages', async () => {
+        await db.query(
+          `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance, event_status, client_uuid)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'unconfirmed', $9)`,
+          [game1.id, player1.id, club1.id, 12, 12, 'goal', 1, 3.5, '60000000-0000-4000-8000-000000000001']
+        );
+
+        const response = await request(app)
+          .get('/api/advanced-analytics/benchmarks/league-averages')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(response.body.league_averages.avg_goals_per_game).toBeGreaterThan(0);
+        expect(response.body.league_averages.avg_fg_percentage).toBeLessThan(100);
+      });
     });
 
     describe('GET /api/advanced-analytics/benchmarks/player-comparison/:playerId', () => {

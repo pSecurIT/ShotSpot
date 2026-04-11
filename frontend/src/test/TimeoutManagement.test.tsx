@@ -267,6 +267,40 @@ describe('TimeoutManagement', () => {
     expect(screen.getByDisplayValue('1 minute')).toBeInTheDocument();
   });
 
+  it('marks recent timeouts for later review', async () => {
+    const user = userEvent.setup();
+    render(<TimeoutManagement {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Recent Timeouts (Period 1)')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Edit Later/i }));
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalledWith('/timeouts/1', { game_id: 1, event_status: 'unconfirmed' });
+    });
+  });
+
+  it('creates unconfirmed timeouts from the form', async () => {
+    const user = userEvent.setup();
+    render(<TimeoutManagement {...mockProps} />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalled();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Start And Review Later' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/timeouts', expect.objectContaining({
+        game_id: 1,
+        timeout_type: 'team',
+        event_status: 'unconfirmed'
+      }));
+    });
+  });
+
   it('switches between timeout types correctly', async () => {
     const user = userEvent.setup();
     render(<TimeoutManagement {...mockProps} />);
@@ -395,7 +429,7 @@ describe('TimeoutManagement', () => {
     await user.click(startButton);
     
     // Check for loading state
-    expect(screen.getByText('Starting...')).toBeInTheDocument();
+    expect(screen.getAllByText('Starting...')).toHaveLength(2);
     expect(startButton).toBeDisabled();
   });
 });

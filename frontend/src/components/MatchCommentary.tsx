@@ -18,6 +18,8 @@ interface Commentary {
   content: string;
   created_by?: number;
   created_by_username?: string;
+  event_status?: 'confirmed' | 'unconfirmed';
+  client_uuid?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -80,7 +82,15 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
     fetchCommentaries();
   }, [filterType, filterPeriod]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAddCommentary = async () => {
+  const scheduleSuccessClear = () => {
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+    }
+
+    successTimeoutRef.current = setTimeout(() => setSuccess(null), 3000);
+  };
+
+  const handleAddCommentary = async (eventStatus: 'confirmed' | 'unconfirmed' = 'confirmed') => {
     if (!content.trim()) {
       setError('Please enter commentary content');
       return;
@@ -95,36 +105,72 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
         time_remaining: timeRemaining || null,
         commentary_type: commentaryType,
         title: title.trim() || null,
-        content: content.trim()
+        content: content.trim(),
+        event_status: eventStatus
       };
 
-      await api.post(`/match-commentary/${gameId}`, commentaryData);
+      const response = await api.post(`/match-commentary/${gameId}`, commentaryData);
+      const wasQueued = Boolean((response.data as { queued?: boolean } | undefined)?.queued);
 
-      setSuccess('Commentary added successfully');
+      setSuccess(wasQueued ? 'Commentary queued for sync when online' : eventStatus === 'unconfirmed' ? 'Commentary added for later review' : 'Commentary added successfully');
       
       // Reset form
       setTitle('');
       setContent('');
       setShowForm(false);
       
-      // Refresh commentaries
-      fetchCommentaries();
+      if (!wasQueued) {
+        fetchCommentaries();
+      }
       
       // Notify parent component
       if (onCommentaryAdded) {
         onCommentaryAdded();
       }
 
-      // Clear success message after 3 seconds
-      if (successTimeoutRef.current) {
-        clearTimeout(successTimeoutRef.current);
-      }
-      successTimeoutRef.current = setTimeout(() => setSuccess(null), 3000);
+      scheduleSuccessClear();
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to add commentary');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateCommentaryStatus = async (commentaryId: number, eventStatus: 'confirmed' | 'unconfirmed', clientUuid?: string | null) => {
+    try {
+      await api.put(`/match-commentary/${gameId}/${commentaryId}`, {
+        event_status: eventStatus,
+        ...(clientUuid ? { client_uuid: clientUuid } : {})
+      });
+      setSuccess(eventStatus === 'unconfirmed' ? 'Commentary marked for later review' : 'Commentary confirmed');
+      fetchCommentaries();
+      if (onCommentaryAdded) {
+        onCommentaryAdded();
+      }
+      scheduleSuccessClear();
+    } catch (err) {
+      const error = err as Error & { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to update commentary review status');
+    }
+  };
+
+  const confirmCommentary = async (commentaryId: number, clientUuid?: string | null) => {
+    try {
+      if (clientUuid) {
+        await api.post(`/match-commentary/${commentaryId}/confirm`, { client_uuid: clientUuid });
+      } else {
+        await api.post(`/match-commentary/${commentaryId}/confirm`);
+      }
+      setSuccess('Commentary confirmed');
+      fetchCommentaries();
+      if (onCommentaryAdded) {
+        onCommentaryAdded();
+      }
+      scheduleSuccessClear();
+    } catch (err) {
+      const error = err as Error & { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to confirm commentary');
     }
   };
 
@@ -136,10 +182,7 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
       if (onCommentaryAdded) {
         onCommentaryAdded();
       }
-      if (successTimeoutRef.current) {
-        clearTimeout(successTimeoutRef.current);
-      }
-      successTimeoutRef.current = setTimeout(() => setSuccess(null), 3000);
+      scheduleSuccessClear();
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to delete commentary');
@@ -286,13 +329,22 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
             </small>
           </div>
 
-          <button
-            onClick={handleAddCommentary}
-            disabled={loading || !content.trim()}
-            className="primary-button"
-          >
-            {loading ? 'Adding...' : 'Add Commentary'}
-          </button>
+          <div className="commentary-form-actions">
+            <button
+              onClick={() => void handleAddCommentary('confirmed')}
+              disabled={loading || !content.trim()}
+              className="primary-button"
+            >
+              {loading ? 'Adding...' : 'Add Commentary'}
+            </button>
+            <button
+              onClick={() => void handleAddCommentary('unconfirmed')}
+              disabled={loading || !content.trim()}
+              className="secondary-button"
+            >
+              {loading ? 'Adding...' : 'Add And Review Later'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -350,6 +402,9 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
                   <span className="commentary-time">
                     Period {commentary.period} • {commentary.time_remaining || 'End'} • {formatTimestamp(commentary.created_at)}
                   </span>
+                  {commentary.event_status === 'unconfirmed' && (
+                    <span className="detail-badge warning">Pending review</span>
+                  )}
                   {commentary.created_by_username && (
                     <span className="commentary-author">
                       by {commentary.created_by_username}
@@ -371,6 +426,26 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({
 
               <div className="commentary-content">
                 {commentary.content}
+              </div>
+
+              <div className="commentary-actions">
+                {commentary.event_status === 'unconfirmed' ? (
+                  <button
+                    onClick={() => confirmCommentary(commentary.id, commentary.client_uuid)}
+                    className="save-button"
+                    title="Confirm this commentary"
+                  >
+                    ✅ Confirm
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => updateCommentaryStatus(commentary.id, 'unconfirmed', commentary.client_uuid)}
+                    className="secondary-button"
+                    title="Review this commentary later"
+                  >
+                    🏷️ Edit Later
+                  </button>
+                )}
               </div>
             </div>
           ))

@@ -233,6 +233,41 @@ describe('⏱️ Timeouts API', () => {
         expect(res.body).toHaveProperty('timeout_type', 'tv');
         expect(res.body).toHaveProperty('duration');
       });
+
+      it('✅ should create unconfirmed timeout idempotently by client_uuid', async () => {
+        const payload = {
+          game_id: gameId,
+          club_id: homeTeamId,
+          timeout_type: 'team',
+          period: 1,
+          client_uuid: '20000000-0000-4000-8000-000000000001',
+          event_status: 'unconfirmed'
+        };
+
+        const firstResponse = await request(app)
+          .post('/api/timeouts')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(payload);
+
+        expect(firstResponse.status).toBe(201);
+        expect(firstResponse.body.event_status).toBe('unconfirmed');
+
+        const secondResponse = await request(app)
+          .post('/api/timeouts')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(payload);
+
+        expect(secondResponse.status).toBe(200);
+        expect(secondResponse.body.id).toBe(firstResponse.body.id);
+
+        const filteredResponse = await request(app)
+          .get(`/api/timeouts/${gameId}?event_status=unconfirmed`)
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(filteredResponse.status).toBe(200);
+        expect(filteredResponse.body.some(timeout => timeout.id === firstResponse.body.id)).toBe(true);
+        expect(filteredResponse.body.every(timeout => timeout.event_status === 'unconfirmed')).toBe(true);
+      });
     });
 
     describe('❌ Error Handling', () => {
@@ -678,6 +713,33 @@ describe('⏱️ Timeouts API', () => {
 
         expect(res.status).toBe(400);
       });
+    });
+  });
+
+  describe('✅ POST /api/timeouts/:timeoutId/confirm', () => {
+    it('✅ should confirm an unconfirmed timeout', async () => {
+      const createResponse = await request(app)
+        .post('/api/timeouts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: gameId,
+          club_id: homeTeamId,
+          timeout_type: 'team',
+          period: 1,
+          client_uuid: '20000000-0000-4000-8000-000000000002',
+          event_status: 'unconfirmed'
+        });
+
+      expect(createResponse.status).toBe(201);
+      expect(createResponse.body.event_status).toBe('unconfirmed');
+
+      const confirmResponse = await request(app)
+        .post(`/api/timeouts/${createResponse.body.id}/confirm`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ game_id: gameId });
+
+      expect(confirmResponse.status).toBe(200);
+      expect(confirmResponse.body.event_status).toBe('confirmed');
     });
   });
 
