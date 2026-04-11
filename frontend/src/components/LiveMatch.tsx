@@ -1299,7 +1299,7 @@ const LiveMatch: React.FC = () => {
     } else {
       setPossessionTiming(null);
     }
-  }, [activePossession?.started_at, currentTimeMs, timerState?.timer_state]);
+  }, [activePossession, activePossession?.started_at, currentTimeMs, timerState?.timer_state]);
 
   useEffect(() => {
     if (!possessionTiming) {

@@ -26,16 +26,33 @@ const COACH_USER = {
   role: 'coach',
 };
 
-/** Inject a fake JWT token + user object so the app treats the visitor as logged in. */
-const loginAs = (user: typeof AUTH_USER) => {
-  cy.window().then((win) => {
-    win.localStorage.setItem('token', 'cypress-token');
-    win.localStorage.setItem('user', JSON.stringify(user));
+const interceptDashboardRequests = () => {
+  cy.intercept('GET', '/api/games?limit=5&sort=recent', { statusCode: 200, body: [] }).as('recentGames');
+  cy.intercept('GET', '/api/games?status=upcoming', { statusCode: 200, body: [] }).as('upcomingGames');
+  cy.intercept('GET', '/api/achievements/recent?limit=8', { statusCode: 200, body: [] }).as('recentAchievements');
+  cy.intercept('GET', '/api/dashboard/summary', { statusCode: 200, body: { teams: 0, players: 0, games: 0 } }).as('dashboardSummary');
+};
+
+const visitDashboard = (user: typeof AUTH_USER, viewport: 'desktop' | 'mobile' = 'desktop') => {
+  if (viewport === 'mobile') {
+    cy.viewport('iphone-6');
+  } else {
+    cy.viewport(1280, 900);
+  }
+
+  interceptDashboardRequests();
+
+  cy.visit('/dashboard', {
+    onBeforeLoad: (win) => {
+      win.localStorage.setItem('token', 'cypress-token');
+      win.localStorage.setItem('user', JSON.stringify(user));
+    },
   });
 };
 
 describe('Navigation: Unauthenticated', () => {
   beforeEach(() => {
+    cy.viewport(1280, 900);
     cy.visit('/');
   });
 
@@ -58,12 +75,7 @@ describe('Navigation: Unauthenticated', () => {
 
 describe('Navigation: Authenticated user', () => {
   beforeEach(() => {
-    cy.visit('/dashboard', {
-      onBeforeLoad: (win) => {
-        win.localStorage.setItem('token', 'cypress-token');
-        win.localStorage.setItem('user', JSON.stringify(AUTH_USER));
-      },
-    });
+    visitDashboard(AUTH_USER);
   });
 
   it('shows the Dashboard link in navigation', () => {
@@ -94,7 +106,7 @@ describe('Navigation: Authenticated user', () => {
 
   it('can open the Analytics dropdown', () => {
     cy.get('[aria-label="Main navigation"]').contains('button', 'Analytics').click();
-    cy.contains('Advanced Analytics').should('be.visible');
+    cy.contains('Achievements').should('be.visible');
   });
 
   it('can open the User menu and see Change Password option', () => {
@@ -132,12 +144,7 @@ describe('Navigation: Authenticated user', () => {
 
 describe('Navigation: Coach user', () => {
   beforeEach(() => {
-    cy.visit('/dashboard', {
-      onBeforeLoad: (win) => {
-        win.localStorage.setItem('token', 'cypress-token');
-        win.localStorage.setItem('user', JSON.stringify(COACH_USER));
-      },
-    });
+    visitDashboard(COACH_USER);
   });
 
   it('shows Match Templates in the Matches dropdown', () => {
@@ -157,12 +164,7 @@ describe('Navigation: Coach user', () => {
 
 describe('Navigation: Admin user', () => {
   beforeEach(() => {
-    cy.visit('/dashboard', {
-      onBeforeLoad: (win) => {
-        win.localStorage.setItem('token', 'cypress-token');
-        win.localStorage.setItem('user', JSON.stringify(ADMIN_USER));
-      },
-    });
+    visitDashboard(ADMIN_USER);
   });
 
   it('shows the Settings nav group', () => {
@@ -182,11 +184,13 @@ describe('Navigation: Admin user', () => {
 
 describe('Navigation: Protected routes redirect', () => {
   it('redirects /dashboard to /login when not authenticated', () => {
+    cy.viewport(1280, 900);
     cy.visit('/dashboard');
     cy.url().should('include', '/login');
   });
 
   it('redirects /competitions to /login when not authenticated', () => {
+    cy.viewport(1280, 900);
     cy.visit('/competitions');
     cy.url().should('include', '/login');
   });
@@ -194,12 +198,7 @@ describe('Navigation: Protected routes redirect', () => {
 
 describe('Navigation: Route transitions', () => {
   beforeEach(() => {
-    cy.visit('/dashboard', {
-      onBeforeLoad: (win) => {
-        win.localStorage.setItem('token', 'cypress-token');
-        win.localStorage.setItem('user', JSON.stringify(AUTH_USER));
-      },
-    });
+    visitDashboard(COACH_USER);
   });
 
   it('navigates to Games via Matches dropdown', () => {
@@ -231,13 +230,7 @@ describe('Navigation: Route transitions', () => {
 
 describe('Navigation: Mobile responsiveness', () => {
   beforeEach(() => {
-    cy.viewport('iphone-6');
-    cy.visit('/dashboard', {
-      onBeforeLoad: (win) => {
-        win.localStorage.setItem('token', 'cypress-token');
-        win.localStorage.setItem('user', JSON.stringify(AUTH_USER));
-      },
-    });
+    visitDashboard(AUTH_USER, 'mobile');
   });
 
   it('renders the navigation bar on mobile viewport', () => {

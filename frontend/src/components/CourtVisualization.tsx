@@ -595,7 +595,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error recording shot');
     }
-  }, [shotSelectionCandidate, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, homeClubId, awayClubId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers, canAddEvents, userAssignedTeam, homeTeamName, awayTeamName, getCurrentOffensivePlayers, parseTimeRemaining]);
+  }, [shotSelectionCandidate, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, homeClubId, awayClubId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, onPauseTimer, homePlayers, awayPlayers, canAddEvents, userAssignedTeam, homeTeamName, awayTeamName, getCurrentOffensivePlayers, parseTimeRemaining, timerState]);
 
   // Render shot markers on court
   const renderShotMarkers = () => {
