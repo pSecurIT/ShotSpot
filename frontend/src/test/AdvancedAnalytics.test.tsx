@@ -47,8 +47,8 @@ vi.mock('jspdf', () => ({
 
 vi.mock('recharts', () => {
   const passthrough = (name: string) => {
-    const MockChartComponent = ({ children }: { children?: React.ReactNode }) =>
-      React.createElement('div', { 'data-testid': name }, children);
+    const MockChartComponent = ({ children, fill, stroke, dataKey, name: seriesName }: { children?: React.ReactNode; fill?: string; stroke?: string; dataKey?: string; name?: string }) =>
+      React.createElement('div', { 'data-testid': name, 'data-fill': fill, 'data-stroke': stroke, 'data-key': dataKey, 'data-name': seriesName }, children);
 
     MockChartComponent.displayName = name;
     return MockChartComponent;
@@ -92,6 +92,7 @@ describe('AdvancedAnalytics', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    document.documentElement.style.setProperty('--surface-canvas', '#faf3e8');
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(anchorClickMock);
 
     apiGetMock.mockResolvedValue({
@@ -282,6 +283,7 @@ describe('AdvancedAnalytics', () => {
     await user.click(screen.getByRole('button', { name: 'Export Image' }));
     await waitFor(() => {
       expect(html2canvasMock).toHaveBeenCalledTimes(1);
+      expect(html2canvasMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ backgroundColor: '#faf3e8' }));
       expect(anchorClickMock).toHaveBeenCalledTimes(1);
     });
 
@@ -291,5 +293,18 @@ describe('AdvancedAnalytics', () => {
       expect(addImageMock).toHaveBeenCalled();
       expect(saveMock).toHaveBeenCalled();
     });
+  });
+
+  it('uses theme chart variables for analytics series colors', async () => {
+    const user = userEvent.setup();
+    render(<AdvancedAnalytics />);
+
+    await screen.findByText('Advanced Analytics Dashboard');
+    await user.click(screen.getByRole('button', { name: 'Fatigue' }));
+    await screen.findByText('Court Load vs Degradation');
+
+    const chartBars = screen.getAllByTestId('Bar');
+    expect(chartBars.some((element) => element.getAttribute('data-fill') === 'var(--chart-series-1)')).toBe(true);
+    expect(chartBars.some((element) => element.getAttribute('data-fill') === 'var(--chart-series-2)')).toBe(true);
   });
 });
