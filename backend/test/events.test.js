@@ -209,6 +209,65 @@ describe('🎯 Events API', () => {
       }
     });
 
+    it('✅ should create unconfirmed event with explicit status', async () => {
+      try {
+        const response = await request(app)
+          .post(`/api/events/${game.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            event_type: 'foul',
+            player_id: player1.id,
+            club_id: club1.id,
+            period: 1,
+            event_status: 'unconfirmed'
+          });
+
+        expect(response.status).toBe(201);
+        expect(response.body.event_status).toBe('unconfirmed');
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST unconfirmed event status failed');
+        throw error;
+      }
+    });
+
+    it('✅ should be idempotent when posting same client_uuid twice', async () => {
+      try {
+        const eventData = {
+          event_type: 'timeout',
+          club_id: club1.id,
+          period: 2,
+          client_uuid: '53d20c31-4e71-4264-9fbc-9f68353cd6a9'
+        };
+
+        const firstResponse = await request(app)
+          .post(`/api/events/${game.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(eventData);
+
+        expect(firstResponse.status).toBe(201);
+        expect(firstResponse.body.client_uuid).toBe(eventData.client_uuid);
+
+        const secondResponse = await request(app)
+          .post(`/api/events/${game.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(eventData);
+
+        expect(secondResponse.status).toBe(200);
+        expect(secondResponse.body.id).toBe(firstResponse.body.id);
+        expect(secondResponse.body.client_uuid).toBe(eventData.client_uuid);
+
+        const duplicateCheck = await db.query(
+          'SELECT COUNT(*)::int AS count FROM game_events WHERE game_id = $1 AND client_uuid = $2',
+          [game.id, eventData.client_uuid]
+        );
+
+        expect(duplicateCheck.rows[0].count).toBe(1);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST idempotent event client_uuid behavior failed');
+        throw error;
+      }
+    });
+
     it('❌ should reject creation by regular user', async () => {
       try {
         const response = await request(app)
@@ -335,6 +394,25 @@ describe('🎯 Events API', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Player does not belong to the specified team');
+    });
+  });
+
+  describe('✅ POST /api/events/:gameId/:eventId/confirm', () => {
+    it('should confirm an unconfirmed event', async () => {
+      const createdEvent = await db.query(
+        `INSERT INTO game_events (game_id, event_type, player_id, club_id, period, event_status)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [game.id, 'foul', player1.id, club1.id, 1, 'unconfirmed']
+      );
+
+      const response = await request(app)
+        .post(`/api/events/${game.id}/${createdEvent.rows[0].id}/confirm`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send();
+
+      expect(response.status).toBe(200);
+      expect(response.body.event_status).toBe('confirmed');
     });
   });
 
@@ -512,6 +590,16 @@ describe('🎯 Events API', () => {
         global.testContext.logTestError(error, 'PUT update time_remaining failed');
         throw error;
       }
+    });
+
+    it('✅ should update event_status for review workflow', async () => {
+      const response = await request(app)
+        .put(`/api/events/${game.id}/${testEvent.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ event_status: 'unconfirmed' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.event_status).toBe('unconfirmed');
     });
 
     it('❌ should reject update for non-existent event', async () => {
@@ -777,6 +865,51 @@ describe('🎯 Events API', () => {
       expect(response.body.result).toBe('miss');
     });
 
+    it('should create an unconfirmed free shot idempotently and confirm it later', async () => {
+      const payload = {
+        game_id: game.id,
+        player_id: player1.id,
+        club_id: club1.id,
+        period: 1,
+        free_shot_type: 'free_shot',
+        result: 'goal',
+        client_uuid: '10000000-0000-4000-8000-000000000001',
+        event_status: 'unconfirmed'
+      };
+
+      const createResponse = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(payload);
+
+      expect(createResponse.status).toBe(201);
+      expect(createResponse.body.event_status).toBe('unconfirmed');
+
+      const duplicateResponse = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(payload);
+
+      expect(duplicateResponse.status).toBe(200);
+      expect(duplicateResponse.body.id).toBe(createResponse.body.id);
+
+      const filteredResponse = await request(app)
+        .get(`/api/free-shots/${game.id}?event_status=unconfirmed`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(filteredResponse.status).toBe(200);
+      expect(filteredResponse.body.some(shot => shot.id === createResponse.body.id)).toBe(true);
+      expect(filteredResponse.body.every(shot => shot.event_status === 'unconfirmed')).toBe(true);
+
+      const confirmResponse = await request(app)
+        .post(`/api/free-shots/${createResponse.body.id}/confirm`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ game_id: game.id });
+
+      expect(confirmResponse.status).toBe(200);
+      expect(confirmResponse.body.event_status).toBe('confirmed');
+    });
+
     it('should get all free shots for a game', async () => {
       // Create test data
       await request(app)
@@ -1008,6 +1141,50 @@ describe('🎯 Events API', () => {
       expect(response.body.commentary_type).toBe('injury');
     });
 
+    it('should create unconfirmed commentary idempotently and confirm it later', async () => {
+      const commentaryData = {
+        game_id: game.id,
+        period: 2,
+        commentary_type: 'note',
+        title: 'Pending note',
+        content: 'Needs confirmation after review.',
+        client_uuid: '20000000-0000-4000-8000-000000000001',
+        event_status: 'unconfirmed'
+      };
+
+      const createResponse = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(commentaryData);
+
+      expect(createResponse.status).toBe(201);
+      expect(createResponse.body.event_status).toBe('unconfirmed');
+      expect(createResponse.body.client_uuid).toBe(commentaryData.client_uuid);
+
+      const duplicateResponse = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(commentaryData);
+
+      expect(duplicateResponse.status).toBe(200);
+      expect(duplicateResponse.body.id).toBe(createResponse.body.id);
+
+      const filteredResponse = await request(app)
+        .get(`/api/match-commentary/${game.id}?event_status=unconfirmed`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(filteredResponse.status).toBe(200);
+      expect(filteredResponse.body).toHaveLength(1);
+      expect(filteredResponse.body[0].event_status).toBe('unconfirmed');
+
+      const confirmResponse = await request(app)
+        .post(`/api/match-commentary/${createResponse.body.id}/confirm`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(confirmResponse.status).toBe(200);
+      expect(confirmResponse.body.event_status).toBe('confirmed');
+    });
+
     it('should get all commentary for a game', async () => {
       // Create test data
       await request(app)
@@ -1231,6 +1408,34 @@ describe('🎯 Events API', () => {
       expect(response.status).toBe(200);
       expect(response.body.length).toBe(1);
       expect(response.body[0].period).toBe(1);
+    }, 30000);
+
+    it('should include unconfirmed commentary in comprehensive pending review filtering', async () => {
+      await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 2,
+          commentary_type: 'technical',
+          title: 'Pending technical note',
+          content: 'Clock review required.',
+          client_uuid: '20000000-0000-4000-8000-000000000002',
+          event_status: 'unconfirmed'
+        });
+
+      const response = await request(app)
+        .get(`/api/events/comprehensive/${game.id}?event_status=unconfirmed`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0]).toMatchObject({
+        type: 'commentary_technical',
+        source_table: 'commentary',
+        event_status: 'unconfirmed',
+        client_uuid: '20000000-0000-4000-8000-000000000002'
+      });
     }, 30000);
   });
 

@@ -8,6 +8,30 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(auth);
 
+const SUBSTITUTION_EVENT_STATUSES = ['confirmed', 'unconfirmed'];
+
+const fetchCompleteSubstitutionById = async (substitutionId) => {
+  const result = await pool.query(
+    `SELECT 
+      s.*,
+      pin.first_name as player_in_first_name,
+      pin.last_name as player_in_last_name,
+      pin.jersey_number as player_in_jersey_number,
+      pout.first_name as player_out_first_name,
+      pout.last_name as player_out_last_name,
+      pout.jersey_number as player_out_jersey_number,
+      c.name as club_name
+    FROM substitutions s
+    JOIN players pin ON s.player_in_id = pin.id
+    JOIN players pout ON s.player_out_id = pout.id
+    JOIN clubs c ON s.club_id = c.id
+    WHERE s.id = $1`,
+    [substitutionId]
+  );
+
+  return result.rows[0] || null;
+};
+
 /**
  * GET /api/substitutions/:gameId
  * Get all substitutions for a game with optional filtering
@@ -19,7 +43,8 @@ router.get(
     param('gameId').isInt().withMessage('Game ID must be an integer'),
     query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
     query('period').optional().isInt({ min: 1 }).withMessage('Period must be a positive integer'),
-    query('player_id').optional().isInt().withMessage('Player ID must be an integer')
+    query('player_id').optional().isInt().withMessage('Player ID must be an integer'),
+    query('event_status').optional().isIn(SUBSTITUTION_EVENT_STATUSES).withMessage('Invalid event status value')
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -28,7 +53,7 @@ router.get(
     }
 
     const { gameId } = req.params;
-    const { club_id, period, player_id } = req.query;
+    const { club_id, period, player_id, event_status } = req.query;
 
     try {
       let query = `
@@ -65,6 +90,12 @@ router.get(
       if (player_id) {
         query += ` AND (s.player_in_id = $${paramIndex} OR s.player_out_id = $${paramIndex})`;
         params.push(player_id);
+        paramIndex++;
+      }
+
+      if (event_status) {
+        query += ` AND s.event_status = $${paramIndex}`;
+        params.push(event_status);
         paramIndex++;
       }
 
@@ -135,7 +166,7 @@ router.get(
       const subsResult = await pool.query(
         `SELECT player_in_id, player_out_id, club_id, created_at
          FROM substitutions
-         WHERE game_id = $1
+         WHERE game_id = $1 AND event_status = 'confirmed'
          ORDER BY created_at ASC`,
         [gameId]
       );
@@ -207,7 +238,9 @@ router.post(
     body('reason')
       .optional()
       .isIn(['tactical', 'injury', 'fatigue', 'disciplinary'])
-      .withMessage('Reason must be one of: tactical, injury, fatigue, disciplinary')
+      .withMessage('Reason must be one of: tactical, injury, fatigue, disciplinary'),
+    body('client_uuid').optional().isUUID().withMessage('client_uuid must be a valid UUID'),
+    body('event_status').optional().isIn(SUBSTITUTION_EVENT_STATUSES).withMessage('event_status must be confirmed or unconfirmed')
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -216,12 +249,25 @@ router.post(
     }
 
     const { gameId } = req.params;
-    const { club_id, player_in_id, player_out_id, period, time_remaining, reason } = req.body;
+    const { club_id, player_in_id, player_out_id, period, time_remaining, reason, client_uuid, event_status } = req.body;
+    const normalizedEventStatus = event_status || 'confirmed';
 
     try {
       // Validate: player_in and player_out must be different
       if (player_in_id === player_out_id) {
         return res.status(400).json({ error: 'Player in and player out must be different' });
+      }
+
+      if (client_uuid) {
+        const existingSubstitutionResult = await pool.query(
+          'SELECT id FROM substitutions WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+          [gameId, client_uuid]
+        );
+
+        if (existingSubstitutionResult.rows.length > 0) {
+          const existingSubstitution = await fetchCompleteSubstitutionById(existingSubstitutionResult.rows[0].id);
+          return res.status(200).json(existingSubstitution);
+        }
       }
 
       await pool.query('BEGIN');
@@ -296,13 +342,13 @@ router.post(
         player_ins AS (
           SELECT player_in_id as player_id, COUNT(*) as in_count
           FROM substitutions
-          WHERE game_id = $1 AND player_in_id = ANY($2)
+          WHERE game_id = $1 AND player_in_id = ANY($2) AND event_status = 'confirmed'
           GROUP BY player_in_id
         ),
         player_outs AS (
           SELECT player_out_id as player_id, COUNT(*) as out_count
           FROM substitutions
-          WHERE game_id = $1 AND player_out_id = ANY($2)
+          WHERE game_id = $1 AND player_out_id = ANY($2) AND event_status = 'confirmed'
           GROUP BY player_out_id
         )
         SELECT 
@@ -344,36 +390,36 @@ router.post(
 
       // Insert the substitution
       const insertResult = await pool.query(
-        `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, time_remaining, reason)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, time_remaining, reason, client_uuid, event_status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
-        [gameId, club_id, player_in_id, player_out_id, period, time_remaining || null, reason || 'tactical']
+        [gameId, club_id, player_in_id, player_out_id, period, time_remaining || null, reason || 'tactical', client_uuid || null, normalizedEventStatus]
       );
 
       await pool.query('COMMIT');
 
-      // Fetch complete substitution data with player names
-      const result = await pool.query(
-        `SELECT 
-          s.*,
-          pin.first_name as player_in_first_name,
-          pin.last_name as player_in_last_name,
-          pin.jersey_number as player_in_jersey_number,
-          pout.first_name as player_out_first_name,
-          pout.last_name as player_out_last_name,
-          pout.jersey_number as player_out_jersey_number,
-          c.name as club_name
-        FROM substitutions s
-        JOIN players pin ON s.player_in_id = pin.id
-        JOIN players pout ON s.player_out_id = pout.id
-        JOIN clubs c ON s.club_id = c.id
-        WHERE s.id = $1`,
-        [insertResult.rows[0].id]
-      );
+      const substitution = await fetchCompleteSubstitutionById(insertResult.rows[0].id);
 
-      res.status(201).json(result.rows[0]);
+      res.status(201).json(substitution);
     } catch (error) {
       await pool.query('ROLLBACK');
+
+      if (error.code === '23505' && client_uuid) {
+        try {
+          const existingSubstitutionResult = await pool.query(
+            'SELECT id FROM substitutions WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+            [gameId, client_uuid]
+          );
+
+          if (existingSubstitutionResult.rows.length > 0) {
+            const existingSubstitution = await fetchCompleteSubstitutionById(existingSubstitutionResult.rows[0].id);
+            return res.status(200).json(existingSubstitution);
+          }
+        } catch (lookupError) {
+          console.error('Error resolving duplicate substitution by client_uuid:', lookupError);
+        }
+      }
+
       console.error('Error recording substitution:', error);
       
       if (error.code === '23514') { // Check constraint violation
@@ -381,6 +427,136 @@ router.post(
       }
       
       res.status(500).json({ error: 'Failed to record substitution' });
+    }
+  }
+);
+
+/**
+ * PUT /api/substitutions/:gameId/:substitutionId
+ * Update a substitution for pending/edit workflow.
+ */
+router.put(
+  '/:gameId/:substitutionId',
+  [
+    requireRole(['admin', 'coach']),
+    param('gameId').isInt().withMessage('Game ID must be an integer'),
+    param('substitutionId').isInt().withMessage('Substitution ID must be an integer'),
+    body('period').optional().isInt({ min: 1 }).withMessage('Period must be a positive integer'),
+    body('time_remaining').optional({ nullable: true }).isString().withMessage('Time remaining must be a string'),
+    body('reason')
+      .optional()
+      .isIn(['tactical', 'injury', 'fatigue', 'disciplinary'])
+      .withMessage('Reason must be one of: tactical, injury, fatigue, disciplinary'),
+    body('event_status').optional().isIn(SUBSTITUTION_EVENT_STATUSES).withMessage('event_status must be confirmed or unconfirmed')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { gameId, substitutionId } = req.params;
+    const { period, time_remaining, reason, event_status } = req.body;
+
+    try {
+      const substitutionResult = await pool.query(
+        'SELECT id FROM substitutions WHERE id = $1 AND game_id = $2',
+        [substitutionId, gameId]
+      );
+
+      if (substitutionResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Substitution not found' });
+      }
+
+      const updateFields = [];
+      const params = [];
+      let paramIndex = 1;
+
+      if (period !== undefined) {
+        updateFields.push(`period = $${paramIndex}`);
+        params.push(period);
+        paramIndex++;
+      }
+
+      if (time_remaining !== undefined) {
+        updateFields.push(`time_remaining = $${paramIndex}`);
+        params.push(time_remaining || null);
+        paramIndex++;
+      }
+
+      if (reason !== undefined) {
+        updateFields.push(`reason = $${paramIndex}`);
+        params.push(reason);
+        paramIndex++;
+      }
+
+      if (event_status !== undefined) {
+        updateFields.push(`event_status = $${paramIndex}`);
+        params.push(event_status);
+        paramIndex++;
+      }
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({ error: 'No fields to update' });
+      }
+
+      params.push(substitutionId);
+
+      await pool.query(
+        `UPDATE substitutions SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
+        params
+      );
+
+      const substitution = await fetchCompleteSubstitutionById(substitutionId);
+      return res.status(200).json(substitution);
+    } catch (error) {
+      console.error('Error updating substitution:', error);
+      return res.status(500).json({ error: 'Failed to update substitution' });
+    }
+  }
+);
+
+/**
+ * POST /api/substitutions/:gameId/:substitutionId/confirm
+ * Confirm a substitution event.
+ */
+router.post(
+  '/:gameId/:substitutionId/confirm',
+  [
+    requireRole(['admin', 'coach']),
+    param('gameId').isInt().withMessage('Game ID must be an integer'),
+    param('substitutionId').isInt().withMessage('Substitution ID must be an integer')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { gameId, substitutionId } = req.params;
+
+    try {
+      const substitutionResult = await pool.query(
+        'SELECT * FROM substitutions WHERE id = $1 AND game_id = $2',
+        [substitutionId, gameId]
+      );
+
+      if (substitutionResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Substitution not found' });
+      }
+
+      if (substitutionResult.rows[0].event_status !== 'confirmed') {
+        await pool.query(
+          'UPDATE substitutions SET event_status = $1 WHERE id = $2',
+          ['confirmed', substitutionId]
+        );
+      }
+
+      const substitution = await fetchCompleteSubstitutionById(substitutionId);
+      res.status(200).json(substitution);
+    } catch (error) {
+      console.error('Error confirming substitution:', error);
+      res.status(500).json({ error: 'Failed to confirm substitution' });
     }
   }
 );

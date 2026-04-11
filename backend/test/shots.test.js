@@ -218,6 +218,78 @@ describe('🏀 Shot Routes', () => {
       }
     });
 
+    it('✅ should create an unconfirmed goal without changing score', async () => {
+      try {
+        const shotData = {
+          player_id: player1.id,
+          club_id: club1.id,
+          x_coord: 51.2,
+          y_coord: 26.1,
+          result: 'goal',
+          period: 1,
+          event_status: 'unconfirmed'
+        };
+
+        const response = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
+
+        expect(response.status).toBe(201);
+        expect(response.body.event_status).toBe('unconfirmed');
+
+        const gameCheck = await db.query('SELECT * FROM games WHERE id = $1', [testGame.id]);
+        expect(gameCheck.rows[0].home_score).toBe(2);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST unconfirmed goal score isolation failed');
+        throw error;
+      }
+    });
+
+    it('✅ should be idempotent when posting same client_uuid twice', async () => {
+      try {
+        const shotData = {
+          player_id: player1.id,
+          club_id: club1.id,
+          x_coord: 62.0,
+          y_coord: 48.0,
+          result: 'goal',
+          period: 1,
+          client_uuid: '0d9d2f0c-cc37-4aaf-9f4c-223e9f6ce1b7'
+        };
+
+        const firstResponse = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
+
+        expect(firstResponse.status).toBe(201);
+        expect(firstResponse.body.client_uuid).toBe(shotData.client_uuid);
+
+        const secondResponse = await request(app)
+          .post(`/api/shots/${testGame.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send(shotData);
+
+        expect(secondResponse.status).toBe(200);
+        expect(secondResponse.body.id).toBe(firstResponse.body.id);
+        expect(secondResponse.body.client_uuid).toBe(shotData.client_uuid);
+
+        const duplicateCheck = await db.query(
+          'SELECT COUNT(*)::int AS count FROM shots WHERE game_id = $1 AND client_uuid = $2',
+          [testGame.id, shotData.client_uuid]
+        );
+
+        expect(duplicateCheck.rows[0].count).toBe(1);
+      } catch (error) {
+        global.testContext.logTestError(error, 'POST idempotent client_uuid behavior failed');
+        throw error;
+      }
+    });
+
     it('❌ should reject creation by regular user', async () => {
       try {
         const shotData = {

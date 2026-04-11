@@ -51,7 +51,7 @@ router.get('/predictions/form-trends/:playerId', [
         ROUND(AVG(s.distance), 2) as avg_distance
       FROM shots s
       JOIN games g ON s.game_id = g.id
-      WHERE s.player_id = $1
+      WHERE s.player_id = $1 AND s.event_status = 'confirmed'
         AND ($3::date IS NULL OR g.date >= $3::date)
         AND ($4::date IS NULL OR g.date < ($4::date + INTERVAL '1 day'))
       GROUP BY g.id, g.date
@@ -181,7 +181,7 @@ router.get('/predictions/fatigue/:playerId', [
         SELECT DISTINCT g.id, g.date, g.period_duration, g.number_of_periods
         FROM games g
         JOIN shots s ON g.id = s.game_id
-        WHERE s.player_id = $1
+        WHERE s.player_id = $1 AND s.event_status = 'confirmed'
           AND ($2::date IS NULL OR g.date >= $2::date)
           AND ($3::date IS NULL OR g.date < ($3::date + INTERVAL '1 day'))
         ORDER BY g.date DESC
@@ -212,7 +212,7 @@ router.get('/predictions/fatigue/:playerId', [
           EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
           'in' as type
         FROM substitutions
-        WHERE game_id = $1 AND player_in_id = $2
+        WHERE game_id = $1 AND player_in_id = $2 AND event_status = 'confirmed'
         UNION ALL
         SELECT 
           player_out_id as player_id,
@@ -220,7 +220,7 @@ router.get('/predictions/fatigue/:playerId', [
           EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
           'out' as type
         FROM substitutions
-        WHERE game_id = $1 AND player_out_id = $3
+        WHERE game_id = $1 AND player_out_id = $3 AND event_status = 'confirmed'
         ORDER BY period, time_remaining_seconds DESC
       `, [game.id, playerId, playerId]);      // Calculate play time
       // period_duration is stored as INTERVAL, extract minutes
@@ -277,7 +277,7 @@ router.get('/predictions/fatigue/:playerId', [
             2
           ) as fg_percentage
         FROM shots
-        WHERE game_id = $1 AND player_id = $2
+        WHERE game_id = $1 AND player_id = $2 AND event_status = 'confirmed'
         GROUP BY period
         ORDER BY period
       `, [game.id, playerId]);
@@ -398,7 +398,7 @@ router.get('/predictions/next-game/:playerId', [
           COUNT(CASE WHEN s.result = 'goal' THEN 1 END) as goals_per_game
         FROM shots s
         JOIN games g ON s.game_id = g.id
-        WHERE s.player_id = $1
+        WHERE s.player_id = $1 AND s.event_status = 'confirmed'
           AND ($2::date IS NULL OR g.date >= $2::date)
           AND ($3::date IS NULL OR g.date < ($3::date + INTERVAL '1 day'))
         GROUP BY g.id, g.date
@@ -452,7 +452,7 @@ router.get('/predictions/next-game/:playerId', [
             NULLIF(COUNT(*), 0) * 100 as fg_percentage
           FROM shots s
           JOIN games g ON s.game_id = g.id
-          WHERE s.player_id = $1
+          WHERE s.player_id = $1 AND s.event_status = 'confirmed'
             AND (
               (g.home_club_id = $2 OR g.away_club_id = $2)
             )
@@ -572,6 +572,7 @@ router.get('/benchmarks/league-averages', [
           ) as fg_percentage,
           ROUND(AVG(s.distance), 2) as avg_distance
         FROM shots s
+        WHERE s.event_status = 'confirmed'
         GROUP BY s.player_id, s.game_id
         HAVING COUNT(*) >= 3
       ) player_games
@@ -599,7 +600,7 @@ router.get('/benchmarks/league-averages', [
             ) as fg_percentage
           FROM shots s
           JOIN game_rosters gr ON s.player_id = gr.player_id AND s.game_id = gr.game_id
-          WHERE gr.starting_position = $1
+          WHERE gr.starting_position = $1 AND s.event_status = 'confirmed'
           GROUP BY s.player_id, s.game_id
           HAVING COUNT(*) >= 3
         ) player_games
@@ -702,7 +703,7 @@ router.get('/benchmarks/player-comparison/:playerId', [
           ROUND(AVG(s.distance), 2) as avg_distance
         FROM shots s
         JOIN games g ON s.game_id = g.id
-        WHERE s.player_id = $1
+        WHERE s.player_id = $1 AND s.event_status = 'confirmed'
           AND ($3::date IS NULL OR g.date >= $3::date)
           AND ($4::date IS NULL OR g.date < ($4::date + INTERVAL '1 day'))
         GROUP BY s.game_id, g.date
@@ -739,7 +740,7 @@ router.get('/benchmarks/player-comparison/:playerId', [
           ROUND(AVG(s.distance), 2) as avg_distance
         FROM shots s
         JOIN games g ON s.game_id = g.id
-        WHERE s.player_id != $1
+        WHERE s.player_id != $1 AND s.event_status = 'confirmed'
           AND ($2::date IS NULL OR g.date >= $2::date)
           AND ($3::date IS NULL OR g.date < ($3::date + INTERVAL '1 day'))
         GROUP BY s.player_id, s.game_id
@@ -846,7 +847,7 @@ router.get('/benchmarks/historical/:entityType/:entityId', [
             ROUND(AVG(s.distance), 2) as avg_distance
           FROM shots s
           JOIN games g ON s.game_id = g.id
-          WHERE s.player_id = $1 ${dateFilter}
+          WHERE s.player_id = $1 AND s.event_status = 'confirmed' ${dateFilter}
         `;
       } else {
         queryText = `
@@ -862,7 +863,7 @@ router.get('/benchmarks/historical/:entityType/:entityId', [
             ROUND(AVG(s.distance), 2) as avg_distance
           FROM shots s
           JOIN games g ON s.game_id = g.id
-          WHERE s.club_id = $1 ${dateFilter}
+          WHERE s.club_id = $1 AND s.event_status = 'confirmed' ${dateFilter}
         `;
       }
       
@@ -1058,7 +1059,7 @@ router.get('/video/highlights/:gameId', [
         FROM shots s
         JOIN players p ON s.player_id = p.id
         JOIN clubs c ON s.club_id = c.id
-        WHERE s.game_id = $1 AND s.result = 'goal'
+        WHERE s.game_id = $1 AND s.result = 'goal' AND s.event_status = 'confirmed'
         ORDER BY s.created_at
         LIMIT $2
       `, [gameId, max_clips - markedHighlights.rows.length]);
@@ -1121,7 +1122,7 @@ router.get('/video/report-data/:gameId', [
             FROM shots s
             JOIN players p ON s.player_id = p.id
             JOIN clubs c ON s.club_id = c.id
-            WHERE s.id = ve.event_id
+            WHERE s.id = ve.event_id AND s.event_status = 'confirmed'
           )
           ELSE NULL
         END as event_details
@@ -1190,7 +1191,8 @@ async function calculatePercentile(playerId, metric, value, startDate = null, en
           ) as avg_metric
         FROM shots s
         JOIN games g ON s.game_id = g.id
-        WHERE ($2::date IS NULL OR g.date >= $2::date)
+        WHERE s.event_status = 'confirmed'
+          AND ($2::date IS NULL OR g.date >= $2::date)
           AND ($3::date IS NULL OR g.date < ($3::date + INTERVAL '1 day'))
         GROUP BY s.player_id
         HAVING COUNT(*) >= 10

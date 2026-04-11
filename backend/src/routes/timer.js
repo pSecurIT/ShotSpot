@@ -8,6 +8,28 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(auth);
 
+const logTimerDebug = (...args) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(...args);
+  }
+};
+
+const TIMER_BASE_FIELDS = `
+  id,
+  status,
+  current_period,
+  number_of_periods,
+  period_duration,
+  time_remaining,
+  timer_state,
+  timer_started_at,
+  timer_paused_at,
+  home_club_id,
+  home_team_id,
+  home_score,
+  away_score
+`;
+
 /**
  * Helper function to parse PostgreSQL interval to seconds
  * PostgreSQL intervals can be returned as objects with various properties
@@ -15,7 +37,7 @@ router.use(auth);
 function intervalToSeconds(interval) {
   if (!interval) return 0;
   
-  console.log('intervalToSeconds input:', { interval, type: typeof interval });
+  logTimerDebug('intervalToSeconds input:', { interval, type: typeof interval });
   
   // If it's already a number, return it
   if (typeof interval === 'number') return interval;
@@ -33,7 +55,7 @@ function intervalToSeconds(interval) {
     if (hasMilliseconds && !hasTimeComponents) {
       // If ONLY milliseconds is present, it's the total duration
       const totalSeconds = Math.floor(interval.milliseconds / 1000);
-      console.log('intervalToSeconds: milliseconds-only format', { 
+      logTimerDebug('intervalToSeconds: milliseconds-only format', { 
         interval, 
         totalSeconds 
       });
@@ -53,7 +75,7 @@ function intervalToSeconds(interval) {
       (minutes * 60) +  // minutes to seconds
       seconds;          // seconds
     
-    console.log('intervalToSeconds: object format', { 
+    logTimerDebug('intervalToSeconds: object format', { 
       interval, 
       parsed: { days, hours, minutes, seconds },
       totalSeconds 
@@ -69,12 +91,12 @@ function intervalToSeconds(interval) {
       const minutes = parseInt(parts[1]) || 0;
       const seconds = parseInt(parts[2]) || 0;
       const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-      console.log('intervalToSeconds: string format', { interval, parts, totalSeconds });
+      logTimerDebug('intervalToSeconds: string format', { interval, parts, totalSeconds });
       return totalSeconds;
     }
   }
   
-  console.log('intervalToSeconds: unknown format', { interval, type: typeof interval });
+  logTimerDebug('intervalToSeconds: unknown format', { interval, type: typeof interval });
   return 0;
 }
 
@@ -106,7 +128,7 @@ router.get('/:gameId', async (req, res) => {
 
     const game = result.rows[0];
 
-    console.log('Timer GET - Raw game data:', {
+    logTimerDebug('Timer GET - Raw game data:', {
       period_duration: game.period_duration,
       period_duration_type: typeof game.period_duration,
       time_remaining: game.time_remaining,
@@ -126,7 +148,7 @@ router.get('/:gameId', async (req, res) => {
         ? intervalToSeconds(game.time_remaining)
         : intervalToSeconds(game.period_duration);
       
-      console.log('Timer GET - Calculated:', {
+      logTimerDebug('Timer GET - Calculated:', {
         elapsed,
         elapsedSeconds,
         startingSeconds,
@@ -165,16 +187,19 @@ router.post('/:gameId/start', [
   const { gameId } = req.params;
 
   try {
+    await db.query('BEGIN');
+
     // Get current game state
-    const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
+    const gameResult = await db.query(`SELECT ${TIMER_BASE_FIELDS} FROM games WHERE id = $1 FOR UPDATE`, [gameId]);
     
     if (gameResult.rows.length === 0) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ error: 'Game not found' });
     }
 
     const game = gameResult.rows[0];
 
-    console.log('Timer START - Game state:', {
+    logTimerDebug('Timer START - Game state:', {
       period_duration: game.period_duration,
       period_duration_type: typeof game.period_duration,
       time_remaining: game.time_remaining,
@@ -183,17 +208,22 @@ router.post('/:gameId/start', [
 
     // Can only start timer if game is in progress
     if (game.status !== 'in_progress') {
+      await db.query('ROLLBACK');
       return res.status(400).json({ 
         error: 'Cannot start timer for game that is not in progress',
         currentStatus: game.status
       });
     }
 
-    // Can't start if already running
+    // Treat repeated start calls as idempotent success so optimistic clients can safely retry.
     if (game.timer_state === 'running') {
-      return res.status(400).json({ 
-        error: 'Timer is already running',
-        currentState: game.timer_state
+      await db.query('ROLLBACK');
+      return res.json({ 
+        message: 'Timer already running',
+        timer_state: game.timer_state,
+        timer_started_at: game.timer_started_at,
+        current_period: game.current_period,
+        time_remaining: game.time_remaining
       });
     }
 
@@ -216,6 +246,8 @@ router.post('/:gameId/start', [
 
     const result = await db.query(updateQuery, [gameId]);
 
+    await db.query('COMMIT');
+
     res.json({
       message: 'Timer started',
       timer_state: result.rows[0].timer_state,
@@ -224,6 +256,11 @@ router.post('/:gameId/start', [
       time_remaining: result.rows[0].time_remaining
     });
   } catch (error) {
+    try {
+      await db.query('ROLLBACK');
+    } catch {
+      // Ignore rollback errors after a failed transaction.
+    }
     console.error('Error starting timer:', error);
     res.status(500).json({ error: 'Failed to start timer' });
   }
@@ -239,15 +276,29 @@ router.post('/:gameId/pause', [
   const { gameId } = req.params;
 
   try {
-    const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
+    await db.query('BEGIN');
+
+    const gameResult = await db.query(`SELECT ${TIMER_BASE_FIELDS} FROM games WHERE id = $1 FOR UPDATE`, [gameId]);
     
     if (gameResult.rows.length === 0) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ error: 'Game not found' });
     }
 
     const game = gameResult.rows[0];
 
+    if (game.timer_state === 'paused') {
+      await db.query('ROLLBACK');
+      return res.json({ 
+        message: 'Timer already paused',
+        timer_state: game.timer_state,
+        timer_paused_at: game.timer_paused_at,
+        time_remaining: game.time_remaining
+      });
+    }
+
     if (game.timer_state !== 'running') {
+      await db.query('ROLLBACK');
       return res.status(400).json({ 
         error: 'Timer is not running',
         currentState: game.timer_state
@@ -282,6 +333,8 @@ router.post('/:gameId/pause', [
       [remainingInterval, gameId]
     );
 
+    await db.query('COMMIT');
+
     res.json({
       message: 'Timer paused',
       timer_state: result.rows[0].timer_state,
@@ -289,6 +342,11 @@ router.post('/:gameId/pause', [
       time_remaining: result.rows[0].time_remaining
     });
   } catch (error) {
+    try {
+      await db.query('ROLLBACK');
+    } catch {
+      // Ignore rollback errors after a failed transaction.
+    }
     console.error('Error pausing timer:', error);
     res.status(500).json({ error: 'Failed to pause timer' });
   }
@@ -304,7 +362,7 @@ router.post('/:gameId/stop', [
   const { gameId } = req.params;
 
   try {
-    const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
+    const gameResult = await db.query('SELECT id FROM games WHERE id = $1', [gameId]);
     
     if (gameResult.rows.length === 0) {
       return res.status(404).json({ error: 'Game not found' });
@@ -342,15 +400,21 @@ router.post('/:gameId/next-period', [
   const { gameId } = req.params;
 
   try {
-    const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
+    await db.query('BEGIN');
+
+    const gameResult = await db.query('SELECT id, current_period, number_of_periods, home_club_id, home_team_id FROM games WHERE id = $1 FOR UPDATE', [gameId]);
     
     if (gameResult.rows.length === 0) {
+      await db.query('ROLLBACK');
       return res.status(404).json({ error: 'Game not found' });
     }
 
     const game = gameResult.rows[0];
 
-    if (game.current_period >= 4) {
+    const maxPeriods = game.number_of_periods || 4;
+
+    if (game.current_period >= maxPeriods) {
+      await db.query('ROLLBACK');
       return res.status(400).json({ 
         error: 'Already at final period',
         currentPeriod: game.current_period
@@ -396,12 +460,19 @@ router.post('/:gameId/next-period', [
       ]
     );
 
+    await db.query('COMMIT');
+
     res.json({
       message: 'Moved to next period',
       current_period: result.rows[0].current_period,
       timer_state: result.rows[0].timer_state
     });
   } catch (error) {
+    try {
+      await db.query('ROLLBACK');
+    } catch {
+      // Ignore rollback errors after a failed transaction.
+    }
     console.error('Error changing period:', error);
     res.status(500).json({ error: 'Failed to change period' });
   }
@@ -427,7 +498,7 @@ router.put('/:gameId/period', [
   const { period } = req.body;
 
   try {
-    const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
+    const gameResult = await db.query('SELECT id FROM games WHERE id = $1', [gameId]);
     
     if (gameResult.rows.length === 0) {
       return res.status(404).json({ error: 'Game not found' });
@@ -477,7 +548,7 @@ router.put('/:gameId/duration', [
   const { minutes } = req.body;
 
   try {
-    const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
+    const gameResult = await db.query('SELECT id FROM games WHERE id = $1', [gameId]);
     
     if (gameResult.rows.length === 0) {
       return res.status(404).json({ error: 'Game not found' });
@@ -515,13 +586,11 @@ router.post('/:gameId/reset-match', [
 
   try {
     // Verify game exists
-    const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
+    const gameResult = await db.query('SELECT id FROM games WHERE id = $1', [gameId]);
     
     if (gameResult.rows.length === 0) {
       return res.status(404).json({ error: 'Game not found' });
     }
-
-    const _game = gameResult.rows[0];
 
     // Start transaction to ensure all or nothing
     await db.query('BEGIN');

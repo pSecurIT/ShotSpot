@@ -1,5 +1,5 @@
 import express from 'express';
-import { body, param, validationResult } from 'express-validator';
+import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
@@ -7,6 +7,38 @@ const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(auth);
+
+const FREE_SHOT_EVENT_STATUSES = ['confirmed', 'unconfirmed'];
+
+const normalizeFreeShotNumbers = (freeShot) => {
+  if (!freeShot) {
+    return freeShot;
+  }
+
+  const normalizedFreeShot = { ...freeShot };
+  if (normalizedFreeShot.x_coord) normalizedFreeShot.x_coord = parseFloat(normalizedFreeShot.x_coord);
+  if (normalizedFreeShot.y_coord) normalizedFreeShot.y_coord = parseFloat(normalizedFreeShot.y_coord);
+  if (normalizedFreeShot.distance) normalizedFreeShot.distance = parseFloat(normalizedFreeShot.distance);
+
+  return normalizedFreeShot;
+};
+
+const fetchCompleteFreeShotById = async (freeShotId) => {
+  const freeShotResult = await db.query(`
+    SELECT 
+      fs.*,
+      p.first_name,
+      p.last_name,
+      p.jersey_number,
+      c.name as club_name
+    FROM free_shots fs
+    JOIN clubs c ON fs.club_id = c.id
+    JOIN players p ON fs.player_id = p.id
+    WHERE fs.id = $1
+  `, [freeShotId]);
+
+  return normalizeFreeShotNumbers(freeShotResult.rows[0] || null);
+};
 
 const getFallbackFreeShotPlayerId = async (clubId) => {
   const existingFallback = await db.query(
@@ -36,11 +68,25 @@ const getFallbackFreeShotPlayerId = async (clubId) => {
  * Get all free shots for a game
  * GET /api/free-shots/:gameId
  */
-router.get('/:gameId', async (req, res) => {
+router.get('/:gameId', [
+  param('gameId')
+    .isInt({ min: 1 })
+    .withMessage('Game ID must be a positive integer'),
+  query('event_status')
+    .optional()
+    .isIn(FREE_SHOT_EVENT_STATUSES)
+    .withMessage('Invalid event status value')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
   const { gameId } = req.params;
+  const { event_status } = req.query;
 
   try {
-    const result = await db.query(`
+    let queryText = `
       SELECT 
         fs.*,
         p.first_name,
@@ -51,16 +97,19 @@ router.get('/:gameId', async (req, res) => {
       JOIN clubs c ON fs.club_id = c.id
       JOIN players p ON fs.player_id = p.id
       WHERE fs.game_id = $1
-      ORDER BY fs.created_at DESC
-    `, [gameId]);
+    `;
+    const params = [gameId];
 
-    // Convert numeric fields from strings to numbers
-    const freeShots = result.rows.map(shot => {
-      if (shot.x_coord) shot.x_coord = parseFloat(shot.x_coord);
-      if (shot.y_coord) shot.y_coord = parseFloat(shot.y_coord);
-      if (shot.distance) shot.distance = parseFloat(shot.distance);
-      return shot;
-    });
+    if (event_status) {
+      queryText += ' AND fs.event_status = $2';
+      params.push(event_status);
+    }
+
+    queryText += ' ORDER BY fs.created_at DESC';
+
+    const result = await db.query(queryText, params);
+
+    const freeShots = result.rows.map(normalizeFreeShotNumbers);
 
     res.json(freeShots);
   } catch (error) {
@@ -120,7 +169,15 @@ router.post('/', [
   body('distance')
     .optional({ nullable: true })
     .isNumeric()
-    .withMessage('Distance must be a number')
+    .withMessage('Distance must be a number'),
+  body('client_uuid')
+    .optional()
+    .isUUID()
+    .withMessage('client_uuid must be a valid UUID'),
+  body('event_status')
+    .optional()
+    .isIn(FREE_SHOT_EVENT_STATUSES)
+    .withMessage('event_status must be confirmed or unconfirmed')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -129,11 +186,24 @@ router.post('/', [
 
   const {
     game_id: gameId, player_id, club_id, period, time_remaining, free_shot_type,
-    reason, x_coord, y_coord, result, distance
+    reason, x_coord, y_coord, result, distance, client_uuid, event_status
   } = req.body;
+  const normalizedEventStatus = event_status || 'confirmed';
   let playerIdForFreeShot = player_id ?? null;
 
   try {
+    if (client_uuid) {
+      const existingFreeShotResult = await db.query(
+        'SELECT id FROM free_shots WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+        [gameId, client_uuid]
+      );
+
+      if (existingFreeShotResult.rows.length > 0) {
+        const existingFreeShot = await fetchCompleteFreeShotById(existingFreeShotResult.rows[0].id);
+        return res.status(200).json(existingFreeShot);
+      }
+    }
+
     // Verify game exists and is in progress
     const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
     if (gameResult.rows.length === 0) {
@@ -183,40 +253,38 @@ router.post('/', [
     const insertQuery = `
       INSERT INTO free_shots (
         game_id, player_id, club_id, period, time_remaining,
-        free_shot_type, reason, x_coord, y_coord, result, distance
+        free_shot_type, reason, x_coord, y_coord, result, distance, client_uuid, event_status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
 
     const result_query = await db.query(insertQuery, [
       gameId, playerIdForFreeShot, club_id, period, time_remaining || null,
       free_shot_type, reason || null, x_coord || null, y_coord || null,
-      result, distance || null
+      result, distance || null, client_uuid || null, normalizedEventStatus
     ]);
 
-    // Fetch the complete free shot with joined data
-    const freeShotResult = await db.query(`
-      SELECT 
-        fs.*,
-        p.first_name,
-        p.last_name,
-        p.jersey_number,
-        c.name as club_name
-      FROM free_shots fs
-      JOIN clubs c ON fs.club_id = c.id
-      JOIN players p ON fs.player_id = p.id
-      WHERE fs.id = $1
-    `, [result_query.rows[0].id]);
-
-    // Convert numeric fields from strings to numbers
-    const freeShot = freeShotResult.rows[0];
-    if (freeShot.x_coord) freeShot.x_coord = parseFloat(freeShot.x_coord);
-    if (freeShot.y_coord) freeShot.y_coord = parseFloat(freeShot.y_coord);
-    if (freeShot.distance) freeShot.distance = parseFloat(freeShot.distance);
+    const freeShot = await fetchCompleteFreeShotById(result_query.rows[0].id);
 
     res.status(201).json(freeShot);
   } catch (error) {
+    if (error.code === '23505' && client_uuid) {
+      try {
+        const existingFreeShotResult = await db.query(
+          'SELECT id FROM free_shots WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+          [gameId, client_uuid]
+        );
+
+        if (existingFreeShotResult.rows.length > 0) {
+          const existingFreeShot = await fetchCompleteFreeShotById(existingFreeShotResult.rows[0].id);
+          return res.status(200).json(existingFreeShot);
+        }
+      } catch (lookupError) {
+        console.error('Error resolving duplicate free shot by client_uuid:', lookupError);
+      }
+    }
+
     console.error('Error creating free shot:', error);
     res.status(500).json({ error: 'Failed to create free shot' });
   }
@@ -276,7 +344,11 @@ router.put('/:freeShotId', [
   body('distance')
     .optional({ nullable: true })
     .isNumeric()
-    .withMessage('Distance must be a number')
+    .withMessage('Distance must be a number'),
+  body('event_status')
+    .optional()
+    .isIn(FREE_SHOT_EVENT_STATUSES)
+    .withMessage('event_status must be confirmed or unconfirmed')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -329,30 +401,60 @@ router.put('/:freeShotId', [
 
     await db.query(updateQuery, params);
 
-    // Fetch the complete updated free shot with joined data
-    const updatedResult = await db.query(`
-      SELECT 
-        fs.*,
-        p.first_name,
-        p.last_name,
-        p.jersey_number,
-        c.name as club_name
-      FROM free_shots fs
-      JOIN clubs c ON fs.club_id = c.id
-      JOIN players p ON fs.player_id = p.id
-      WHERE fs.id = $1
-    `, [freeShotId]);
-
-    // Convert numeric fields from strings to numbers
-    const freeShot = updatedResult.rows[0];
-    if (freeShot.x_coord) freeShot.x_coord = parseFloat(freeShot.x_coord);
-    if (freeShot.y_coord) freeShot.y_coord = parseFloat(freeShot.y_coord);
-    if (freeShot.distance) freeShot.distance = parseFloat(freeShot.distance);
+    const freeShot = await fetchCompleteFreeShotById(freeShotId);
 
     res.json(freeShot);
   } catch (error) {
     console.error('Error updating free shot:', error);
     res.status(500).json({ error: 'Failed to update free shot' });
+  }
+});
+
+/**
+ * Confirm a free shot
+ * POST /api/free-shots/:freeShotId/confirm
+ * Body: { game_id }
+ */
+router.post('/:freeShotId/confirm', [
+  requireRole(['admin', 'coach']),
+  param('freeShotId')
+    .isInt({ min: 1 })
+    .withMessage('Free shot ID must be a positive integer'),
+  body('game_id')
+    .notEmpty()
+    .isInt({ min: 1 })
+    .withMessage('Game ID must be a positive integer')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const { freeShotId } = req.params;
+  const { game_id: gameId } = req.body;
+
+  try {
+    const freeShotResult = await db.query(
+      'SELECT * FROM free_shots WHERE id = $1 AND game_id = $2',
+      [freeShotId, gameId]
+    );
+
+    if (freeShotResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Free shot not found' });
+    }
+
+    if (freeShotResult.rows[0].event_status !== 'confirmed') {
+      await db.query(
+        'UPDATE free_shots SET event_status = $1 WHERE id = $2',
+        ['confirmed', freeShotId]
+      );
+    }
+
+    const freeShot = await fetchCompleteFreeShotById(freeShotId);
+    res.status(200).json(freeShot);
+  } catch (error) {
+    console.error('Error confirming free shot:', error);
+    res.status(500).json({ error: 'Failed to confirm free shot' });
   }
 });
 

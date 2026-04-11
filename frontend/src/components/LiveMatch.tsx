@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import CourtVisualization from './CourtVisualization';
@@ -118,6 +118,12 @@ interface Possession {
   club_name?: string;
 }
 
+interface PossessionTimingState {
+  startedAtMs: number;
+  accumulatedPausedMs: number;
+  pausedAtMs: number | null;
+}
+
 // Reserved for future analytics feature
 // interface PossessionStats {
 //   team_id: number;
@@ -142,12 +148,28 @@ const LiveMatch: React.FC = () => {
     
     // Clear active possession when period ends
     setActivePossession(null);
-    setPossessionDuration(0);
+    setPossessionTiming(null);
   }, []);
 
-  const { timerState, refetch: fetchTimerState, setTimerStateOptimistic, periodHasEnded, resetPeriodEndState } = useTimer(gameId, {
+  const {
+    timerState,
+    currentTimeMs,
+    error: timerError,
+    refetch: fetchTimerState,
+    setTimerStateOptimistic,
+    periodHasEnded,
+    resetPeriodEndState,
+    startTimer,
+    pauseTimer
+  } = useTimer(gameId, {
     onPeriodEnd: handlePeriodEnd
   });
+
+  useEffect(() => {
+    if (timerError) {
+      setError(timerError);
+    }
+  }, [timerError]);
 
   // Check if events can be added (returns false if period has ended and user hasn't confirmed)
   const canAddEvents = useCallback(() => {
@@ -190,11 +212,13 @@ const LiveMatch: React.FC = () => {
 
   // Possession tracking state
   const [activePossession, setActivePossession] = useState<Possession | null>(null);
-  const [possessionDuration, setPossessionDuration] = useState<number>(0); // Client-side timer in seconds
+  const [possessionTiming, setPossessionTiming] = useState<PossessionTimingState | null>(null);
   // Note: possessionStats removed - reserved for future analytics feature
 
   // Reset tracking - incrementing this key forces CourtVisualization to remount and refetch shots
   const [courtResetKey, setCourtResetKey] = useState<number>(0);
+  const nextPeriodMutationRef = useRef<Promise<void> | null>(null);
+  const resetMatchMutationRef = useRef<Promise<void> | null>(null);
 
   // Active tab for Enhanced Match Events
   const [activeTab, setActiveTab] = useState<'timeline' | 'faults' | 'timeouts' | 'freeshots' | 'commentary'>('timeline');
@@ -218,6 +242,7 @@ const LiveMatch: React.FC = () => {
    * - Shot data remains in game.home_score/away_score and is visible in both views
    */
   const [focusMode, setFocusMode] = useState<boolean>(false);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
 
   const currentUserRole = (() => {
     if (typeof window === 'undefined') {
@@ -261,6 +286,32 @@ const LiveMatch: React.FC = () => {
       }
     }
   }, [gameId]);
+
+  const fetchPendingReviewCount = useCallback(async () => {
+    if (!gameId) return;
+
+    try {
+      const [comprehensiveResponse, shotsResponse, substitutionsResponse] = await Promise.all([
+        api.get(`/events/comprehensive/${gameId}?event_status=unconfirmed`),
+        api.get(`/shots/${gameId}?event_status=unconfirmed`),
+        api.get(`/substitutions/${gameId}?event_status=unconfirmed`)
+      ]);
+
+      setPendingReviewCount(
+        (comprehensiveResponse.data?.length || 0) +
+        (shotsResponse.data?.length || 0) +
+        (substitutionsResponse.data?.length || 0)
+      );
+    } catch (pendingError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching pending review count:', pendingError);
+      }
+    }
+  }, [gameId]);
+
+  const refreshMatchContext = useCallback(() => {
+    void Promise.allSettled([fetchGame(), fetchPendingReviewCount()]);
+  }, [fetchGame, fetchPendingReviewCount]);
 
   // Fetch players for both teams
   const fetchPlayers = useCallback(async () => {
@@ -738,12 +789,12 @@ const LiveMatch: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await fetchGame(); // Timer state is now handled by useTimer hook
+      await Promise.all([fetchGame(), fetchPendingReviewCount()]);
       setLoading(false);
     };
     
     loadData();
-  }, [gameId, fetchGame]);
+  }, [gameId, fetchGame, fetchPendingReviewCount]);
 
   // Fetch players when game is loaded or status changes
   useEffect(() => {
@@ -778,22 +829,7 @@ const LiveMatch: React.FC = () => {
       
       // Check if this is the first start
       const wasFirstStart = timerState?.timer_state === 'stopped' && timerState?.current_period === 1 && !activePossession;
-      
-      // 🔥 INSTANT OPTIMISTIC UPDATE: Change UI immediately before API call
-      setTimerStateOptimistic({ timer_state: 'running' });
-      
-      // 🔥 Fire API calls in background WITH RETRY for reliability
-      retryApiCall(() => api.post(`/timer/${gameId}/start`, {}))
-        .then(() => {
-          // Sync with server after successful start (background refresh)
-          setTimeout(() => fetchTimerState(), 100);
-        })
-        .catch(err => {
-          const error = err as { response?: { data?: { error?: string } }; message?: string };
-          setError(error.response?.data?.error || 'Error starting timer after retries');
-          // Revert optimistic update on error
-          setTimerStateOptimistic({ timer_state: 'paused' });
-        });
+      await startTimer();
       
       // If this is the first start, give home team possession (fire and forget)
       if (wasFirstStart && game) {
@@ -810,45 +846,36 @@ const LiveMatch: React.FC = () => {
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error starting timer');
-      setTimerStateOptimistic({ timer_state: 'paused' });
     }
   };
 
   const handlePauseTimer = async () => {
     try {
       setError(null);
-      
-      // 🔥 INSTANT OPTIMISTIC UPDATE: Pause UI immediately
-      setTimerStateOptimistic({ timer_state: 'paused' });
-      
-      // Pause timer in background WITH RETRY
-      retryApiCall(() => api.post(`/timer/${gameId}/pause`, {}))
-        .then(() => {
-          setTimeout(() => fetchTimerState(), 100);
-        })
-        .catch(err => {
-          const error = err as { response?: { data?: { error?: string } }; message?: string };
-          setError(error.response?.data?.error || 'Error pausing timer after retries');
-          // Revert on error
-          setTimerStateOptimistic({ timer_state: 'running' });
-        });
+      await pauseTimer();
       
       setSuccess('Timer paused');
       setTimeout(() => setSuccess(null), 2000);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error pausing timer');
-      setTimerStateOptimistic({ timer_state: 'running' });
     }
   };
 
   const handleStopTimer = async () => {
+    if (resetMatchMutationRef.current) {
+      return resetMatchMutationRef.current;
+    }
+
     if (typeof window !== 'undefined' && !window.confirm('Are you sure you want to stop and reset the entire match? This will:\n\n• Reset scores to 0-0\n• Delete all recorded shots\n• Delete all game events\n• Delete all possession records\n• Reset timer to period 1\n\nThis action cannot be undone!')) {
       return;
     }
     
     try {
       setError(null);
+      const previousGame = game ? { ...game } : null;
+      const previousPossession = activePossession;
+      const previousPossessionTiming = possessionTiming;
       
       // 🔥 OPTIMISTIC UPDATE: Reset UI immediately
       setTimerStateOptimistic({ 
@@ -869,29 +896,47 @@ const LiveMatch: React.FC = () => {
       
       setSuccess('Resetting match...');
       
-      // Fire API in background WITH RETRY
-      retryApiCall(() => api.post(`/timer/${gameId}/reset-match`, {}))
-        .then(() => {
-          // Refresh all game data after API success
-          setTimeout(() => {
-            Promise.all([
-              fetchTimerState(),
-              fetchGame(),
-              fetchActivePossession(),
-              fetchPossessionStats()
-            ]);
-          }, 100);
+      const mutationPromise = (async () => {
+        try {
+          await retryApiCall(() => api.post(`/timer/${gameId}/reset-match`, {}));
+          void Promise.allSettled([
+            fetchTimerState(true),
+            fetchGame(),
+            fetchActivePossession(),
+            fetchPossessionStats()
+          ]);
           setSuccess('Match reset successfully - all data cleared');
           setTimeout(() => setSuccess(null), 3000);
-        })
-        .catch(err => {
+        } catch (err) {
           const error = err as { response?: { data?: { error?: string } }; message?: string };
           setError(error.response?.data?.error || 'Error resetting match after retries');
-          // Revert on error
-          fetchTimerState();
-          fetchGame();
-          fetchActivePossession();
-        });
+          setActivePossession(previousPossession);
+          setPossessionTiming(previousPossessionTiming);
+          setCourtResetKey(prev => Math.max(0, prev - 1));
+
+          if (previousGame) {
+            setGame(previousGame);
+            setTimerStateOptimistic({
+              current_period: previousGame.current_period,
+              timer_state: previousGame.timer_state,
+              time_remaining: previousGame.time_remaining || previousGame.period_duration || { minutes: 10, seconds: 0 },
+              period_duration: previousGame.period_duration || { minutes: 10, seconds: 0 }
+            });
+          }
+
+          void Promise.allSettled([
+            fetchTimerState(true),
+            fetchGame(),
+            fetchActivePossession(),
+            fetchPossessionStats()
+          ]);
+        } finally {
+          resetMatchMutationRef.current = null;
+        }
+      })();
+
+      resetMatchMutationRef.current = mutationPromise;
+      return mutationPromise;
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error resetting match');
@@ -899,12 +944,20 @@ const LiveMatch: React.FC = () => {
   };
 
   const handleNextPeriod = async () => {
+    if (nextPeriodMutationRef.current) {
+      return nextPeriodMutationRef.current;
+    }
+
     try {
       setError(null);
+
+      const previousGame = game ? { ...game } : null;
+      const previousPossession = activePossession;
+      const previousPossessionTiming = possessionTiming;
       
       // Clear active possession when starting new period
       setActivePossession(null);
-      setPossessionDuration(0);
+      setPossessionTiming(null);
       
       // 🔥 OPTIMISTIC UPDATE: Increment period immediately
       if (timerState && game) {
@@ -918,24 +971,46 @@ const LiveMatch: React.FC = () => {
         setGame(prev => prev ? { ...prev, current_period: nextPeriod } : null);
       }
       
-      // Fire API in background WITH RETRY
-      retryApiCall(() => api.post(`/timer/${gameId}/next-period`, {}))
-        .then(() => {
-          setTimeout(() => {
-            fetchTimerState();
-            fetchGame();
-          }, 100);
-        })
-        .catch(err => {
+      const mutationPromise = (async () => {
+        try {
+          await retryApiCall(() => api.post(`/timer/${gameId}/next-period`, {}));
+          void Promise.allSettled([
+            fetchTimerState(true),
+            fetchGame(),
+            fetchPossessionStats()
+          ]);
+        } catch (err) {
           const error = err as { response?: { data?: { error?: string } }; message?: string };
           setError(error.response?.data?.error || 'Error advancing period after retries');
-          // Revert on error
-          fetchTimerState();
-          fetchGame();
-        });
+          setActivePossession(previousPossession);
+          setPossessionTiming(previousPossessionTiming);
+
+          if (previousGame) {
+            setGame(previousGame);
+            setTimerStateOptimistic({
+              current_period: previousGame.current_period,
+              timer_state: previousGame.timer_state,
+              time_remaining: previousGame.time_remaining || previousGame.period_duration || { minutes: 10, seconds: 0 },
+              period_duration: previousGame.period_duration || { minutes: 10, seconds: 0 }
+            });
+          }
+
+          void Promise.allSettled([
+            fetchTimerState(true),
+            fetchGame(),
+            fetchActivePossession(),
+            fetchPossessionStats()
+          ]);
+        } finally {
+          nextPeriodMutationRef.current = null;
+        }
+      })();
+
+      nextPeriodMutationRef.current = mutationPromise;
       
       setSuccess('Advanced to next period');
       setTimeout(() => setSuccess(null), 2000);
+      return mutationPromise;
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error advancing period');
@@ -1085,7 +1160,7 @@ const LiveMatch: React.FC = () => {
         club_id: ids.clubId,
         team_id: ids.teamId,
         period: currentPeriod,
-        started_at: new Date().toISOString(),
+        started_at: new Date(currentTimeMs).toISOString(),
         ended_at: null,
         shots_taken: 0,
         team_name: ids.teamName
@@ -1095,7 +1170,8 @@ const LiveMatch: React.FC = () => {
       // Fire API in background WITH RETRY
       retryApiCall(() => api.post(`/possessions/${gameId}`, {
         club_id: ids.clubId,
-        period: currentPeriod
+        period: currentPeriod,
+        started_at: optimisticPossession.started_at
       }))
         .then((response) => {
           // Update with real possession data immediately
@@ -1119,7 +1195,7 @@ const LiveMatch: React.FC = () => {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error starting possession');
     }
-  }, [game, timerState?.current_period, gameId, fetchActivePossession, normalizePossession, resolvePossessionIds]);
+  }, [currentTimeMs, game, timerState?.current_period, gameId, fetchActivePossession, normalizePossession, resolvePossessionIds]);
 
   const handleShotRecorded = useCallback(async (shotInfo: { result: 'goal' | 'miss' | 'blocked'; teamId: number; opposingTeamId: number }) => {
     // Check if period has ended and require confirmation
@@ -1160,6 +1236,22 @@ const LiveMatch: React.FC = () => {
     
     // Handle goal-specific actions
     if (shotInfo.result === 'goal') {
+      setGame(prev => {
+        if (!prev) {
+          return null;
+        }
+
+        if (shotInfo.teamId === prev.home_team_id) {
+          return { ...prev, home_score: prev.home_score + 1 };
+        }
+
+        if (shotInfo.teamId === prev.away_team_id) {
+          return { ...prev, away_score: prev.away_score + 1 };
+        }
+
+        return prev;
+      });
+
       // Give possession to the opposing team (non-blocking)
       handleCenterLineCross(shotInfo.opposingTeamId)
         .catch(error => {
@@ -1193,109 +1285,80 @@ const LiveMatch: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id, game?.status, fetchActivePossession, fetchPossessionStats]);
 
-  // Use ref to track possession start time - prevents resets when optimistic ID updates to real ID
-  const possessionStartTimeRef = useRef<number | null>(null);
-  const possessionIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const totalPausedDurationRef = useRef<number>(0); // Track total time spent paused (in ms)
-  const lastPauseTimeRef = useRef<number | null>(null); // Track when timer was paused
-  const wasRunningRef = useRef<boolean>(false); // Track if timer was running
-  
-  // Update possession start time ref when possession changes (but not when ID just updates)
-  // Track when possession starts (using state to trigger timer effect)
-  const [possessionStarted, setPossessionStarted] = useState<number | null>(null);
-  
+  const possessionDuration = useMemo(() => {
+    if (!activePossession || !possessionTiming) {
+      return 0;
+    }
+
+    const effectiveNowMs = timerState?.timer_state === 'running'
+      ? currentTimeMs
+      : possessionTiming.pausedAtMs ?? currentTimeMs;
+
+    const elapsedMs = effectiveNowMs - possessionTiming.startedAtMs - possessionTiming.accumulatedPausedMs;
+    return Math.max(0, Math.floor(elapsedMs / 1000));
+  }, [activePossession, currentTimeMs, possessionTiming, timerState?.timer_state]);
+
   useEffect(() => {
     if (activePossession) {
       const newStartTime = new Date(activePossession.started_at).getTime();
-      
-      // Only update ref if this is actually a NEW possession (different start time by more than 1 second)
-      // This prevents reset when optimistic possession gets replaced with server response
-      if (!possessionStartTimeRef.current || 
-          Math.abs(newStartTime - possessionStartTimeRef.current) > 1000) {
-        possessionStartTimeRef.current = newStartTime;
-        totalPausedDurationRef.current = 0; // Reset paused time for new possession
-        lastPauseTimeRef.current = null;
-        wasRunningRef.current = false;
-        setPossessionStarted(newStartTime); // Trigger timer effect
-      }
-    } else {
-      possessionStartTimeRef.current = null;
-      totalPausedDurationRef.current = 0;
-      lastPauseTimeRef.current = null;
-      wasRunningRef.current = false;
-      setPossessionStarted(null);
-    }
-    // Intentionally NOT depending on activePossession to prevent reset when optimistic ID updates
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePossession?.started_at]);
+      setPossessionTiming(previousState => {
+        if (previousState && Math.abs(previousState.startedAtMs - newStartTime) <= 1000) {
+          return previousState;
+        }
 
-  // Client-side possession duration timer (pauses when game timer is paused)
+        return {
+          startedAtMs: newStartTime,
+          accumulatedPausedMs: 0,
+          pausedAtMs: timerState?.timer_state === 'running' ? null : currentTimeMs
+        };
+      });
+    } else {
+      setPossessionTiming(null);
+    }
+  }, [activePossession, activePossession?.started_at, currentTimeMs, timerState?.timer_state]);
+
   useEffect(() => {
-    // Clear existing interval
-    if (possessionIntervalRef.current) {
-      clearInterval(possessionIntervalRef.current);
-      possessionIntervalRef.current = null;
-    }
-    
-    const isRunning = timerState?.timer_state === 'running';
-    
-    if (activePossession && isRunning && possessionStartTimeRef.current) {
-      // Timer is running - count up from current position
-      
-      // If we're resuming from pause, add the paused duration to our total
-      if (wasRunningRef.current === false && lastPauseTimeRef.current !== null) {
-        const pauseDuration = Date.now() - lastPauseTimeRef.current;
-        totalPausedDurationRef.current += pauseDuration;
-        lastPauseTimeRef.current = null;
-      }
-      wasRunningRef.current = true;
-      
-      const calculateDuration = () => {
-        if (!possessionStartTimeRef.current) return;
-        const now = Date.now();
-        // Calculate elapsed time minus total paused duration
-        const elapsed = now - possessionStartTimeRef.current - totalPausedDurationRef.current;
-        const durationSeconds = Math.floor(elapsed / 1000);
-        setPossessionDuration(durationSeconds);
-      };
-      
-      // Set initial duration
-      calculateDuration();
-      
-      // Update duration every second only when timer is running
-      possessionIntervalRef.current = setInterval(() => {
-        calculateDuration();
-      }, 1000);
-    } else if (activePossession && !isRunning && possessionStartTimeRef.current) {
-      // Timer paused/stopped - freeze duration at current value
-      if (wasRunningRef.current === true) {
-        // Just paused - record the pause time
-        lastPauseTimeRef.current = Date.now();
-        wasRunningRef.current = false;
-      }
-      
-      // Keep displaying the frozen duration (calculate without adding more paused time)
-      if (lastPauseTimeRef.current !== null) {
-        const elapsed = lastPauseTimeRef.current - possessionStartTimeRef.current - totalPausedDurationRef.current;
-        const durationSeconds = Math.floor(elapsed / 1000);
-        setPossessionDuration(durationSeconds);
-      }
-    } else {
-      // No active possession, reset duration
-      setPossessionDuration(0);
-      lastPauseTimeRef.current = null;
-      wasRunningRef.current = false;
+    if (!possessionTiming) {
+      return;
     }
 
-    return () => {
-      if (possessionIntervalRef.current) {
-        clearInterval(possessionIntervalRef.current);
-        possessionIntervalRef.current = null;
+    if (timerState?.timer_state === 'running') {
+      if (possessionTiming.pausedAtMs !== null) {
+        setPossessionTiming(previousState => {
+          if (!previousState || previousState.pausedAtMs === null) {
+            return previousState;
+          }
+
+          return {
+            ...previousState,
+            accumulatedPausedMs: previousState.accumulatedPausedMs + Math.max(0, currentTimeMs - previousState.pausedAtMs),
+            pausedAtMs: null
+          };
+        });
       }
-    };
-    // Timer state and possession start time changes should trigger interval update
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timerState?.timer_state, possessionStarted]);
+
+      return;
+    }
+
+    if (possessionTiming.pausedAtMs === null) {
+      setPossessionTiming(previousState => {
+        if (!previousState || previousState.pausedAtMs !== null) {
+          return previousState;
+        }
+
+        return {
+          ...previousState,
+          pausedAtMs: currentTimeMs
+        };
+      });
+    }
+  }, [currentTimeMs, possessionTiming, timerState?.timer_state]);
+
+  useEffect(() => {
+    if (game?.status !== 'in_progress') {
+      setPossessionTiming(null);
+    }
+  }, [game?.status]);
 
   // Format time remaining
   const formatTime = (timeObj: { minutes?: number; seconds?: number; hours?: number } | null): string => {
@@ -1975,6 +2038,7 @@ const LiveMatch: React.FC = () => {
           homePlayers={homePlayers}
           awayPlayers={awayPlayers}
           timerState={timerState?.timer_state}
+          timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining || game.period_duration)}
           onResumeTimer={handleStartTimer}
           onPauseTimer={handlePauseTimer}
           canAddEvents={canAddEvents}
@@ -2029,7 +2093,7 @@ const LiveMatch: React.FC = () => {
                     className={`tab-button ${activeTab === 'timeline' ? 'active' : ''}`}
                     onClick={() => setActiveTab('timeline')}
                   >
-                    📊 Timeline
+                    📊 Timeline {pendingReviewCount > 0 ? `(${pendingReviewCount})` : ''}
                   </button>
                   <button
                     className={`tab-button ${activeTab === 'faults' ? 'active' : ''}`}
@@ -2080,7 +2144,7 @@ const LiveMatch: React.FC = () => {
                     awayTeamName={game.away_team_name}
                     homePlayers={homePlayers}
                     awayPlayers={awayPlayers}
-                    onRefresh={fetchGame}
+                    onRefresh={refreshMatchContext}
                   />
                 )}
 
@@ -2096,8 +2160,7 @@ const LiveMatch: React.FC = () => {
                     currentPeriod={timerState?.current_period || game.current_period}
                     timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
                     onFaultRecorded={() => {
-                      // Refresh timeline to show new fault events
-                      fetchGame();
+                      refreshMatchContext();
                     }}
                     canAddEvents={canAddEvents}
                     userAssignedTeam={eventRestrictedTeam}
@@ -2117,8 +2180,7 @@ const LiveMatch: React.FC = () => {
                     currentPeriod={timerState?.current_period || game.current_period}
                     timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
                     onTimeoutRecorded={() => {
-                      // Refresh timeline to show new timeout events
-                      fetchGame();
+                      refreshMatchContext();
                     }}
                     canAddEvents={canAddEvents}
                     userAssignedTeam={eventRestrictedTeam}
@@ -2138,8 +2200,7 @@ const LiveMatch: React.FC = () => {
                     currentPeriod={timerState?.current_period || game.current_period}
                     timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
                     onFreeShotRecorded={() => {
-                      // Refresh timeline and game data to show new free shot events
-                      fetchGame();
+                      refreshMatchContext();
                     }}
                     userAssignedTeam={eventRestrictedTeam}
                     currentUserRole={currentUserRole}

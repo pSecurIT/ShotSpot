@@ -237,6 +237,48 @@ describe('🏃 Ball Possessions API', () => {
         expect(endedPossession.ended_at).not.toBeNull();
         expect(endedPossession.result).toBe('turnover');
       });
+
+      it('✅ should create an unconfirmed possession idempotently by client_uuid', async () => {
+        const possessionData = {
+          club_id: club1.id,
+          period: 1,
+          client_uuid: '40000000-0000-4000-8000-000000000001',
+          event_status: 'unconfirmed'
+        };
+
+        const firstResponse = await request(app)
+          .post(`/api/possessions/${game.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(possessionData)
+          .expect(201);
+
+        expect(firstResponse.body.event_status).toBe('unconfirmed');
+
+        const secondResponse = await request(app)
+          .post(`/api/possessions/${game.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(possessionData)
+          .expect(200);
+
+        expect(secondResponse.body.id).toBe(firstResponse.body.id);
+      });
+
+      it('✅ should preserve a client-supplied started_at timestamp when creating a possession', async () => {
+        const startedAt = '2026-04-07T12:34:56.000Z';
+
+        const response = await request(app)
+          .post(`/api/possessions/${game.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            club_id: club1.id,
+            period: 1,
+            started_at: startedAt,
+            client_uuid: '40000000-0000-4000-8000-000000000099'
+          })
+          .expect(201);
+
+        expect(new Date(response.body.started_at).toISOString()).toBe(startedAt);
+      });
     });
 
     describe('❌ Error Handling', () => {
@@ -490,6 +532,27 @@ describe('🏃 Ball Possessions API', () => {
 
         expect(Array.isArray(response.body)).toBe(true);
       });
+
+      it('✅ should filter possessions by event status', async () => {
+        await request(app)
+          .post(`/api/possessions/${game.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            club_id: club1.id,
+            period: 3,
+            client_uuid: '40000000-0000-4000-8000-000000000002',
+            event_status: 'unconfirmed'
+          })
+          .expect(201);
+
+        const response = await request(app)
+          .get(`/api/possessions/${game.id}?event_status=unconfirmed`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
+
+        expect(response.body.length).toBeGreaterThan(0);
+        expect(response.body.every(possession => possession.event_status === 'unconfirmed')).toBe(true);
+      });
     });
 
     describe('❌ Error Handling', () => {
@@ -613,6 +676,14 @@ describe('🏃 Ball Possessions API', () => {
         );
         statsTestPossessions.push(possessionResult.rows[0]);
       }
+
+      const ignoredPossessionResult = await db.query(
+        `INSERT INTO ball_possessions (game_id, club_id, period, shots_taken, result, started_at, ended_at, duration_seconds, event_status, client_uuid)
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP - INTERVAL '30 seconds', CURRENT_TIMESTAMP, 30, 'unconfirmed', $6)
+         RETURNING *`,
+        [statsTestGame.id, club1.id, 2, 1, 'goal', '40000000-0000-4000-8000-000000000003']
+      );
+      statsTestPossessions.push(ignoredPossessionResult.rows[0]);
     }, 10000);
 
     describe('✅ Successful Operations', () => {
@@ -782,6 +853,28 @@ describe('🏃 Ball Possessions API', () => {
           .set('Content-Type', 'application/json')
           .expect(400);
       }, 30000);
+    });
+  });
+
+  describe('✅ POST /api/possessions/:gameId/:possessionId/confirm', () => {
+    it('✅ should confirm an unconfirmed possession', async () => {
+      const createResponse = await request(app)
+        .post(`/api/possessions/${game.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          club_id: club1.id,
+          period: 1,
+          client_uuid: '40000000-0000-4000-8000-000000000004',
+          event_status: 'unconfirmed'
+        })
+        .expect(201);
+
+      const confirmResponse = await request(app)
+        .post(`/api/possessions/${game.id}/${createResponse.body.id}/confirm`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(confirmResponse.body.event_status).toBe('confirmed');
     });
   });
 

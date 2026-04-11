@@ -314,7 +314,7 @@ async function fetchGameScope(gameId) {
     FROM shots s
     JOIN players p ON p.id = s.player_id
     JOIN clubs c ON c.id = s.club_id
-    WHERE s.game_id = $1
+    WHERE s.game_id = $1 AND s.event_status = 'confirmed'
     ORDER BY s.period, s.created_at
   `, [gameId]);
 
@@ -455,7 +455,7 @@ async function fetchClubSeasonScope({ clubId, teamId, playerId, dateRange, repor
     JOIN players p ON p.id = s.player_id
     JOIN games g ON g.id = s.game_id
     LEFT JOIN clubs c ON c.id = s.club_id
-    ${whereClause}
+    ${whereClause}${whereClause ? ' AND' : ' WHERE'} s.event_status = 'confirmed'
     ORDER BY g.date DESC, s.created_at DESC
   `, params);
 

@@ -9,7 +9,8 @@ import { waitForSelectOptions } from './helpers/testHelpers';
 vi.mock('../utils/api', () => ({
   default: {
     get: vi.fn(),
-    post: vi.fn()
+    post: vi.fn(),
+    put: vi.fn()
   }
 }));
 
@@ -53,6 +54,10 @@ describe('FreeShotPanel', () => {
     
     (api.post as jest.Mock).mockResolvedValue({
       data: { id: 1, free_shot_type: 'free_shot', message: 'Free shot recorded successfully' }
+    });
+
+    (api.put as jest.Mock).mockResolvedValue({
+      data: { id: 1, event_status: 'unconfirmed' }
     });
   });
 
@@ -279,6 +284,65 @@ describe('FreeShotPanel', () => {
     
     // Verify callback was not called on error
     expect(mockProps.onFreeShotRecorded).not.toHaveBeenCalled();
+  });
+
+  it('confirms pending free shots from the recent list', async () => {
+    const user = userEvent.setup();
+    (api.get as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/game-rosters')) {
+        return Promise.resolve({ data: [...mockHomePlayers, ...mockAwayPlayers] });
+      }
+      if (url.includes('/free-shots')) {
+        return Promise.resolve({
+          data: [{
+            id: 8,
+            game_id: 1,
+            player_id: 1,
+            club_id: 100,
+            period: 1,
+            time_remaining: '00:08:30',
+            free_shot_type: 'free_shot',
+            result: 'goal',
+            first_name: 'John',
+            last_name: 'Doe',
+            jersey_number: 10,
+            club_name: 'Team Alpha',
+            event_status: 'unconfirmed',
+            created_at: '2024-01-15T10:30:00Z'
+          }]
+        });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<FreeShotPanel {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Pending review')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Confirm/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/free-shots/8/confirm', { game_id: 1 });
+    });
+  });
+
+  it('creates unconfirmed free shots from the form', async () => {
+    const user = userEvent.setup();
+    render(<FreeShotPanel {...mockProps} />);
+
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select player'));
+    await user.selectOptions(screen.getByDisplayValue('Select player'), '1');
+    await user.click(screen.getByRole('button', { name: 'Record And Review Later' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/free-shots', expect.objectContaining({
+        game_id: 1,
+        free_shot_type: 'free_shot',
+        event_status: 'unconfirmed'
+      }));
+    });
   });
 
   it('clears form after successful submission', async () => {

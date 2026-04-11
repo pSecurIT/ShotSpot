@@ -30,6 +30,8 @@ interface Timeout {
   team_name?: string;
   created_at: string;
   ended_at?: string;
+  event_status?: 'confirmed' | 'unconfirmed';
+  client_uuid?: string | null;
 }
 
 const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
@@ -95,7 +97,7 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
     }
   };
 
-  const handleStartTimeout = async () => {
+  const handleStartTimeout = async (eventStatus: 'confirmed' | 'unconfirmed' = 'confirmed') => {
     if (timeoutType === 'team' && !selectedTeam) {
       setError('Please select a team for team timeout');
       return;
@@ -115,6 +117,7 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
         timeout_type: string;
         period: number;
         time_remaining: string | null;
+        event_status: 'confirmed' | 'unconfirmed';
         duration: string;
         reason: string | null;
         called_by: string | null;
@@ -124,6 +127,7 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
         timeout_type: timeoutType,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
+        event_status: eventStatus,
         duration: duration,
         reason: reason || null,
         called_by: calledBy || null
@@ -134,17 +138,23 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
         timeoutData.club_id = selectedTeam === homeTeamId ? homeClubId : awayClubId;
       }
 
-      await api.post(`/timeouts`, timeoutData);
+      const response = await api.post(`/timeouts`, timeoutData);
+      const wasQueued = Boolean((response.data as { queued?: boolean } | undefined)?.queued);
 
-      setSuccess(`${getTimeoutDisplayName(timeoutType)} started successfully`);
+      setSuccess(wasQueued
+        ? `${getTimeoutDisplayName(timeoutType)} queued for sync when online`
+        : eventStatus === 'unconfirmed'
+          ? `${getTimeoutDisplayName(timeoutType)} added for later review`
+          : `${getTimeoutDisplayName(timeoutType)} started successfully`);
       
       // Reset form
       setReason('');
       setCalledBy('');
       setDuration('1 minute');
       
-      // Refresh timeouts
-      fetchRecentTimeouts();
+      if (!wasQueued) {
+        fetchRecentTimeouts();
+      }
       
       // Notify parent component
       if (onTimeoutRecorded) {
@@ -206,6 +216,55 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to remove timeout');
+    }
+  };
+
+  const updateTimeoutStatus = async (timeoutId: number, eventStatus: 'confirmed' | 'unconfirmed', clientUuid?: string | null) => {
+    try {
+      await api.put(`/timeouts/${timeoutId}`, {
+        game_id: gameId,
+        event_status: eventStatus,
+        ...(clientUuid ? { client_uuid: clientUuid } : {})
+      });
+      setSuccess(eventStatus === 'unconfirmed' ? 'Timeout marked for later review' : 'Timeout confirmed');
+      fetchRecentTimeouts();
+      if (onTimeoutRecorded) {
+        onTimeoutRecorded();
+      }
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
+    } catch (err) {
+      const error = err as Error & { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to update timeout review status');
+    }
+  };
+
+  const confirmTimeout = async (timeoutId: number, clientUuid?: string | null) => {
+    try {
+      await api.post(`/timeouts/${timeoutId}/confirm`, {
+        game_id: gameId,
+        ...(clientUuid ? { client_uuid: clientUuid } : {})
+      });
+      setSuccess('Timeout confirmed');
+      fetchRecentTimeouts();
+      if (onTimeoutRecorded) {
+        onTimeoutRecorded();
+      }
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
+    } catch (err) {
+      const error = err as Error & { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to confirm timeout');
     }
   };
 
@@ -379,13 +438,22 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
         </div>
 
         {/* Submit Button */}
-        <button
-          onClick={handleStartTimeout}
-          disabled={loading || (timeoutType === 'team' && !selectedTeam)}
-          className="primary-button"
-        >
-          {loading ? 'Starting...' : `Start ${getTimeoutDisplayName(timeoutType)}`}
-        </button>
+        <div className="panel-form-actions">
+          <button
+            onClick={() => void handleStartTimeout('confirmed')}
+            disabled={loading || (timeoutType === 'team' && !selectedTeam)}
+            className="primary-button"
+          >
+            {loading ? 'Starting...' : `Start ${getTimeoutDisplayName(timeoutType)}`}
+          </button>
+          <button
+            onClick={() => void handleStartTimeout('unconfirmed')}
+            disabled={loading || (timeoutType === 'team' && !selectedTeam)}
+            className="secondary-button"
+          >
+            {loading ? 'Starting...' : 'Start And Review Later'}
+          </button>
+        </div>
       </div>
 
       {/* Recent Timeouts */}
@@ -398,6 +466,7 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
                 <div className="timeout-info">
                   <span className="timeout-type">{getTimeoutDisplayName(timeout.timeout_type)}</span>
                   {timeout.team_name && <span className="team-name">{timeout.team_name}</span>}
+                  {timeout.event_status === 'unconfirmed' && <span className="detail-badge warning">Pending review</span>}
                   <span className="timeout-duration">{formatDuration(timeout.duration)}</span>
                   {timeout.called_by && <span className="called-by">Called by: {timeout.called_by}</span>}
                   {timeout.reason && <span className="timeout-reason">({timeout.reason})</span>}
@@ -408,6 +477,23 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
                   {!timeout.ended_at && <span className="status">⏰ Active</span>}
                 </div>
                 <div className="timeout-actions">
+                  {timeout.event_status === 'unconfirmed' ? (
+                    <button
+                      onClick={() => confirmTimeout(timeout.id, timeout.client_uuid)}
+                      className="save-button"
+                      title="Confirm this timeout"
+                    >
+                      ✅ Confirm
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => updateTimeoutStatus(timeout.id, 'unconfirmed', timeout.client_uuid)}
+                      className="secondary-button"
+                      title="Mark this timeout to review later"
+                    >
+                      🏷️ Edit Later
+                    </button>
+                  )}
                   {!timeout.ended_at && (
                     <button
                       onClick={() => handleEndTimeout(timeout.id)}
