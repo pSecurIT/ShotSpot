@@ -18,6 +18,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
   userMenuItems = []
 }) => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const roleLabel = userRole.charAt(0).toUpperCase() + userRole.slice(1);
 
   // Lock body scroll when menu is open
   useEffect(() => {
@@ -86,7 +87,12 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
       >
         {/* Header */}
         <div className="mobile-menu-header">
-          <h2 className="mobile-menu-header__title">Menu</h2>
+          <div className="mobile-menu-header__copy">
+            <span className="mobile-menu-header__eyebrow">Navigation</span>
+            <h2 className="mobile-menu-header__title">Match menu</h2>
+            <p className="mobile-menu-header__subtitle">Fast access to capture, review, and account tools.</p>
+          </div>
+          <span className="mobile-menu-header__role-chip">{roleLabel}</span>
           <button
             className="mobile-menu-header__close"
             onClick={onClose}
@@ -99,6 +105,11 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
 
         {/* Menu Items */}
         <nav className="mobile-menu-nav">
+          <div className="mobile-menu-nav__intro">
+            <span className="mobile-menu-nav__intro-label">Quick access</span>
+            <span className="mobile-menu-nav__intro-copy">Choose a section to jump straight back into match operations.</span>
+          </div>
+
           {filterItemsByRole(navigationItems).map((item) => {
             const isExpanded = expandedSections.has(item.label);
             const hasChildren = item.children && item.children.length > 0;
