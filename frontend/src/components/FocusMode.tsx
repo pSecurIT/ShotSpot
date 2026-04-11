@@ -171,6 +171,7 @@ const FocusMode: React.FC<FocusModeProps> = ({
             homePlayers={homePlayers}
             awayPlayers={awayPlayers}
             timerState={timerState}
+            timeRemaining={timeRemaining}
             onResumeTimer={onResumeTimer}
             onPauseTimer={onPauseTimer}
             canAddEvents={canAddEvents}

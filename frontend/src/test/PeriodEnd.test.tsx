@@ -54,12 +54,15 @@ describe('Period End Functionality', () => {
 
       mockUseTimer.mockReturnValue({
         timerState: mockTimerState,
+        currentTimeMs: Date.now(),
         loading: false,
         error: null,
         refetch: vi.fn(),
         setTimerStateOptimistic: vi.fn(),
         periodHasEnded: false,
-        resetPeriodEndState: vi.fn()
+        resetPeriodEndState: vi.fn(),
+        startTimer: vi.fn(),
+        pauseTimer: vi.fn()
       });
 
       // Create a test component that uses the timer
@@ -78,12 +81,15 @@ describe('Period End Functionality', () => {
     it('should return periodHasEnded state when period ends', () => {
       mockUseTimer.mockReturnValue({
         timerState: null,
+        currentTimeMs: Date.now(),
         loading: false,
         error: null,
         refetch: vi.fn(),
         setTimerStateOptimistic: vi.fn(),
         periodHasEnded: true, // Period has ended
-        resetPeriodEndState: vi.fn()
+        resetPeriodEndState: vi.fn(),
+        startTimer: vi.fn(),
+        pauseTimer: vi.fn()
       });
 
       const TestComponent = () => {

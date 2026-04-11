@@ -225,6 +225,34 @@ describe('🔄 Substitutions API', () => {
       }
     });
 
+    it('✅ should create an unconfirmed substitution idempotently by client_uuid', async () => {
+      const payload = {
+        club_id: homeTeam.id,
+        player_in_id: homePlayer3.id,
+        player_out_id: homePlayer1.id,
+        period: 1,
+        reason: 'tactical',
+        client_uuid: '30000000-0000-4000-8000-000000000001',
+        event_status: 'unconfirmed'
+      };
+
+      const firstResponse = await request(app)
+        .post(`/api/substitutions/${testGame.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(payload);
+
+      expect(firstResponse.status).toBe(201);
+      expect(firstResponse.body.event_status).toBe('unconfirmed');
+
+      const secondResponse = await request(app)
+        .post(`/api/substitutions/${testGame.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(payload);
+
+      expect(secondResponse.status).toBe(200);
+      expect(secondResponse.body.id).toBe(firstResponse.body.id);
+    });
+
     test('❌ should reject substitution from viewer role', async () => {
       try {
         const response = await request(app)
@@ -609,6 +637,27 @@ describe('🔄 Substitutions API', () => {
         throw error;
       }
     });
+
+    test('✅ should filter substitutions by event status', async () => {
+      try {
+        await db.query(
+          `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, reason, event_status, client_uuid)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [testGame.id, homeTeam.id, homePlayer3.id, homePlayer1.id, 3, 'tactical', 'unconfirmed', '30000000-0000-4000-8000-000000000002']
+        );
+
+        const response = await request(app)
+          .get(`/api/substitutions/${testGame.id}?event_status=unconfirmed`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.length).toBeGreaterThan(0);
+        expect(response.body.every(substitution => substitution.event_status === 'unconfirmed')).toBe(true);
+      } catch (error) {
+        global.testContext.logTestError(error, 'Substitution event status filtering failed');
+        throw error;
+      }
+    });
   });
 
   describe('🏃 GET /api/substitutions/:gameId/active-players', () => {
@@ -663,6 +712,27 @@ describe('🔄 Substitutions API', () => {
       } catch (error) {
         console.log('      ❌ Substitution reflection test failed:', error.message);
         global.testContext.logTestError(error, 'Substitution reflection test failed');
+        throw error;
+      }
+    });
+
+    test('✅ should ignore unconfirmed substitutions when calculating active players', async () => {
+      try {
+        await db.query(
+          `INSERT INTO substitutions (game_id, club_id, player_in_id, player_out_id, period, reason, event_status, client_uuid)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [testGame.id, homeTeam.id, homePlayer3.id, homePlayer1.id, 1, 'tactical', 'unconfirmed', '30000000-0000-4000-8000-000000000003']
+        );
+
+        const response = await request(app)
+          .get(`/api/substitutions/${testGame.id}/active-players`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.home_team.active.some(player => player.id === homePlayer1.id)).toBe(true);
+        expect(response.body.home_team.active.some(player => player.id === homePlayer3.id)).toBe(false);
+      } catch (error) {
+        global.testContext.logTestError(error, 'Unconfirmed substitution active player test failed');
         throw error;
       }
     });
@@ -859,6 +929,70 @@ describe('🔄 Substitutions API', () => {
         global.testContext.logTestError(error, 'Delete only substitution test failed');
         throw error;
       }
+    });
+  });
+
+  describe('✅ POST /api/substitutions/:gameId/:substitutionId/confirm', () => {
+    afterEach(async () => {
+      await db.query('DELETE FROM substitutions WHERE game_id = $1', [testGame.id]);
+    });
+
+    test('✅ should confirm an unconfirmed substitution', async () => {
+      const createResponse = await request(app)
+        .post(`/api/substitutions/${testGame.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          club_id: homeTeam.id,
+          player_in_id: homePlayer3.id,
+          player_out_id: homePlayer1.id,
+          period: 1,
+          reason: 'tactical',
+          client_uuid: '30000000-0000-4000-8000-000000000004',
+          event_status: 'unconfirmed'
+        });
+
+      expect(createResponse.status).toBe(201);
+      expect(createResponse.body.event_status).toBe('unconfirmed');
+
+      const confirmResponse = await request(app)
+        .post(`/api/substitutions/${testGame.id}/${createResponse.body.id}/confirm`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(confirmResponse.status).toBe(200);
+      expect(confirmResponse.body.event_status).toBe('confirmed');
+    });
+  });
+
+  describe('✏️ PUT /api/substitutions/:gameId/:substitutionId', () => {
+    afterEach(async () => {
+      await db.query('DELETE FROM substitutions WHERE game_id = $1', [testGame.id]);
+    });
+
+    test('✅ should update substitution status and reason for review workflow', async () => {
+      const createResponse = await request(app)
+        .post(`/api/substitutions/${testGame.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          club_id: homeTeam.id,
+          player_in_id: homePlayer3.id,
+          player_out_id: homePlayer1.id,
+          period: 1,
+          reason: 'tactical'
+        });
+
+      expect(createResponse.status).toBe(201);
+
+      const updateResponse = await request(app)
+        .put(`/api/substitutions/${testGame.id}/${createResponse.body.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          reason: 'fatigue',
+          event_status: 'unconfirmed'
+        });
+
+      expect(updateResponse.status).toBe(200);
+      expect(updateResponse.body.reason).toBe('fatigue');
+      expect(updateResponse.body.event_status).toBe('unconfirmed');
     });
   });
 

@@ -26,8 +26,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const isCypressRun = typeof window !== 'undefined' && 'Cypress' in window;
 
   useEffect(() => {
+    if (isCypressRun) {
+      return;
+    }
+
     // Get auth token from localStorage
     const token = localStorage.getItem('token');
 
@@ -79,7 +84,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         socketRef.current = null;
       }
     };
-  }, [user]);
+  }, [isCypressRun, user]);
 
   const joinGame = (gameId: number) => {
     if (socketRef.current?.connected) {

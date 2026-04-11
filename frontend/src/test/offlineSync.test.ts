@@ -295,6 +295,59 @@ describe('Offline Sync Manager', () => {
       expect(actions).toHaveLength(0);
     });
 
+    it('replays queued create, edit, and confirm actions as one logical match-event mutation', async () => {
+      const clientUuid = '40000000-0000-4000-8000-000000000123';
+
+      await queueAction('POST', '/api/shots/1', {
+        player_id: 1,
+        club_id: 1,
+        x_coord: 45,
+        y_coord: 55,
+        result: 'goal',
+        period: 1,
+        event_status: 'unconfirmed',
+        client_uuid: clientUuid
+      });
+
+      await queueAction('PUT', '/api/shots/1/999999999', {
+        result: 'miss',
+        time_remaining: '00:08:12',
+        client_uuid: clientUuid
+      });
+
+      await queueAction('POST', '/api/shots/1/999999999/confirm', {
+        client_uuid: clientUuid
+      });
+
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 42, client_uuid: clientUuid })
+      } as Response);
+
+      const result = await processQueue();
+
+      expect(result.total).toBe(3);
+      expect(result.successful).toBe(3);
+      expect(result.failed).toBe(0);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+      expect(fetchCall[0]).toBe('/api/shots/1');
+      expect(fetchCall[1]).toEqual(expect.objectContaining({ method: 'POST' }));
+
+      const replayedPayload = JSON.parse(String(fetchCall[1]?.body));
+      expect(replayedPayload).toEqual(expect.objectContaining({
+        result: 'miss',
+        time_remaining: '00:08:12',
+        event_status: 'confirmed',
+        client_uuid: clientUuid
+      }));
+
+      const actions = await getUnsyncedActions();
+      expect(actions).toHaveLength(0);
+    });
+
     it('should handle complex nested objects without double-encoding', async () => {
       const data = {
         game: {

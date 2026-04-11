@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
@@ -21,18 +21,28 @@ vi.mock('react-router-dom', async () => {
 
 // Mock timer hook
 const mockRefetch = vi.fn();
+const mockStartTimer = vi.fn();
+const mockPauseTimer = vi.fn();
+const mockSetTimerStateOptimistic = vi.fn();
+const mockCurrentTimeMs = 1_700_000_000_000;
+let mockTimerState = {
+  current_period: 1,
+  timer_state: 'stopped' as 'stopped' | 'running' | 'paused',
+  time_remaining: { minutes: 10, seconds: 0 },
+  period_duration: { minutes: 10, seconds: 0 }
+};
 vi.mock('../hooks/useTimer', () => ({
   useTimer: () => ({
-    timerState: {
-      current_period: 1,
-      timer_state: 'stopped',
-      time_remaining: { minutes: 10, seconds: 0 },
-      period_duration: { minutes: 10, seconds: 0 }
-    },
+    timerState: mockTimerState,
+    currentTimeMs: mockCurrentTimeMs,
+    loading: false,
+    error: null,
     refetch: mockRefetch,
-    setTimerStateOptimistic: vi.fn(),
+    setTimerStateOptimistic: mockSetTimerStateOptimistic,
     periodHasEnded: false,
-    resetPeriodEndState: vi.fn()
+    resetPeriodEndState: vi.fn(),
+    startTimer: mockStartTimer,
+    pauseTimer: mockPauseTimer
   })
 }));
 
@@ -87,10 +97,28 @@ describe('LiveMatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    mockStartTimer.mockResolvedValue(undefined);
+    mockPauseTimer.mockResolvedValue(undefined);
+    mockSetTimerStateOptimistic.mockReset();
+    mockTimerState = {
+      current_period: 1,
+      timer_state: 'stopped',
+      time_remaining: { minutes: 10, seconds: 0 },
+      period_duration: { minutes: 10, seconds: 0 }
+    };
     
     mockApi.get.mockImplementation((url: string) => {
       if (url === '/games/1') {
         return Promise.resolve({ data: mockGame });
+      }
+      if (url === '/events/comprehensive/1?event_status=unconfirmed') {
+        return Promise.resolve({ data: [] });
+      }
+      if (url === '/shots/1?event_status=unconfirmed') {
+        return Promise.resolve({ data: [] });
+      }
+      if (url === '/substitutions/1?event_status=unconfirmed') {
+        return Promise.resolve({ data: [] });
       }
       return Promise.resolve({ data: [] });
     });
@@ -144,6 +172,30 @@ describe('LiveMatch', () => {
     
     await waitFor(() => {
       expect(screen.getByText('Match Events Dashboard')).toBeInTheDocument();
+    });
+  });
+
+  it('shows the pending review count on the timeline tab', async () => {
+    mockApi.get.mockImplementation((url: string) => {
+      if (url === '/games/1') {
+        return Promise.resolve({ data: mockGame });
+      }
+      if (url === '/events/comprehensive/1?event_status=unconfirmed') {
+        return Promise.resolve({ data: [{ id: 1 }, { id: 2 }] });
+      }
+      if (url === '/shots/1?event_status=unconfirmed') {
+        return Promise.resolve({ data: [{ id: 3 }] });
+      }
+      if (url === '/substitutions/1?event_status=unconfirmed') {
+        return Promise.resolve({ data: [{ id: 4 }] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<LiveMatchWrapper />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Timeline \(4\)/i })).toBeInTheDocument();
     });
   });
 
@@ -214,7 +266,7 @@ describe('LiveMatch', () => {
       await user.click(screen.getByText('▶️ Start Match'));
 
       await waitFor(() => {
-        expect(mockApi.post).toHaveBeenCalledWith('/timer/1/start', {});
+        expect(mockStartTimer).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -228,6 +280,43 @@ describe('LiveMatch', () => {
       // For this test, we'll just check if the pause functionality would be available
       // The actual pause button appears when timer is running, which requires more complex state setup
       expect(screen.queryByText('⏸️ Pause')).not.toBeInTheDocument();
+    });
+
+    it('advances to the next period optimistically before the timer API finishes', async () => {
+      const user = userEvent.setup();
+      let resolveNextPeriodRequest: (() => void) | null = null;
+
+      mockApi.post.mockImplementation((url: string) => {
+        if (url === '/timer/1/next-period') {
+          return new Promise(resolve => {
+            resolveNextPeriodRequest = () => resolve({ data: { success: true } });
+          });
+        }
+
+        return Promise.resolve({ data: { success: true } });
+      });
+
+      render(<LiveMatchWrapper />);
+
+      await waitFor(() => {
+        expect(screen.getByText('⏭️ Next Period')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText('⏭️ Next Period'));
+
+      expect(mockSetTimerStateOptimistic).toHaveBeenCalledWith({
+        current_period: 2,
+        timer_state: 'stopped',
+        time_remaining: { minutes: 10, seconds: 0 }
+      });
+      expect(mockApi.post).toHaveBeenCalledWith('/timer/1/next-period', {});
+
+      await act(async () => {
+        if (resolveNextPeriodRequest) {
+          resolveNextPeriodRequest();
+        }
+        await Promise.resolve();
+      });
     });
 
     it('handles timer stop with confirmation', async () => {
@@ -248,6 +337,54 @@ describe('LiveMatch', () => {
       
       await waitFor(() => {
         expect(mockApi.post).toHaveBeenCalledWith('/games/1/end', {});
+      });
+
+      confirmSpy.mockRestore();
+    });
+
+    it('resets the match optimistically before the reset API finishes', async () => {
+      const user = userEvent.setup();
+      let resolveResetRequest: (() => void) | null = null;
+
+      mockTimerState = {
+        current_period: 1,
+        timer_state: 'running',
+        time_remaining: { minutes: 9, seconds: 12 },
+        period_duration: { minutes: 10, seconds: 0 }
+      };
+
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      mockApi.post.mockImplementation((url: string) => {
+        if (url === '/timer/1/reset-match') {
+          return new Promise(resolve => {
+            resolveResetRequest = () => resolve({ data: { success: true } });
+          });
+        }
+
+        return Promise.resolve({ data: { success: true } });
+      });
+
+      render(<LiveMatchWrapper />);
+
+      await waitFor(() => {
+        expect(screen.getByText('⏹️ Reset Match')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText('⏹️ Reset Match'));
+
+      expect(confirmSpy).toHaveBeenCalled();
+      expect(mockSetTimerStateOptimistic).toHaveBeenCalledWith({
+        current_period: 1,
+        timer_state: 'stopped',
+        time_remaining: { minutes: 10, seconds: 0 }
+      });
+      expect(mockApi.post).toHaveBeenCalledWith('/timer/1/reset-match', {});
+
+      await act(async () => {
+        if (resolveResetRequest) {
+          resolveResetRequest();
+        }
+        await Promise.resolve();
       });
 
       confirmSpy.mockRestore();
@@ -278,8 +415,7 @@ describe('LiveMatch', () => {
     it('handles timer API errors with retry logic', async () => {
       const user = userEvent.setup();
       
-      // Mock API to fail initially then succeed  
-      mockApi.post.mockRejectedValueOnce(new Error('Network error'));
+      mockStartTimer.mockRejectedValueOnce(new Error('Network error'));
       
       render(<LiveMatchWrapper />);
       
@@ -289,9 +425,9 @@ describe('LiveMatch', () => {
 
       await user.click(screen.getByText('▶️ Start Match'));
 
-      // Should attempt the API call
       await waitFor(() => {
-        expect(mockApi.post).toHaveBeenCalledWith('/timer/1/start', {});
+        expect(mockStartTimer).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('Error starting timer')).toBeInTheDocument();
       });
     });
   });
@@ -670,11 +806,8 @@ describe('LiveMatch', () => {
 
   // API Retry Mechanism Tests
   describe('API Retry Logic', () => {
-    it('retries API calls on failure with exponential backoff', async () => {
-      // Mock API to fail initially then succeed
-      mockApi.post
-        .mockRejectedValueOnce(new Error('Network timeout'))
-        .mockResolvedValueOnce({ data: { success: true } });
+    it('delegates timer start to the timer hook', async () => {
+      mockStartTimer.mockResolvedValueOnce(undefined);
       
       const user = userEvent.setup();
       
@@ -686,15 +819,13 @@ describe('LiveMatch', () => {
 
       await user.click(screen.getByText('▶️ Start Match'));
 
-      // Should retry the failed call (initial call + retry)
       await waitFor(() => {
-        expect(mockApi.post).toHaveBeenCalledWith('/timer/1/start', {});
+        expect(mockStartTimer).toHaveBeenCalledTimes(1);
       });
     });
 
-    it('handles persistent API failures', async () => {
-      // Mock API to always fail
-      mockApi.post.mockRejectedValue(new Error('Persistent error'));
+    it('surfaces timer hook start failures', async () => {
+      mockStartTimer.mockRejectedValueOnce(new Error('Persistent error'));
       
       const user = userEvent.setup();
       
@@ -706,9 +837,9 @@ describe('LiveMatch', () => {
 
       await user.click(screen.getByText('▶️ Start Match'));
 
-      // Should attempt the API call and handle the error
       await waitFor(() => {
-        expect(mockApi.post).toHaveBeenCalledWith('/timer/1/start', {});
+        expect(mockStartTimer).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('Error starting timer')).toBeInTheDocument();
       });
     });
   });
@@ -755,8 +886,6 @@ describe('LiveMatch', () => {
     });
 
     it('creates roster and updates game on successful start', async () => {
-      // This would require setting up proper team selection state
-      // For now, test that the API endpoints are called correctly
       const user = userEvent.setup();
       
       render(<LiveMatchWrapper />);
@@ -767,9 +896,8 @@ describe('LiveMatch', () => {
 
       await user.click(screen.getByText('▶️ Start Match'));
 
-      // Should make timer start API call
       await waitFor(() => {
-        expect(mockApi.post).toHaveBeenCalledWith('/timer/1/start', {});
+        expect(mockStartTimer).toHaveBeenCalledTimes(1);
       });
     });
   });
@@ -788,7 +916,7 @@ describe('LiveMatch', () => {
     });
 
     it('displays error messages for failed actions', async () => {
-      mockApi.post.mockRejectedValue(new Error('Server error'));
+      mockStartTimer.mockRejectedValueOnce(new Error('Server error'));
       const user = userEvent.setup();
       
       render(<LiveMatchWrapper />);
@@ -799,9 +927,8 @@ describe('LiveMatch', () => {
 
       await user.click(screen.getByText('▶️ Start Match'));
 
-      // The component might show a success message instead, let's test what actually happens
       await waitFor(() => {
-        expect(screen.getByText('Timer started')).toBeInTheDocument();
+        expect(screen.getByText('Error starting timer')).toBeInTheDocument();
       });
     });
 

@@ -24,6 +24,7 @@ The offline support system consists of four main components:
 - Automatically processes the queue when connection is restored
 - Tracks sync status and retries failed operations
 - Cleans up old synced actions after 7 days
+- Replays match-event create, edit, and confirm flows by stable `client_uuid` so follow-up review actions can collapse onto the same logical record during reconnect
 
 ### 4. UI Indicator
 - Visual indicator in top-right corner shows connection status:
@@ -45,6 +46,7 @@ The offline support system consists of four main components:
 - Creating new teams or players
 - Updating team/player information
 - Recording shots and events (stored locally, synced when online)
+- Reviewing match events after creation, including edit-later and confirm flows for records that carry a stable `client_uuid`
 - Deleting records
 
 ### ❌ Requires Internet Connection
@@ -92,7 +94,14 @@ Check: Online?
          ↓
     Background Sync triggers
          ↓
-    Process queue → Send to API → Mark synced
+    Process queue → Merge match-event create/edit/confirm steps by `client_uuid` when possible → Send to API → Mark synced
+
+  ### Match Event Replay Contract
+
+  - Match-event creates generate a stable `client_uuid` in the frontend before sync.
+  - The backend stores both `client_uuid` and `event_status` for shots, events, substitutions, possessions, free shots, timeouts, and commentary.
+  - If a queued record is edited or confirmed before reconnect, the replay layer folds those follow-up mutations back into the original create action when they share the same `client_uuid`.
+  - Confirmed-only consumers such as score, analytics, reports, and exports still ignore unconfirmed items until the replayed or online confirmation step sets `event_status` to `confirmed`.
 ```
 
 ### File Structure

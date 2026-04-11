@@ -1,5 +1,5 @@
 import express from 'express';
-import { body, param, validationResult } from 'express-validator';
+import { body, param, query, validationResult } from 'express-validator';
 import pool from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
@@ -7,6 +7,20 @@ const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(auth);
+
+const POSSESSION_EVENT_STATUSES = ['confirmed', 'unconfirmed'];
+
+const fetchCompletePossessionById = async (possessionId) => {
+  const result = await pool.query(
+    `SELECT p.*, c.name as club_name
+     FROM ball_possessions p
+     JOIN clubs c ON p.club_id = c.id
+     WHERE p.id = $1`,
+    [possessionId]
+  );
+
+  return result.rows[0] || null;
+};
 
 /**
  * POST /api/possessions/:gameId
@@ -18,6 +32,9 @@ router.post(
   param('gameId').isInt(),
   body('club_id').isInt(),
   body('period').isInt({ min: 1, max: 10 }),
+  body('started_at').optional().isISO8601().withMessage('started_at must be a valid ISO 8601 timestamp'),
+  body('client_uuid').optional().isUUID().withMessage('client_uuid must be a valid UUID'),
+  body('event_status').optional().isIn(POSSESSION_EVENT_STATUSES).withMessage('event_status must be confirmed or unconfirmed'),
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -25,9 +42,23 @@ router.post(
     }
 
     const { gameId } = req.params;
-    const { club_id, period } = req.body;
+    const { club_id, period, started_at, client_uuid, event_status } = req.body;
+    const normalizedEventStatus = event_status || 'confirmed';
+    const possessionStartedAt = started_at || new Date().toISOString();
 
     try {
+      if (client_uuid) {
+        const existingPossessionResult = await pool.query(
+          'SELECT id FROM ball_possessions WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+          [gameId, client_uuid]
+        );
+
+        if (existingPossessionResult.rows.length > 0) {
+          const existingPossession = await fetchCompletePossessionById(existingPossessionResult.rows[0].id);
+          return res.status(200).json(existingPossession);
+        }
+      }
+
       // Validate game exists
       const gameRes = await pool.query('SELECT 1 FROM games WHERE id = $1', [gameId]);
       if (gameRes.rowCount === 0) {
@@ -43,32 +74,41 @@ router.post(
       // End any active possession for this game
       await pool.query(
         `UPDATE ball_possessions
-         SET ended_at = CURRENT_TIMESTAMP,
-             duration_seconds = EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at))::INTEGER,
+         SET ended_at = $2::timestamptz,
+             duration_seconds = GREATEST(0, EXTRACT(EPOCH FROM ($2::timestamptz - started_at))::INTEGER),
              result = COALESCE(result, 'turnover')
          WHERE game_id = $1 AND ended_at IS NULL`,
-        [gameId]
+        [gameId, possessionStartedAt]
       );
 
       // Create new possession and include club name
       const result = await pool.query(
-        `INSERT INTO ball_possessions (game_id, club_id, period)
-         VALUES ($1, $2, $3)
+        `INSERT INTO ball_possessions (game_id, club_id, period, started_at, client_uuid, event_status)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [gameId, club_id, period]
+        [gameId, club_id, period, possessionStartedAt, client_uuid || null, normalizedEventStatus]
       );
 
-      // Fetch the possession with club name to match GET /active response format
-      const possessionWithClub = await pool.query(
-        `SELECT p.*, c.name as club_name
-         FROM ball_possessions p
-         JOIN clubs c ON p.club_id = c.id
-         WHERE p.id = $1`,
-        [result.rows[0].id]
-      );
+      const possession = await fetchCompletePossessionById(result.rows[0].id);
 
-      return res.status(201).json(possessionWithClub.rows[0]);
+      return res.status(201).json(possession);
     } catch (error) {
+      if (error && error.code === '23505' && client_uuid) {
+        try {
+          const existingPossessionResult = await pool.query(
+            'SELECT id FROM ball_possessions WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+            [gameId, client_uuid]
+          );
+
+          if (existingPossessionResult.rows.length > 0) {
+            const existingPossession = await fetchCompletePossessionById(existingPossessionResult.rows[0].id);
+            return res.status(200).json(existingPossession);
+          }
+        } catch (lookupError) {
+          console.error('Error resolving duplicate possession by client_uuid:', lookupError);
+        }
+      }
+
       console.error('Error creating possession:', error);
       
       // Defensive mapping for FK errors if they still occur
@@ -135,7 +175,12 @@ router.put(
  */
 router.get(
   '/:gameId',
-  param('gameId').isInt(),
+  [
+    param('gameId').isInt(),
+    query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
+    query('period').optional().isInt({ min: 1 }).withMessage('Period must be a positive integer'),
+    query('event_status').optional().isIn(POSSESSION_EVENT_STATUSES).withMessage('Invalid event status value')
+  ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -143,7 +188,7 @@ router.get(
     }
 
     const { gameId } = req.params;
-    const { club_id, period } = req.query;
+    const { club_id, period, event_status } = req.query;
 
     try {
       let query = `
@@ -165,6 +210,12 @@ router.get(
         paramCount++;
         query += ` AND p.period = $${paramCount}`;
         params.push(period);
+      }
+
+      if (event_status) {
+        paramCount++;
+        query += ` AND p.event_status = $${paramCount}`;
+        params.push(event_status);
       }
 
       query += ' ORDER BY p.started_at DESC';
@@ -243,7 +294,7 @@ router.get(
           SUM(CASE WHEN p.result = 'turnover' THEN 1 ELSE 0 END)::INTEGER as turnovers
          FROM ball_possessions p
          JOIN clubs c ON p.club_id = c.id
-         WHERE p.game_id = $1 AND p.ended_at IS NOT NULL
+         WHERE p.game_id = $1 AND p.ended_at IS NOT NULL AND p.event_status = 'confirmed'
          GROUP BY p.club_id, c.name`,
         [gameId]
       );
@@ -252,6 +303,51 @@ router.get(
     } catch (error) {
       console.error('Error fetching possession stats:', error);
       res.status(500).json({ error: 'Failed to fetch possession stats' });
+    }
+  }
+);
+
+/**
+ * POST /api/possessions/:gameId/:possessionId/confirm
+ * Confirm a possession event.
+ */
+router.post(
+  '/:gameId/:possessionId/confirm',
+  [
+    requireRole(['admin', 'coach']),
+    param('gameId').isInt(),
+    param('possessionId').isInt()
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { gameId, possessionId } = req.params;
+
+    try {
+      const possessionResult = await pool.query(
+        'SELECT * FROM ball_possessions WHERE id = $1 AND game_id = $2',
+        [possessionId, gameId]
+      );
+
+      if (possessionResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Possession not found' });
+      }
+
+      if (possessionResult.rows[0].event_status !== 'confirmed') {
+        await pool.query(
+          'UPDATE ball_possessions SET event_status = $1 WHERE id = $2',
+          ['confirmed', possessionId]
+        );
+      }
+
+      const possession = await fetchCompletePossessionById(possessionId);
+      res.status(200).json(possession);
+    } catch (error) {
+      console.error('Error confirming possession:', error);
+      res.status(500).json({ error: 'Failed to confirm possession' });
     }
   }
 );

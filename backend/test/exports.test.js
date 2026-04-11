@@ -235,6 +235,29 @@ describe('📤 Exports API', () => {
       expect(response.text).not.toContain('EVENTS');
     });
 
+    it('✅ should exclude unconfirmed shots and events from match CSV exports', async () => {
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, shot_type, event_status, client_uuid)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'unconfirmed', $9)`,
+        [game1.id, player1.id, club1.id, 33.3, 22.2, 'goal', 3, 'hidden_export_probe', '70000000-0000-4000-8000-000000000001']
+      );
+
+      await db.query(
+        `INSERT INTO game_events (game_id, event_type, club_id, player_id, period, details, event_status, client_uuid)
+         VALUES ($1, $2, $3, $4, $5, $6, 'unconfirmed', $7)`,
+        [game1.id, 'foul', club1.id, player1.id, 2, JSON.stringify({ note: 'hidden_export_event_probe' }), '70000000-0000-4000-8000-000000000002']
+      );
+
+      const response = await request(app)
+        .get(`/api/exports/match-csv/${game1.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .query({ sections: 'shots,events' });
+
+      expect(response.status).toBe(200);
+      expect(response.text).not.toContain('hidden_export_probe');
+      expect(response.text).not.toContain('hidden_export_event_probe');
+    });
+
     it('❌ should reject invalid sections parameter', async () => {
       const response = await request(app)
         .get(`/api/exports/match-csv/${game1.id}`)

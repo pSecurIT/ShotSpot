@@ -42,6 +42,8 @@ interface FreeShot {
   last_name: string;
   jersey_number: number;
   club_name: string;
+  event_status?: 'confirmed' | 'unconfirmed';
+  client_uuid?: string | null;
   created_at: string;
 }
 
@@ -121,7 +123,7 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
     }
   };
 
-  const handleRecordFreeShot = async () => {
+  const handleRecordFreeShot = async (eventStatus: 'confirmed' | 'unconfirmed' = 'confirmed') => {
     if (!selectedTeam) {
       setError('Please select a team');
       return;
@@ -149,6 +151,7 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
         club_id: clubId,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
+        event_status: eventStatus,
         free_shot_type: freeShotType,
         reason: reason || null,
         result: result,
@@ -159,9 +162,14 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
         ...(selectedTeamRequiresPlayerDetails && selectedPlayer ? { player_id: selectedPlayer } : {})
       };
 
-      await api.post(`/free-shots`, freeShotData);
+      const response = await api.post(`/free-shots`, freeShotData);
+      const wasQueued = Boolean((response.data as { queued?: boolean } | undefined)?.queued);
 
-      setSuccess(`${getFreeShotDisplayName(freeShotType)} recorded successfully`);
+      setSuccess(wasQueued
+        ? `${getFreeShotDisplayName(freeShotType)} queued for sync when online`
+        : eventStatus === 'unconfirmed'
+          ? `${getFreeShotDisplayName(freeShotType)} recorded for later review`
+          : `${getFreeShotDisplayName(freeShotType)} recorded successfully`);
       
       // Reset form
       setSelectedPlayer(null);
@@ -169,8 +177,9 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
       setDistance('');
       setResult('miss');
       
-      // Refresh recent free shots
-      fetchRecentFreeShots();
+      if (!wasQueued) {
+        fetchRecentFreeShots();
+      }
       
       // Notify parent component
       if (onFreeShotRecorded) {
@@ -211,6 +220,55 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to remove free shot');
+    }
+  };
+
+  const updateFreeShotStatus = async (freeShotId: number, eventStatus: 'confirmed' | 'unconfirmed', clientUuid?: string | null) => {
+    try {
+      await api.put(`/free-shots/${freeShotId}`, {
+        game_id: gameId,
+        event_status: eventStatus,
+        ...(clientUuid ? { client_uuid: clientUuid } : {})
+      });
+      setSuccess(eventStatus === 'unconfirmed' ? 'Free shot marked for later review' : 'Free shot confirmed');
+      fetchRecentFreeShots();
+      if (onFreeShotRecorded) {
+        onFreeShotRecorded();
+      }
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
+    } catch (err) {
+      const error = err as Error & { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to update free shot review status');
+    }
+  };
+
+  const confirmFreeShot = async (freeShotId: number, clientUuid?: string | null) => {
+    try {
+      await api.post(`/free-shots/${freeShotId}/confirm`, {
+        game_id: gameId,
+        ...(clientUuid ? { client_uuid: clientUuid } : {})
+      });
+      setSuccess('Free shot confirmed');
+      fetchRecentFreeShots();
+      if (onFreeShotRecorded) {
+        onFreeShotRecorded();
+      }
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
+    } catch (err) {
+      const error = err as Error & { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to confirm free shot');
     }
   };
 
@@ -400,13 +458,22 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
         </div>
 
         {/* Submit Button */}
-        <button
-          onClick={handleRecordFreeShot}
-          disabled={loading || !selectedTeam || (selectedTeamRequiresPlayerDetails && !selectedPlayer)}
-          className="primary-button"
-        >
-          {loading ? 'Recording...' : `Record ${getFreeShotDisplayName(freeShotType)}`}
-        </button>
+        <div className="panel-form-actions">
+          <button
+            onClick={() => void handleRecordFreeShot('confirmed')}
+            disabled={loading || !selectedTeam || (selectedTeamRequiresPlayerDetails && !selectedPlayer)}
+            className="primary-button"
+          >
+            {loading ? 'Recording...' : `Record ${getFreeShotDisplayName(freeShotType)}`}
+          </button>
+          <button
+            onClick={() => void handleRecordFreeShot('unconfirmed')}
+            disabled={loading || !selectedTeam || (selectedTeamRequiresPlayerDetails && !selectedPlayer)}
+            className="secondary-button"
+          >
+            {loading ? 'Recording...' : 'Record And Review Later'}
+          </button>
+        </div>
       </div>
 
       {/* Recent Free Shots */}
@@ -419,6 +486,7 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
                 <div className="free-shot-info">
                   <span className="shot-type">{getFreeShotDisplayName(freeShot.free_shot_type)}</span>
                   <span className="team-name">{freeShot.club_name}</span>
+                  {freeShot.event_status === 'unconfirmed' && <span className="detail-badge warning">Pending review</span>}
                   <span className="player-name">
                     #{freeShot.jersey_number} {freeShot.first_name} {freeShot.last_name}
                   </span>
@@ -435,13 +503,32 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
                     {freeShot.time_remaining || `Period ${freeShot.period}`}
                   </span>
                 </div>
-                <button
-                  onClick={() => deleteFreeShot(freeShot.id)}
-                  className="delete-button"
-                  title="Remove this free shot"
-                >
-                  🗑️ Delete
-                </button>
+                <div className="timeline-actions">
+                  {freeShot.event_status === 'unconfirmed' ? (
+                    <button
+                      onClick={() => confirmFreeShot(freeShot.id, freeShot.client_uuid)}
+                      className="save-button"
+                      title="Confirm this free shot"
+                    >
+                      ✅ Confirm
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => updateFreeShotStatus(freeShot.id, 'unconfirmed', freeShot.client_uuid)}
+                      className="secondary-button"
+                      title="Mark this free shot to review later"
+                    >
+                      🏷️ Edit Later
+                    </button>
+                  )}
+                  <button
+                    onClick={() => deleteFreeShot(freeShot.id)}
+                    className="delete-button"
+                    title="Remove this free shot"
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
