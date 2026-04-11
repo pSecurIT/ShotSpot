@@ -63,6 +63,12 @@ const clipDuration = (event: { timestamp_start?: string | null; timestamp_end?: 
   return 'Timing unavailable';
 };
 
+const readThemeVariable = (name: string, fallback: string): string => {
+  if (typeof window === 'undefined') return fallback;
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+};
+
 const AdvancedAnalytics: React.FC = () => {
   const exportRef = useRef<HTMLDivElement>(null);
   const [players, setPlayers] = useState<AnalyticsPlayerOption[]>([]);
@@ -271,8 +277,9 @@ const AdvancedAnalytics: React.FC = () => {
 
     setExporting('image');
     try {
+      const backgroundColor = readThemeVariable('--surface-canvas', '#f4f8fb');
       const canvas = await html2canvas(exportRef.current, {
-        backgroundColor: '#f4f8fb',
+        backgroundColor,
         scale: 2,
       });
 
@@ -290,8 +297,9 @@ const AdvancedAnalytics: React.FC = () => {
 
     setExporting('pdf');
     try {
+      const backgroundColor = readThemeVariable('--surface-canvas', '#f4f8fb');
       const canvas = await html2canvas(exportRef.current, {
-        backgroundColor: '#f4f8fb',
+        backgroundColor,
         scale: 2,
       });
 
@@ -467,8 +475,8 @@ const AdvancedAnalytics: React.FC = () => {
                           <YAxis />
                           <Tooltip />
                           <Legend />
-                          <Bar dataKey="play_time_percent" fill="#1f6f78" name="Play time %" />
-                          <Bar dataKey="degradation" fill="#d1495b" name="Performance degradation" />
+                          <Bar dataKey="play_time_percent" fill="var(--chart-series-1)" name="Play time %" />
+                          <Bar dataKey="degradation" fill="var(--chart-series-2)" name="Performance degradation" />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -487,8 +495,8 @@ const AdvancedAnalytics: React.FC = () => {
                             <YAxis />
                             <Tooltip />
                             <Legend />
-                            <Line type="monotone" dataKey="fg_percentage" stroke="#d1495b" strokeWidth={3} name="FG%" />
-                            <Line type="monotone" dataKey="shots" stroke="#edae49" strokeWidth={2} name="Shots" />
+                            <Line type="monotone" dataKey="fg_percentage" stroke="var(--chart-series-2)" strokeWidth={3} name="FG%" />
+                            <Line type="monotone" dataKey="shots" stroke="var(--chart-series-4)" strokeWidth={2} name="Shots" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -603,7 +611,7 @@ const AdvancedAnalytics: React.FC = () => {
                             <XAxis dataKey="event_type" />
                             <YAxis allowDecimals={false} />
                             <Tooltip />
-                            <Bar dataKey="count" fill="#1f6f78" name="Tagged events" />
+                            <Bar dataKey="count" fill="var(--chart-series-1)" name="Tagged events" />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>

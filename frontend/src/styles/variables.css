@@ -1,23 +1,31 @@
 :root {
-  /* Color Palette - Fresh and Sporty */
-  --primary-color: #2962ff;      /* Vibrant blue for primary actions */
-  --primary-rgb: 41, 98, 255;    /* RGB helper for gradients/overlays */
-  --primary-light: #e3f2fd;      /* Light blue for hover/active states */
-  --secondary-color: #00c853;    /* Energy green for success/progress */
-  --accent-color: #ff3d00;       /* Dynamic orange for highlights/alerts */
-  --danger-color: #d32f2f;       /* Red for danger/delete actions */
-  --danger-hover: #b71c1c;       /* Darker red for danger hover */
-  --background-light: #f5f7fa;   /* Light gray background */
-  --background-dark: #1a1a1a;    /* Dark mode background */
-  --text-primary: #2c3e50;       /* Main text color */
-  --text-secondary: #666666;     /* Secondary text color */
-  --text-light: #ffffff;         /* Light text for dark backgrounds */
-  --text-dark: #1a1a1a;          /* Dark text color */
-  --text-muted: #9e9e9e;         /* Muted text color */
-  --border-color: #e0e6ed;       /* Subtle borders */
-  --hover-bg: #f5f5f5;           /* Hover background color */
-  --bg-light: #fafafa;           /* Light background variant */
-  --focus-color: #2962ff;        /* Focus outline color */
+  --primary-color: #2962ff;
+  --primary-rgb: 41, 98, 255;
+  --primary-light: #e3f2fd;
+  --secondary-color: #00c853;
+  --accent-color: #ff6b1a;
+  --accent-soft: #ffe1cf;
+  --danger-color: #d32f2f;
+  --danger-hover: #b71c1c;
+  --background-light: #f5f7fa;
+  --background-dark: #1a1a1a;
+  --text-primary: #2c3e50;
+  --text-secondary: #666666;
+  --text-light: #ffffff;
+  --text-dark: #1a1a1a;
+  --text-muted: #9e9e9e;
+  --border-color: #e0e6ed;
+  --hover-bg: #f5f5f5;
+  --bg-light: #fafafa;
+  --focus-color: #2962ff;
+  --surface-canvas: #f5f7fa;
+  --surface-hero: linear-gradient(135deg, #0f1724 0%, #112747 52%, #1764ff 100%);
+  --surface-nav: linear-gradient(135deg, rgba(8, 14, 24, 0.9) 0%, rgba(17, 39, 71, 0.94) 58%, rgba(41, 98, 255, 0.88) 100%);
+  --surface-glow: radial-gradient(circle at top left, rgba(255, 107, 26, 0.16), transparent 40%);
+  --chart-series-1: var(--primary-color);
+  --chart-series-2: var(--accent-color);
+  --chart-series-3: var(--secondary-color);
+  --chart-series-4: #edae49;
   
   /* Typography */
   --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -39,6 +47,7 @@
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 14px 34px rgba(var(--primary-rgb), 0.18);
   
   /* Transitions */
   --transition-fast: 150ms ease;

@@ -234,6 +234,61 @@ describe('🏆 Club Routes', () => {
     });
   });
 
+  describe('🎨 Club Theme Routes', () => {
+    it('✅ should return the club default theme palette', async () => {
+      const clubName = generateUniqueClubName('ThemeClub');
+      const clubResult = await db.query(
+        'INSERT INTO clubs (name, club_theme_palette_id) VALUES ($1, $2) RETURNING id',
+        [clubName, 'emerald-club']
+      );
+
+      const response = await request(app)
+        .get(`/api/clubs/${clubResult.rows[0].id}/theme`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body).toEqual({
+        club_id: clubResult.rows[0].id,
+        palette_id: 'emerald-club'
+      });
+    });
+
+    it('✅ should allow admins to update the club default theme palette', async () => {
+      const clubName = generateUniqueClubName('ThemeClubUpdate');
+      const clubResult = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+        [clubName]
+      );
+
+      const response = await request(app)
+        .put(`/api/clubs/${clubResult.rows[0].id}/theme`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ palette_id: 'graphite-gold' })
+        .expect(200);
+
+      expect(response.body).toEqual({
+        club_id: clubResult.rows[0].id,
+        palette_id: 'graphite-gold'
+      });
+    });
+
+    it('❌ should block coaches from changing the club default theme palette', async () => {
+      const clubName = generateUniqueClubName('ThemeClubCoach');
+      const clubResult = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+        [clubName]
+      );
+
+      await request(app)
+        .put(`/api/clubs/${clubResult.rows[0].id}/theme`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ palette_id: 'crimson-strike' })
+        .expect(403);
+    });
+  });
+
   describe('📋 GET /api/clubs/:id/teams - Get Club Teams', () => {
     it('❌ should return 404 for missing club', async () => {
       const response = await request(app)
