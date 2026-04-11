@@ -31,6 +31,7 @@ const renderNavigation = (user: { username: string; role: string } | null = null
     user,
     logout: mockLogout,
     login: vi.fn(),
+    updateUser: vi.fn(),
     isLoading: false
   });
 
@@ -126,8 +127,9 @@ describe('Navigation Component', () => {
 
     it('displays user information', () => {
       renderNavigation(regularUser);
-      
-      expect(screen.getByText(/testuser\s*\(\s*user\s*\)/i)).toBeInTheDocument();
+
+      expect(screen.getByLabelText('Current user')).toHaveTextContent('testuser');
+      expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument();
     });
 
     it('shows change password button when authenticated', async () => {

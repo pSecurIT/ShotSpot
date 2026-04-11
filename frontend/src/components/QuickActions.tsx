@@ -33,11 +33,11 @@ const QuickActions: React.FC = () => {
 
   return (
     <div className="quick-actions" aria-label="Quick actions">
-      {visibleActions.map((action) => (
+      {visibleActions.map((action, index) => (
         <button
           key={action.label}
           type="button"
-          className="quick-actions__button"
+          className={`quick-actions__button ${index === 0 ? 'quick-actions__button--primary' : 'quick-actions__button--secondary'}`}
           onClick={() => navigate(action.to)}
         >
           <span className="quick-actions__icon" aria-hidden="true">{action.icon}</span>
