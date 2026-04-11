@@ -605,11 +605,12 @@ describe('Live Match Timer', () => {
     cy.wait('@recordShot');
     cy.wait('@pauseTimer');
     cy.wait('@createPossession');
+    cy.wait('@getGame');
     cy.get('.scoreboard .timer-status').should('contain', 'paused');
     cy.get('.scoreboard .time-remaining').invoke('text').then((pausedClock) => {
       secondsAfterHomeGoal = parseClock(pausedClock);
     });
-    cy.get('.scoreboard .team-section.home-team .score').should('contain', '1');
+    cy.get('.scoreboard .team-section.home-team .score', { timeout: 10000 }).should('contain', '1');
     cy.get('.scoreboard .team-section.away-team .score').should('contain', '0');
 
     cy.contains('button', '▶️ Resume').click();
@@ -668,13 +669,16 @@ describe('Live Match Timer', () => {
     cy.wait('@recordShot');
     cy.wait('@pauseTimer');
     cy.wait('@createPossession');
+    cy.wait('@getGame');
     cy.get('.scoreboard .timer-status').should('contain', 'paused');
     cy.get('.scoreboard .time-remaining').invoke('text').then((pausedClock) => {
       const awayGoalPauseSeconds = parseClock(pausedClock);
       expect(awayGoalPauseSeconds).to.be.lessThan(secondsAfterHomeGoal);
     });
-    cy.get('.scoreboard .team-section.home-team .score').should('contain', '1');
-    cy.get('.scoreboard .team-section.away-team .score').should('contain', '1');
+    cy.get('.scoreboard .team-section.home-team .score', { timeout: 10000 }).should('contain', '1');
+    cy.get('.scoreboard .team-section.away-team .score', { timeout: 10000 }).should('contain', '1');
     cy.contains('button', '▶️ Resume').should('be.visible');
   });
 });
+
+export {};

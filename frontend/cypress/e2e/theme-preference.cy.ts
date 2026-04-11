@@ -1,5 +1,7 @@
 describe('Smoke: Theme preference', () => {
   it('can switch theme and persists across reload', () => {
+    cy.viewport(1280, 900)
+
     cy.visit('/profile', {
       onBeforeLoad(win) {
         win.localStorage.setItem('token', 'cypress-token')
@@ -16,7 +18,7 @@ describe('Smoke: Theme preference', () => {
       },
     })
 
-    cy.contains('My Profile').should('be.visible')
+    cy.contains('h2', 'My Profile').should('be.visible')
 
     cy.get('#themePreference').should('have.value', 'system')
 
@@ -34,3 +36,5 @@ describe('Smoke: Theme preference', () => {
     cy.get('#themePreference').should('have.value', 'dark')
   })
 })
+
+export {}
