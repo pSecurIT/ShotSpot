@@ -201,7 +201,9 @@ describe('ScheduledReports', () => {
 
     render(<ScheduledReports />);
 
-    expect(await screen.findByText('No schedules configured yet')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('No schedules configured yet');
+    });
     expect(screen.getByRole('button', { name: 'Create First Schedule' })).toBeInTheDocument();
   });
 
@@ -210,7 +212,9 @@ describe('ScheduledReports', () => {
 
     render(<ScheduledReports />);
 
-    expect(await screen.findByText('Failed to load data')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to load data');
+    });
   });
 
   it('toggles schedule active state', async () => {
@@ -225,7 +229,9 @@ describe('ScheduledReports', () => {
       expect(mockUpdate).toHaveBeenCalledWith(10, { is_active: false });
     });
 
-    expect(await screen.findByText('Schedule disabled successfully')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('Schedule disabled successfully');
+    });
   });
 
   it('does not delete schedule when confirmation is cancelled', async () => {

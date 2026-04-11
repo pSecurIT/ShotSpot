@@ -18,7 +18,7 @@ vi.mock('../services/clubsApi', () => ({
 
 describe('ClubManagement', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
@@ -37,6 +37,32 @@ describe('ClubManagement', () => {
       expect(clubsApi.getAll).toHaveBeenCalledTimes(1);
       expect(screen.getByText('Alpha Club')).toBeInTheDocument();
       expect(screen.getByText('Beta Club')).toBeInTheDocument();
+    });
+  });
+
+  it('announces empty and success states accessibly', async () => {
+    (clubsApi.getAll as unknown as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 1, name: 'New Club', created_at: '', updated_at: '' }]);
+    (clubsApi.create as unknown as jest.Mock).mockResolvedValue({
+      id: 1,
+      name: 'New Club',
+      created_at: '',
+      updated_at: ''
+    });
+
+    render(<ClubManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('No clubs found')).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /add club/i }));
+    await userEvent.type(screen.getByPlaceholderText('Enter club name'), 'New Club');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Club created successfully')).toBeInTheDocument();
     });
   });
 

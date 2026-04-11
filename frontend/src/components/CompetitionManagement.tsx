@@ -161,12 +161,12 @@ const CompetitionManagement: React.FC = () => {
         />
       </div>
 
-      {loading && <div className="competition-management__loading">Loading competitions…</div>}
-      {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
+      {loading && <div className="competition-management__loading" role="status" aria-live="polite">Loading competitions…</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      {success && <div className="alert alert-success" role="status" aria-live="polite">{success}</div>}
 
       {!loading && !error && filteredCompetitions.length === 0 && (
-        <div className="empty-state">No competitions found</div>
+        <div className="empty-state" role="status" aria-live="polite">No competitions found</div>
       )}
 
       <div className="competition-grid" aria-busy={loading ? 'true' : 'false'}>

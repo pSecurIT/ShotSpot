@@ -345,7 +345,7 @@ const PlayerManagement: React.FC = () => {
         return { ...prev, is_active: value === 'true' };
       }
       if (name === 'jersey_number') {
-        return { ...prev, [name]: parseInt(value) };
+        return { ...prev, [name]: value === '' ? 0 : parseInt(value, 10) };
       }
       return { ...prev, [name]: value };
     });
@@ -724,12 +724,14 @@ const PlayerManagement: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="search-input"
+                aria-label="Search players"
               />
               {searchQuery && (
                 <button
                   className="clear-search"
                   onClick={() => setSearchQuery('')}
                   title="Clear search"
+                  aria-label="Clear player search"
                 >
                   ✕
                 </button>
@@ -802,6 +804,7 @@ const PlayerManagement: React.FC = () => {
                   className="sort-order-btn"
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                   title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+                  aria-label={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
                 >
                   {sortOrder === 'asc' ? '↑' : '↓'}
                 </button>
@@ -820,7 +823,7 @@ const PlayerManagement: React.FC = () => {
             </div>
             
             {/* Results count */}
-            <div className="results-count">
+            <div className="results-count" role="status" aria-live="polite">
               Showing {filteredPlayers.length} of {players.length} players
             </div>
           </div>
@@ -828,7 +831,7 @@ const PlayerManagement: React.FC = () => {
 
         <div className="players-grid">
           {filteredPlayers.length === 0 ? (
-            <p className="no-players">No players found.</p>
+            <p className="no-players" role="status" aria-live="polite">No players found.</p>
           ) : (
             filteredPlayers.map(player => {
               const shootingPercentage = player.total_shots && player.total_shots > 0

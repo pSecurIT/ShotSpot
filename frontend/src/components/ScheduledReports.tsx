@@ -185,7 +185,7 @@ const ScheduledReports: React.FC = () => {
   }, [scheduledReports]);
 
   if (loading) {
-    return <div className="scheduled-reports-page">Loading scheduled reports...</div>;
+    return <div className="scheduled-reports-page" role="status" aria-live="polite">Loading scheduled reports...</div>;
   }
 
   return (
@@ -198,17 +198,17 @@ const ScheduledReports: React.FC = () => {
         <button type="button" onClick={handleOpenCreate}>+ New Schedule</button>
       </div>
 
-      {error && <div className="scheduled-reports-banner scheduled-reports-banner--error">{error}</div>}
-      {success && <div className="scheduled-reports-banner scheduled-reports-banner--success">{success}</div>}
+      {error && <div className="scheduled-reports-banner scheduled-reports-banner--error" role="alert">{error}</div>}
+      {success && <div className="scheduled-reports-banner scheduled-reports-banner--success" role="status" aria-live="polite">{success}</div>}
 
       {scheduledReports.length === 0 ? (
-        <div className="scheduled-reports-empty">
+        <div className="scheduled-reports-empty" role="status" aria-live="polite">
           <h3>No schedules configured yet</h3>
           <p>Create a schedule to automate recurring report delivery.</p>
           <button type="button" onClick={handleOpenCreate}>Create First Schedule</button>
         </div>
       ) : (
-        <div className="scheduled-reports-list">
+        <div className="scheduled-reports-list" aria-label="Scheduled reports list">
           {scheduledReports.map((schedule) => {
             const isBusy = busyScheduleId === schedule.id;
             const isHistoryOpen = historyScheduleId === schedule.id;

@@ -200,7 +200,7 @@ describe('Login Component', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Invalid username or password')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent('Invalid username or password');
       });
     });
 
@@ -242,7 +242,7 @@ describe('Login Component', () => {
 
       expect(consoleSpy).toHaveBeenCalled();
       const call = consoleSpy.mock.calls[0];
-      expect(call[0]).toContain('Login');
+      expect(call[0]).toContain('Login exception');
       expect(call[1]).toBeInstanceOf(Error);
       consoleSpy.mockRestore();
     });
@@ -302,7 +302,7 @@ describe('Login Component', () => {
   });
 
   describe('Edge Cases', () => {
-    it('handles empty form submission', () => {
+    it('handles empty form submission', async () => {
       mockLogin.mockResolvedValue({ success: false, error: 'Fields required' });
       renderLogin();
 
@@ -312,7 +312,9 @@ describe('Login Component', () => {
         fireEvent.submit(form);
       }
 
-      expect(mockLogin).toHaveBeenCalledWith('', '');
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledWith('', '');
+      });
     });
 
     it('handles whitespace-only input', () => {
