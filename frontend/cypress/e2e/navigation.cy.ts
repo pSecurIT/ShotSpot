@@ -241,3 +241,5 @@ describe('Navigation: Mobile responsiveness', () => {
     cy.get('[aria-label="Main navigation"]').find('button').should('exist');
   });
 });
+
+export {};
