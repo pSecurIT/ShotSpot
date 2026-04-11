@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 import Dashboard from '../components/Dashboard';
@@ -84,7 +84,11 @@ describe('Dashboard', () => {
     );
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Performance hub')).toBeInTheDocument();
     expect(screen.getByText('Quick Actions')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh feed' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View analytics' })).toHaveAttribute('href', '/analytics');
+    expect(screen.getByLabelText('Dashboard status')).toBeInTheDocument();
 
     const recentMatches = screen.getByLabelText('Recent Matches');
     await waitFor(() => {
@@ -102,6 +106,41 @@ describe('Dashboard', () => {
     expect(screen.getByText(/Sharpshooter/i)).toBeInTheDocument();
   });
 
+  it('shows the coach/admin primary action when the user can manage matches', async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 2, username: 'coach', role: 'coach', passwordMustChange: false }
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText(/Sharpshooter/i);
+    expect(screen.getByRole('link', { name: 'Open match center' })).toHaveAttribute('href', '/games');
+  });
+
+  it('refreshes all dashboard feeds when the refresh action is clicked', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText(/Sharpshooter/i);
+
+    mockApi.get.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh feed' }));
+
+    await waitFor(() => {
+      expect(mockApi.get).toHaveBeenCalledWith('/games', { params: { limit: 5, sort: 'recent' } });
+      expect(mockApi.get).toHaveBeenCalledWith('/games', { params: { status: 'upcoming' } });
+      expect(mockApi.get).toHaveBeenCalledWith('/achievements/recent', { params: { limit: 8 } });
+      expect(mockApi.get).toHaveBeenCalledWith('/dashboard/summary');
+    });
+  });
+
   it('refreshes achievements when achievement-unlocked is received', async () => {
     render(
       <BrowserRouter>
@@ -112,7 +151,9 @@ describe('Dashboard', () => {
     await screen.findByText(/Sharpshooter/i);
 
     const getSpy = vi.spyOn(mockApi, 'get');
-    emit('achievement-unlocked');
+    act(() => {
+      emit('achievement-unlocked');
+    });
 
     await waitFor(() => {
       expect(getSpy).toHaveBeenCalledWith('/achievements/recent', expect.anything());

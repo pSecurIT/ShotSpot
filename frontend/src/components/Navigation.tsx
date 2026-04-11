@@ -94,6 +94,7 @@ const Navigation: React.FC = () => {
   }, [user, handleLogout]);
 
   const visibleItems = visibleNavigation;
+  const userRoleLabel = user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '';
 
   return (
     <nav className="navigation-v2" aria-label="Main navigation">
@@ -168,7 +169,11 @@ const Navigation: React.FC = () => {
 
               {/* User Info & Actions */}
               <div className="navigation-v2__user">
-                <span className="navigation-v2__user-info">{user.username} ({user.role})</span>
+                <div className="navigation-v2__user-meta" aria-label="Current user">
+                  <span className="navigation-v2__user-kicker">Active profile</span>
+                  <span className="navigation-v2__user-info">{user.username}</span>
+                </div>
+                <span className="navigation-v2__role-chip">{userRoleLabel}</span>
                 <NavigationDropdown
                   label="User"
                   icon="👤"
