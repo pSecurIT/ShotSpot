@@ -146,8 +146,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [remoteClubPaletteId, setRemoteClubPaletteId] = useState<ThemePaletteId>(() => getStoredLocalInheritedPaletteId());
   const [teamScopeId, setTeamScopeIdState] = useState<number | null>(() => getStoredTeamScopeId());
   const [teamPaletteId, setTeamPaletteIdState] = useState<ThemePaletteId | null>(null);
-  const [clubScopeReady, setClubScopeReady] = useState<boolean>(() => getStoredClubScopeId() === null);
-  const [teamScopeReady, setTeamScopeReady] = useState<boolean>(() => getStoredTeamScopeId() === null);
+  const clubScopeLoadingRef = useRef(false);
+  const teamScopeLoadingRef = useRef(false);
   const lastLoadedClubPaletteRef = useRef<ThemePaletteId | null>(null);
   const lastLoadedTeamPaletteRef = useRef<ThemePaletteId | null>(null);
 
@@ -176,13 +176,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (clubScopeId === null) {
       window.localStorage.removeItem(CLUB_SCOPE_STORAGE_KEY);
       lastLoadedClubPaletteRef.current = null;
-      setRemoteClubPaletteId(localInheritedPaletteId);
-      setClubScopeReady(true);
+      clubScopeLoadingRef.current = false;
       return;
     }
 
     window.localStorage.setItem(CLUB_SCOPE_STORAGE_KEY, String(clubScopeId));
-  }, [clubScopeId, localInheritedPaletteId]);
+  }, [clubScopeId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -190,8 +189,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (teamScopeId === null) {
       window.localStorage.removeItem(TEAM_SCOPE_STORAGE_KEY);
       lastLoadedTeamPaletteRef.current = null;
-      setTeamPaletteIdState(null);
-      setTeamScopeReady(true);
+      teamScopeLoadingRef.current = false;
       return;
     }
 
@@ -202,7 +200,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (clubScopeId === null) return undefined;
 
     let ignore = false;
-    setClubScopeReady(false);
+    clubScopeLoadingRef.current = true;
 
     api.get<{ club_id: number; palette_id: string }>(`/clubs/${clubScopeId}/theme`)
       .then((response) => {
@@ -212,14 +210,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ? response.data.palette_id
           : DEFAULT_THEME_PALETTE_ID;
 
+        clubScopeLoadingRef.current = false;
         lastLoadedClubPaletteRef.current = nextPaletteId;
         setRemoteClubPaletteId(nextPaletteId);
-        setClubScopeReady(true);
       })
       .catch(() => {
         if (!ignore) {
+          clubScopeLoadingRef.current = false;
           lastLoadedClubPaletteRef.current = null;
-          setClubScopeReady(true);
         }
       });
 
@@ -232,7 +230,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (teamScopeId === null) return undefined;
 
     let ignore = false;
-    setTeamScopeReady(false);
+    teamScopeLoadingRef.current = true;
 
     api.get<{
       team_id: number;
@@ -252,6 +250,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ? response.data.club_palette_id
           : DEFAULT_THEME_PALETTE_ID;
 
+        teamScopeLoadingRef.current = false;
         if (clubScopeId !== response.data.club_id) {
           setClubScopeIdState(response.data.club_id);
         }
@@ -260,13 +259,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setRemoteClubPaletteId(nextClubPaletteId);
         lastLoadedTeamPaletteRef.current = nextTeamPaletteId;
         setTeamPaletteIdState(nextTeamPaletteId);
-        setTeamScopeReady(true);
       })
       .catch(() => {
         if (!ignore) {
+          teamScopeLoadingRef.current = false;
           lastLoadedTeamPaletteRef.current = null;
           setTeamPaletteIdState(null);
-          setTeamScopeReady(true);
         }
       });
 
@@ -277,7 +275,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     if (clubScopeId === null) return;
-    if (!clubScopeReady) return;
+    if (clubScopeLoadingRef.current) return;
     if (lastLoadedClubPaletteRef.current === remoteClubPaletteId) return;
 
     api.put(`/clubs/${clubScopeId}/theme`, { palette_id: remoteClubPaletteId })
@@ -287,11 +285,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .catch(() => {
         // Keep the selected palette applied locally even if persistence fails.
       });
-  }, [clubScopeId, clubScopeReady, remoteClubPaletteId]);
+  }, [clubScopeId, remoteClubPaletteId]);
 
   useEffect(() => {
     if (teamScopeId === null) return;
-    if (!teamScopeReady) return;
+    if (teamScopeLoadingRef.current) return;
     if (lastLoadedTeamPaletteRef.current === teamPaletteId) return;
 
     api.put(`/teams/${teamScopeId}/theme`, { palette_id: teamPaletteId })
@@ -301,7 +299,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .catch(() => {
         // Keep the local selection applied even if backend persistence fails.
       });
-  }, [teamPaletteId, teamScopeId, teamScopeReady]);
+  }, [teamPaletteId, teamScopeId]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
@@ -327,7 +325,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setRemoteClubPaletteId(next);
       },
       teamScopeId,
-      setTeamScopeId: setTeamScopeIdState,
+      setTeamScopeId: (next) => {
+        setTeamScopeIdState(next);
+        if (next === null) {
+          setTeamPaletteIdState(null);
+        }
+      },
       teamPaletteId,
       setTeamPaletteId: setTeamPaletteIdState,
       inheritedPaletteId,
