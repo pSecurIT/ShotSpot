@@ -36,7 +36,7 @@ const CompetitionBracketView: React.FC = () => {
         setBracket(bracketData);
       } catch (err) {
         const errorObj = err as { response?: { data?: { error?: string; details?: string } }; message?: string };
-        setError(errorObj.response?.data?.error || errorObj.response?.data?.details || 'Failed to load bracket');
+        setError(errorObj.response?.data?.error || errorObj.response?.data?.details || errorObj.message || 'Failed to load bracket');
       } finally {
         setLoading(false);
       }
@@ -73,7 +73,7 @@ const CompetitionBracketView: React.FC = () => {
               setBracket(refreshed);
             } catch (err) {
               const errorObj = err as { response?: { data?: { error?: string; details?: string } }; message?: string };
-              setError(errorObj.response?.data?.error || errorObj.response?.data?.details || 'Failed to generate bracket');
+              setError(errorObj.response?.data?.error || errorObj.response?.data?.details || errorObj.message || 'Failed to generate bracket');
             } finally {
               setBusy(false);
             }
@@ -83,12 +83,12 @@ const CompetitionBracketView: React.FC = () => {
         </button>
       </div>
 
-      {loading && <div>Loading bracket…</div>}
-      {error && <div className="alert alert-error">{error}</div>}
+      {loading && <div role="status" aria-live="polite">Loading bracket…</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
 
       {!loading && !error && bracket && (
         <div className="competition-card">
-          {bracket.rounds.length === 0 && <div className="empty-state">No rounds available</div>}
+          {bracket.rounds.length === 0 && <div className="empty-state" role="status" aria-live="polite">No rounds available</div>}
 
           {bracket.rounds.length > 0 && (
             <TournamentBracketSvg
@@ -105,7 +105,7 @@ const CompetitionBracketView: React.FC = () => {
                   setBracket(refreshed);
                 } catch (err) {
                   const errorObj = err as { response?: { data?: { error?: string; details?: string } }; message?: string };
-                  setError(errorObj.response?.data?.error || errorObj.response?.data?.details || 'Failed to assign team');
+                  setError(errorObj.response?.data?.error || errorObj.response?.data?.details || errorObj.message || 'Failed to assign team');
                 } finally {
                   setBusy(false);
                 }
@@ -119,7 +119,7 @@ const CompetitionBracketView: React.FC = () => {
                   setBracket(refreshed);
                 } catch (err) {
                   const errorObj = err as { response?: { data?: { error?: string; details?: string } }; message?: string };
-                  setError(errorObj.response?.data?.error || errorObj.response?.data?.details || 'Failed to update match result');
+                  setError(errorObj.response?.data?.error || errorObj.response?.data?.details || errorObj.message || 'Failed to update match result');
                 } finally {
                   setBusy(false);
                 }
@@ -127,6 +127,10 @@ const CompetitionBracketView: React.FC = () => {
             />
           )}
         </div>
+      )}
+
+      {!loading && !error && !bracket && (
+        <div className="empty-state" role="status" aria-live="polite">No bracket data available.</div>
       )}
     </div>
   );

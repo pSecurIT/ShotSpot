@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import ChangePasswordDialog from '../components/ChangePasswordDialog';
 import api from '../utils/api';
@@ -28,6 +29,7 @@ describe('ChangePasswordDialog Component', () => {
     it('renders dialog when open', () => {
       render(<ChangePasswordDialog {...defaultProps} />);
       
+      expect(screen.getByRole('dialog', { name: 'Change Your Password' })).toBeInTheDocument();
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
       expect(screen.getByLabelText('Current Password *')).toBeInTheDocument();
       expect(screen.getByLabelText('New Password *')).toBeInTheDocument();
@@ -271,6 +273,22 @@ describe('ChangePasswordDialog Component', () => {
   });
 
   describe('Dialog Controls', () => {
+    it('closes dialog when Escape is pressed', async () => {
+      render(<ChangePasswordDialog {...defaultProps} />);
+
+      await userEvent.keyboard('{Escape}');
+
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    it('does not close a forced dialog on Escape', async () => {
+      render(<ChangePasswordDialog {...defaultProps} isForced />);
+
+      await userEvent.keyboard('{Escape}');
+
+      expect(mockOnClose).not.toHaveBeenCalled();
+    });
+
     it('closes dialog when cancel button is clicked', () => {
       render(<ChangePasswordDialog {...defaultProps} />);
       
@@ -337,6 +355,7 @@ describe('ChangePasswordDialog Component', () => {
       render(<ChangePasswordDialog {...defaultProps} />);
       
       expect(screen.getByText(/Must be at least 8 characters/i)).toBeInTheDocument();
+      expect(screen.getByLabelText('New Password *')).toHaveAttribute('aria-describedby', 'new-password-hint');
     });
 
     it('marks required fields', () => {

@@ -48,7 +48,9 @@ const TeamManagement: React.FC = () => {
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error fetching clubs');
-      console.error('Error fetching clubs:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error fetching clubs:', error);
+      }
     }
   };
 
@@ -60,7 +62,9 @@ const TeamManagement: React.FC = () => {
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error fetching teams');
-      console.error('Error fetching teams:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error fetching teams:', error);
+      }
     }
   };
 
@@ -111,7 +115,9 @@ const TeamManagement: React.FC = () => {
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error adding team');
-      console.error('Error adding team:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error adding team:', error);
+      }
     }
   };
 
@@ -232,13 +238,13 @@ const TeamManagement: React.FC = () => {
       </div>
 
       {error && (
-        <div className="error-message" style={{ marginBottom: '1rem' }}>
+        <div className="error-message" style={{ marginBottom: '1rem' }} role="alert">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="success-message" style={{ marginBottom: '1rem' }}>
+        <div className="success-message" style={{ marginBottom: '1rem' }} role="status" aria-live="polite">
           {success}
         </div>
       )}
@@ -266,7 +272,7 @@ const TeamManagement: React.FC = () => {
               )}
             </select>
             {clubs.length === 0 && (
-              <div className="empty-state">Create a club first to add teams.</div>
+              <div className="empty-state" role="status" aria-live="polite">Create a club first to add teams.</div>
             )}
           </div>
 
@@ -422,7 +428,7 @@ const TeamManagement: React.FC = () => {
               </div>
             </div>
 
-            <div className="results-count">
+            <div className="results-count" role="status" aria-live="polite">
               Showing {filteredTeams.length} of {teams.length} teams
             </div>
           </div>
@@ -430,7 +436,7 @@ const TeamManagement: React.FC = () => {
 
         <div className="team-grid">
           {filteredTeams.length === 0 ? (
-            <div className="empty-state">No teams found.</div>
+            <div className="empty-state" role="status" aria-live="polite">No teams found.</div>
           ) : (
             filteredTeams.map((team) => (
               <div

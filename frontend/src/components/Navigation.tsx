@@ -95,6 +95,7 @@ const Navigation: React.FC = () => {
 
   const visibleItems = visibleNavigation;
   const userRoleLabel = user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '';
+  const mobileMenuId = 'mobile-navigation-menu';
 
   return (
     <nav className="navigation-v2" aria-label="Main navigation">
@@ -107,6 +108,7 @@ const Navigation: React.FC = () => {
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Open navigation menu"
               aria-expanded={isMobileMenuOpen}
+              aria-controls={mobileMenuId}
               type="button"
             >
               <span className="hamburger-line"></span>
@@ -186,6 +188,7 @@ const Navigation: React.FC = () => {
 
           {/* Mobile Menu */}
           <MobileMenu
+            menuId={mobileMenuId}
             isOpen={isMobileMenuOpen}
             onClose={() => setIsMobileMenuOpen(false)}
             navigationItems={visibleItems}

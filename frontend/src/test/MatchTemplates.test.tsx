@@ -71,7 +71,7 @@ describe('MatchTemplates', () => {
 
   it('should render loading state initially', () => {
     renderWithProviders(<MatchTemplates />);
-    expect(screen.getByText('Loading templates...')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading templates...');
   });
 
   it('should render templates after loading', async () => {
@@ -201,7 +201,7 @@ describe('MatchTemplates', () => {
     fireEvent.click(screen.getByText('Create Template'));
     
     await waitFor(() => {
-      expect(screen.getByText('Template created successfully')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Template created successfully');
     });
   });
 
@@ -226,7 +226,7 @@ describe('MatchTemplates', () => {
     renderWithProviders(<MatchTemplates />);
     
     await waitFor(() => {
-      expect(screen.getByText('Failed to load match templates')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to load match templates');
     });
   });
 });

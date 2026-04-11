@@ -50,12 +50,12 @@ const SeasonOverview: React.FC<SeasonOverviewProps> = ({ overview }) => {
 
       <div className="team-analytics__grid team-analytics__grid--two-column">
         <article className="team-analytics__panel">
-          <h3>Top Scorers</h3>
+          <h3 id="team-analytics-top-scorers">Top Scorers</h3>
           {overview.top_scorers.length === 0 ? (
-            <p className="team-analytics__empty">No scorer data available for this season.</p>
+            <p className="team-analytics__empty" role="status" aria-live="polite">No scorer data available for this season.</p>
           ) : (
             <div className="team-analytics__table-wrap">
-              <table className="team-analytics__table">
+              <table className="team-analytics__table" aria-labelledby="team-analytics-top-scorers">
                 <thead>
                   <tr>
                     <th>Player</th>
@@ -83,12 +83,12 @@ const SeasonOverview: React.FC<SeasonOverviewProps> = ({ overview }) => {
         </article>
 
         <article className="team-analytics__panel">
-          <h3>Period Breakdown</h3>
+          <h3 id="team-analytics-period-breakdown">Period Breakdown</h3>
           {overview.period_breakdown.length === 0 ? (
-            <p className="team-analytics__empty">No period data available for this season.</p>
+            <p className="team-analytics__empty" role="status" aria-live="polite">No period data available for this season.</p>
           ) : (
             <div className="team-analytics__table-wrap">
-              <table className="team-analytics__table">
+              <table className="team-analytics__table" aria-labelledby="team-analytics-period-breakdown">
                 <thead>
                   <tr>
                     <th>Period</th>
@@ -116,7 +116,7 @@ const SeasonOverview: React.FC<SeasonOverviewProps> = ({ overview }) => {
       <article className="team-analytics__panel">
         <h3>Previous Season Comparison</h3>
         {!comparison ? (
-          <p className="team-analytics__empty">No previous-season baseline is available yet.</p>
+          <p className="team-analytics__empty" role="status" aria-live="polite">No previous-season baseline is available yet.</p>
         ) : (
           <div className="team-analytics__comparison-grid">
             <div>

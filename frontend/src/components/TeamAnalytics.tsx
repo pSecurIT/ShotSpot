@@ -254,15 +254,15 @@ const TeamAnalytics: React.FC = () => {
       )}
 
       {scopeNotice && (
-        <div className="team-analytics__alert team-analytics__alert--info">
+        <div className="team-analytics__alert team-analytics__alert--info" role="status" aria-live="polite">
           {scopeNotice}
         </div>
       )}
 
       {loadingOptions || loadingData ? (
-        <div className="team-analytics__loading">Loading team analytics…</div>
+        <div className="team-analytics__loading" role="status" aria-live="polite">Loading team analytics…</div>
       ) : !overview || !momentum || !strengthsWeaknesses ? (
-        <div className="team-analytics__empty">Choose a team to load analytics.</div>
+        <div className="team-analytics__empty" role="status" aria-live="polite">Choose a team to load analytics.</div>
       ) : (
         <div ref={exportRef} className="team-analytics__content" data-testid="team-analytics-export-surface">
           <SeasonOverview overview={overview} />
@@ -280,7 +280,7 @@ const TeamAnalytics: React.FC = () => {
               <article className="team-analytics__panel">
                 <h3>Strengths</h3>
                 {strengthsWeaknesses.strengths.length === 0 ? (
-                  <p className="team-analytics__empty">No strengths identified yet.</p>
+                  <p className="team-analytics__empty" role="status" aria-live="polite">No strengths identified yet.</p>
                 ) : (
                   <ul className="team-analytics__insight-list">
                     {strengthsWeaknesses.strengths.map((insight) => (
@@ -296,7 +296,7 @@ const TeamAnalytics: React.FC = () => {
               <article className="team-analytics__panel">
                 <h3>Weaknesses</h3>
                 {strengthsWeaknesses.weaknesses.length === 0 ? (
-                  <p className="team-analytics__empty">No weaknesses identified yet.</p>
+                  <p className="team-analytics__empty" role="status" aria-live="polite">No weaknesses identified yet.</p>
                 ) : (
                   <ul className="team-analytics__insight-list">
                     {strengthsWeaknesses.weaknesses.map((insight) => (
