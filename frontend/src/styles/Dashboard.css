@@ -213,6 +213,10 @@
   background: var(--surface-panel-muted);
 }
 
+.dashboard-widget__state {
+  min-height: 100%;
+}
+
 .dashboard-widget__error {
   background: rgba(211, 47, 47, 0.12);
   color: var(--danger-color);

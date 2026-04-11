@@ -208,13 +208,18 @@ describe('ScheduledReports', () => {
   });
 
   it('shows error banner when loading schedules fails', async () => {
-    mockGetAll.mockRejectedValueOnce(new Error('Failed to load data'));
+    const user = userEvent.setup();
+    mockGetAll.mockRejectedValueOnce(new Error('Failed to load data')).mockResolvedValueOnce([seededSchedule]);
 
     render(<ScheduledReports />);
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Failed to load data');
     });
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('Weekly Team Insights')).toBeInTheDocument();
   });
 
   it('toggles schedule active state', async () => {

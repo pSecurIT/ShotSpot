@@ -226,8 +226,7 @@ describe('PlayerManagement', () => {
     await userEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Jersey number already taken')).toBeInTheDocument();
-      expect(screen.getByText('Jersey number already taken')).toHaveAttribute('role', 'alert');
+      expect(screen.getByRole('alert')).toHaveTextContent('Jersey number already taken');
     });
 
     consoleSpy.mockRestore();
@@ -696,10 +695,12 @@ describe('PlayerManagement', () => {
     render(<PlayerManagement />);
 
     await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalled();
+      expect(screen.getByText('Couldn’t load players')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Player Management')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Failed to fetch teams');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(consoleSpy).toHaveBeenCalled();
     
     consoleSpy.mockRestore();
   });

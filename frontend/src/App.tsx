@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
 import OfflineIndicator from './components/OfflineIndicator';
 import NotFound from './components/NotFound';
+import RoutePending from './components/ui/RoutePending';
 import logo from './img/ShotSpot_logo.png';
 
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -35,7 +36,7 @@ const ReportTemplates = React.lazy(() => import('./components/ReportTemplates'))
 const SettingsPage = React.lazy(() => import('./components/SettingsPage'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
-  <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
+  <Suspense fallback={<RoutePending />}>
     {children}
   </Suspense>
 );
@@ -58,7 +59,7 @@ const App: React.FC = () => {
                 <Navigation />
               </div>
             </header>
-            <main id="app-main" tabIndex={-1}>
+            <main id="app-main" className="App-main" tabIndex={-1}>
               <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />

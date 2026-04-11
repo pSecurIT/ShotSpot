@@ -5,6 +5,8 @@ import { competitionsApi } from '../services/competitionsApi';
 import CompetitionCard from './CompetitionCard';
 import CompetitionDialog from './CompetitionDialog';
 import TeamRegistrationDialog from './TeamRegistrationDialog';
+import StatePanel from './ui/StatePanel';
+import Toast from './ui/Toast';
 import '../styles/CompetitionManagement.css';
 
 type Filters = {
@@ -31,6 +33,8 @@ const CompetitionManagement: React.FC = () => {
 
   const [teamsDialogOpen, setTeamsDialogOpen] = useState(false);
   const [teamsCompetition, setTeamsCompetition] = useState<Competition | undefined>(undefined);
+
+  const hasActiveFilters = Boolean(filters.type || filters.status || filters.search.trim());
 
   const fetchCompetitions = useCallback(async () => {
     try {
@@ -111,6 +115,14 @@ const CompetitionManagement: React.FC = () => {
     }
   };
 
+  const resetFilters = () => {
+    setFilters({ type: '', status: '', search: '' });
+    setPage(1);
+  };
+
+  const showFullPageError = Boolean(error && !loading && competitions.length === 0);
+  const showInlineError = Boolean(error && !showFullPageError);
+
   return (
     <div className="competition-management">
       <div className="competition-management__header">
@@ -161,25 +173,60 @@ const CompetitionManagement: React.FC = () => {
         />
       </div>
 
-      {loading && <div className="competition-management__loading" role="status" aria-live="polite">Loading competitions…</div>}
-      {error && <div className="alert alert-error" role="alert">{error}</div>}
-      {success && <div className="alert alert-success" role="status" aria-live="polite">{success}</div>}
-
-      {!loading && !error && filteredCompetitions.length === 0 && (
-        <div className="empty-state" role="status" aria-live="polite">No competitions found</div>
+      {showInlineError && (
+        <StatePanel
+          variant="error"
+          title="Couldn’t update competitions"
+          message={error ?? undefined}
+          actionLabel="Reload competitions"
+          onAction={() => {
+            void fetchCompetitions();
+          }}
+          compact
+          className="competition-management__feedback"
+        />
       )}
 
-      <div className="competition-grid" aria-busy={loading ? 'true' : 'false'}>
-        {paginated.map((competition) => (
-          <CompetitionCard
-            key={competition.id}
-            competition={competition}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            onManageTeams={openTeams}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <StatePanel
+          variant="loading"
+          title="Loading competitions"
+          message="Preparing competition cards, filters, and admin actions."
+          className="competition-management__feedback"
+        />
+      ) : showFullPageError ? (
+        <StatePanel
+          variant="error"
+          title="Couldn’t load competitions"
+          message={error ?? undefined}
+          actionLabel="Retry"
+          onAction={() => {
+            void fetchCompetitions();
+          }}
+          className="competition-management__feedback"
+        />
+      ) : filteredCompetitions.length === 0 ? (
+        <StatePanel
+          variant="empty"
+          title={hasActiveFilters ? 'No competitions match these filters' : 'No competitions yet'}
+          message={hasActiveFilters ? 'Try widening the filters or search term to find the right competition.' : 'Create the first competition to start tracking brackets, standings, and team registration.'}
+          actionLabel={hasActiveFilters ? 'Clear filters' : 'Create competition'}
+          onAction={hasActiveFilters ? resetFilters : openCreate}
+          className="competition-management__feedback"
+        />
+      ) : (
+        <div className="competition-grid" aria-busy={loading ? 'true' : 'false'}>
+          {paginated.map((competition) => (
+            <CompetitionCard
+              key={competition.id}
+              competition={competition}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              onManageTeams={openTeams}
+            />
+          ))}
+        </div>
+      )}
 
       {filteredCompetitions.length > PAGE_SIZE && (
         <div className="competition-pagination" aria-label="Pagination">
@@ -241,6 +288,14 @@ const CompetitionManagement: React.FC = () => {
           Manage series/divisions
         </button>
       </div>
+
+      {success && (
+        <Toast
+          message={success}
+          title="Competition updated"
+          onDismiss={() => setSuccess(null)}
+        />
+      )}
     </div>
   );
 };

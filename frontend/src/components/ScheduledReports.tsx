@@ -10,6 +10,8 @@ import type {
 } from '../types/scheduled-reports';
 import ReportScheduleDialog from './ReportScheduleDialog';
 import ExecutionHistory from './ExecutionHistory';
+import StatePanel from './ui/StatePanel';
+import Toast from './ui/Toast';
 import '../styles/ScheduledReports.css';
 
 const scheduleTypeLabel: Record<ScheduleType, string> = {
@@ -184,8 +186,24 @@ const ScheduledReports: React.FC = () => {
     return `${activeCount} active of ${scheduledReports.length} schedules`;
   }, [scheduledReports]);
 
+  const showLoadErrorState = Boolean(error && scheduledReports.length === 0);
+
   if (loading) {
-    return <div className="scheduled-reports-page" role="status" aria-live="polite">Loading scheduled reports...</div>;
+    return (
+      <div className="scheduled-reports-page">
+        <div className="scheduled-reports-header">
+          <div>
+            <h2>Scheduled Reports</h2>
+            <p>Loading your automations</p>
+          </div>
+        </div>
+        <StatePanel
+          variant="loading"
+          title="Loading scheduled reports"
+          message="Pulling schedules, templates, teams, and execution history entry points together."
+        />
+      </div>
+    );
   }
 
   return (
@@ -198,15 +216,39 @@ const ScheduledReports: React.FC = () => {
         <button type="button" onClick={handleOpenCreate}>+ New Schedule</button>
       </div>
 
-      {error && <div className="scheduled-reports-banner scheduled-reports-banner--error" role="alert">{error}</div>}
-      {success && <div className="scheduled-reports-banner scheduled-reports-banner--success" role="status" aria-live="polite">{success}</div>}
+      {!showLoadErrorState && error && (
+        <StatePanel
+          variant="error"
+          title="Scheduled report action failed"
+          message={error}
+          actionLabel="Reload schedules"
+          onAction={() => {
+            void loadAllData();
+          }}
+          compact
+          className="scheduled-reports__feedback"
+        />
+      )}
 
-      {scheduledReports.length === 0 ? (
-        <div className="scheduled-reports-empty" role="status" aria-live="polite">
-          <h3>No schedules configured yet</h3>
-          <p>Create a schedule to automate recurring report delivery.</p>
-          <button type="button" onClick={handleOpenCreate}>Create First Schedule</button>
-        </div>
+      {showLoadErrorState ? (
+        <StatePanel
+          variant="error"
+          title="Couldn’t load scheduled reports"
+          message={error}
+          actionLabel="Retry"
+          onAction={() => {
+            void loadAllData();
+          }}
+        />
+      ) : scheduledReports.length === 0 ? (
+        <StatePanel
+          variant="empty"
+          title="No schedules configured yet"
+          message="Create a schedule to automate recurring report delivery."
+          actionLabel="Create First Schedule"
+          onAction={handleOpenCreate}
+          className="scheduled-reports-empty"
+        />
       ) : (
         <div className="scheduled-reports-list" aria-label="Scheduled reports list">
           {scheduledReports.map((schedule) => {
@@ -276,6 +318,14 @@ const ScheduledReports: React.FC = () => {
         onClose={() => setIsDialogOpen(false)}
         onSave={handleSaveSchedule}
       />
+
+      {success && (
+        <Toast
+          title="Schedule updated"
+          message={success}
+          onDismiss={() => setSuccess('')}
+        />
+      )}
     </div>
   );
 };

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
+import StatePanel from './ui/StatePanel';
+import Toast from './ui/Toast';
 
 interface Team {
   id: number;
@@ -48,6 +50,7 @@ const GameManagement: React.FC = () => {
   const [games, setGames] = useState<Game[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [templates, setTemplates] = useState<MatchTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
@@ -102,7 +105,7 @@ const GameManagement: React.FC = () => {
       setTeams(response.data);
     } catch (error) {
       console.error('Error fetching teams:', error);
-      setError('Failed to fetch teams');
+      throw new Error('Failed to fetch teams');
     }
   }, []);
 
@@ -112,39 +115,58 @@ const GameManagement: React.FC = () => {
       setTemplates(response.data);
     } catch (error) {
       console.error('Error fetching templates:', error);
+      throw new Error('Failed to fetch match templates');
     }
   }, []);
 
   const fetchGames = useCallback(async () => {
     try {
-      setError(null);
       const params = filterStatus ? { status: filterStatus } : {};
       const response = await api.get('/games', { params });
       setGames(response.data);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      setError(err.response?.data?.error || 'Error fetching games');
+      throw new Error(err.response?.data?.error || 'Error fetching games');
       console.error('Error fetching games:', error);
     }
   }, [filterStatus]);
 
+  const loadInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      await Promise.all([fetchTeams(), fetchTemplates(), fetchGames()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load games');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchGames, fetchTeams, fetchTemplates]);
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      void fetchTeams();
-      void fetchGames();
-      void fetchTemplates();
+      void loadInitialData();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [fetchTeams, fetchGames, fetchTemplates]);
+  }, [loadInitialData]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      void fetchGames();
+      if (!loading) {
+        void (async () => {
+          try {
+            setError(null);
+            await fetchGames();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load games');
+          }
+        })();
+      }
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [fetchGames]);
+  }, [fetchGames, loading]);
 
   // Handle game creation
   const handleCreateGame = async (e: React.FormEvent) => {
@@ -323,16 +345,40 @@ const GameManagement: React.FC = () => {
     <div className="game-management-container">
       <h2>Game Management</h2>
       
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
+      {loading && (
+        <StatePanel
+          variant="loading"
+          title="Loading games"
+          message="Preparing teams, match templates, schedules, and live-match actions."
+          className="game-management__feedback"
+        />
       )}
 
-      {success && (
-        <div className="success-message">
-          {success}
-        </div>
+      {!loading && error && games.length === 0 && (
+        <StatePanel
+          variant="error"
+          title="Couldn’t load games"
+          message={error ?? undefined}
+          actionLabel="Retry"
+          onAction={() => {
+            void loadInitialData();
+          }}
+          className="game-management__feedback"
+        />
+      )}
+
+      {!loading && error && games.length > 0 && (
+        <StatePanel
+          variant="error"
+          title="Game action failed"
+          message={error ?? undefined}
+          actionLabel="Reload games"
+          onAction={() => {
+            void loadInitialData();
+          }}
+          compact
+          className="game-management__feedback"
+        />
       )}
 
       <div className="game-controls">
@@ -360,6 +406,8 @@ const GameManagement: React.FC = () => {
         </button>
       </div>
 
+      {!loading && !(error && games.length === 0) && (
+      <>
       {showCreateForm && (
         <div className="create-game-form">
           <h3>Create New Game</h3>
@@ -549,7 +597,14 @@ const GameManagement: React.FC = () => {
       <div className="games-list">
         <h3>Games ({games.length})</h3>
         {games.length === 0 ? (
-          <p className="empty-state">No games found</p>
+          <StatePanel
+            variant="empty"
+            title="No games found"
+            message={filterStatus ? 'Try another status filter or create a new game.' : 'Create a game to start preparing matches and analytics.'}
+            actionLabel={filterStatus ? 'Clear filter' : 'Create New Game'}
+            onAction={filterStatus ? () => setFilterStatus('') : () => setShowCreateForm(true)}
+            className="game-management__feedback"
+          />
         ) : (
           <div>
             {games.map(game => (
@@ -665,6 +720,16 @@ const GameManagement: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
+
+      {success && (
+        <Toast
+          title="Game updated"
+          message={success}
+          onDismiss={() => setSuccess(null)}
+        />
+      )}
     </div>
   );
 };
