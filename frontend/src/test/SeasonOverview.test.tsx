@@ -49,6 +49,8 @@ describe('SeasonOverview', () => {
 
     expect(screen.getByText(/Alex Arrow/)).toBeInTheDocument();
     expect(screen.getByText('P1')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Top Scorers' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Period Breakdown' })).toBeInTheDocument();
   });
 
   it('shows no-data messages for empty scorers and periods', () => {
@@ -62,8 +64,9 @@ describe('SeasonOverview', () => {
       />,
     );
 
-    expect(screen.getByText('No scorer data available for this season.')).toBeInTheDocument();
-    expect(screen.getByText('No period data available for this season.')).toBeInTheDocument();
+    const statuses = screen.getAllByRole('status');
+    expect(statuses[0]).toHaveTextContent('No scorer data available for this season.');
+    expect(statuses[1]).toHaveTextContent('No period data available for this season.');
   });
 
   it('shows no previous baseline message when comparison is null', () => {
@@ -76,7 +79,7 @@ describe('SeasonOverview', () => {
       />,
     );
 
-    expect(screen.getByText('No previous-season baseline is available yet.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('No previous-season baseline is available yet.');
   });
 
   it('formats signed delta values in previous season comparison', () => {
