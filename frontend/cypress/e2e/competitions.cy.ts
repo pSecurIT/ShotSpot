@@ -266,3 +266,5 @@ describe('Competitions: Mobile responsiveness', () => {
     cy.contains('Spring League 2025').should('be.visible');
   });
 });
+
+export {};
