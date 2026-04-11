@@ -7,7 +7,7 @@
   --team-analytics-accent: #0f766e;
   --team-analytics-warning: #b45309;
   --team-analytics-danger: #b91c1c;
-  padding: 24px;
+  padding: clamp(18px, 3vw, 24px);
   background:
     radial-gradient(circle at top right, rgba(15, 118, 110, 0.12), transparent 28%),
     linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.98));
@@ -58,6 +58,7 @@
   min-height: 44px;
   border-radius: 12px;
   border: 1px solid var(--team-analytics-border);
+  width: 100%;
 }
 
 .team-analytics__field select {
@@ -131,6 +132,8 @@
 
 .team-analytics__table-wrap {
   overflow-x: auto;
+  margin-inline: -4px;
+  padding-inline: 4px;
 }
 
 .team-analytics__table {
@@ -194,12 +197,36 @@
   padding: 32px 0;
 }
 
+@media (max-width: 1024px) {
+  .team-analytics__hero {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .team-analytics__toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-analytics__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-analytics__grid--two-column {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .team-analytics {
     padding: 18px;
   }
 
   .team-analytics__hero {
+    grid-template-columns: 1fr;
+  }
+
+  .team-analytics__toolbar,
+  .team-analytics__cards {
     grid-template-columns: 1fr;
   }
 }

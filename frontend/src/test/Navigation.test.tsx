@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
@@ -42,6 +42,17 @@ const renderNavigation = (user: { username: string; role: string } | null = null
   );
 };
 
+const setViewportWidth = (width: number) => {
+  act(() => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: width
+    });
+    window.dispatchEvent(new Event('resize'));
+  });
+};
+
 const openUserMenu = async () => {
   const trigger = screen.getByRole('button', { name: 'User' });
   if (trigger.getAttribute('aria-expanded') === 'true') {
@@ -65,6 +76,7 @@ describe('Navigation Component', () => {
     vi.clearAllMocks();
     // Mock window.alert
     global.alert = vi.fn();
+    setViewportWidth(1280);
   });
 
   describe('Unauthenticated State', () => {
