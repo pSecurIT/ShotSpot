@@ -20,6 +20,8 @@ const NavigationDropdown: React.FC<NavigationDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const focusFirstItemRef = useRef(false);
+  const menuId = `${label.toLowerCase().replace(/\s+/g, '-')}-menu`;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -38,6 +40,14 @@ const NavigationDropdown: React.FC<NavigationDropdownProps> = ({
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen || !focusFirstItemRef.current) return;
+
+    const firstItem = dropdownRef.current?.querySelector('.nav-dropdown-menu a, .nav-dropdown-menu button') as HTMLElement | null;
+    firstItem?.focus();
+    focusFirstItemRef.current = false;
+  }, [isOpen]);
+
   // Handle keyboard navigation
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape') {
@@ -46,10 +56,10 @@ const NavigationDropdown: React.FC<NavigationDropdownProps> = ({
     } else if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       setIsOpen(!isOpen);
-    } else if (event.key === 'ArrowDown' && isOpen) {
+    } else if (event.key === 'ArrowDown') {
       event.preventDefault();
-      const firstItem = dropdownRef.current?.querySelector('.nav-dropdown-menu a, .nav-dropdown-menu button') as HTMLElement;
-      firstItem?.focus();
+      focusFirstItemRef.current = true;
+      setIsOpen(true);
     }
   };
 
@@ -90,8 +100,9 @@ const NavigationDropdown: React.FC<NavigationDropdownProps> = ({
         className={`nav-dropdown__trigger ${isOpen || isActive ? 'active' : ''}`}
         onClick={handleToggle}
         onKeyDown={handleKeyDown}
-        aria-haspopup="true"
+        aria-haspopup="menu"
         aria-expanded={isOpen}
+        aria-controls={isOpen ? menuId : undefined}
         aria-label={label}
         type="button"
       >
@@ -102,7 +113,7 @@ const NavigationDropdown: React.FC<NavigationDropdownProps> = ({
       </button>
 
       {isOpen && (
-        <div className="nav-dropdown-menu" role="menu" aria-label={`${label} menu`}>
+        <div className="nav-dropdown-menu" id={menuId} role="menu" aria-label={`${label} menu`}>
           {items.map((item, index) => (
             <div
               key={item.label}

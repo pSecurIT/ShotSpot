@@ -125,6 +125,20 @@ describe('Navigation Component', () => {
       expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument();
     });
 
+    it('supports opening dropdown menus with keyboard and focuses the first item', async () => {
+      renderNavigation(regularUser);
+
+      const trigger = screen.getByRole('button', { name: 'Matches' });
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+
+      await waitFor(() => {
+        expect(screen.getByRole('menu', { name: 'Matches menu' })).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole('menuitem', { name: /All Games/i })).toHaveFocus();
+    });
+
     it('displays user information', () => {
       renderNavigation(regularUser);
 
@@ -480,5 +494,11 @@ describe('Navigation Component', () => {
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
     });
+  });
+
+  it('exposes a skip link to main content', () => {
+    renderNavigation(null);
+
+    expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument();
   });
 });
