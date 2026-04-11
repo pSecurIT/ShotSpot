@@ -21,7 +21,11 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({
     <section className="dashboard-widget" aria-label={title}>
       <div className="dashboard-widget__header">
         <h2 className="dashboard-widget__title">
-          {icon && <span className="dashboard-widget__icon" aria-hidden="true">{icon}</span>}
+          {icon && (
+            <span className="dashboard-widget__icon-shell" aria-hidden="true">
+              <span className="dashboard-widget__icon">{icon}</span>
+            </span>
+          )}
           <span>{title}</span>
         </h2>
         {actions && <div className="dashboard-widget__actions">{actions}</div>}
