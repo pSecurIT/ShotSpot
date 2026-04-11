@@ -11,6 +11,9 @@
 
 body {
   font-family: var(--font-primary);
+  background:
+    var(--surface-glow),
+    linear-gradient(180deg, #f8fbff 0%, var(--surface-canvas) 18%, #edf2f8 100%);
   background-color: var(--background-light);
   color: var(--text-primary);
   line-height: 1.6;
@@ -84,12 +87,9 @@ body {
 }
 
 .App-header {
-  background: linear-gradient(
-    to right,
-    rgba(var(--primary-rgb), 0.38) 0%,
-    rgba(15, 18, 22, 0.98) 52%,
-    rgba(var(--primary-rgb), 0.38) 100%
-  );
+  background:
+    radial-gradient(circle at top left, rgba(255, 107, 26, 0.22), transparent 22%),
+    var(--surface-hero);
   padding: var(--spacing-md) var(--spacing-xl);
   color: var(--text-light);
   box-shadow: var(--shadow-md);

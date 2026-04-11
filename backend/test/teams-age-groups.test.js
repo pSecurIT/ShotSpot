@@ -15,17 +15,20 @@ describe('👥 Age Group Team Routes', () => {
   let authToken;
   let coachAuthToken;
   let testClubId;
+  let coachUserId;
 
   beforeAll(async () => {
     console.log('🔧 Setting up Age Group Team Routes tests...');
     // Generate test auth token
     authToken = generateTestToken('admin');
     coachAuthToken = generateTestToken('coach');
+    coachUserId = 1;
   });
 
   beforeEach(async () => {
     try {
       // Clear all tables in correct order (child tables first due to foreign keys)
+      await db.query('DELETE FROM trainer_assignments');
       await db.query('DELETE FROM substitutions');
       await db.query('DELETE FROM game_rosters');
       await db.query('DELETE FROM ball_possessions');
@@ -43,6 +46,15 @@ describe('👥 Age Group Team Routes', () => {
         [clubName]
       );
       testClubId = clubResult.rows[0].id;
+
+      await db.query(`
+        INSERT INTO users (id, username, email, password_hash, role)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO UPDATE
+        SET username = EXCLUDED.username,
+            email = EXCLUDED.email,
+            role = EXCLUDED.role
+      `, [coachUserId, 'coach-theme-user', 'coach-theme@test.com', '$2b$10$test', 'coach']);
     } catch (error) {
       global.testContext.logTestError(error, 'Database cleanup failed');
       throw error;
@@ -229,6 +241,142 @@ describe('👥 Age Group Team Routes', () => {
         global.testContext.logTestError(error, 'Failed to get team players');
         throw error;
       }
+    });
+  });
+
+  describe('🎨 Team Theme Routes', () => {
+    it('✅ should return the stored team theme palette', async () => {
+      await db.query(
+        'UPDATE clubs SET club_theme_palette_id = $1 WHERE id = $2',
+        ['graphite-gold', testClubId]
+      );
+
+      const teamRes = await db.query(
+        `INSERT INTO teams (club_id, name, age_group, team_theme_palette_id)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id`,
+        [testClubId, generateUniqueTeamName('ThemeTeam'), 'U17', 'emerald-club']
+      );
+
+      const response = await request(app)
+        .get(`/api/teams/${teamRes.rows[0].id}/theme`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect('Content-Type', /json/)
+        .expect(200);
+
+      expect(response.body).toEqual({
+        team_id: teamRes.rows[0].id,
+        club_id: testClubId,
+        palette_id: 'emerald-club',
+        club_palette_id: 'graphite-gold',
+        effective_palette_id: 'emerald-club',
+        is_inherited: false
+      });
+    });
+
+    it('✅ should inherit the club theme when the team has no override', async () => {
+      await db.query(
+        'UPDATE clubs SET club_theme_palette_id = $1 WHERE id = $2',
+        ['violet-pulse', testClubId]
+      );
+
+      const teamRes = await db.query(
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+        [testClubId, generateUniqueTeamName('ThemeInherited'), 'U11']
+      );
+
+      const response = await request(app)
+        .get(`/api/teams/${teamRes.rows[0].id}/theme`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body).toEqual({
+        team_id: teamRes.rows[0].id,
+        club_id: testClubId,
+        palette_id: null,
+        club_palette_id: 'violet-pulse',
+        effective_palette_id: 'violet-pulse',
+        is_inherited: true
+      });
+    });
+
+    it('✅ should let admins update the team theme palette', async () => {
+      const teamRes = await db.query(
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+        [testClubId, generateUniqueTeamName('ThemeAdmin'), 'U19']
+      );
+
+      const response = await request(app)
+        .put(`/api/teams/${teamRes.rows[0].id}/theme`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ palette_id: 'crimson-strike' })
+        .expect('Content-Type', /json/)
+        .expect(200);
+
+      expect(response.body).toEqual({
+        team_id: teamRes.rows[0].id,
+        palette_id: 'crimson-strike'
+      });
+
+      const dbResult = await db.query('SELECT team_theme_palette_id FROM teams WHERE id = $1', [teamRes.rows[0].id]);
+      expect(dbResult.rows[0].team_theme_palette_id).toBe('crimson-strike');
+    });
+
+    it('✅ should let assigned coaches update the team theme palette', async () => {
+      const teamRes = await db.query(
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+        [testClubId, generateUniqueTeamName('ThemeCoach'), 'U15']
+      );
+
+      await db.query(
+        'INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active) VALUES ($1, $2, $3, $4)',
+        [coachUserId, testClubId, teamRes.rows[0].id, true]
+      );
+
+      await request(app)
+        .put(`/api/teams/${teamRes.rows[0].id}/theme`)
+        .set('Authorization', `Bearer ${coachAuthToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ palette_id: 'sunset-flare' })
+        .expect(200);
+
+      const dbResult = await db.query('SELECT team_theme_palette_id FROM teams WHERE id = $1', [teamRes.rows[0].id]);
+      expect(dbResult.rows[0].team_theme_palette_id).toBe('sunset-flare');
+    });
+
+    it('❌ should reject invalid team theme palette IDs', async () => {
+      const teamRes = await db.query(
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+        [testClubId, generateUniqueTeamName('ThemeInvalid'), 'U13']
+      );
+
+      await request(app)
+        .put(`/api/teams/${teamRes.rows[0].id}/theme`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ palette_id: 'not-a-palette' })
+        .expect(400);
+    });
+
+    it('✅ should allow clearing a team override back to the club default', async () => {
+      const teamRes = await db.query(
+        `INSERT INTO teams (club_id, name, age_group, team_theme_palette_id)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [testClubId, generateUniqueTeamName('ThemeReset'), 'Senior', 'crimson-strike']
+      );
+
+      const response = await request(app)
+        .put(`/api/teams/${teamRes.rows[0].id}/theme`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ palette_id: null })
+        .expect(200);
+
+      expect(response.body).toEqual({
+        team_id: teamRes.rows[0].id,
+        palette_id: null
+      });
     });
   });
 
