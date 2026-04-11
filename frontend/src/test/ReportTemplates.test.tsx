@@ -94,6 +94,24 @@ describe('ReportTemplates', () => {
     expect(screen.getByRole('button', { name: 'Duplicate Template' })).toBeInTheDocument();
   });
 
+  it('announces empty and success states accessibly', async () => {
+    const user = userEvent.setup();
+    getAllMock.mockResolvedValueOnce([]);
+
+    render(<ReportTemplates />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('No templates yet');
+    });
+
+    await user.type(screen.getByLabelText('Template Name'), 'Weekly Insights');
+    await user.click(screen.getByRole('button', { name: 'Save Template' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('Template created successfully');
+    });
+  });
+
   it('creates a new template', async () => {
     const user = userEvent.setup();
     render(<ReportTemplates />);

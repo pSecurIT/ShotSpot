@@ -161,12 +161,12 @@ const ClubManagement: React.FC = () => {
         />
       </div>
 
-      {loading && <div className="club-management__loading">Loading clubs…</div>}
-      {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
+      {loading && <div className="club-management__loading" role="status" aria-live="polite">Loading clubs…</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      {success && <div className="alert alert-success" role="status" aria-live="polite">{success}</div>}
 
       {!loading && !error && filteredClubs.length === 0 && (
-        <div className="empty-state">No clubs found</div>
+        <div className="empty-state" role="status" aria-live="polite">No clubs found</div>
       )}
 
       <div className="club-grid" aria-busy={loading ? 'true' : 'false'}>
@@ -241,8 +241,8 @@ const ClubManagement: React.FC = () => {
               </button>
             </div>
 
-            {detailLoading && <div>Loading…</div>}
-            {detailError && <div className="alert alert-error">{detailError}</div>}
+            {detailLoading && <div role="status" aria-live="polite">Loading…</div>}
+            {detailError && <div className="alert alert-error" role="alert">{detailError}</div>}
 
             {!detailLoading && !detailError && detailView.mode === 'teams' && (
               <div className="club-details__list">

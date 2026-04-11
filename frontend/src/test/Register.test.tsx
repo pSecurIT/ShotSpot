@@ -51,6 +51,7 @@ describe('Register Component', () => {
       renderRegister();
       
       expect(screen.getByText(/password must contain at least 8 characters/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^password/i)).toHaveAttribute('aria-describedby', 'register-password-help');
     });
 
     it('has correct input types for form fields', () => {
@@ -136,7 +137,7 @@ describe('Register Component', () => {
       fireEvent.click(screen.getByRole('button', { name: /create account/i }));
       
       await waitFor(() => {
-        expect(screen.getByText(/password must be at least 8 characters long/i)).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent('Password must be at least 8 characters long');
       });
     });
 

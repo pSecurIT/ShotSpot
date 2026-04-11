@@ -239,16 +239,16 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
         </div>
       </div>
 
-      {loading && <div className="league-standings__loading">Loading standings…</div>}
-      {error && <div className="alert alert-error">{error}</div>}
+      {loading && <div className="league-standings__loading" role="status" aria-live="polite">Loading standings…</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
 
       {!loading && !error && standings.length === 0 && (
-        <div className="league-standings__empty">No standings available yet</div>
+        <div className="league-standings__empty" role="status" aria-live="polite">No standings available yet</div>
       )}
 
       {!loading && !error && standings.length > 0 && (
         <div className="league-standings__container">
-          <table className="league-standings__table">
+          <table className="league-standings__table" aria-label="League standings table">
             <thead>
               <tr>
                 <th

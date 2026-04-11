@@ -127,6 +127,7 @@ describe('UserManagement Component', () => {
       expect(screen.getByText('Role')).toBeInTheDocument();
       expect(screen.getByText('Last Login')).toBeInTheDocument();
       expect(screen.getByText('Actions')).toBeInTheDocument();
+      expect(screen.getByRole('table', { name: 'User management table' })).toBeInTheDocument();
     });
 
     it('displays all users in the table', async () => {
@@ -202,7 +203,7 @@ describe('UserManagement Component', () => {
       fireEvent.change(user1Dropdown, { target: { value: 'coach' } });
       
       await waitFor(() => {
-        expect(screen.getByText('User role updated successfully')).toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent('User role updated successfully');
       });
     });
 
@@ -221,7 +222,7 @@ describe('UserManagement Component', () => {
       fireEvent.change(adminDropdown, { target: { value: 'user' } });
       
       await waitFor(() => {
-        expect(screen.getByText('Cannot change your own role')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent('Cannot change your own role');
       });
       
       expect(mockApi.put).not.toHaveBeenCalled();
