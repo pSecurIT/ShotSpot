@@ -57,7 +57,7 @@ const App: React.FC = () => {
                 <Navigation />
               </div>
             </header>
-            <main>
+            <main className="App-main">
               <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />

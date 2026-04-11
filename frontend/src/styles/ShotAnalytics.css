@@ -2,14 +2,15 @@
 .shot-analytics-container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: clamp(1rem, 3vw, 2rem);
   background-color: #f5f5f5;
   min-height: 100vh;
+  width: 100%;
 }
 
 .analytics-header {
   background: white;
-  padding: 1.5rem;
+  padding: clamp(1rem, 2.4vw, 1.5rem);
   border-radius: 8px;
   margin-bottom: 2rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -18,11 +19,13 @@
 .header-top {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 1rem;
 }
 
 .back-button {
+  min-height: 44px;
   padding: 0.5rem 1rem;
   background: #f5f5f5;
   border: 1px solid #ddd;
@@ -42,6 +45,8 @@
   color: #333;
   font-size: 1.8rem;
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* View Tabs */
@@ -52,6 +57,7 @@
 }
 
 .view-tab {
+  min-height: 44px;
   padding: 0.75rem 1.5rem;
   border: 2px solid #ddd;
   background: white;
@@ -86,6 +92,7 @@
 /* Keyboard Hints */
 .keyboard-hints {
   flex: 1;
+  min-width: min(100%, 18rem);
   padding: 0.5rem;
   background: #E3F2FD;
   border-radius: 4px;
@@ -96,6 +103,7 @@
 .auto-refresh-toggle {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
   background: white;
@@ -152,7 +160,7 @@ input:checked + .toggle-slider:before {
   font-weight: 600;
   font-size: 0.95rem;
   color: #333;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .hint {
@@ -164,7 +172,7 @@ input:checked + .toggle-slider:before {
 /* Analytics View Container */
 .analytics-view {
   background: white;
-  padding: 2rem;
+  padding: clamp(1rem, 2.8vw, 2rem);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -184,6 +192,8 @@ input:checked + .toggle-slider:before {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex: 1 1 180px;
+  min-width: 0;
 }
 
 .control-group label {
@@ -198,7 +208,7 @@ input:checked + .toggle-slider:before {
   border-radius: 4px;
   font-size: 1rem;
   background: white;
-  min-width: 150px;
+  min-width: 0;
 }
 
 /* Court Container */
@@ -209,7 +219,7 @@ input:checked + .toggle-slider:before {
   margin: 0 auto 2rem;
   background: #e8f5e8;
   border-radius: 8px;
-  padding: 1rem;
+  padding: clamp(0.6rem, 2vw, 1rem);
 }
 
 .court-image {
@@ -288,6 +298,7 @@ input:checked + .toggle-slider:before {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 1rem;
   max-width: 400px;
   margin: 0 auto;
@@ -295,7 +306,8 @@ input:checked + .toggle-slider:before {
 
 .gradient-bar {
   height: 20px;
-  width: 200px;
+  width: min(200px, 100%);
+  flex: 1 1 160px;
   background: linear-gradient(to right, 
     rgba(76, 175, 80, 0.3), 
     rgba(255, 100, 50, 0.8));
@@ -1319,6 +1331,10 @@ input:checked + .toggle-slider:before {
     padding: 1rem;
   }
 
+  .analytics-header {
+    margin-bottom: 1rem;
+  }
+
   .analytics-header h2 {
     font-size: 1.5rem;
   }
@@ -1351,6 +1367,16 @@ input:checked + .toggle-slider:before {
 
   .analytics-controls {
     flex-direction: column;
+  }
+
+  .analytics-controls-bar,
+  .auto-refresh-toggle {
+    align-items: stretch;
+  }
+
+  .auto-refresh-toggle {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .control-group select {
@@ -1394,6 +1420,8 @@ input:checked + .toggle-slider:before {
 
   .player-stats-table {
     font-size: 0.75rem;
+    margin-inline: -0.25rem;
+    padding-inline: 0.25rem;
   }
 
   .player-stats-table th,
@@ -1473,6 +1501,29 @@ input:checked + .toggle-slider:before {
 
   .empty-icon {
     font-size: 3rem;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .shot-analytics-container {
+    padding: 1.5rem;
+  }
+
+  .view-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .analytics-controls-bar {
+    align-items: stretch;
+  }
+
+  .analytics-view {
+    padding: 1.5rem;
+  }
+
+  .stat-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
