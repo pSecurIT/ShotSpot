@@ -1236,6 +1236,22 @@ const LiveMatch: React.FC = () => {
     
     // Handle goal-specific actions
     if (shotInfo.result === 'goal') {
+      setGame(prev => {
+        if (!prev) {
+          return null;
+        }
+
+        if (shotInfo.teamId === prev.home_team_id) {
+          return { ...prev, home_score: prev.home_score + 1 };
+        }
+
+        if (shotInfo.teamId === prev.away_team_id) {
+          return { ...prev, away_score: prev.away_score + 1 };
+        }
+
+        return prev;
+      });
+
       // Give possession to the opposing team (non-blocking)
       handleCenterLineCross(shotInfo.opposingTeamId)
         .catch(error => {
