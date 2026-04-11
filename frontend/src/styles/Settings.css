@@ -5,7 +5,7 @@
 .settings-page {
   max-width: 900px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: clamp(1rem, 3vw, 2rem);
 }
 
 .settings-page__header {
@@ -27,10 +27,10 @@
 /* Tab navigation */
 .settings-tabs {
   display: flex;
-  gap: 0;
+  gap: 0.35rem;
   border-bottom: 2px solid var(--border-color, #e2e8f0);
   margin-bottom: 1.5rem;
-  overflow-x: auto;
+  flex-wrap: wrap;
 }
 
 .settings-tab {
@@ -39,6 +39,7 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   padding: 0.75rem 1.25rem;
+  min-height: 44px;
   font-size: 0.95rem;
   font-weight: 500;
   color: var(--text-secondary);
@@ -61,7 +62,7 @@
   background: var(--surface, #fff);
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 8px;
-  padding: 1.5rem;
+  padding: clamp(1rem, 2.6vw, 1.5rem);
 }
 
 /* Section inside a tab panel */
@@ -202,7 +203,7 @@
 .settings-field input[type='number'],
 .settings-field input[type='text'] {
   width: 100%;
-  max-width: 340px;
+  max-width: 100%;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 6px;
@@ -356,6 +357,12 @@
     padding: 1rem;
   }
 
+  .settings-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+    border-bottom: none;
+  }
+
   .settings-content {
     padding: 1rem;
   }
@@ -363,6 +370,13 @@
   .settings-tab {
     padding: 0.6rem 0.9rem;
     font-size: 0.85rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    margin-bottom: 0;
+  }
+
+  .settings-tab--active {
+    border-color: var(--primary, #3b82f6);
   }
 
   .settings-group,
@@ -377,5 +391,27 @@
 
   .settings-details__row dt {
     margin-top: 0.5rem;
+  }
+
+  .settings-actions > * {
+    width: 100%;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 900px) {
+  .settings-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-bottom: none;
+  }
+
+  .settings-tab {
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    margin-bottom: 0;
+  }
+
+  .settings-tab--active {
+    border-color: var(--primary, #3b82f6);
   }
 }

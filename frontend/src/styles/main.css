@@ -18,6 +18,7 @@ body {
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 html {
@@ -167,13 +168,14 @@ textarea:focus-visible,
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .App-header {
   background:
     radial-gradient(circle at top left, rgba(255, 107, 26, 0.22), transparent 22%),
     var(--surface-hero);
-  padding: var(--spacing-lg) var(--spacing-xl) var(--spacing-md);
+  padding: clamp(0.9rem, 2vw, var(--spacing-lg)) clamp(0.9rem, 3vw, var(--spacing-xl)) clamp(0.75rem, 1.5vw, var(--spacing-md));
   color: var(--text-light);
   box-shadow: var(--shadow-lg);
 }
@@ -182,19 +184,24 @@ textarea:focus-visible,
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+  width: min(100%, 1280px);
+  margin: 0 auto;
 }
 
 .header-branding {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--spacing-md);
   padding: var(--spacing-sm) 0;
+  min-width: 0;
 }
 
 .header-logo {
-  height: 50px;
+  height: clamp(40px, 8vw, 50px);
   width: auto;
   object-fit: contain;
+  flex-shrink: 0;
 }
 
 .App-header h1 {
@@ -203,11 +210,13 @@ textarea:focus-visible,
   font-size: clamp(1.5rem, 2vw, 2.15rem);
   letter-spacing: var(--tracking-tight);
   margin: 0;
+  line-height: 1.1;
+  min-width: 0;
 }
 
-main {
+.App-main {
   flex: 1;
-  padding: var(--spacing-xl);
+  padding: clamp(0.9rem, 3vw, var(--spacing-xl));
   max-width: 1280px;
   margin: 0 auto;
   width: 100%;
@@ -250,6 +259,21 @@ main {
 .user-info {
   margin-left: auto;
   color: var(--text-light);
+}
+
+@media (max-width: 768px) {
+  .header-content {
+    gap: var(--spacing-md);
+  }
+
+  .header-branding {
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .App-header h1 {
+    font-size: clamp(1.2rem, 6vw, 1.7rem);
+  }
 }
 
 /* Forms */
