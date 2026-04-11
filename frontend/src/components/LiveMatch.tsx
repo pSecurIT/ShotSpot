@@ -1432,11 +1432,11 @@ const LiveMatch: React.FC = () => {
   }, [focusMode]);
 
   if (loading) {
-    return <div className="loading">Loading match data...</div>;
+    return <div className="loading" role="status" aria-live="polite">Loading match data...</div>;
   }
 
   if (!game) {
-    return <div className="error-message">Game not found</div>;
+    return <div className="error-message" role="alert">Game not found</div>;
   }
 
   // Show pre-match setup for scheduled games
@@ -1458,8 +1458,8 @@ const LiveMatch: React.FC = () => {
           <h2>Pre-Match Setup</h2>
         </div>
 
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
+        {error && <div className="error-message" role="alert">{error}</div>}
+        {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
 
         <div className="pre-match-setup">
           <h3>{game.home_team_name} vs {game.away_team_name}</h3>
@@ -1687,7 +1687,7 @@ const LiveMatch: React.FC = () => {
             </div>
 
             {!requirements.valid && (
-              <div className="requirements-error">
+              <div className="requirements-error" role="alert">
                 {requirements.message}
               </div>
             )}
@@ -1871,7 +1871,7 @@ const LiveMatch: React.FC = () => {
   // Check if game is in progress
   if (game.status !== 'in_progress') {
     return (
-      <div className="error-message">
+      <div className="error-message" role="alert">
         This game is not in progress. Status: {game.status}
         <button onClick={() => navigate('/games')} className="secondary-button">
           Back to Games
@@ -1936,8 +1936,8 @@ const LiveMatch: React.FC = () => {
         </button>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
 
       {/* Scoreboard */}
       <div className="scoreboard">

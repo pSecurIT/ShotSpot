@@ -385,29 +385,44 @@ const ExportCenter: React.FC = () => {
       )}
 
       {error && (
-        <div className="error-message">{error}</div>
+        <div className="error-message" role="alert">{error}</div>
       )}
 
       {success && (
-        <div className="success-message">{success}</div>
+        <div className="success-message" role="status" aria-live="polite">{success}</div>
       )}
 
-      <div className="export-tabs">
+      <div className="export-tabs" role="tablist" aria-label="Export center views">
         <button 
+          id="export-tab-exports"
           className={`tab-button ${activeTab === 'exports' ? 'active' : ''}`}
           onClick={() => setActiveTab('exports')}
+          role="tab"
+          aria-selected={activeTab === 'exports'}
+          aria-controls="export-panel-exports"
+          tabIndex={activeTab === 'exports' ? 0 : -1}
         >
           Recent Exports
         </button>
         <button 
+          id="export-tab-templates"
           className={`tab-button ${activeTab === 'templates' ? 'active' : ''}`}
           onClick={() => setActiveTab('templates')}
+          role="tab"
+          aria-selected={activeTab === 'templates'}
+          aria-controls="export-panel-templates"
+          tabIndex={activeTab === 'templates' ? 0 : -1}
         >
           Templates
         </button>
         <button 
+          id="export-tab-schedule"
           className={`tab-button ${activeTab === 'schedule' ? 'active' : ''}`}
           onClick={() => setActiveTab('schedule')}
+          role="tab"
+          aria-selected={activeTab === 'schedule'}
+          aria-controls="export-panel-schedule"
+          tabIndex={activeTab === 'schedule' ? 0 : -1}
         >
           Scheduled Exports
         </button>
@@ -415,7 +430,12 @@ const ExportCenter: React.FC = () => {
 
       <div className="export-content">
         {activeTab === 'exports' && (
-          <div className="exports-list">
+          <div
+            id="export-panel-exports"
+            className="exports-list"
+            role="tabpanel"
+            aria-labelledby="export-tab-exports"
+          >
             <div className="section-header">
               <p>View and manage your generated exports. Reports may take a few minutes to process.</p>
               <button 
@@ -431,9 +451,9 @@ const ExportCenter: React.FC = () => {
               </button>
             </div>
             {loading ? (
-              <div className="loading-message">Loading exports...</div>
+              <div className="loading-message" role="status" aria-live="polite">Loading exports...</div>
             ) : recentExports.length === 0 ? (
-              <div className="empty-state">
+              <div className="empty-state" role="status" aria-live="polite">
                 <p>No exports yet</p>
                 <button 
                   className="primary-button"
@@ -488,7 +508,12 @@ const ExportCenter: React.FC = () => {
         )}
 
         {activeTab === 'templates' && (
-          <div className="templates-list">
+          <div
+            id="export-panel-templates"
+            className="templates-list"
+            role="tabpanel"
+            aria-labelledby="export-tab-templates"
+          >
             <div className="templates-header">
               <p>Export templates help you quickly generate reports with predefined settings.</p>
               <button 
@@ -502,7 +527,7 @@ const ExportCenter: React.FC = () => {
               </button>
             </div>
             {templates.length === 0 ? (
-              <div className="empty-state">
+              <div className="empty-state" role="status" aria-live="polite">
                 <p>No templates available</p>
               </div>
             ) : (
@@ -545,12 +570,17 @@ const ExportCenter: React.FC = () => {
         )}
 
         {activeTab === 'schedule' && (
-          <div className="schedule-section">
+          <div
+            id="export-panel-schedule"
+            className="schedule-section"
+            role="tabpanel"
+            aria-labelledby="export-tab-schedule"
+          >
             <div className="schedule-header">
               <p>Schedule automatic exports to be generated at regular intervals.</p>
               <button className="secondary-button">+ Schedule Export</button>
             </div>
-            <div className="empty-state">
+            <div className="empty-state" role="status" aria-live="polite">
               <p>No scheduled exports configured</p>
               <p className="empty-state-hint">Create a schedule to automatically generate reports daily, weekly, or monthly.</p>
             </div>

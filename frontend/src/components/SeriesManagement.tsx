@@ -156,13 +156,13 @@ const SeriesManagement: React.FC = () => {
         Manage Belgian korfball division hierarchy, level ordering, and regional assignments.
       </p>
 
-      {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      {success && <div className="alert alert-success" role="status" aria-live="polite">{success}</div>}
 
       {loading ? (
-        <div className="series-management__loading">Loading series…</div>
+        <div className="series-management__loading" role="status" aria-live="polite">Loading series…</div>
       ) : orderedSeries.length === 0 ? (
-        <div className="empty-state">No series found</div>
+        <div className="empty-state" role="status" aria-live="polite">No series found</div>
       ) : (
         <div className="series-management__table-wrap">
           <table className="series-management__table">

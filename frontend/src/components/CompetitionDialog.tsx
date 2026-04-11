@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Competition, CompetitionCreate, CompetitionFormatConfig, CompetitionStatus, CompetitionType } from '../types/competitions';
 import type { Season } from '../types/seasons';
 import type { Series } from '../types/series';
 import { competitionsApi } from '../services/competitionsApi';
 import { seasonsApi } from '../services/seasonsApi';
 import { seriesApi } from '../services/seriesApi';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 interface CompetitionDialogProps {
   isOpen: boolean;
@@ -63,6 +64,12 @@ const toOptionalIntOrNull = (value: string): number | null => {
 
 const CompetitionDialog: React.FC<CompetitionDialogProps> = ({ isOpen, onClose, onSuccess, competition }) => {
   const isEdit = useMemo(() => Boolean(competition), [competition]);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const { dialogRef, titleId, onDialogKeyDown } = useAccessibleDialog({
+    isOpen,
+    onClose,
+    initialFocusRef: nameInputRef,
+  });
 
   const [form, setForm] = useState<FormState>({
     name: '',
@@ -229,38 +236,45 @@ const CompetitionDialog: React.FC<CompetitionDialogProps> = ({ isOpen, onClose, 
   return (
     <div
       className="competition-dialog__overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="competition-dialog__content">
+      <div
+        ref={dialogRef}
+        className="competition-dialog__content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={onDialogKeyDown}
+        tabIndex={-1}
+      >
         <div className="competition-dialog__header">
-          <h3>{title}</h3>
+          <h3 id={titleId}>{title}</h3>
           <button type="button" className="secondary-button" onClick={onClose} aria-label="Close">
             ✕
           </button>
         </div>
 
-        {formError && <div className="alert alert-error">{formError}</div>}
-        {optionsError && <div className="alert alert-error">{optionsError}</div>}
+        {formError && <div className="alert alert-error" role="alert">{formError}</div>}
+        {optionsError && <div className="alert alert-error" role="alert">{optionsError}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="competition-dialog__grid">
             <div className="competition-dialog__field">
               <label htmlFor="competition-name">Competition name</label>
               <input
+                ref={nameInputRef}
                 id="competition-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => update({ name: e.target.value })}
                 className={fieldErrors.name ? 'error' : ''}
                 disabled={submitting}
-                autoFocus
+                aria-invalid={fieldErrors.name ? 'true' : 'false'}
+                aria-describedby={fieldErrors.name ? 'competition-name-error' : undefined}
               />
-              {fieldErrors.name && <span className="field-error">{fieldErrors.name}</span>}
+              {fieldErrors.name && <span className="field-error" id="competition-name-error">{fieldErrors.name}</span>}
             </div>
 
             {!isEdit && (
@@ -287,8 +301,10 @@ const CompetitionDialog: React.FC<CompetitionDialogProps> = ({ isOpen, onClose, 
                 onChange={(e) => update({ start_date: e.target.value })}
                 className={fieldErrors.start_date ? 'error' : ''}
                 disabled={submitting}
+                aria-invalid={fieldErrors.start_date ? 'true' : 'false'}
+                aria-describedby={fieldErrors.start_date ? 'competition-start-error' : undefined}
               />
-              {fieldErrors.start_date && <span className="field-error">{fieldErrors.start_date}</span>}
+              {fieldErrors.start_date && <span className="field-error" id="competition-start-error">{fieldErrors.start_date}</span>}
             </div>
 
             <div className="competition-dialog__field">
@@ -300,8 +316,10 @@ const CompetitionDialog: React.FC<CompetitionDialogProps> = ({ isOpen, onClose, 
                 onChange={(e) => update({ end_date: e.target.value })}
                 className={fieldErrors.end_date ? 'error' : ''}
                 disabled={submitting}
+                aria-invalid={fieldErrors.end_date ? 'true' : 'false'}
+                aria-describedby={fieldErrors.end_date ? 'competition-end-error' : undefined}
               />
-              {fieldErrors.end_date && <span className="field-error">{fieldErrors.end_date}</span>}
+              {fieldErrors.end_date && <span className="field-error" id="competition-end-error">{fieldErrors.end_date}</span>}
             </div>
 
             <div className="competition-dialog__field">

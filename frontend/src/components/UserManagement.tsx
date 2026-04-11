@@ -40,9 +40,13 @@ const UserManagement: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return;
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
-  }, []);
+  }, [currentUser]);
 
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
@@ -234,7 +238,7 @@ const UserManagement: React.FC = () => {
 
       {selectedUsers.size > 0 && (
         <div style={styles.bulkActionsBar}>
-          <span>{selectedUsers.size} user(s) selected</span>
+          <span role="status" aria-live="polite">{selectedUsers.size} user(s) selected</span>
           <div style={styles.bulkButtons}>
             <select
               onChange={(e) => {
@@ -262,18 +266,18 @@ const UserManagement: React.FC = () => {
       )}
 
       {error && (
-        <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+        <div className="alert alert-error" style={{ marginBottom: '1rem' }} role="alert">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="alert alert-success" style={{ marginBottom: '1rem' }}>
+        <div className="alert alert-success" style={{ marginBottom: '1rem' }} role="status" aria-live="polite">
           {success}
         </div>
       )}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }} aria-label="User management table">
         <thead>
           <tr>
             <th style={styles.th}>

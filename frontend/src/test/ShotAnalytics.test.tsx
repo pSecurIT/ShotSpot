@@ -158,6 +158,8 @@ describe('ShotAnalytics Component', () => {
       <MemoryRouter initialEntries={[`/analytics/${gameId}`]}>
         <Routes>
           <Route path="/analytics/:gameId" element={<ShotAnalytics />} />
+          <Route path="/match/:gameId" element={<div>Match Details</div>} />
+          <Route path="/achievements" element={<div>Achievements Hub Page</div>} />
         </Routes>
       </MemoryRouter>
     );
@@ -199,8 +201,18 @@ describe('ShotAnalytics Component', () => {
       renderShotAnalytics();
 
       await waitFor(() => {
-        const heatmapTab = screen.getByText('🔥 Heatmap');
+        const heatmapTab = screen.getByRole('tab', { name: '🔥 Heatmap' });
         expect(heatmapTab).toHaveClass('active');
+        expect(heatmapTab).toHaveAttribute('aria-selected', 'true');
+      });
+    });
+
+    it('announces empty heatmap data', async () => {
+      mockGet.mockResolvedValue({ data: null });
+      renderShotAnalytics();
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent('No heatmap data available. Shots will appear here once they are recorded.');
       });
     });
   });

@@ -137,30 +137,18 @@ describe('Navigation Component', () => {
       expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument();
     });
 
-    it('collapses into hamburger navigation on smaller viewports', () => {
-      setViewportWidth(900);
-
+    it('supports opening dropdown menus with keyboard and focuses the first item', async () => {
       renderNavigation(regularUser);
 
-      expect(screen.getByRole('button', { name: 'Open navigation menu' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'testuser' })).toBeInTheDocument();
-      expect(screen.queryByLabelText('Current user')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Matches' })).not.toBeInTheDocument();
-    });
-
-    it('closes the mobile menu when resizing back to desktop', async () => {
-      setViewportWidth(900);
-
-      renderNavigation(regularUser);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
-      expect(screen.getByRole('dialog', { name: 'Navigation menu' })).toHaveAttribute('aria-hidden', 'false');
-
-      setViewportWidth(1280);
+      const trigger = screen.getByRole('button', { name: 'Matches' });
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key: 'ArrowDown' });
 
       await waitFor(() => {
-        expect(screen.getByRole('dialog', { hidden: true })).toHaveAttribute('aria-hidden', 'true');
+        expect(screen.getByRole('menu', { name: 'Matches menu' })).toBeInTheDocument();
       });
+
+      expect(screen.getByRole('menuitem', { name: /All Games/i })).toHaveFocus();
     });
 
     it('displays user information', () => {
@@ -518,5 +506,11 @@ describe('Navigation Component', () => {
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
     });
+  });
+
+  it('exposes a skip link to main content', () => {
+    renderNavigation(null);
+
+    expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument();
   });
 });

@@ -317,8 +317,8 @@ const TimeoutManagement: React.FC<TimeoutManagementProps> = ({
     <div className="timeout-management">
       <h4>Timeout Management</h4>
 
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
 
       {/* Active Timeouts */}
       {activeTimeouts.length > 0 && (

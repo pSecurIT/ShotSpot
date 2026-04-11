@@ -127,6 +127,16 @@ describe('CompetitionManagement', () => {
     });
   });
 
+  it('announces empty state accessibly', async () => {
+    listMock.mockResolvedValue([]);
+
+    renderAtCompetitions();
+
+    await waitFor(() => {
+      expect(screen.getByText('No competitions found')).toBeInTheDocument();
+    });
+  });
+
   it('filters competitions by type, status and search', async () => {
     listMock.mockResolvedValue([
       makeCompetition({ id: 1, name: 'Summer Tournament', type: 'tournament', status: 'upcoming', start_date: '2025-06-01' }),

@@ -47,6 +47,7 @@ const App: React.FC = () => {
         <WebSocketProvider>
           <Router>
             <div className="App">
+            <a className="skip-link" href="#app-main">Skip to main content</a>
             <OfflineIndicator />
             <header className="App-header">
               <div className="header-content">
@@ -57,7 +58,7 @@ const App: React.FC = () => {
                 <Navigation />
               </div>
             </header>
-            <main className="App-main">
+            <main id="app-main" tabIndex={-1}>
               <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />

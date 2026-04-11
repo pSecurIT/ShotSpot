@@ -50,7 +50,9 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
       const response = await api.get('/match-templates');
       setTemplates(response.data);
     } catch (err) {
-      console.error('Error fetching templates:', err);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error fetching templates:', err);
+      }
       setError('Failed to load match templates');
     } finally {
       setLoading(false);
@@ -177,7 +179,7 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
   const userTemplates = templates.filter(t => !t.is_system_template);
 
   if (loading) {
-    return <div className="loading">Loading templates...</div>;
+    return <div className="loading" role="status" aria-live="polite">Loading templates...</div>;
   }
 
   return (
@@ -197,8 +199,8 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
         )}
       </div>
 
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
 
       {showForm && !selectionMode && (
         <form onSubmit={handleSubmit} className="template-form">
@@ -423,7 +425,7 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
       )}
 
       {!selectionMode && userTemplates.length === 0 && (
-        <div className="empty-state">
+        <div className="empty-state" role="status" aria-live="polite">
           <p>You haven&apos;t created any custom templates yet.</p>
           <button 
             className="primary-button"
