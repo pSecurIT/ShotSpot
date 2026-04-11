@@ -45,10 +45,40 @@ const defaultExportSettings = {
 const mockCoach = { id: 5, username: 'coach1', email: 'coach@test.com', role: 'coach' };
 const mockAdmin = { id: 1, username: 'admin', email: 'admin@test.com', role: 'admin' };
 
-function setup(user = mockCoach) {
+async function setup(user = mockCoach) {
   mockUseAuth.mockReturnValue({ user });
-  mockUseTheme.mockReturnValue({ themePreference: 'system', setThemePreference: vi.fn() });
-  (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: defaultExportSettings });
+  mockUseTheme.mockReturnValue({
+    themePreference: 'system',
+    setThemePreference: vi.fn(),
+    paletteSelection: 'team-default',
+    setPaletteSelection: vi.fn(),
+    clubScopeId: 1,
+    setClubScopeId: vi.fn(),
+    clubPaletteId: 'shotspot-blue',
+    setClubPaletteId: vi.fn(),
+    teamScopeId: 2,
+    setTeamScopeId: vi.fn(),
+    teamPaletteId: null,
+    setTeamPaletteId: vi.fn(),
+    inheritedPaletteId: 'shotspot-blue',
+    resolvedPaletteId: 'shotspot-blue',
+    resolvedPalette: { id: 'shotspot-blue', name: 'ShotSpot Blue', description: '', primary: '#2962ff', secondary: '#00c853', accent: '#ff6b1a' },
+    availablePalettes: [
+      { id: 'shotspot-blue', name: 'ShotSpot Blue', description: '', primary: '#2962ff', secondary: '#00c853', accent: '#ff6b1a' },
+      { id: 'emerald-club', name: 'Emerald Club', description: '', primary: '#0f8f6b', secondary: '#1463ff', accent: '#f4b740' },
+    ]
+  });
+  (api.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    if (url === '/clubs') {
+      return Promise.resolve({ data: [{ id: 1, name: 'ShotSpot Club' }] });
+    }
+
+    if (url === '/teams') {
+      return Promise.resolve({ data: [{ id: 2, name: 'First Team', club_id: 1, club_name: 'ShotSpot Club' }] });
+    }
+
+    return Promise.resolve({ data: defaultExportSettings });
+  });
   (api.put as ReturnType<typeof vi.fn>).mockResolvedValue({ data: defaultExportSettings });
   (api.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: defaultExportSettings });
 
@@ -58,6 +88,11 @@ function setup(user = mockCoach) {
       <SettingsPage />
     </BrowserRouter>
   );
+
+  await waitFor(() => {
+    expect(api.get).toHaveBeenCalled();
+  });
+
   return { ue: user_event };
 }
 
@@ -71,13 +106,13 @@ describe('SettingsPage', () => {
     localStorage.clear();
   });
 
-  it('🏷️ renders the page heading', () => {
-    setup();
+  it('🏷️ renders the page heading', async () => {
+    await setup();
     expect(screen.getByRole('heading', { name: /settings/i })).toBeInTheDocument();
   });
 
-  it('📑 shows tab navigation with correct tabs for coach', () => {
-    setup();
+  it('📑 shows tab navigation with correct tabs for coach', async () => {
+    await setup();
     expect(screen.getByRole('button', { name: 'Export Settings' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'User Preferences' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Account Settings' })).toBeInTheDocument();
@@ -85,27 +120,32 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('button', { name: 'System Configuration' })).not.toBeInTheDocument();
   });
 
-  it('🔐 shows System Configuration tab for admin', () => {
-    setup(mockAdmin);
+  it('🔐 shows System Configuration tab for admin', async () => {
+    await setup(mockAdmin);
     expect(screen.getByRole('button', { name: 'System Configuration' })).toBeInTheDocument();
   });
 
   it('📤 Export Settings tab is active by default for coach', async () => {
-    setup();
+    await setup();
     await waitFor(() => {
       expect(screen.getByLabelText('Default Export Format')).toBeInTheDocument();
     });
   });
 
   it('🎨 switches to User Preferences tab and shows theme selector', async () => {
-    const { ue } = setup();
+    const { ue } = await setup();
     await ue.click(screen.getByRole('button', { name: 'User Preferences' }));
     expect(screen.getByLabelText('Theme')).toBeInTheDocument();
+    expect(screen.getByLabelText('Personal palette')).toBeInTheDocument();
+    expect(screen.getByLabelText('Club theme source')).toBeInTheDocument();
+    expect(screen.getByLabelText('Club default palette')).toBeInTheDocument();
+    expect(screen.getByLabelText('Team theme source')).toBeInTheDocument();
+    expect(screen.getByLabelText('Team override palette')).toBeInTheDocument();
     expect(screen.getByLabelText('Language')).toBeInTheDocument();
   });
 
   it('👤 shows account info in Account Settings tab', async () => {
-    const { ue } = setup();
+    const { ue } = await setup();
     await ue.click(screen.getByRole('button', { name: 'Account Settings' }));
     expect(screen.getByText('coach1')).toBeInTheDocument();
     expect(screen.getByText('coach@test.com')).toBeInTheDocument();
@@ -114,13 +154,13 @@ describe('SettingsPage', () => {
   });
 
   it('🖥️ shows system info in System Configuration tab for admin', async () => {
-    const { ue } = setup(mockAdmin);
+    const { ue } = await setup(mockAdmin);
     await ue.click(screen.getByRole('button', { name: 'System Configuration' }));
     expect(screen.getByText(/korfball/i)).toBeInTheDocument();
   });
 
   it('💾 save button in Export Settings calls PUT', async () => {
-    const { ue } = setup();
+    const { ue } = await setup();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /save export settings/i })).toBeInTheDocument();
     });
@@ -132,7 +172,7 @@ describe('SettingsPage', () => {
   });
 
   it('🔄 reset button in Export Settings calls POST reset', async () => {
-    const { ue } = setup();
+    const { ue } = await setup();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /reset to defaults/i })).toBeInTheDocument();
     });
@@ -144,7 +184,7 @@ describe('SettingsPage', () => {
   });
 
   it('✅ save User Preferences persists language to localStorage', async () => {
-    const { ue } = setup();
+    const { ue } = await setup();
     await ue.click(screen.getByRole('button', { name: 'User Preferences' }));
 
     const languageSelect = screen.getByLabelText('Language');
@@ -160,7 +200,7 @@ describe('SettingsPage', () => {
     localStorage.setItem('language', 'fr');
     localStorage.setItem('emailNotifications', 'true');
 
-    const { ue } = setup();
+    const { ue } = await setup();
     await ue.click(screen.getByRole('button', { name: 'User Preferences' }));
 
     await ue.click(screen.getByRole('button', { name: /reset to defaults/i }));
@@ -171,7 +211,7 @@ describe('SettingsPage', () => {
   });
 
   it('⛔ Export Settings shows error for invalid auto-delete days', async () => {
-    const { ue } = setup();
+    const { ue } = await setup();
     await waitFor(() => {
       expect(screen.getByLabelText('Auto-delete exports after (days)')).toBeInTheDocument();
     });
