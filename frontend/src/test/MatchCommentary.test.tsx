@@ -71,7 +71,9 @@ describe('MatchCommentary', () => {
   });
 
   it('renders match commentary interface correctly', async () => {
-    render(<MatchCommentary {...mockProps} />);
+    await act(async () => {
+      render(<MatchCommentary {...mockProps} />);
+    });
     
     expect(screen.getByText('Match Commentary')).toBeInTheDocument();
     expect(screen.getByText('📝 Add Note')).toBeInTheDocument();
@@ -387,11 +389,15 @@ describe('MatchCommentary', () => {
     expect(screen.getByText('📝 Note')).toHaveClass('active');
   });
 
-  it('updates time remaining when prop changes', () => {
-    const { rerender } = render(<MatchCommentary {...mockProps} />);
+  it('updates time remaining when prop changes', async () => {
+    let rerender: ReturnType<typeof render>['rerender'];
+
+    await act(async () => {
+      ({ rerender } = render(<MatchCommentary {...mockProps} />));
+    });
     
     // Update time remaining
-    act(() => {
+    await act(async () => {
       rerender(<MatchCommentary {...mockProps} timeRemaining="00:05:00" />);
     });
     

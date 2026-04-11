@@ -347,8 +347,8 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
         </p>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
 
       {/* Team Selection */}
       <div className="team-selector">

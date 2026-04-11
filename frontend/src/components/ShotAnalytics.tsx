@@ -724,7 +724,7 @@ const ShotAnalytics: React.FC = () => {
     if (!heatmapData) {
       return (
         <div className="analytics-view">
-          <div className="empty-state">
+          <div className="empty-state" role="status" aria-live="polite">
             <p>No heatmap data available. Shots will appear here once they are recorded.</p>
           </div>
         </div>
@@ -734,7 +734,7 @@ const ShotAnalytics: React.FC = () => {
     if (heatmapData.data.length === 0) {
       return (
         <div className="analytics-view">
-          <div className="empty-state">
+          <div className="empty-state" role="status" aria-live="polite">
             <p>No shot data for the selected filters. Try changing team or period filters.</p>
           </div>
         </div>
@@ -865,7 +865,7 @@ const ShotAnalytics: React.FC = () => {
     if (shotChartData.length === 0) {
       return (
         <div className="analytics-view">
-          <div className="empty-state">
+          <div className="empty-state" role="status" aria-live="polite">
             <p>No shots recorded yet. Shot markers will appear on the court once shots are recorded.</p>
           </div>
         </div>
@@ -925,7 +925,7 @@ const ShotAnalytics: React.FC = () => {
         </div>
 
         {shotChartData.length === 0 ? (
-          <div className="empty-state">
+          <div className="empty-state" role="status" aria-live="polite">
             <div className="empty-icon">🎯</div>
             <h3>No Shots Recorded</h3>
             <p>No shots have been recorded for this game yet. Start tracking shots to see them visualized here.</p>
@@ -933,56 +933,56 @@ const ShotAnalytics: React.FC = () => {
         ) : (
           <>
             <div className="court-container" ref={courtRef} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center', transition: 'transform 0.3s ease' }}>
-              <img 
+              <img
                 ref={imageRef}
-                src={courtImageUrl} 
-                alt="Korfball Court" 
+                src={courtImageUrl}
+                alt="Korfball Court"
                 className="court-image"
               />
               <div className="shot-markers-overlay">
                 {shotChartData.map((shot) => (
-              <div
-                key={shot.id}
-                className={`shot-marker ${shot.result}`}
-                style={{
-                  left: `${shot.x_coord}%`,
-                  top: `${shot.y_coord}%`,
-                  backgroundColor: getShotColor(shot.result),
-                }}
-                onClick={() => setSelectedShot(shot)}
-              >
-                {getShotMarker(shot.result)}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {selectedShot && (
-          <div className="shot-modal-overlay" onClick={() => setSelectedShot(null)}>
-            <div className="shot-modal" onClick={(e) => e.stopPropagation()}>
-              <button className="modal-close" onClick={() => setSelectedShot(null)}>×</button>
-              <h3>Shot Details</h3>
-              <div className="modal-content">
-                <div className="modal-section">
-                  <h4>Player</h4>
-                  <p>#{selectedShot.jersey_number} {selectedShot.first_name} {selectedShot.last_name}</p>
-                  <p className="team-name">{selectedShot.team_name}</p>
-                </div>
-                <div className="modal-section">
-                  <h4>Shot Information</h4>
-                  <p><strong>Result:</strong> <span className={`result-badge ${selectedShot.result}`}>{selectedShot.result.toUpperCase()}</span></p>
-                  <p><strong>Period:</strong> {selectedShot.period}</p>
-                  <p><strong>Distance:</strong> {selectedShot.distance ? `${selectedShot.distance}m` : 'N/A'}</p>
-                </div>
-                <div className="modal-section">
-                  <h4>Location</h4>
-                  <p><strong>X:</strong> {selectedShot.x_coord.toFixed(1)}%</p>
-                  <p><strong>Y:</strong> {selectedShot.y_coord.toFixed(1)}%</p>
-                </div>
+                  <div
+                    key={shot.id}
+                    className={`shot-marker ${shot.result}`}
+                    style={{
+                      left: `${shot.x_coord}%`,
+                      top: `${shot.y_coord}%`,
+                      backgroundColor: getShotColor(shot.result),
+                    }}
+                    onClick={() => setSelectedShot(shot)}
+                  >
+                    {getShotMarker(shot.result)}
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        )}
+
+            {selectedShot && (
+              <div className="shot-modal-overlay" onClick={() => setSelectedShot(null)}>
+                <div className="shot-modal" onClick={(e) => e.stopPropagation()}>
+                  <button className="modal-close" onClick={() => setSelectedShot(null)}>×</button>
+                  <h3>Shot Details</h3>
+                  <div className="modal-content">
+                    <div className="modal-section">
+                      <h4>Player</h4>
+                      <p>#{selectedShot.jersey_number} {selectedShot.first_name} {selectedShot.last_name}</p>
+                      <p className="team-name">{selectedShot.team_name}</p>
+                    </div>
+                    <div className="modal-section">
+                      <h4>Shot Information</h4>
+                      <p><strong>Result:</strong> <span className={`result-badge ${selectedShot.result}`}>{selectedShot.result.toUpperCase()}</span></p>
+                      <p><strong>Period:</strong> {selectedShot.period}</p>
+                      <p><strong>Distance:</strong> {selectedShot.distance ? `${selectedShot.distance}m` : 'N/A'}</p>
+                    </div>
+                    <div className="modal-section">
+                      <h4>Location</h4>
+                      <p><strong>X:</strong> {selectedShot.x_coord.toFixed(1)}%</p>
+                      <p><strong>Y:</strong> {selectedShot.y_coord.toFixed(1)}%</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="shot-chart-legend">
               <h4>Shot Chart</h4>
@@ -1479,7 +1479,7 @@ const ShotAnalytics: React.FC = () => {
               ))}
             </div>
           ) : (
-            <p className="no-data">No streak data available</p>
+            <p className="no-data" role="status" aria-live="polite">No streak data available</p>
           )}
         </div>
 
@@ -1522,7 +1522,7 @@ const ShotAnalytics: React.FC = () => {
               </div>
             </>
           ) : (
-            <p className="no-data">No zone analysis available (need 10+ shots per zone)</p>
+            <p className="no-data" role="status" aria-live="polite">No zone analysis available (need 10+ shots per zone)</p>
           )}
         </div>
 
@@ -1567,7 +1567,7 @@ const ShotAnalytics: React.FC = () => {
               </table>
             </div>
           ) : (
-            <p className="no-data">No trend data available</p>
+            <p className="no-data" role="status" aria-live="polite">No trend data available</p>
           )}
         </div>
       </div>
@@ -1684,7 +1684,7 @@ const ShotAnalytics: React.FC = () => {
                 </div>
               </>
             ) : (
-              <p className="no-data">No development data available for this player</p>
+              <p className="no-data" role="status" aria-live="polite">No development data available for this player</p>
             )}
           </div>
         )}
@@ -1829,7 +1829,7 @@ const ShotAnalytics: React.FC = () => {
         )}
 
         {!selectedPlayerId && !teamTendencies && !matchupAnalysis && (
-          <div className="empty-state">
+          <div className="empty-state" role="status" aria-live="polite">
             <p>📊 Select a player, team, or opponent to view historical analytics</p>
           </div>
         )}
@@ -1866,7 +1866,7 @@ const ShotAnalytics: React.FC = () => {
 
     return (
       <div className="analytics-view">
-        <React.Suspense fallback={<div>Loading player comparison…</div>}>
+        <React.Suspense fallback={<div role="status" aria-live="polite">Loading player comparison…</div>}>
           <PlayerComparisonRadar
             players={comparisonPlayers}
             availablePlayers={playerStats}
@@ -1888,7 +1888,7 @@ const ShotAnalytics: React.FC = () => {
     if (!homeTeam || !awayTeam) {
       return (
         <div className="analytics-view">
-          <div className="empty-state">
+          <div className="empty-state" role="status" aria-live="polite">
             <p>Loading team information...</p>
           </div>
         </div>
@@ -1922,11 +1922,14 @@ const ShotAnalytics: React.FC = () => {
             🏆 Achievements Hub
           </button>
         </div>
-        <div className="view-tabs">
+        <div className="view-tabs" role="tablist" aria-label="Shot analytics views">
           <button
             className={`view-tab ${activeView === 'heatmap' ? 'active' : ''}`}
             onClick={() => setActiveView('heatmap')}
             title="Keyboard: 1"
+            role="tab"
+            aria-selected={activeView === 'heatmap'}
+            tabIndex={activeView === 'heatmap' ? 0 : -1}
           >
             🔥 Heatmap
           </button>
@@ -1934,6 +1937,9 @@ const ShotAnalytics: React.FC = () => {
             className={`view-tab ${activeView === 'shot-chart' ? 'active' : ''}`}
             onClick={() => setActiveView('shot-chart')}
             title="Keyboard: 2 | Zoom: ← → | Reset: 0"
+            role="tab"
+            aria-selected={activeView === 'shot-chart'}
+            tabIndex={activeView === 'shot-chart' ? 0 : -1}
           >
             🎯 Shot Chart
           </button>
@@ -1941,6 +1947,9 @@ const ShotAnalytics: React.FC = () => {
             className={`view-tab ${activeView === 'interactive' ? 'active' : ''}`}
             onClick={() => setActiveView('interactive')}
             title="Interactive shot chart with clickable zones"
+            role="tab"
+            aria-selected={activeView === 'interactive'}
+            tabIndex={activeView === 'interactive' ? 0 : -1}
           >
             🎨 Interactive
           </button>
@@ -1948,6 +1957,9 @@ const ShotAnalytics: React.FC = () => {
             className={`view-tab ${activeView === 'comparison' ? 'active' : ''}`}
             onClick={() => setActiveView('comparison')}
             title="Compare players with radar charts"
+            role="tab"
+            aria-selected={activeView === 'comparison'}
+            tabIndex={activeView === 'comparison' ? 0 : -1}
           >
             👥 Compare
           </button>
@@ -1955,6 +1967,9 @@ const ShotAnalytics: React.FC = () => {
             className={`view-tab ${activeView === 'possession' ? 'active' : ''}`}
             onClick={() => setActiveView('possession')}
             title="Possession flow diagram"
+            role="tab"
+            aria-selected={activeView === 'possession'}
+            tabIndex={activeView === 'possession' ? 0 : -1}
           >
             🔄 Possession
           </button>
@@ -1962,6 +1977,9 @@ const ShotAnalytics: React.FC = () => {
             className={`view-tab ${activeView === 'players' ? 'active' : ''}`}
             onClick={() => setActiveView('players')}
             title="Keyboard: 3"
+            role="tab"
+            aria-selected={activeView === 'players'}
+            tabIndex={activeView === 'players' ? 0 : -1}
           >
             👤 Player Stats
           </button>
@@ -1969,6 +1987,9 @@ const ShotAnalytics: React.FC = () => {
             className={`view-tab ${activeView === 'summary' ? 'active' : ''}`}
             onClick={() => setActiveView('summary')}
             title="Keyboard: 4"
+            role="tab"
+            aria-selected={activeView === 'summary'}
+            tabIndex={activeView === 'summary' ? 0 : -1}
           >
             📋 Summary
           </button>
@@ -1976,6 +1997,9 @@ const ShotAnalytics: React.FC = () => {
             className={`view-tab ${activeView === 'charts' ? 'active' : ''}`}
             onClick={() => setActiveView('charts')}
             title="Keyboard: 5"
+            role="tab"
+            aria-selected={activeView === 'charts'}
+            tabIndex={activeView === 'charts' ? 0 : -1}
           >
             📈 Advanced Charts
           </button>
@@ -1983,6 +2007,9 @@ const ShotAnalytics: React.FC = () => {
             className={`view-tab ${activeView === 'performance' ? 'active' : ''}`}
             onClick={() => setActiveView('performance')}
             title="Keyboard: 6"
+            role="tab"
+            aria-selected={activeView === 'performance'}
+            tabIndex={activeView === 'performance' ? 0 : -1}
           >
             ⚡ Performance
           </button>
@@ -1990,6 +2017,9 @@ const ShotAnalytics: React.FC = () => {
             className={`view-tab ${activeView === 'historical' ? 'active' : ''}`}
             onClick={() => setActiveView('historical')}
             title="Keyboard: 7"
+            role="tab"
+            aria-selected={activeView === 'historical'}
+            tabIndex={activeView === 'historical' ? 0 : -1}
           >
             📚 Historical
           </button>
@@ -2015,7 +2045,7 @@ const ShotAnalytics: React.FC = () => {
       </div>
 
       {loading && (
-        <div className="loading-container">
+        <div className="loading-container" role="status" aria-live="polite" aria-label="Loading shot analytics">
           <div className="loading-skeleton">
             <div className="skeleton-header"></div>
             <div className="skeleton-content">
@@ -2028,7 +2058,7 @@ const ShotAnalytics: React.FC = () => {
       )}
       
       {error && (
-        <div className="error-message">
+        <div className="error-message" role="alert">
           <span className="error-icon">❌</span>
           <span className="error-text">{error}</span>
           <button className="retry-button" onClick={() => {

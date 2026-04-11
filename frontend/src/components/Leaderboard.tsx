@@ -52,7 +52,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
           </h3>
           {season && <span className="leaderboard__season">{season}</span>}
         </div>
-        <div className="leaderboard__loading">
+        <div className="leaderboard__loading" role="status" aria-live="polite">
           <div className="leaderboard__spinner"></div>
           <p>Loading leaderboard...</p>
         </div>
@@ -69,7 +69,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
           </h3>
           {season && <span className="leaderboard__season">{season}</span>}
         </div>
-        <div className="leaderboard__empty">
+        <div className="leaderboard__empty" role="status" aria-live="polite">
           <p>No players found</p>
           <span className="leaderboard__empty-icon">📊</span>
         </div>
@@ -87,7 +87,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
       </div>
 
       <div className="leaderboard__table-container">
-        <table className="leaderboard__table">
+        <table className="leaderboard__table" aria-label={type === 'global' ? 'Global leaderboard' : `${teamName || 'Team'} leaderboard`}>
           <thead>
             <tr>
               <th className="leaderboard__th leaderboard__th--rank">Rank</th>
