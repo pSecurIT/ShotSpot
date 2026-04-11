@@ -364,8 +364,11 @@ describe('TeamManagement', () => {
     render(<TeamManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText(errorMessage)).toBeInTheDocument();
+      expect(screen.getByText('Couldn’t load teams')).toBeInTheDocument();
     });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(errorMessage);
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
   it('displays error message when team creation fails', async () => {
@@ -383,7 +386,34 @@ describe('TeamManagement', () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText(errorMessage)).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(errorMessage);
+    });
+  });
+
+  it('retries team loading from the error state', async () => {
+    const user = userEvent.setup();
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/clubs') return Promise.resolve({ data: mockClubs });
+      if (url === '/teams') return Promise.reject({ response: { data: { error: 'Failed to fetch teams' } } });
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<TeamManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    });
+
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/clubs') return Promise.resolve({ data: mockClubs });
+      if (url === '/teams') return Promise.resolve({ data: mockTeams });
+      return Promise.resolve({ data: [] });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Team Alpha', { selector: 'span.player-name' })).toBeInTheDocument();
     });
   });
 

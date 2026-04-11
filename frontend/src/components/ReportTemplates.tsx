@@ -7,6 +7,8 @@ import {
   createDuplicateTemplateDraft,
   createEmptyTemplateDraft,
 } from '../types/report-templates';
+import StatePanel from './ui/StatePanel';
+import Toast from './ui/Toast';
 import '../styles/ReportTemplates.css';
 
 const formatDate = (value?: string) => {
@@ -141,8 +143,24 @@ const ReportTemplates: React.FC = () => {
     return `${templates.length} templates, ${customCount} custom`; 
   }, [templates]);
 
+  const showLoadErrorState = Boolean(error && templates.length === 0);
+
   if (loading) {
-    return <div className="report-templates-page" role="status" aria-live="polite">Loading report templates...</div>;
+    return (
+      <div className="report-templates-page">
+        <header className="report-templates-page__header">
+          <div>
+            <h1>Report Templates</h1>
+            <p>Loading your template library</p>
+          </div>
+        </header>
+        <StatePanel
+          variant="loading"
+          title="Loading report templates"
+          message="Preparing the saved layouts and the template editor."
+        />
+      </div>
+    );
   }
 
   return (
@@ -158,8 +176,19 @@ const ReportTemplates: React.FC = () => {
         </button>
       </header>
 
-      {error && <div className="report-templates__banner report-templates__banner--error" role="alert">{error}</div>}
-      {success && <div className="report-templates__banner report-templates__banner--success" role="status" aria-live="polite">{success}</div>}
+      {!showLoadErrorState && error && (
+        <StatePanel
+          variant="error"
+          title="Template action failed"
+          message={error}
+          actionLabel="Reload templates"
+          onAction={() => {
+            void loadTemplates();
+          }}
+          compact
+          className="report-templates__feedback"
+        />
+      )}
 
       <div className="report-templates-page__layout">
         <aside className="report-templates-page__sidebar">
@@ -168,11 +197,24 @@ const ReportTemplates: React.FC = () => {
             <p>Select a template to preview or edit it.</p>
           </div>
 
-          {templates.length === 0 ? (
-            <div className="report-templates-page__empty" role="status" aria-live="polite">
-              <h3>No templates yet</h3>
-              <p>Create your first report template to define reusable report layouts.</p>
-            </div>
+          {showLoadErrorState ? (
+            <StatePanel
+              variant="error"
+              title="Couldn’t load templates"
+              message={error}
+              actionLabel="Retry"
+              onAction={() => {
+                void loadTemplates();
+              }}
+            />
+          ) : templates.length === 0 ? (
+            <StatePanel
+              variant="empty"
+              title="No templates yet"
+              message="Create your first report template to define reusable report layouts."
+              actionLabel="Create template"
+              onAction={() => openCreate()}
+            />
           ) : (
             <div className="report-templates-page__list">
               {templates.map((template) => (
@@ -228,6 +270,14 @@ const ReportTemplates: React.FC = () => {
           />
         </main>
       </div>
+
+      {success && (
+        <Toast
+          title="Template saved"
+          message={success}
+          onDismiss={() => setSuccess('')}
+        />
+      )}
     </div>
   );
 };

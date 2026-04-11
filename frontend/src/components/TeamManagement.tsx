@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useAuth } from '../contexts/AuthContext';
+import StatePanel from './ui/StatePanel';
+import Toast from './ui/Toast';
 
 interface Team {
   id: number;
@@ -31,13 +33,13 @@ const TeamManagement: React.FC = () => {
   const [newTeamGender, setNewTeamGender] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
 
-  const fetchClubs = async () => {
+  const fetchClubs = useCallback(async () => {
     try {
-      setError(null);
       const response = await api.get('/clubs');
       const fetchedClubs = (response.data || []) as Club[];
       setClubs(fetchedClubs);
@@ -47,32 +49,41 @@ const TeamManagement: React.FC = () => {
       });
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      setError(err.response?.data?.error || 'Error fetching clubs');
+      throw new Error(err.response?.data?.error || 'Error fetching clubs');
       if (process.env.NODE_ENV !== 'test') {
         console.error('Error fetching clubs:', error);
       }
     }
-  };
+  }, []);
 
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async () => {
     try {
-      setError(null);
       const response = await api.get('/teams');
       setTeams(response.data);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      setError(err.response?.data?.error || 'Error fetching teams');
+      throw new Error(err.response?.data?.error || 'Error fetching teams');
       if (process.env.NODE_ENV !== 'test') {
         console.error('Error fetching teams:', error);
       }
     }
-  };
+  }, []);
+
+  const loadInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      await Promise.all([fetchClubs(), fetchTeams()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load teams');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchClubs, fetchTeams]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchClubs();
-    fetchTeams();
-  }, []);
+    void loadInitialData();
+  }, [loadInitialData]);
 
   const filteredTeams = teams.filter((team) => {
     if (selectedClubFilter && team.club_id?.toString() !== selectedClubFilter) return false;
@@ -83,6 +94,10 @@ const TeamManagement: React.FC = () => {
   const filterTeamOptions = selectedClubFilter
     ? teams.filter((team) => team.club_id?.toString() === selectedClubFilter)
     : teams;
+
+  const showLoadErrorState = !loading && Boolean(error) && teams.length === 0;
+  const showInlineError = Boolean(error) && !showLoadErrorState;
+  const showEmptyTeams = !loading && filteredTeams.length === 0;
 
   const handleAddTeam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,18 +252,44 @@ const TeamManagement: React.FC = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="error-message" style={{ marginBottom: '1rem' }} role="alert">
-          {error}
-        </div>
+      {loading && (
+        <StatePanel
+          variant="loading"
+          title="Loading teams"
+          message="Preparing clubs, team cards, and editing controls."
+          className="team-management__feedback"
+        />
       )}
 
-      {success && (
-        <div className="success-message" style={{ marginBottom: '1rem' }} role="status" aria-live="polite">
-          {success}
-        </div>
+      {showLoadErrorState && (
+        <StatePanel
+          variant="error"
+          title="Couldn’t load teams"
+          message={error ?? undefined}
+          actionLabel="Retry"
+          onAction={() => {
+            void loadInitialData();
+          }}
+          className="team-management__feedback"
+        />
       )}
 
+      {showInlineError && (
+        <StatePanel
+          variant="error"
+          title="Team action failed"
+          message={error ?? undefined}
+          actionLabel="Reload teams"
+          onAction={() => {
+            void loadInitialData();
+          }}
+          compact
+          className="team-management__feedback"
+        />
+      )}
+
+      {!showLoadErrorState && (
+      <>
       <div className="create-game-form create-team-form">
         <h3>Create Team</h3>
         <form onSubmit={handleAddTeam}>
@@ -435,8 +476,18 @@ const TeamManagement: React.FC = () => {
         </div>
 
         <div className="team-grid">
-          {filteredTeams.length === 0 ? (
-            <div className="empty-state" role="status" aria-live="polite">No teams found.</div>
+          {showEmptyTeams ? (
+            <StatePanel
+              variant="empty"
+              title="No teams found."
+              message={selectedClubFilter || selectedTeamFilter ? 'Try a different club or team filter to find the team you need.' : 'Create a team to start managing rosters and exports.'}
+              actionLabel={selectedClubFilter || selectedTeamFilter ? 'Clear filters' : undefined}
+              onAction={selectedClubFilter || selectedTeamFilter ? () => {
+                setSelectedClubFilter('');
+                setSelectedTeamFilter('');
+              } : undefined}
+              className="team-management__feedback"
+            />
           ) : (
             filteredTeams.map((team) => (
               <div
@@ -481,6 +532,16 @@ const TeamManagement: React.FC = () => {
           onExport={handleExport}
           title={`Export ${teams.find(t => t.id === selectedTeamId)?.name} Season Summary`}
           dataType="team"
+        />
+      )}
+      </>
+      )}
+
+      {success && (
+        <Toast
+          title="Team saved"
+          message={success}
+          onDismiss={() => setSuccess(null)}
         />
       )}
     </div>
