@@ -140,9 +140,7 @@ export function buildThemeCssVariables(palette: ThemePalette): Record<string, st
   const heroBase = mixColors(palette.primary, '#0f1724', 0.56);
   const heroMid = mixColors(palette.secondary, '#112747', 0.44);
   const heroHigh = mixColors(palette.accent, palette.primary, 0.42);
-  const navBase = mixColors(palette.primary, '#08111d', 0.72);
   const navMid = mixColors(palette.secondary, '#112747', 0.52);
-  const navHigh = mixColors(palette.accent, palette.primary, 0.35);
 
   return {
     '--primary-color': palette.primary,
