@@ -1,5 +1,5 @@
 import express from 'express';
-import { body, query, validationResult } from 'express-validator';
+import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { hasTrainerAccess } from '../middleware/trainerAccess.js';
@@ -8,6 +8,25 @@ const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(auth);
+
+const EVENT_STATUSES = ['confirmed', 'unconfirmed'];
+
+const fetchCompleteGameEventById = async (eventId) => {
+  const eventResult = await db.query(`
+    SELECT
+      e.*,
+      p.first_name,
+      p.last_name,
+      p.jersey_number,
+      c.name as club_name
+    FROM game_events e
+    JOIN clubs c ON e.club_id = c.id
+    LEFT JOIN players p ON e.player_id = p.id
+    WHERE e.id = $1
+  `, [eventId]);
+
+  return eventResult.rows[0] || null;
+};
 
 /**
  * Get all events for a game with optional filtering
@@ -35,7 +54,11 @@ router.get('/:gameId', [
   query('period')
     .optional()
     .isInt({ min: 1, max: 4 })
-    .withMessage('Period must be between 1 and 4')
+    .withMessage('Period must be between 1 and 4'),
+  query('event_status')
+    .optional()
+    .isIn(EVENT_STATUSES)
+    .withMessage('Invalid event status')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -43,7 +66,7 @@ router.get('/:gameId', [
   }
 
   const { gameId } = req.params;
-  const { event_type, club_id, player_id, period } = req.query;
+  const { event_type, club_id, player_id, period, event_status } = req.query;
 
   try {
     let queryText = `
@@ -82,6 +105,12 @@ router.get('/:gameId', [
     if (period) {
       queryText += ` AND e.period = $${paramIndex}`;
       params.push(period);
+      paramIndex++;
+    }
+
+    if (event_status) {
+      queryText += ` AND e.event_status = $${paramIndex}`;
+      params.push(event_status);
       paramIndex++;
     }
 
@@ -130,7 +159,15 @@ router.post('/:gameId', [
   body('details')
     .optional({ nullable: true })
     .isObject()
-    .withMessage('Details must be a valid JSON object')
+    .withMessage('Details must be a valid JSON object'),
+  body('client_uuid')
+    .optional()
+    .isUUID()
+    .withMessage('client_uuid must be a valid UUID'),
+  body('event_status')
+    .optional()
+    .isIn(EVENT_STATUSES)
+    .withMessage('event_status must be confirmed or unconfirmed')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -138,7 +175,17 @@ router.post('/:gameId', [
   }
 
   const { gameId } = req.params;
-  const { event_type, player_id, club_id, period, time_remaining, details } = req.body;
+  const {
+    event_type,
+    player_id,
+    club_id,
+    period,
+    time_remaining,
+    details,
+    client_uuid,
+    event_status
+  } = req.body;
+  const normalizedEventStatus = event_status || 'confirmed';
 
   try {
     // Verify game exists and is in progress
@@ -229,10 +276,23 @@ router.post('/:gameId', [
       }
     }
 
+    // Idempotent create for offline retries.
+    if (client_uuid) {
+      const existingEventResult = await db.query(
+        'SELECT id FROM game_events WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+        [gameId, client_uuid]
+      );
+
+      if (existingEventResult.rows.length > 0) {
+        const existingEvent = await fetchCompleteGameEventById(existingEventResult.rows[0].id);
+        return res.status(200).json(existingEvent);
+      }
+    }
+
     // Insert the event
     const insertQuery = `
-      INSERT INTO game_events (game_id, event_type, player_id, club_id, period, time_remaining, details)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO game_events (game_id, event_type, player_id, club_id, period, time_remaining, details, client_uuid, event_status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
 
@@ -243,25 +303,30 @@ router.post('/:gameId', [
       club_id,
       period,
       time_remaining || null,
-      details ? JSON.stringify(details) : null
+      details ? JSON.stringify(details) : null,
+      client_uuid || null,
+      normalizedEventStatus
     ]);
 
-    // Fetch the complete event with joined data
-    const eventResult = await db.query(`
-      SELECT 
-        e.*,
-        p.first_name,
-        p.last_name,
-        p.jersey_number,
-        c.name as club_name
-      FROM game_events e
-      JOIN clubs c ON e.club_id = c.id
-      LEFT JOIN players p ON e.player_id = p.id
-      WHERE e.id = $1
-    `, [result.rows[0].id]);
-
-    res.status(201).json(eventResult.rows[0]);
+    const completeEvent = await fetchCompleteGameEventById(result.rows[0].id);
+    res.status(201).json(completeEvent);
   } catch (error) {
+    if (error.code === '23505' && req.body.client_uuid) {
+      try {
+        const existingEventResult = await db.query(
+          'SELECT id FROM game_events WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+          [gameId, req.body.client_uuid]
+        );
+
+        if (existingEventResult.rows.length > 0) {
+          const existingEvent = await fetchCompleteGameEventById(existingEventResult.rows[0].id);
+          return res.status(200).json(existingEvent);
+        }
+      } catch (lookupError) {
+        console.error('Error resolving duplicate event by client_uuid:', lookupError);
+      }
+    }
+
     console.error('Error creating event:', error);
     res.status(500).json({ error: 'Failed to create event' });
   }
@@ -302,7 +367,11 @@ router.put('/:gameId/:eventId', [
   body('details')
     .optional({ nullable: true })
     .isObject()
-    .withMessage('Details must be a valid JSON object')
+    .withMessage('Details must be a valid JSON object'),
+  body('event_status')
+    .optional()
+    .isIn(EVENT_STATUSES)
+    .withMessage('event_status must be confirmed or unconfirmed')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -334,7 +403,7 @@ router.put('/:gameId/:eventId', [
     }
   }
 
-  const { event_type, player_id, club_id, period, time_remaining, details } = req.body;
+  const { event_type, player_id, club_id, period, time_remaining, details, event_status } = req.body;
 
   try {
     // Verify event exists
@@ -388,6 +457,12 @@ router.put('/:gameId/:eventId', [
       paramIndex++;
     }
 
+    if (event_status !== undefined) {
+      updates.push(`event_status = $${paramIndex}`);
+      params.push(event_status);
+      paramIndex++;
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
@@ -402,24 +477,49 @@ router.put('/:gameId/:eventId', [
 
     await db.query(updateQuery, params);
 
-    // Fetch the complete event with joined data
-    const updatedResult = await db.query(`
-      SELECT 
-        e.*,
-        p.first_name,
-        p.last_name,
-        p.jersey_number,
-        c.name as club_name
-      FROM game_events e
-      JOIN clubs c ON e.club_id = c.id
-      LEFT JOIN players p ON e.player_id = p.id
-      WHERE e.id = $1
-    `, [eventId]);
-
-    res.json(updatedResult.rows[0]);
+    const updatedEvent = await fetchCompleteGameEventById(eventId);
+    res.json(updatedEvent);
   } catch (error) {
     console.error('Error updating event:', error);
     res.status(500).json({ error: 'Failed to update event' });
+  }
+});
+
+/**
+ * Confirm an event
+ * POST /api/events/:gameId/:eventId/confirm
+ */
+router.post('/:gameId/:eventId/confirm', [
+  requireRole(['admin', 'coach']),
+  param('gameId').isInt({ min: 1 }).withMessage('Game ID must be a positive integer'),
+  param('eventId').isInt({ min: 1 }).withMessage('Event ID must be a positive integer')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const { gameId, eventId } = req.params;
+
+  try {
+    const existingEvent = await db.query(
+      'SELECT id, event_status FROM game_events WHERE id = $1 AND game_id = $2',
+      [eventId, gameId]
+    );
+
+    if (existingEvent.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    if (existingEvent.rows[0].event_status !== 'confirmed') {
+      await db.query('UPDATE game_events SET event_status = $1 WHERE id = $2', ['confirmed', eventId]);
+    }
+
+    const confirmedEvent = await fetchCompleteGameEventById(eventId);
+    return res.status(200).json(confirmedEvent);
+  } catch (error) {
+    console.error('Error confirming event:', error);
+    return res.status(500).json({ error: 'Failed to confirm event' });
   }
 });
 
@@ -490,7 +590,11 @@ router.get('/comprehensive/:gameId', [
   query('period')
     .optional()
     .isInt({ min: 1, max: 10 })
-    .withMessage('Period must be between 1 and 10')
+    .withMessage('Period must be between 1 and 10'),
+  query('event_status')
+    .optional()
+    .isIn(EVENT_STATUSES)
+    .withMessage('Invalid event status')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -498,7 +602,7 @@ router.get('/comprehensive/:gameId', [
   }
 
   const { gameId } = req.params;
-  const { type, period } = req.query;
+  const { type, period, event_status } = req.query;
 
   try {
     const allEvents = [];
@@ -509,19 +613,24 @@ router.get('/comprehensive/:gameId', [
         'game_event' as source_table,
         ge.id,
         ge.game_id,
+        ge.event_type as event_type,
         ge.event_type as type,
         ge.club_id,
+        ge.club_id as team_id,
         ge.player_id,
         ge.period,
         ge.time_remaining,
         ge.details,
+        ge.event_status,
+        ge.client_uuid,
         ge.created_at,
-          c.name as club_name,
+        c.name as club_name,
+        c.name as team_name,
         p.first_name,
         p.last_name,
         p.jersey_number
       FROM game_events ge
-        JOIN clubs c ON ge.club_id = c.id
+      JOIN clubs c ON ge.club_id = c.id
       LEFT JOIN players p ON ge.player_id = p.id
       WHERE ge.game_id = $1
     `;
@@ -540,6 +649,12 @@ router.get('/comprehensive/:gameId', [
       paramIndex++;
     }
 
+    if (event_status) {
+      gameEventsQuery += ` AND ge.event_status = $${paramIndex}`;
+      params.push(event_status);
+      paramIndex++;
+    }
+
     const gameEventsResult = await db.query(gameEventsQuery, params);
     allEvents.push(...gameEventsResult.rows);
 
@@ -550,8 +665,10 @@ router.get('/comprehensive/:gameId', [
           'free_shot' as source_table,
           fs.id,
           fs.game_id,
+          CONCAT('free_shot_', fs.free_shot_type) as event_type,
           CONCAT('free_shot_', fs.free_shot_type) as type,
           fs.club_id,
+          fs.club_id as team_id,
           fs.player_id,
           fs.period,
           fs.time_remaining,
@@ -562,8 +679,11 @@ router.get('/comprehensive/:gameId', [
             'y_coord', fs.y_coord,
             'distance', fs.distance
           ) as details,
+          fs.event_status,
+          fs.client_uuid,
           fs.created_at,
           c.name as club_name,
+          c.name as team_name,
           p.first_name,
           p.last_name,
           p.jersey_number
@@ -585,6 +705,12 @@ router.get('/comprehensive/:gameId', [
       if (period) {
         freeShotsQuery += ` AND fs.period = $${fsParamIndex}`;
         fsParams.push(period);
+        fsParamIndex++;
+      }
+
+      if (event_status) {
+        freeShotsQuery += ` AND fs.event_status = $${fsParamIndex}`;
+        fsParams.push(event_status);
       }
 
       const freeShotsResult = await db.query(freeShotsQuery, fsParams);
@@ -598,8 +724,10 @@ router.get('/comprehensive/:gameId', [
           'timeout' as source_table,
           t.id,
           t.game_id,
+          CONCAT('timeout_', t.timeout_type) as event_type,
           CONCAT('timeout_', t.timeout_type) as type,
           t.club_id,
+          t.club_id as team_id,
           NULL as player_id,
           t.period,
           t.time_remaining,
@@ -609,8 +737,11 @@ router.get('/comprehensive/:gameId', [
             'called_by', t.called_by,
             'ended_at', t.ended_at
           ) as details,
+          t.event_status,
+          t.client_uuid,
           t.created_at,
           c.name as club_name,
+          c.name as team_name,
           NULL as first_name,
           NULL as last_name,
           NULL as jersey_number
@@ -631,6 +762,12 @@ router.get('/comprehensive/:gameId', [
       if (period) {
         timeoutsQuery += ` AND t.period = $${toParamIndex}`;
         toParams.push(period);
+        toParamIndex++;
+      }
+
+      if (event_status) {
+        timeoutsQuery += ` AND t.event_status = $${toParamIndex}`;
+        toParams.push(event_status);
       }
 
       const timeoutsResult = await db.query(timeoutsQuery, toParams);
@@ -644,8 +781,10 @@ router.get('/comprehensive/:gameId', [
           'commentary' as source_table,
           mc.id,
           mc.game_id,
+          CONCAT('commentary_', mc.commentary_type) as event_type,
           CONCAT('commentary_', mc.commentary_type) as type,
           NULL as club_id,
+          NULL as team_id,
           NULL as player_id,
           mc.period,
           mc.time_remaining,
@@ -654,8 +793,11 @@ router.get('/comprehensive/:gameId', [
             'content', mc.content,
             'created_by', mc.created_by
           ) as details,
+          mc.event_status,
+          mc.client_uuid,
           mc.created_at,
           NULL as club_name,
+          NULL as team_name,
           NULL as first_name,
           NULL as last_name,
           NULL as jersey_number
@@ -675,6 +817,12 @@ router.get('/comprehensive/:gameId', [
       if (period) {
         commentaryQuery += ` AND mc.period = $${mcParamIndex}`;
         mcParams.push(period);
+        mcParamIndex++;
+      }
+
+      if (event_status) {
+        commentaryQuery += ` AND mc.event_status = $${mcParamIndex}`;
+        mcParams.push(event_status);
       }
 
       const commentaryResult = await db.query(commentaryQuery, mcParams);

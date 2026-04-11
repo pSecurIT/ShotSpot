@@ -9,7 +9,8 @@ import { waitForSelectOptions } from './helpers/testHelpers';
 vi.mock('../utils/api', () => ({
   default: {
     get: vi.fn(),
-    post: vi.fn()
+    post: vi.fn(),
+    put: vi.fn()
   }
 }));
 
@@ -77,6 +78,10 @@ describe('FaultManagement', () => {
     
     (api.post as jest.Mock).mockResolvedValue({
       data: { id: 1, event_type: 'fault_offensive', message: 'Fault recorded successfully' }
+    });
+
+    (api.put as jest.Mock).mockResolvedValue({
+      data: { id: 1, event_status: 'unconfirmed' }
     });
   });
 
@@ -266,6 +271,56 @@ describe('FaultManagement', () => {
     expect(recordButton).toBeDisabled();
   });
 
+  it('confirms pending faults from the recent list', async () => {
+    const user = userEvent.setup();
+    (api.get as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/game-rosters')) {
+        return Promise.resolve({
+          data: [
+            ...mockHomePlayers.map(p => ({ ...p, club_id: 100, is_starting: true })),
+            ...mockAwayPlayers.map(p => ({ ...p, club_id: 101, is_starting: true }))
+          ]
+        });
+      }
+      if (url.includes('/events')) {
+        return Promise.resolve({ data: [{ ...mockRecentFaults[0], event_status: 'unconfirmed' }] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<FaultManagement {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Pending review')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Confirm/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/events/1/1/confirm');
+    });
+  });
+
+  it('creates unconfirmed faults from the form', async () => {
+    const user = userEvent.setup();
+    render(<FaultManagement {...mockProps} />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalled();
+    });
+
+    await waitForSelectOptions(() => screen.getByDisplayValue('Select player'));
+    await user.selectOptions(screen.getByDisplayValue('Select player'), '1');
+    await user.click(screen.getByRole('button', { name: 'Record And Review Later' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/events/1', expect.objectContaining({
+        event_type: 'fault_offensive',
+        event_status: 'unconfirmed'
+      }));
+    });
+  });
+
   it('enables submit button when all required fields are selected', async () => {
     const user = userEvent.setup();
     render(<FaultManagement {...mockProps} />);
@@ -422,7 +477,7 @@ describe('FaultManagement', () => {
     await user.click(recordButton);
     
     // Check for loading state
-    expect(screen.getByText('Recording...')).toBeInTheDocument();
+    expect(screen.getAllByText('Recording...')).toHaveLength(2);
     expect(recordButton).toBeDisabled();
   });
 

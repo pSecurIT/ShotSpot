@@ -38,6 +38,8 @@ interface Substitution {
   player_out_last_name: string;
   player_out_jersey_number: number;
   club_name: string;
+  event_status?: 'confirmed' | 'unconfirmed';
+  client_uuid?: string | null;
   created_at: string;
 }
 
@@ -148,7 +150,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
     }
   };
 
-  const handleSubstitution = async () => {
+  const handleSubstitution = async (eventStatus: 'confirmed' | 'unconfirmed' = 'confirmed') => {
     if (!playerOut || !playerIn) {
       setError('Please select both players for substitution');
       return;
@@ -178,25 +180,28 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
       // Map team_id to club_id
       const clubId = selectedTeam === homeTeamId ? homeClubId : awayClubId;
       
-      await api.post(`/substitutions/${gameId}`, {
+      const response = await api.post(`/substitutions/${gameId}`, {
         club_id: clubId,
         player_in_id: playerIn,
         player_out_id: playerOut,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
-        reason: reason
+        reason: reason,
+        event_status: eventStatus
       });
+      const wasQueued = Boolean((response.data as { queued?: boolean } | undefined)?.queued);
 
-      setSuccess('Substitution recorded successfully!');
+      setSuccess(wasQueued ? 'Substitution queued for sync when online' : eventStatus === 'unconfirmed' ? 'Substitution recorded for later review' : 'Substitution recorded successfully!');
       
       // Reset form
       setPlayerOut(null);
       setPlayerIn(null);
       setReason('tactical');
 
-      // Refresh data
-      await fetchActivePlayers();
-      await fetchRecentSubstitutions();
+      if (!wasQueued) {
+        await fetchActivePlayers();
+        await fetchRecentSubstitutions();
+      }
 
       // Notify parent component
       if (onSubstitutionRecorded) {
@@ -254,6 +259,57 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
       const axiosError = err as { response?: { data?: { error?: string } } };
       const errorMessage = axiosError.response?.data?.error || 'Failed to undo substitution';
       setError(errorMessage);
+    }
+  };
+
+  const updateSubstitutionStatus = async (subId: number, eventStatus: 'confirmed' | 'unconfirmed', clientUuid?: string | null) => {
+    try {
+      await api.put(`/substitutions/${gameId}/${subId}`, {
+        event_status: eventStatus,
+        ...(clientUuid ? { client_uuid: clientUuid } : {})
+      });
+      setSuccess(eventStatus === 'unconfirmed' ? 'Substitution marked for later review' : 'Substitution confirmed');
+      await fetchActivePlayers();
+      await fetchRecentSubstitutions();
+      if (onSubstitutionRecorded) {
+        onSubstitutionRecorded();
+      }
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      setError(axiosError.response?.data?.error || 'Failed to update substitution review status');
+    }
+  };
+
+  const confirmSubstitution = async (subId: number, clientUuid?: string | null) => {
+    try {
+      if (clientUuid) {
+        await api.post(`/substitutions/${gameId}/${subId}/confirm`, { client_uuid: clientUuid });
+      } else {
+        await api.post(`/substitutions/${gameId}/${subId}/confirm`);
+      }
+      setSuccess('Substitution confirmed');
+      await fetchActivePlayers();
+      await fetchRecentSubstitutions();
+      if (onSubstitutionRecorded) {
+        onSubstitutionRecorded();
+      }
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        successTimeoutRef.current = null;
+      }, 3000);
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } } };
+      setError(axiosError.response?.data?.error || 'Failed to confirm substitution');
     }
   };
 
@@ -397,13 +453,22 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
         </div>
 
         {/* Submit Button */}
-        <button
-          className="submit-substitution-button"
-          onClick={handleSubstitution}
-          disabled={loading || !selectedTeamHasRosterDetails || !playerOut || !playerIn}
-        >
-          {loading ? 'Recording...' : '✓ Record Substitution'}
-        </button>
+        <div className="panel-form-actions">
+          <button
+            className="submit-substitution-button"
+            onClick={() => void handleSubstitution('confirmed')}
+            disabled={loading || !selectedTeamHasRosterDetails || !playerOut || !playerIn}
+          >
+            {loading ? 'Recording...' : '✓ Record Substitution'}
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => void handleSubstitution('unconfirmed')}
+            disabled={loading || !selectedTeamHasRosterDetails || !playerOut || !playerIn}
+          >
+            {loading ? 'Recording...' : 'Record And Review Later'}
+          </button>
+        </div>
       </div>
 
       {/* Quick Swap Suggestions */}
@@ -446,6 +511,7 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
               <div key={sub.id} className="substitution-item">
                 <div className="substitution-details">
                   <span className="substitution-team">{sub.club_name}</span>
+                  {sub.event_status === 'unconfirmed' && <span className="detail-badge warning">Pending review</span>}
                   <span className="substitution-change">
                     #{sub.player_out_jersey_number} {sub.player_out_first_name[0]}.{' '}
                     {sub.player_out_last_name}
@@ -457,15 +523,34 @@ const SubstitutionPanel: React.FC<SubstitutionPanelProps> = ({
                     P{sub.period} • {sub.reason}
                   </span>
                 </div>
-                {recentSubstitutions[0].id === sub.id && (
-                  <button
-                    className="undo-button"
-                    onClick={() => handleUndoSubstitution(sub.id)}
-                    title="Undo this substitution"
-                  >
-                    ↶ Undo
-                  </button>
-                )}
+                <div className="timeline-actions">
+                  {sub.event_status === 'unconfirmed' ? (
+                    <button
+                      className="save-button"
+                      onClick={() => confirmSubstitution(sub.id, sub.client_uuid)}
+                      title="Confirm this substitution"
+                    >
+                      ✅ Confirm
+                    </button>
+                  ) : (
+                    <button
+                      className="secondary-button"
+                      onClick={() => updateSubstitutionStatus(sub.id, 'unconfirmed', sub.client_uuid)}
+                      title="Mark this substitution to review later"
+                    >
+                      🏷️ Edit Later
+                    </button>
+                  )}
+                  {recentSubstitutions[0].id === sub.id && (
+                    <button
+                      className="undo-button"
+                      onClick={() => handleUndoSubstitution(sub.id)}
+                      title="Undo this substitution"
+                    >
+                      ↶ Undo
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

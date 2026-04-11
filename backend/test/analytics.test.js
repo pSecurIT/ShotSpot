@@ -420,6 +420,27 @@ describe('📊 Analytics Routes', () => {
       }
     });
 
+    it('✅ should ignore unconfirmed shots in summary statistics', async () => {
+      try {
+        await db.query(
+          `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, distance, event_status, client_uuid)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'unconfirmed', $9)`,
+          [analyticsGame.id, player1.id, club1.id, 95, 25, 'goal', 1, 4.2, '50000000-0000-4000-8000-000000000001']
+        );
+
+        const response = await request(app)
+          .get(`/api/analytics/shots/${analyticsGame.id}/summary`)
+          .set('Authorization', `Bearer ${authToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.overall.total_shots).toBe(14);
+        expect(response.body.overall.total_goals).toBe(7);
+      } catch (error) {
+        global.testContext.logTestError(error, 'Unconfirmed analytics summary isolation failed');
+        throw error;
+      }
+    });
+
     it('✅ should allow regular users to view summary', async () => {
       try {
         const response = await request(app)

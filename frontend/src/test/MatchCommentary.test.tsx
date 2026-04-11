@@ -168,6 +168,58 @@ describe('MatchCommentary', () => {
     });
   });
 
+  it('adds commentary for later review', async () => {
+    const user = userEvent.setup();
+    render(<MatchCommentary {...mockProps} />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalled();
+    });
+
+    await user.click(screen.getByText('📝 Add Note'));
+    await user.type(screen.getByPlaceholderText('Enter your commentary or notes here...'), 'Review this later');
+    await user.click(screen.getByRole('button', { name: 'Add And Review Later' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/match-commentary/1', expect.objectContaining({
+        content: 'Review this later',
+        event_status: 'unconfirmed'
+      }));
+    });
+  });
+
+  it('does not refetch commentary history when creation is queued offline', async () => {
+    const user = userEvent.setup();
+    (api.post as jest.Mock).mockResolvedValue({
+      data: {
+        queued: true,
+        message: 'Action queued for sync when online'
+      }
+    });
+
+    render(<MatchCommentary {...mockProps} />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalled();
+    });
+
+    (api.get as jest.Mock).mockClear();
+
+    await user.click(screen.getByText('📝 Add Note'));
+    await user.type(screen.getByPlaceholderText('Enter your commentary or notes here...'), 'Offline queued note');
+    await user.click(screen.getByRole('button', { name: 'Add Commentary' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/match-commentary/1', expect.objectContaining({
+        content: 'Offline queued note',
+        event_status: 'confirmed'
+      }));
+    });
+
+    expect(api.get).not.toHaveBeenCalled();
+    expect(await screen.findByText('Commentary queued for sync when online')).toBeInTheDocument();
+  });
+
   it('validates required fields before submission', async () => {
     const user = userEvent.setup();
     render(<MatchCommentary {...mockProps} />);
@@ -386,6 +438,28 @@ describe('MatchCommentary', () => {
     await waitFor(() => {
       expect(screen.getByText('No commentary added yet.')).toBeInTheDocument();
       expect(screen.getByText('Add First Note')).toBeInTheDocument();
+    });
+  });
+
+  it('confirms pending commentary from the list', async () => {
+    const user = userEvent.setup();
+    (api.get as jest.Mock).mockResolvedValue({
+      data: [{
+        ...mockComments[0],
+        event_status: 'unconfirmed'
+      }]
+    });
+
+    render(<MatchCommentary {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Pending review')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Confirm/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/match-commentary/1/confirm');
     });
   });
 

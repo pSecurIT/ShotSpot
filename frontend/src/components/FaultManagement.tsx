@@ -41,6 +41,8 @@ interface Fault {
   first_name?: string;
   last_name?: string;
   jersey_number?: number;
+  event_status?: 'confirmed' | 'unconfirmed';
+  client_uuid?: string | null;
   created_at: string;
 }
 
@@ -132,7 +134,7 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
     }
   };
 
-  const handleRecordFault = async () => {
+  const handleRecordFault = async (eventStatus: 'confirmed' | 'unconfirmed' = 'confirmed') => {
     if (!selectedTeam) {
       setError('Please select a team');
       return;
@@ -165,6 +167,7 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
         club_id: clubId,
         period: currentPeriod,
         time_remaining: timeRemaining || null,
+        event_status: eventStatus,
         details: {
           reason: faultReason || null,
           fault_type: faultType
@@ -172,16 +175,22 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
         ...(faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && selectedPlayer ? { player_id: selectedPlayer } : {})
       };
 
-      await api.post(`/events/${gameId}`, faultData);
+      const response = await api.post(`/events/${gameId}`, faultData);
+      const wasQueued = Boolean((response.data as { queued?: boolean } | undefined)?.queued);
 
-      setSuccess(`${getFaultDisplayName(faultType)} recorded successfully`);
+      setSuccess(wasQueued
+        ? `${getFaultDisplayName(faultType)} queued for sync when online`
+        : eventStatus === 'unconfirmed'
+          ? `${getFaultDisplayName(faultType)} recorded for later review`
+          : `${getFaultDisplayName(faultType)} recorded successfully`);
       
       // Reset form
       setSelectedPlayer(null);
       setFaultReason('');
       
-      // Refresh recent faults
-      fetchRecentFaults();
+      if (!wasQueued) {
+        fetchRecentFaults();
+      }
       
       // Notify parent component
       if (onFaultRecorded) {
@@ -243,6 +252,55 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
     } catch (err) {
       const error = err as Error & { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to remove fault');
+    }
+  };
+
+  const updateFaultStatus = async (faultId: number, eventStatus: 'confirmed' | 'unconfirmed', clientUuid?: string | null) => {
+    try {
+      await api.put(`/events/${gameId}/${faultId}`, {
+        event_status: eventStatus,
+        ...(clientUuid ? { client_uuid: clientUuid } : {})
+      });
+      setSuccess(eventStatus === 'unconfirmed' ? 'Fault marked for later review' : 'Fault confirmed');
+      fetchRecentFaults();
+      if (onFaultRecorded) {
+        onFaultRecorded();
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        timeoutRef.current = null;
+      }, 3000);
+    } catch (err) {
+      const error = err as Error & { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to update fault review status');
+    }
+  };
+
+  const confirmFault = async (faultId: number, clientUuid?: string | null) => {
+    try {
+      if (clientUuid) {
+        await api.post(`/events/${gameId}/${faultId}/confirm`, { client_uuid: clientUuid });
+      } else {
+        await api.post(`/events/${gameId}/${faultId}/confirm`);
+      }
+      setSuccess('Fault confirmed');
+      fetchRecentFaults();
+      if (onFaultRecorded) {
+        onFaultRecorded();
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        setSuccess(null);
+        timeoutRef.current = null;
+      }, 3000);
+    } catch (err) {
+      const error = err as Error & { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to confirm fault');
     }
   };
 
@@ -345,13 +403,22 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
         </div>
 
         {/* Submit Button */}
-        <button
-          onClick={handleRecordFault}
-          disabled={loading || !selectedTeam || (faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && !selectedPlayer)}
-          className="primary-button"
-        >
-          {loading ? 'Recording...' : `Record ${getFaultDisplayName(faultType)}`}
-        </button>
+        <div className="panel-form-actions">
+          <button
+            onClick={() => void handleRecordFault('confirmed')}
+            disabled={loading || !selectedTeam || (faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && !selectedPlayer)}
+            className="primary-button"
+          >
+            {loading ? 'Recording...' : `Record ${getFaultDisplayName(faultType)}`}
+          </button>
+          <button
+            onClick={() => void handleRecordFault('unconfirmed')}
+            disabled={loading || !selectedTeam || (faultTypeRequiresPlayer && selectedTeamRequiresPlayerDetails && !selectedPlayer)}
+            className="secondary-button"
+          >
+            {loading ? 'Recording...' : 'Record And Review Later'}
+          </button>
+        </div>
       </div>
 
       {/* Recent Faults */}
@@ -364,6 +431,9 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
                 <div className="fault-info">
                   <span className="fault-type">{getFaultDisplayName(fault.event_type)}</span>
                   <span className="team-name">{fault.club_name}</span>
+                  {fault.event_status === 'unconfirmed' && (
+                    <span className="detail-badge warning">Pending review</span>
+                  )}
                   {fault.first_name && (
                     <span className="player-name">
                       #{fault.jersey_number} {fault.first_name} {fault.last_name}
@@ -376,13 +446,32 @@ const FaultManagement: React.FC<FaultManagementProps> = ({
                     {fault.time_remaining || `Period ${fault.period}`}
                   </span>
                 </div>
-                <button
-                  onClick={() => undoFault(fault.id)}
-                  className="undo-button"
-                  title="Remove this fault"
-                >
-                  ↶ Undo
-                </button>
+                <div className="timeline-actions">
+                  {fault.event_status === 'unconfirmed' ? (
+                    <button
+                      onClick={() => confirmFault(fault.id, fault.client_uuid)}
+                      className="save-button"
+                      title="Confirm this fault"
+                    >
+                      ✅ Confirm
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => updateFaultStatus(fault.id, 'unconfirmed', fault.client_uuid)}
+                      className="secondary-button"
+                      title="Mark this fault to review later"
+                    >
+                      🏷️ Edit Later
+                    </button>
+                  )}
+                  <button
+                    onClick={() => undoFault(fault.id)}
+                    className="undo-button"
+                    title="Remove this fault"
+                  >
+                    ↶ Undo
+                  </button>
+                </div>
               </div>
             ))}
           </div>

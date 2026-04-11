@@ -16,6 +16,12 @@ Object.defineProperty(window, 'confirm', {
   writable: true,
 });
 
+const mockPrompt = vi.fn();
+Object.defineProperty(window, 'prompt', {
+  value: mockPrompt,
+  writable: true,
+});
+
 const mockApi = api as jest.Mocked<typeof api>;
 
 describe('MatchTimeline', () => {
@@ -36,6 +42,7 @@ describe('MatchTimeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfirm.mockReturnValue(true);
+    mockPrompt.mockReturnValue(null);
     
     // Simple mock responses that resolve quickly
     mockApi.get.mockImplementation(() => {
@@ -279,5 +286,85 @@ describe('MatchTimeline', () => {
         expect(remainingFaults.length).toBeLessThanOrEqual(1);
       }, { timeout: 3000 });
     }
+  });
+
+  it('shows pending review items and confirms an unconfirmed shot', async () => {
+    const user = userEvent.setup();
+    const mockShot = {
+      id: 1,
+      game_id: 1,
+      player_id: 2,
+      team_id: 2,
+      result: 'goal',
+      period: 1,
+      time_remaining: '00:09:00',
+      created_at: '2024-01-01T10:02:00Z',
+      first_name: 'Jane',
+      last_name: 'Smith',
+      jersey_number: 12,
+      team_name: 'Away Team',
+      event_status: 'unconfirmed'
+    };
+
+    mockApi.get.mockImplementation((url: string) => {
+      if (url.includes('/shots/')) {
+        return Promise.resolve({ data: [mockShot] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    mockApi.post.mockResolvedValue({ data: { ...mockShot, event_status: 'confirmed' } });
+
+    render(<MatchTimelineWrapper />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Pending Review')).toBeInTheDocument();
+      expect(screen.getByText(/Shot review:/)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getAllByRole('button', { name: /^✅ Confirm$/i })[0]);
+
+    await waitFor(() => {
+      expect(mockApi.post).toHaveBeenCalledWith('/shots/1/1/confirm');
+    });
+  });
+
+  it('marks the latest reviewable item to edit later', async () => {
+    const user = userEvent.setup();
+    const mockEvent = {
+      id: 1,
+      game_id: 1,
+      source_table: 'game_event',
+      event_type: 'fault_offensive',
+      team_id: 1,
+      period: 1,
+      time_remaining: '00:10:00',
+      details: null,
+      created_at: '2024-01-01T10:00:00Z',
+      first_name: 'John',
+      last_name: 'Doe',
+      jersey_number: 10,
+      team_name: 'Home Team',
+      event_status: 'confirmed'
+    };
+
+    mockApi.get.mockImplementation((url: string) => {
+      if (url.includes('/events/comprehensive/')) {
+        return Promise.resolve({ data: [mockEvent] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    mockApi.put.mockResolvedValue({ data: { ...mockEvent, event_status: 'unconfirmed' } });
+
+    render(<MatchTimelineWrapper />);
+
+    await waitFor(() => {
+      expect(screen.getByText('FAULT OFFENSIVE')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Mark Last To Edit Later/i }));
+
+    await waitFor(() => {
+      expect(mockApi.put).toHaveBeenCalledWith('/events/1/1', { event_status: 'unconfirmed' });
+    });
   });
 });

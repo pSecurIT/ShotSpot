@@ -8,6 +8,13 @@ import { useTimer } from '../hooks/useTimer';
 let mockAxios: MockAdapter;
 
 describe('useTimer Hook', () => {
+  const flushAsyncUpdates = async () => {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  };
+
   beforeEach(() => {
     mockAxios = new MockAdapter(api);
   });
@@ -15,6 +22,7 @@ describe('useTimer Hook', () => {
   afterEach(() => {
     mockAxios.restore();
     vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   describe('Initial State', () => {
@@ -28,6 +36,8 @@ describe('useTimer Hook', () => {
       expect(typeof result.current.refetch).toBe('function');
       expect(typeof result.current.setTimerStateOptimistic).toBe('function');
       expect(typeof result.current.resetPeriodEndState).toBe('function');
+      expect(typeof result.current.startTimer).toBe('function');
+      expect(typeof result.current.pauseTimer).toBe('function');
     });
 
     it('should not make API calls when gameId is undefined', async () => {
@@ -222,6 +232,218 @@ describe('useTimer Hook', () => {
     });
   });
 
+  describe('Baseline Countdown', () => {
+    it('should derive the displayed countdown from a captured time baseline', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-07T12:00:00.000Z'));
+
+      mockAxios.onGet('/timer/game-123').reply(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 1, seconds: 30 },
+        timer_state: 'running',
+        timer_started_at: '2026-04-07T11:58:30.000Z'
+      });
+
+      const { result } = renderHook(() => useTimer('game-123'));
+
+      await flushAsyncUpdates();
+
+      expect(result.current.timerState?.timer_state).toBe('running');
+      expect(result.current.timerState?.time_remaining).toEqual({ minutes: 1, seconds: 30 });
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+
+      await flushAsyncUpdates();
+
+      expect(result.current.timerState?.time_remaining).toEqual({ minutes: 1, seconds: 28 });
+    });
+
+    it('should auto-pause through the shared pause path when the period reaches zero', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-07T12:00:00.000Z'));
+
+      const onPeriodEnd = vi.fn();
+
+      mockAxios.onGet('/timer/game-123').replyOnce(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 0, seconds: 1 },
+        timer_state: 'running',
+        timer_started_at: '2026-04-07T11:59:59.000Z'
+      });
+      mockAxios.onPost('/timer/game-123/pause').reply(200, { data: {} });
+      mockAxios.onGet('/timer/game-123').replyOnce(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 0, seconds: 0 },
+        timer_state: 'paused',
+        timer_started_at: '2026-04-07T11:59:59.000Z',
+        timer_paused_at: '2026-04-07T12:00:01.000Z'
+      });
+
+      const { result } = renderHook(() => useTimer('game-123', { onPeriodEnd }));
+
+      await flushAsyncUpdates();
+
+      expect(result.current.timerState?.timer_state).toBe('running');
+
+      act(() => {
+        vi.advanceTimersByTime(1100);
+      });
+
+      await flushAsyncUpdates();
+
+      expect(mockAxios.history.post.some(request => request.url === '/timer/game-123/pause')).toBe(true);
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      await flushAsyncUpdates();
+
+      expect(onPeriodEnd).toHaveBeenCalledTimes(1);
+
+      expect(result.current.periodHasEnded).toBe(true);
+      expect(result.current.timerState?.timer_state).toBe('paused');
+      expect(result.current.timerState?.time_remaining).toEqual({ minutes: 0, seconds: 0 });
+    });
+  });
+
+  describe('Unified Timer Actions', () => {
+    it('should resolve startTimer without waiting for the reconciliation fetch to finish', async () => {
+      mockAxios.onGet('/timer/game-123').replyOnce(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 1, seconds: 15 },
+        timer_state: 'paused',
+        timer_started_at: '2026-04-07T11:58:45.000Z',
+        timer_paused_at: '2026-04-07T12:00:00.000Z'
+      });
+      mockAxios.onPost('/timer/game-123/start').reply(200, { data: {} });
+      mockAxios.onGet('/timer/game-123').replyOnce(() => new Promise(() => {}));
+
+      const { result } = renderHook(() => useTimer('game-123'));
+
+      await flushAsyncUpdates();
+
+      let resolution = 'timeout';
+
+      await act(async () => {
+        resolution = await Promise.race([
+          result.current.startTimer().then(() => 'resolved'),
+          new Promise<string>(resolve => setTimeout(() => resolve('timeout'), 50))
+        ]);
+      });
+
+      expect(resolution).toBe('resolved');
+      expect(result.current.timerState?.timer_state).toBe('running');
+      expect(mockAxios.history.post[0]?.url).toBe('/timer/game-123/start');
+      expect(mockAxios.history.get.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should use the shared start and pause actions for timer transitions', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-07T12:00:00.000Z'));
+
+      mockAxios.onGet('/timer/game-123').replyOnce(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 1, seconds: 15 },
+        timer_state: 'paused',
+        timer_started_at: '2026-04-07T11:58:45.000Z',
+        timer_paused_at: '2026-04-07T12:00:00.000Z'
+      });
+      mockAxios.onPost('/timer/game-123/start').reply(200, { data: {} });
+      mockAxios.onGet('/timer/game-123').replyOnce(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 1, seconds: 15 },
+        timer_state: 'running',
+        timer_started_at: '2026-04-07T12:00:00.000Z'
+      });
+      mockAxios.onPost('/timer/game-123/pause').reply(200, { data: {} });
+      mockAxios.onGet('/timer/game-123').replyOnce(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 1, seconds: 13 },
+        timer_state: 'paused',
+        timer_started_at: '2026-04-07T12:00:00.000Z',
+        timer_paused_at: '2026-04-07T12:00:02.000Z'
+      });
+
+      const { result } = renderHook(() => useTimer('game-123'));
+
+      await flushAsyncUpdates();
+
+      expect(result.current.timerState?.timer_state).toBe('paused');
+
+      await act(async () => {
+        await result.current.startTimer();
+      });
+
+      expect(result.current.timerState?.timer_state).toBe('running');
+      expect(mockAxios.history.post[0]?.url).toBe('/timer/game-123/start');
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+
+      await act(async () => {
+        await result.current.pauseTimer();
+      });
+
+      expect(result.current.timerState?.timer_state).toBe('paused');
+      expect(result.current.timerState?.time_remaining).toEqual({ minutes: 1, seconds: 13 });
+      expect(mockAxios.history.post[1]?.url).toBe('/timer/game-123/pause');
+    });
+
+    it('should deduplicate repeated start requests while one is already in flight', async () => {
+      let resolveStartRequest: (() => void) | null = null;
+
+      mockAxios.onGet('/timer/game-123').replyOnce(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 1, seconds: 15 },
+        timer_state: 'paused',
+        timer_started_at: '2026-04-07T11:58:45.000Z',
+        timer_paused_at: '2026-04-07T12:00:00.000Z'
+      });
+      mockAxios.onPost('/timer/game-123/start').replyOnce(() => new Promise(resolve => {
+        resolveStartRequest = () => resolve([200, { data: {} }]);
+      }));
+      mockAxios.onGet('/timer/game-123').reply(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 1, seconds: 15 },
+        timer_state: 'running',
+        timer_started_at: '2026-04-07T12:00:00.000Z'
+      });
+
+      const { result } = renderHook(() => useTimer('game-123'));
+
+      await flushAsyncUpdates();
+
+      let firstPromise: Promise<void> | undefined;
+      let secondPromise: Promise<void> | undefined;
+
+      await act(async () => {
+        firstPromise = result.current.startTimer();
+        secondPromise = result.current.startTimer();
+        await Promise.resolve();
+      });
+
+      expect(mockAxios.history.post.filter(request => request.url === '/timer/game-123/start')).toHaveLength(1);
+
+      await act(async () => {
+        resolveStartRequest?.();
+        await Promise.all([firstPromise, secondPromise]);
+      });
+    });
+  });
+
   describe('Request Deduplication', () => {
     it('should allow forced refetch even with deduplication', async () => {
       const mockTimerResponse = {
@@ -256,6 +478,42 @@ describe('useTimer Hook', () => {
   });
 
   describe('Error Handling', () => {
+    it('should refetch timer state when the tab becomes visible again', async () => {
+      mockAxios.onGet('/timer/game-123').reply(200, {
+        current_period: 1,
+        period_duration: { minutes: 10, seconds: 0 },
+        time_remaining: { minutes: 8, seconds: 30 },
+        timer_state: 'running'
+      });
+
+      renderHook(() => useTimer('game-123'));
+
+      await waitFor(() => {
+        expect(mockAxios.history.get.length).toBe(1);
+      });
+
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'visible'
+      });
+
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await waitFor(() => {
+        expect(mockAxios.history.get.length).toBe(2);
+      });
+
+      act(() => {
+        window.dispatchEvent(new Event('focus'));
+      });
+
+      await waitFor(() => {
+        expect(mockAxios.history.get.length).toBe(3);
+      });
+    });
+
     it('should handle development environment logging', async () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';

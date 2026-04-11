@@ -73,6 +73,12 @@ interface Shot {
   player_last_name?: string;
 }
 
+interface ShotSelectionCandidate {
+  x: number;
+  y: number;
+  timeRemaining: string | null;
+}
+
 interface Possession {
   id: number;
   game_id: number;
@@ -101,6 +107,7 @@ interface CourtVisualizationProps {
   homePlayers?: Player[]; // Optional: If provided, won't fetch
   awayPlayers?: Player[]; // Optional: If provided, won't fetch
   timerState?: string; // 'running' | 'paused' | 'stopped'
+  timeRemaining?: string | null;
   onResumeTimer?: () => void; // Resume timer when clicking court
   onPauseTimer?: () => void; // Pause timer when needed
   canAddEvents?: () => boolean; // Period end check function
@@ -124,8 +131,9 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   homePlayers: homePlayersProps,
   awayPlayers: awayPlayersProps,
   timerState,
+  timeRemaining,
   onResumeTimer,
-  onPauseTimer: _onPauseTimer, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onPauseTimer,
   canAddEvents,
   userAssignedTeam
 }) => {
@@ -139,7 +147,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   const [selectedTeam, setSelectedTeam] = useState<'home' | 'away'>('home');
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [shotType, setShotType] = useState<string>('running_shot'); // Default to most common shot type
-  const [clickedCoords, setClickedCoords] = useState<{ x: number; y: number } | null>(null);
+  const [shotSelectionCandidate, setShotSelectionCandidate] = useState<ShotSelectionCandidate | null>(null);
   const [lastSelectedPlayerId, setLastSelectedPlayerId] = useState<number | null>(null); // Remember last player
   
   // Auto-select the user's assigned team when available
@@ -155,6 +163,38 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
   const FIELD_LENGTH = 40; // meters
   const FIELD_WIDTH = 20;  // meters
   const FIELD_CENTER_X = 50; // Center line at 50%
+
+  const normalizeTimeRemaining = useCallback((rawTimeRemaining?: string | null): string | null => {
+    if (!rawTimeRemaining) {
+      return null;
+    }
+
+    const parts = rawTimeRemaining.split(':').map((part) => part.trim());
+    if (parts.length === 2) {
+      const [minutes, seconds] = parts;
+      return `00:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
+    }
+
+    if (parts.length === 3) {
+      const [hours, minutes, seconds] = parts;
+      return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
+    }
+
+    return null;
+  }, []);
+
+  const parseTimeRemaining = useCallback((rawTimeRemaining: string | null): { minutes: number; seconds: number } | null => {
+    const normalizedTimeRemaining = normalizeTimeRemaining(rawTimeRemaining);
+    if (!normalizedTimeRemaining) {
+      return null;
+    }
+
+    const [hours, minutes, seconds] = normalizedTimeRemaining.split(':').map((part) => parseInt(part, 10) || 0);
+    return {
+      minutes: (hours * 60) + minutes,
+      seconds
+    };
+  }, [normalizeTimeRemaining]);
 
   // Determine which team attacks which korf based on initial setup - memoize to avoid recalculation
   const getAttackingConfiguration = useMemo(() => {
@@ -411,16 +451,20 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       }
     }
 
-    setClickedCoords({ x: clampedX, y: clampedY });
+    setShotSelectionCandidate({
+      x: clampedX,
+      y: clampedY,
+      timeRemaining: normalizeTimeRemaining(timeRemaining)
+    });
     setError(null);
     
     // Team selection is automatic based on possession - no need to show message
     // (Possession buttons already indicate which team is attacking)
-  }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, timerState, userAssignedTeam, homeTeamName, awayTeamName]);
+  }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, normalizeTimeRemaining, timeRemaining, timerState, userAssignedTeam, homeTeamName, awayTeamName]);
 
   // Record shot with specific result - memoize with useCallback
   const handleRecordShot = useCallback(async (result: 'goal' | 'miss' | 'blocked') => {
-    if (!clickedCoords) {
+    if (!shotSelectionCandidate) {
       setError('Please click on the court to select shot location');
       return;
     }
@@ -467,23 +511,27 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
 
     try {
       setError(null);
-      
-      // PAUSE TIMER ON GOAL - TEMPORARILY DISABLED (not used in current league)
-      // if (result === 'goal' && onPauseTimer && timerState === 'running') {
-      //   await onPauseTimer();
-      // }
+
+      if (result === 'goal' && onPauseTimer && timerState === 'running') {
+        void Promise.resolve(onPauseTimer()).catch((pauseError: unknown) => {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error auto-pausing timer after goal:', pauseError);
+          }
+        });
+      }
       
       // Calculate distance to nearest korf automatically
-      const calculatedDistance = calculateDistanceToKorf(clickedCoords.x, clickedCoords.y);
+      const calculatedDistance = calculateDistanceToKorf(shotSelectionCandidate.x, shotSelectionCandidate.y);
       
       const shotData = {
         club_id: selectedTeam === 'home' ? homeClubId : awayClubId,
-        x_coord: clickedCoords.x,
-        y_coord: clickedCoords.y,
+        x_coord: shotSelectionCandidate.x,
+        y_coord: shotSelectionCandidate.y,
         result: result,
         period: currentPeriod,
         distance: calculatedDistance,
         shot_type: shotType, // Always include shot_type (defaults to running_shot)
+        ...(shotSelectionCandidate.timeRemaining ? { time_remaining: shotSelectionCandidate.timeRemaining } : {}),
         ...(playerIdForShot !== null ? { player_id: playerIdForShot } : {})
       };
 
@@ -499,7 +547,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
         shot_type: shotData.shot_type,
         distance: shotData.distance,
         period: shotData.period,
-        time_remaining: null,
+        time_remaining: parseTimeRemaining(shotSelectionCandidate.timeRemaining),
         created_at: new Date().toISOString(),
         player_first_name: playerIdForShot !== null ? homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.first_name : 'Unknown',
         player_last_name: playerIdForShot !== null ? homePlayers.concat(awayPlayers).find(p => p.id === playerIdForShot)?.last_name : 'Scorer'
@@ -515,7 +563,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       }
       
       // Reset form but keep player and shot type
-      setClickedCoords(null);
+      setShotSelectionCandidate(null);
       // Keep shotType for next shot (don't reset)
       // Keep selectedPlayerId for quick repeat shots
       
@@ -526,7 +574,14 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       
       // 🔥 Fire API in background WITH RETRY for reliability
       retryApiCall(() => api.post(`/shots/${gameId}`, shotData))
-        .then(() => {
+        .then((response) => {
+          const wasQueued = Boolean((response.data as { queued?: boolean } | undefined)?.queued);
+          if (wasQueued) {
+            setSuccess('Shot queued for sync when online');
+            setTimeout(() => setSuccess(null), 2000);
+            return;
+          }
+
           // Refresh shots from server to get real ID
           setTimeout(() => fetchShots(), 100);
         })
@@ -540,7 +595,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error recording shot');
     }
-  }, [clickedCoords, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, homeClubId, awayClubId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, homePlayers, awayPlayers, canAddEvents, userAssignedTeam, homeTeamName, awayTeamName, getCurrentOffensivePlayers]);
+  }, [shotSelectionCandidate, selectedPlayerId, calculateDistanceToKorf, selectedTeam, homeTeamId, awayTeamId, homeClubId, awayClubId, currentPeriod, shotType, gameId, fetchShots, onShotRecorded, onPauseTimer, homePlayers, awayPlayers, canAddEvents, userAssignedTeam, homeTeamName, awayTeamName, getCurrentOffensivePlayers, parseTimeRemaining, timerState]);
 
   // Render shot markers on court
   const renderShotMarkers = () => {
@@ -567,14 +622,14 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
 
   // Render clicked position indicator
   const renderClickedPosition = () => {
-    if (!clickedCoords) return null;
+    if (!shotSelectionCandidate) return null;
 
     return (
       <div
         className="shot-marker selected"
         style={{
-          left: `${clickedCoords.x}%`,
-          top: `${clickedCoords.y}%`,
+          left: `${shotSelectionCandidate.x}%`,
+          top: `${shotSelectionCandidate.y}%`,
         }}
       />
     );
@@ -790,11 +845,11 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           </div>
 
           {/* Auto-calculated Distance Display */}
-          {clickedCoords && (
+          {shotSelectionCandidate && (
             <div className="form-group">
               <label>Distance to Korf:</label>
               <div className="distance-display">
-                {calculateDistanceToKorf(clickedCoords.x, clickedCoords.y).toFixed(1)} m
+                {calculateDistanceToKorf(shotSelectionCandidate.x, shotSelectionCandidate.y).toFixed(1)} m
               </div>
             </div>
           )}
@@ -805,28 +860,28 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           <button
             onClick={() => handleRecordShot('goal')}
             className="primary-button goal-button"
-            disabled={!clickedCoords || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
+            disabled={!shotSelectionCandidate || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
           >
             ⚽ Goal
           </button>
           <button
             onClick={() => handleRecordShot('miss')}
             className="secondary-button miss-button"
-            disabled={!clickedCoords || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
+            disabled={!shotSelectionCandidate || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
           >
             ✗ Miss
           </button>
           <button
             onClick={() => handleRecordShot('blocked')}
             className="secondary-button blocked-button"
-            disabled={!clickedCoords || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
+            disabled={!shotSelectionCandidate || (selectedTeamRequiresPlayerDetails && !selectedPlayerId)}
           >
             🛡️ Blocked
           </button>
           
-          {clickedCoords && (
+          {shotSelectionCandidate && (
             <button
-              onClick={() => setClickedCoords(null)}
+              onClick={() => setShotSelectionCandidate(null)}
               className="danger-button"
             >
               Clear Position
@@ -834,10 +889,11 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           )}
         </div>
 
-        {clickedCoords && (
+        {shotSelectionCandidate && (
           <div className="coordinates-display">
-            Selected position: ({clickedCoords.x}, {clickedCoords.y}) • 
-            Distance: {calculateDistanceToKorf(clickedCoords.x, clickedCoords.y).toFixed(1)}m to nearest korf
+            Selected position: ({shotSelectionCandidate.x}, {shotSelectionCandidate.y}) • 
+            Distance: {calculateDistanceToKorf(shotSelectionCandidate.x, shotSelectionCandidate.y).toFixed(1)}m to nearest korf
+            {shotSelectionCandidate.timeRemaining ? ` • Timestamp: ${shotSelectionCandidate.timeRemaining}` : ''}
           </div>
         )}
       </div>
