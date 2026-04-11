@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../utils/api';
 import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
@@ -122,7 +123,7 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  const dialogContent = (
     <div
       style={styles.overlay}
       onMouseDown={(event) => {
@@ -248,6 +249,8 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(dialogContent, document.body);
 };
 
 const styles = {
@@ -259,9 +262,11 @@ const styles = {
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
-    zIndex: 1000
+    padding: 'clamp(12px, 4vh, 32px) 16px',
+    overflowY: 'auto' as const,
+    zIndex: 2000
   },
   dialog: {
     backgroundColor: 'var(--bg-light)',
@@ -269,8 +274,9 @@ const styles = {
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
     maxWidth: '500px',
     width: '90%',
-    maxHeight: '90vh',
-    overflow: 'auto'
+    maxHeight: 'calc(100vh - clamp(24px, 8vh, 64px))',
+    overflowY: 'auto' as const,
+    margin: 'auto 0'
   },
   header: {
     display: 'flex',
