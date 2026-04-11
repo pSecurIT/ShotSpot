@@ -11,9 +11,13 @@
 
 body {
   font-family: var(--font-primary);
+  background:
+    var(--surface-glow),
+    linear-gradient(180deg, #f8fbff 0%, var(--surface-canvas) 18%, #edf2f8 100%);
   background-color: var(--background-light);
   color: var(--text-primary);
   line-height: 1.6;
+  min-height: 100vh;
 }
 
 /* Dark mode support */
@@ -25,8 +29,20 @@ body {
     --text-secondary: #b3b9c4;
     --text-dark: #e7eaee;
     --border-color: #26303a;
+    --border-strong: #3c4a57;
     --hover-bg: rgba(255, 255, 255, 0.08);
     --bg-light: #151a21;
+    --surface-canvas: #0f1216;
+    --surface-panel: rgba(21, 26, 33, 0.9);
+    --surface-panel-strong: #151a21;
+    --surface-panel-muted: #1c242d;
+    --surface-hero: linear-gradient(135deg, #09111d 0%, #0f2541 52%, #0f58e3 100%);
+    --surface-nav: linear-gradient(135deg, rgba(6, 10, 18, 0.94) 0%, rgba(12, 26, 45, 0.96) 58%, rgba(15, 88, 227, 0.9) 100%);
+    --surface-glow: radial-gradient(circle at top left, rgba(255, 107, 26, 0.12), transparent 35%);
+    --shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.22);
+    --shadow-md: 0 18px 40px rgba(0, 0, 0, 0.28);
+    --shadow-lg: 0 28px 56px rgba(0, 0, 0, 0.34);
+    --shadow-glow: 0 14px 34px rgba(20, 99, 255, 0.24);
   }
 }
 
@@ -38,20 +54,40 @@ body {
   --text-secondary: #b3b9c4;
   --text-dark: #e7eaee;
   --border-color: #26303a;
+  --border-strong: #3c4a57;
   --hover-bg: rgba(255, 255, 255, 0.08);
   --bg-light: #151a21;
+  --surface-canvas: #0f1216;
+  --surface-panel: rgba(21, 26, 33, 0.9);
+  --surface-panel-strong: #151a21;
+  --surface-panel-muted: #1c242d;
+  --surface-hero: linear-gradient(135deg, #09111d 0%, #0f2541 52%, #0f58e3 100%);
+  --surface-nav: linear-gradient(135deg, rgba(6, 10, 18, 0.94) 0%, rgba(12, 26, 45, 0.96) 58%, rgba(15, 88, 227, 0.9) 100%);
+  --surface-glow: radial-gradient(circle at top left, rgba(255, 107, 26, 0.12), transparent 35%);
+  --shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 18px 40px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 28px 56px rgba(0, 0, 0, 0.34);
+  --shadow-glow: 0 14px 34px rgba(20, 99, 255, 0.24);
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
   /* Reset to light defaults (must override prefers-color-scheme: dark) */
-  --background-light: #f5f7fa;
-  --text-primary: #2c3e50;
-  --text-secondary: #666666;
-  --text-dark: #1a1a1a;
-  --border-color: #e0e6ed;
-  --hover-bg: #f5f5f5;
-  --bg-light: #fafafa;
+  --background-light: #f4f7fb;
+  --text-primary: #17212b;
+  --text-secondary: #5f6f82;
+  --text-dark: #101820;
+  --border-color: #d7e0ea;
+  --border-strong: #afbcc9;
+  --hover-bg: #eef3f8;
+  --bg-light: #ffffff;
+  --surface-canvas: #f4f7fb;
+  --surface-panel: rgba(255, 255, 255, 0.9);
+  --surface-panel-strong: #ffffff;
+  --surface-panel-muted: #eef3f8;
+  --surface-hero: linear-gradient(135deg, #0f1724 0%, #112747 52%, #1764ff 100%);
+  --surface-nav: linear-gradient(135deg, rgba(8, 14, 24, 0.9) 0%, rgba(17, 39, 71, 0.94) 58%, rgba(20, 99, 255, 0.88) 100%);
+  --surface-glow: radial-gradient(circle at top left, rgba(255, 107, 26, 0.16), transparent 40%);
 }
 
 /* High contrast / accessibility */
@@ -84,27 +120,25 @@ body {
 }
 
 .App-header {
-  background: linear-gradient(
-    to right,
-    rgba(var(--primary-rgb), 0.38) 0%,
-    rgba(15, 18, 22, 0.98) 52%,
-    rgba(var(--primary-rgb), 0.38) 100%
-  );
-  padding: var(--spacing-md) var(--spacing-xl);
+  background:
+    radial-gradient(circle at top left, rgba(255, 107, 26, 0.22), transparent 22%),
+    var(--surface-hero);
+  padding: var(--spacing-lg) var(--spacing-xl) var(--spacing-md);
   color: var(--text-light);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
 }
 
 .header-content {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
 }
 
 .header-branding {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  padding: var(--spacing-sm) 0;
 }
 
 .header-logo {
@@ -116,14 +150,15 @@ body {
 .App-header h1 {
   font-family: var(--font-heading);
   font-weight: 700;
-  font-size: 1.75rem;
+  font-size: clamp(1.5rem, 2vw, 2.15rem);
+  letter-spacing: var(--tracking-tight);
   margin: 0;
 }
 
 main {
   flex: 1;
   padding: var(--spacing-xl);
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   width: 100%;
 }
