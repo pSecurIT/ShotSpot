@@ -231,9 +231,7 @@ describe('FreeShotPanel', () => {
   });
 
   it('disables submit button when required fields are missing', async () => {
-    act(() => {
-      render(<FreeShotPanel {...mockProps} />);
-    });
+    render(<FreeShotPanel {...mockProps} />);
     
     const recordButton = screen.getByRole('button', { name: 'Record Free Shot' });
     expect(recordButton).toBeDisabled();
@@ -426,9 +424,7 @@ describe('FreeShotPanel', () => {
     const { rerender } = render(<FreeShotPanel {...mockProps} />);
     
     // Update time remaining
-    act(() => {
-      rerender(<FreeShotPanel {...mockProps} timeRemaining="00:05:00" />);
-    });
+    rerender(<FreeShotPanel {...mockProps} timeRemaining="00:05:00" />);
     
     // Component should handle the updated time
     expect(screen.getByText('Record Free Shot / Penalty')).toBeInTheDocument();
