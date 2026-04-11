@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
@@ -42,6 +42,17 @@ const renderNavigation = (user: { username: string; role: string } | null = null
   );
 };
 
+const setViewportWidth = (width: number) => {
+  act(() => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: width
+    });
+    window.dispatchEvent(new Event('resize'));
+  });
+};
+
 const openUserMenu = async () => {
   const trigger = screen.getByRole('button', { name: 'User' });
   if (trigger.getAttribute('aria-expanded') === 'true') {
@@ -65,6 +76,7 @@ describe('Navigation Component', () => {
     vi.clearAllMocks();
     // Mock window.alert
     global.alert = vi.fn();
+    setViewportWidth(1280);
   });
 
   describe('Unauthenticated State', () => {
@@ -123,6 +135,32 @@ describe('Navigation Component', () => {
       expect(screen.getByRole('button', { name: 'Analytics' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Data' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument();
+    });
+
+    it('collapses into hamburger navigation on smaller viewports', () => {
+      setViewportWidth(900);
+
+      renderNavigation(regularUser);
+
+      expect(screen.getByRole('button', { name: 'Open navigation menu' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'testuser' })).toBeInTheDocument();
+      expect(screen.queryByLabelText('Current user')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Matches' })).not.toBeInTheDocument();
+    });
+
+    it('closes the mobile menu when resizing back to desktop', async () => {
+      setViewportWidth(900);
+
+      renderNavigation(regularUser);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+      expect(screen.getByRole('dialog', { name: 'Navigation menu' })).toHaveAttribute('aria-hidden', 'false');
+
+      setViewportWidth(1280);
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { hidden: true })).toHaveAttribute('aria-hidden', 'true');
+      });
     });
 
     it('displays user information', () => {

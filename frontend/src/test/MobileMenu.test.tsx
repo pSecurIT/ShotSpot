@@ -82,4 +82,18 @@ describe('MobileMenu', () => {
 
     expect(screen.getByRole('dialog', { hidden: true })).toHaveAttribute('aria-hidden', 'true');
   });
+
+  it('locks body scrolling while the menu is open', () => {
+    renderMobileMenu(true);
+
+    expect(document.body.style.overflow).toBe('hidden');
+  });
+
+  it('closes when escape is pressed', () => {
+    const { onClose } = renderMobileMenu();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
