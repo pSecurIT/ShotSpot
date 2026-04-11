@@ -47,6 +47,7 @@ const formatGameTitle = (g: GameListItem): string => {
 const Dashboard: React.FC = () => {
   const { socket, connected } = useWebSocket();
   const { user } = useAuth();
+  const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
 
   const [recentGames, setRecentGames] = useState<GameListItem[]>([]);
   const [upcomingGames, setUpcomingGames] = useState<GameListItem[]>([]);
@@ -174,18 +175,57 @@ const Dashboard: React.FC = () => {
   return (
     <div className="dashboard">
       <div className="dashboard__header">
-        <h1 className="dashboard__title">Dashboard</h1>
-        <p className="dashboard__subtitle">Quick actions and recent activity</p>
+        <div className="dashboard__hero-copy">
+          <span className="dashboard__eyebrow">Performance hub</span>
+          <h1 className="dashboard__title">Dashboard</h1>
+          <p className="dashboard__subtitle">Matchday ops, live system signals, and the fastest path back into action.</p>
+        </div>
+
+        <div className="dashboard__header-actions">
+          <button
+            type="button"
+            className="dashboard-action dashboard-action--secondary"
+            onClick={() => {
+              void refreshAll();
+            }}
+          >
+            Refresh feed
+          </button>
+          <Link
+            to={isCoachOrAdmin ? '/games' : '/analytics'}
+            className="dashboard-action dashboard-action--primary"
+          >
+            {isCoachOrAdmin ? 'Open match center' : 'View analytics'}
+          </Link>
+        </div>
       </div>
 
+      <section className="dashboard__spotlight" aria-label="Dashboard status">
+        <div className="dashboard__spotlight-card dashboard__spotlight-card--signal">
+          <span className="dashboard__spotlight-label">Sync state</span>
+          <strong className="dashboard__spotlight-value">{connected ? 'Live' : 'Standby'}</strong>
+          <span className="dashboard__spotlight-meta">{connected ? 'Realtime updates are flowing.' : 'Live updates will resume when the socket reconnects.'}</span>
+        </div>
+        <div className="dashboard__spotlight-card">
+          <span className="dashboard__spotlight-label">Matchday mode</span>
+          <strong className="dashboard__spotlight-value">{typeof navigator !== 'undefined' && !navigator.onLine ? 'Offline queue' : 'Ready'}</strong>
+          <span className="dashboard__spotlight-meta">{typeof navigator !== 'undefined' && !navigator.onLine ? 'New actions will be queued safely for sync.' : 'Connected for capture, analysis, and export.'}</span>
+        </div>
+        <div className="dashboard__spotlight-card">
+          <span className="dashboard__spotlight-label">Primary focus</span>
+          <strong className="dashboard__spotlight-value">{isCoachOrAdmin ? 'Run the next match' : 'Review performance'}</strong>
+          <span className="dashboard__spotlight-meta">{isCoachOrAdmin ? 'Use quick actions to jump into match prep and exports.' : 'Use analytics and achievements to review the latest results.'}</span>
+        </div>
+      </section>
+
       <div className="dashboard__grid">
-        <div style={{ gridColumn: 'span 12' }}>
+        <div className="dashboard__panel dashboard__panel--full">
           <DashboardWidget title="Quick Actions" icon="⚡">
             <QuickActions />
           </DashboardWidget>
         </div>
 
-        <div style={{ gridColumn: 'span 6' }}>
+        <div className="dashboard__panel dashboard__panel--half">
           <DashboardWidget title="Recent Matches" icon="🕒" loading={loading.recent} error={errors.recent}>
             {recentGames.length === 0 ? (
               <div>No recent matches found.</div>
@@ -211,7 +251,7 @@ const Dashboard: React.FC = () => {
           </DashboardWidget>
         </div>
 
-        <div style={{ gridColumn: 'span 6' }}>
+        <div className="dashboard__panel dashboard__panel--half">
           <DashboardWidget title="Upcoming Games" icon="📅" loading={loading.upcoming} error={errors.upcoming}>
             {upcomingGames.length === 0 ? (
               <div>No upcoming games.</div>
@@ -235,7 +275,7 @@ const Dashboard: React.FC = () => {
           </DashboardWidget>
         </div>
 
-        <div style={{ gridColumn: 'span 6' }}>
+        <div className="dashboard__panel dashboard__panel--half">
           <DashboardWidget title="Quick Stats" icon="📈" loading={loading.summary} error={errors.summary}>
             {summary ? (
               <div className="stats-row">
@@ -258,7 +298,7 @@ const Dashboard: React.FC = () => {
           </DashboardWidget>
         </div>
 
-        <div style={{ gridColumn: 'span 6' }}>
+        <div className="dashboard__panel dashboard__panel--half">
           <DashboardWidget title="Notifications" icon="🔔">
             <div className="notifications">
               {notifications.map((n) => (
@@ -268,7 +308,7 @@ const Dashboard: React.FC = () => {
           </DashboardWidget>
         </div>
 
-        <div style={{ gridColumn: 'span 12' }}>
+        <div className="dashboard__panel dashboard__panel--full">
           <DashboardWidget title="Recent Achievements" icon="🏆" loading={loading.achievements} error={errors.achievements}>
             {recentAchievements.length === 0 ? (
               <div>No recent achievements.</div>
