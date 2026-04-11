@@ -159,4 +159,59 @@ describe('Dashboard', () => {
       expect(getSpy).toHaveBeenCalledWith('/achievements/recent', expect.anything());
     });
   });
+
+  it('shows a retry action for widget errors and recovers on retry', async () => {
+    let achievementsShouldFail = true;
+
+    mockApi.get = vi.fn((url: string) => {
+      if (url === '/games') {
+        return Promise.resolve({ data: [] });
+      }
+      if (url === '/achievements/recent') {
+        if (achievementsShouldFail) {
+          return Promise.reject(new Error('boom'));
+        }
+
+        return Promise.resolve({
+          data: [
+            {
+              id: 10,
+              earned_at: new Date().toISOString(),
+              player_id: 99,
+              player_name: 'Test Achiever',
+              name: 'Sharpshooter',
+              description: '10 goals',
+              badge_icon: '🏆',
+              points: 10,
+              game_id: 1,
+              game_date: new Date().toISOString(),
+            },
+          ],
+        });
+      }
+      if (url === '/dashboard/summary') {
+        return Promise.resolve({ data: { teams: 3, players: 10, games: 5 } });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    const achievementsWidget = screen.getByLabelText('Recent Achievements');
+
+    await waitFor(() => {
+      expect(within(achievementsWidget).getByRole('alert')).toHaveTextContent('Failed to load achievements feed');
+    });
+
+    achievementsShouldFail = false;
+    fireEvent.click(within(achievementsWidget).getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => {
+      expect(within(achievementsWidget).getByText(/Sharpshooter/i)).toBeInTheDocument();
+    });
+  });
 });

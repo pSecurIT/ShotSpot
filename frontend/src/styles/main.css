@@ -1,4 +1,5 @@
 @import './variables.css';
+@import './state-feedback.css';
 @import './Navigation.css';
 @import './MobileMenu.css';
 
@@ -733,6 +734,13 @@ select.error:focus {
   text-align: center;
   padding: 3rem;
   font-size: 1.1rem;
+}
+
+.team-management__feedback,
+.user-management__feedback,
+.player-management__feedback,
+.game-management__feedback {
+  margin-bottom: 1rem;
 }
 
 /* Cards */

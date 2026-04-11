@@ -422,6 +422,48 @@ describe('GameManagement', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
+  it('retries loading games after an initial fetch failure', async () => {
+    const user = userEvent.setup();
+
+    (api.get as jest.Mock).mockImplementation((url) => {
+      if (url === '/teams') {
+        return Promise.reject({ response: { data: { error: 'Failed to fetch teams' } } });
+      }
+      if (url === '/games') {
+        return Promise.reject({ response: { data: { error: 'Failed to fetch games' } } });
+      }
+      if (url === '/match-templates') {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<GameManagementWrapper />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Couldn’t load games')).toBeInTheDocument();
+    });
+
+    (api.get as jest.Mock).mockImplementation((url) => {
+      if (url === '/teams') {
+        return Promise.resolve({ data: mockTeams });
+      }
+      if (url === '/games') {
+        return Promise.resolve({ data: mockGames });
+      }
+      if (url === '/match-templates') {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Games (2)')).toBeInTheDocument();
+    });
+  });
+
   it('handles API error when creating game', async () => {
     const user = userEvent.setup();
     

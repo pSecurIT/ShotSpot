@@ -497,7 +497,7 @@ describe('Responsive layout polish', () => {
 
     cy.get('.dashboard__title').should('be.visible').and('contain.text', 'Dashboard');
     cy.get('[aria-label="Main navigation"] button[aria-label="Open navigation menu"]').click();
-    cy.get('[role="dialog"][aria-label="Navigation menu"]').should('be.visible');
+    cy.get('.mobile-menu-panel.open[role="dialog"]').should('be.visible');
     expectNoPageOverflow();
   });
 
