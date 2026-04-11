@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import '../styles/ExportDialog.css';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 export type ExportFormat = 'pdf-summary' | 'pdf-detailed' | 'csv';
 
@@ -27,6 +28,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   title = 'Export Data',
   dataType
 }) => {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('pdf-summary');
   const [showPreview, setShowPreview] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
@@ -37,6 +39,11 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   });
   const [emailAddress, setEmailAddress] = useState('');
   const [shareMethod, setShareMethod] = useState<'download' | 'email' | 'link'>('download');
+  const { dialogRef, titleId, onDialogKeyDown } = useAccessibleDialog({
+    isOpen,
+    onClose,
+    initialFocusRef: closeButtonRef,
+  });
 
   if (!isOpen) return null;
 
@@ -155,10 +162,19 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
 
   return (
     <div className="export-dialog-overlay" onClick={onClose}>
-      <div className="export-dialog" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        className="export-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={onDialogKeyDown}
+        tabIndex={-1}
+      >
         <div className="export-dialog-header">
-          <h2>{title}</h2>
-          <button className="close-button" onClick={onClose} aria-label="Close dialog">
+          <h2 id={titleId}>{title}</h2>
+          <button ref={closeButtonRef} className="close-button" onClick={onClose} aria-label="Close dialog">
             ×
           </button>
         </div>
@@ -265,7 +281,9 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                       onChange={(e) => setEmailAddress(e.target.value)}
                       placeholder="recipient@example.com"
                       required
+                      aria-describedby="export-email-hint"
                     />
+                    <small id="export-email-hint">Used only when sharing the export by email.</small>
                   </div>
                 )}
               </div>
