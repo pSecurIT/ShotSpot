@@ -54,7 +54,7 @@ const MomentumChart: React.FC<MomentumChartProps> = ({ momentum }) => {
 
       <article className="team-analytics__panel team-analytics__panel--chart">
         {momentum.trend.length === 0 ? (
-          <p className="team-analytics__empty">No recent matches available to chart momentum.</p>
+          <p className="team-analytics__empty" role="status" aria-live="polite">No recent matches available to chart momentum.</p>
         ) : (
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={momentum.trend}>

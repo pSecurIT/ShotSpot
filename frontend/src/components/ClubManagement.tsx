@@ -247,7 +247,7 @@ const ClubManagement: React.FC = () => {
             {!detailLoading && !detailError && detailView.mode === 'teams' && (
               <div className="club-details__list">
                 {clubTeams.length === 0 ? (
-                  <div className="empty-state">No teams found for this club</div>
+                  <div className="empty-state" role="status" aria-live="polite">No teams found for this club</div>
                 ) : (
                   <ul className="list" aria-label="Club teams list">
                     {clubTeams.map((t) => (
@@ -263,7 +263,7 @@ const ClubManagement: React.FC = () => {
             {!detailLoading && !detailError && detailView.mode === 'players' && (
               <div className="club-details__list">
                 {clubPlayers.length === 0 ? (
-                  <div className="empty-state">No players found for this club</div>
+                  <div className="empty-state" role="status" aria-live="polite">No players found for this club</div>
                 ) : (
                   <ul className="list" aria-label="Club players list">
                     {clubPlayers.map((p) => (

@@ -92,7 +92,7 @@ const PredictionsPanel: React.FC<PredictionsPanelProps> = ({
       </p>
 
       {isUnavailable ? (
-        <p className="predictions-panel__empty">{prediction?.message || 'Not enough data for prediction.'}</p>
+        <p className="predictions-panel__empty" role="status" aria-live="polite">{prediction?.message || 'Not enough data for prediction.'}</p>
       ) : (
         <>
           <div className="predictions-panel__cards">
@@ -137,7 +137,7 @@ const PredictionsPanel: React.FC<PredictionsPanelProps> = ({
                 <li>Goals: {predictedGoals} predicted vs {historical.goals_per_game} historical average</li>
               </ul>
             ) : (
-              <p className="predictions-panel__empty">Historical baseline is unavailable for this player.</p>
+              <p className="predictions-panel__empty" role="status" aria-live="polite">Historical baseline is unavailable for this player.</p>
             )}
           </article>
 

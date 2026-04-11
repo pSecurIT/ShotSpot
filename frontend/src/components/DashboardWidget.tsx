@@ -33,7 +33,7 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({
 
       <div className="dashboard-widget__body">
         {loading ? (
-          <div className="dashboard-widget__loading">Loading…</div>
+          <div className="dashboard-widget__loading" role="status" aria-live="polite">Loading…</div>
         ) : error ? (
           <div className="dashboard-widget__error" role="alert">{error}</div>
         ) : (
