@@ -168,6 +168,58 @@ describe('API Utility', () => {
       expect(request.headers?.['X-CSRF-Token']).toBeUndefined();
     });
 
+    it('should inject client_uuid for match-event create requests', async () => {
+      const mockCsrfResponse = { data: { csrfToken: 'csrf-token' } };
+      mockAxios.onGet('/auth/csrf').reply(200, mockCsrfResponse.data);
+      mockAxios.onPost('/shots/123').reply(201, { data: 'success' });
+
+      await api.post('/shots/123', { player_id: 1, result: 'goal' });
+
+      const request = mockAxios.history.post[0];
+      const payload = JSON.parse(request.data);
+      expect(payload.player_id).toBe(1);
+      expect(payload.result).toBe('goal');
+      expect(payload.client_uuid).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
+    });
+
+    it('should preserve existing client_uuid for match-event create requests', async () => {
+      const mockCsrfResponse = { data: { csrfToken: 'csrf-token' } };
+      const existingClientUuid = '53d20c31-4e71-4264-9fbc-9f68353cd6a9';
+      mockAxios.onGet('/auth/csrf').reply(200, mockCsrfResponse.data);
+      mockAxios.onPost('/events/42').reply(201, { data: 'success' });
+
+      await api.post('/events/42', {
+        event_type: 'timeout',
+        club_id: 1,
+        client_uuid: existingClientUuid
+      });
+
+      const request = mockAxios.history.post[0];
+      const payload = JSON.parse(request.data);
+      expect(payload.client_uuid).toBe(existingClientUuid);
+    });
+
+    it('should inject client_uuid for match commentary create requests', async () => {
+      const mockCsrfResponse = { data: { csrfToken: 'csrf-token' } };
+      mockAxios.onGet('/auth/csrf').reply(200, mockCsrfResponse.data);
+      mockAxios.onPost('/match-commentary/42').reply(201, { data: 'success' });
+
+      await api.post('/match-commentary/42', {
+        commentary_type: 'note',
+        content: 'Sideline note'
+      });
+
+      const request = mockAxios.history.post[0];
+      const payload = JSON.parse(request.data);
+      expect(payload.commentary_type).toBe('note');
+      expect(payload.content).toBe('Sideline note');
+      expect(payload.client_uuid).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
+    });
+
     it('should handle CSRF token fetch error gracefully', async () => {
       mockAxios.onGet('/auth/csrf').reply(500);
       mockAxios.onPost('/test').reply(200, { data: 'success' });
@@ -376,6 +428,18 @@ describe('API Utility', () => {
         'POST',
         'http://localhost:3001/api/external',
         '{"data":"test"}'
+      );
+    });
+
+    it('should queue generated client_uuid for offline match-event create requests', async () => {
+      mockQueueAction.mockResolvedValue();
+
+      await api.post('/shots/123', { player_id: 1, result: 'goal' });
+
+      expect(mockQueueAction).toHaveBeenCalledWith(
+        'POST',
+        '/api/shots/123',
+        expect.stringMatching(/"client_uuid":"[0-9a-f-]{36}"/i)
       );
     });
   });

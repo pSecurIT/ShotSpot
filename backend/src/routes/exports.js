@@ -50,7 +50,7 @@ async function fetchGameData(gameId) {
     FROM shots s
     JOIN players p ON s.player_id = p.id
     JOIN clubs c ON s.club_id = c.id
-    WHERE s.game_id = $1
+    WHERE s.game_id = $1 AND s.event_status = 'confirmed'
     ORDER BY s.period, s.created_at
   `, [gameId]);
 
@@ -65,7 +65,7 @@ async function fetchGameData(gameId) {
     FROM game_events ge
     LEFT JOIN players p ON ge.player_id = p.id
     JOIN clubs c ON ge.club_id = c.id
-    WHERE ge.game_id = $1
+    WHERE ge.game_id = $1 AND ge.event_status = 'confirmed'
     ORDER BY ge.period, ge.created_at
   `, [gameId]);
 
@@ -716,7 +716,7 @@ router.get('/player-report/:playerId', [
       JOIN games g ON gr.game_id = g.id
       LEFT JOIN clubs hc ON g.home_club_id = hc.id
       LEFT JOIN clubs ac ON g.away_club_id = ac.id
-      LEFT JOIN shots s ON s.player_id = gr.player_id AND s.game_id = g.id
+      LEFT JOIN shots s ON s.player_id = gr.player_id AND s.game_id = g.id AND s.event_status = 'confirmed'
       WHERE gr.player_id = $1 AND g.status = 'completed'
       GROUP BY g.id, g.date, hc.name, ac.name, g.home_score, g.away_score
       ORDER BY g.date DESC

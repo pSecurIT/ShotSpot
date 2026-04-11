@@ -9,6 +9,25 @@ const router = express.Router();
 // Apply authentication to all routes
 router.use(auth);
 
+const SHOT_EVENT_STATUSES = ['confirmed', 'unconfirmed'];
+
+const fetchCompleteShotById = async (shotId) => {
+  const completeShotResult = await db.query(`
+    SELECT
+      s.*,
+      p.first_name,
+      p.last_name,
+      p.jersey_number,
+      c.name as club_name
+    FROM shots s
+    JOIN players p ON s.player_id = p.id
+    JOIN clubs c ON s.club_id = c.id
+    WHERE s.id = $1
+  `, [shotId]);
+
+  return completeShotResult.rows[0] || null;
+};
+
 const getFallbackShotPlayerId = async (clubId) => {
   const existingFallback = await db.query(
     `SELECT id
@@ -41,7 +60,8 @@ router.get('/:gameId', [
   query('period').optional().isInt({ min: 1 }).withMessage('Period must be a positive integer'),
   query('club_id').optional().isInt().withMessage('Club ID must be an integer'),
   query('player_id').optional().isInt().withMessage('Player ID must be an integer'),
-  query('result').optional().isIn(['goal', 'miss', 'blocked']).withMessage('Invalid result value')
+  query('result').optional().isIn(['goal', 'miss', 'blocked']).withMessage('Invalid result value'),
+  query('event_status').optional().isIn(SHOT_EVENT_STATUSES).withMessage('Invalid event status value')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -49,7 +69,7 @@ router.get('/:gameId', [
   }
 
   const { gameId } = req.params;
-  const { period, club_id, player_id, result } = req.query;
+  const { period, club_id, player_id, result, event_status } = req.query;
 
   try {
     // Build dynamic query with filters
@@ -92,6 +112,12 @@ router.get('/:gameId', [
       paramIndex++;
     }
 
+    if (event_status) {
+      queryText += ` AND s.event_status = $${paramIndex}`;
+      queryParams.push(event_status);
+      paramIndex++;
+    }
+
     queryText += ' ORDER BY s.created_at DESC';
 
     const shotsResult = await db.query(queryText, queryParams);
@@ -117,7 +143,9 @@ router.post('/:gameId', [
   body('period').isInt({ min: 1 }).withMessage('Period must be a positive integer'),
   body('time_remaining').optional().matches(/^\d{2}:\d{2}:\d{2}$/).withMessage('Time remaining must be in format HH:MM:SS'),
   body('shot_type').optional().isString().withMessage('Shot type must be a string'),
-  body('distance').optional().isFloat({ min: 0 }).withMessage('Distance must be a positive number')
+  body('distance').optional().isFloat({ min: 0 }).withMessage('Distance must be a positive number'),
+  body('client_uuid').optional().isUUID().withMessage('client_uuid must be a valid UUID'),
+  body('event_status').optional().isIn(SHOT_EVENT_STATUSES).withMessage('event_status must be confirmed or unconfirmed')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -125,7 +153,20 @@ router.post('/:gameId', [
   }
 
   const { gameId } = req.params;
-  const { player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance } = req.body;
+  const {
+    player_id,
+    club_id,
+    x_coord,
+    y_coord,
+    result,
+    period,
+    time_remaining,
+    shot_type,
+    distance,
+    client_uuid,
+    event_status
+  } = req.body;
+  const normalizedEventStatus = event_status || 'confirmed';
   let playerIdForShot = player_id ?? null;
 
   try {
@@ -183,17 +224,30 @@ router.post('/:gameId', [
       }
     }
 
+    // Idempotent create for offline retries.
+    if (client_uuid) {
+      const existingShotResult = await db.query(
+        'SELECT id FROM shots WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+        [gameId, client_uuid]
+      );
+
+      if (existingShotResult.rows.length > 0) {
+        const existingShot = await fetchCompleteShotById(existingShotResult.rows[0].id);
+        return res.status(200).json(existingShot);
+      }
+    }
+
     // Insert shot
     const shotResult = await db.query(`
-      INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance, client_uuid, event_status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
-    `, [gameId, playerIdForShot, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance]);
+    `, [gameId, playerIdForShot, club_id, x_coord, y_coord, result, period, time_remaining, shot_type, distance, client_uuid || null, normalizedEventStatus]);
 
     const shot = shotResult.rows[0];
 
     // If it's a goal, update the game score
-    if (result === 'goal') {
+    if (result === 'goal' && normalizedEventStatus === 'confirmed') {
       const scoreField = club_id === game.home_club_id ? 'home_score' : 'away_score';
       await db.query(`
         UPDATE games 
@@ -202,21 +256,7 @@ router.post('/:gameId', [
       `, [gameId]);
     }
 
-    // Fetch complete shot data with player and club info
-    const completeShotResult = await db.query(`
-      SELECT 
-        s.*,
-        p.first_name,
-        p.last_name,
-        p.jersey_number,
-        c.name as club_name
-      FROM shots s
-      JOIN players p ON s.player_id = p.id
-      JOIN clubs c ON s.club_id = c.id
-      WHERE s.id = $1
-    `, [shot.id]);
-
-    const completeShot = completeShotResult.rows[0];
+    const completeShot = await fetchCompleteShotById(shot.id);
 
     // Emit WebSocket event for real-time analytics update
     const io = req.app.get('io');
@@ -237,6 +277,22 @@ router.post('/:gameId', [
 
     res.status(201).json(completeShot);
   } catch (err) {
+    if (err.code === '23505' && client_uuid) {
+      try {
+        const existingShotResult = await db.query(
+          'SELECT id FROM shots WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+          [gameId, client_uuid]
+        );
+
+        if (existingShotResult.rows.length > 0) {
+          const existingShot = await fetchCompleteShotById(existingShotResult.rows[0].id);
+          return res.status(200).json(existingShot);
+        }
+      } catch (lookupError) {
+        console.error('Error resolving duplicate shot by client_uuid:', lookupError);
+      }
+    }
+
     console.error('Error creating shot:', err);
     res.status(500).json({ error: 'Failed to create shot' });
   }
@@ -253,7 +309,8 @@ router.put('/:gameId/:shotId', [
   body('y_coord').optional().isFloat({ min: 0, max: 100 }).withMessage('Y coordinate must be between 0 and 100'),
   body('result').optional().isIn(['goal', 'miss', 'blocked']).withMessage('Result must be goal, miss, or blocked'),
   body('shot_type').optional().isString().withMessage('Shot type must be a string'),
-  body('distance').optional().isFloat({ min: 0 }).withMessage('Distance must be a positive number')
+  body('distance').optional().isFloat({ min: 0 }).withMessage('Distance must be a positive number'),
+  body('event_status').optional().isIn(SHOT_EVENT_STATUSES).withMessage('event_status must be confirmed or unconfirmed')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -272,7 +329,9 @@ router.put('/:gameId/:shotId', [
 
     const oldShot = shotCheck.rows[0];
     const oldResult = oldShot.result;
+    const oldStatus = oldShot.event_status || 'confirmed';
     const newResult = updates.result || oldResult;
+    const newStatus = updates.event_status || oldStatus;
 
     // Build dynamic update query
     const fields = [];
@@ -294,46 +353,79 @@ router.put('/:gameId/:shotId', [
     
     const _updateResult = await db.query(updateQuery, values);
 
-    // Update game score if result changed
-    if (updates.result && oldResult !== newResult) {
+    // Update game score when goal-counting status changes.
+    const oldCountsAsGoal = oldResult === 'goal' && oldStatus === 'confirmed';
+    const newCountsAsGoal = newResult === 'goal' && newStatus === 'confirmed';
+
+    if (oldCountsAsGoal !== newCountsAsGoal) {
       const game = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
       const gameData = game.rows[0];
       const scoreField = oldShot.club_id === gameData.home_club_id ? 'home_score' : 'away_score';
 
-      let scoreChange = 0;
-      if (oldResult === 'goal' && newResult !== 'goal') {
-        scoreChange = -1; // Was a goal, now isn't
-      } else if (oldResult !== 'goal' && newResult === 'goal') {
-        scoreChange = 1; // Wasn't a goal, now is
-      }
+      const scoreChange = newCountsAsGoal ? 1 : -1;
 
-      if (scoreChange !== 0) {
-        await db.query(`
-          UPDATE games 
-          SET ${scoreField} = GREATEST(0, ${scoreField} + $1), updated_at = CURRENT_TIMESTAMP
-          WHERE id = $2
-        `, [scoreChange, gameId]);
-      }
+      await db.query(`
+        UPDATE games 
+        SET ${scoreField} = GREATEST(0, ${scoreField} + $1), updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `, [scoreChange, gameId]);
     }
 
-    // Fetch complete shot data
-    const completeShotResult = await db.query(`
-      SELECT 
-        s.*,
-        p.first_name,
-        p.last_name,
-        p.jersey_number,
-        c.name as club_name
-      FROM shots s
-      JOIN players p ON s.player_id = p.id
-      JOIN clubs c ON s.club_id = c.id
-      WHERE s.id = $1
-    `, [shotId]);
-
-    res.json(completeShotResult.rows[0]);
+    const completeShot = await fetchCompleteShotById(shotId);
+    res.json(completeShot);
   } catch (err) {
     console.error('Error updating shot:', err);
     res.status(500).json({ error: 'Failed to update shot' });
+  }
+});
+
+/**
+ * Confirm a shot event
+ */
+router.post('/:gameId/:shotId/confirm', [
+  requireRole(['admin', 'coach']),
+  param('gameId').isInt().withMessage('Game ID must be an integer'),
+  param('shotId').isInt().withMessage('Shot ID must be an integer')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { gameId, shotId } = req.params;
+
+  try {
+    const shotCheck = await db.query('SELECT * FROM shots WHERE id = $1 AND game_id = $2', [shotId, gameId]);
+    if (shotCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Shot not found' });
+    }
+
+    const shot = shotCheck.rows[0];
+    if (shot.event_status === 'confirmed') {
+      const completeShot = await fetchCompleteShotById(shotId);
+      return res.status(200).json(completeShot);
+    }
+
+    await db.query(
+      'UPDATE shots SET event_status = $1 WHERE id = $2',
+      ['confirmed', shotId]
+    );
+
+    if (shot.result === 'goal') {
+      const game = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
+      const gameData = game.rows[0];
+      const scoreField = shot.club_id === gameData.home_club_id ? 'home_score' : 'away_score';
+      await db.query(
+        `UPDATE games SET ${scoreField} = ${scoreField} + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [gameId]
+      );
+    }
+
+    const completeShot = await fetchCompleteShotById(shotId);
+    res.status(200).json(completeShot);
+  } catch (err) {
+    console.error('Error confirming shot:', err);
+    res.status(500).json({ error: 'Failed to confirm shot' });
   }
 });
 

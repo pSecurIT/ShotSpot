@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { queueAction } from './offlineSync';
+import { ensureMatchEventClientUuid } from './matchEventIdentity';
 
 const api = axios.create({
   baseURL: (import.meta.env.VITE_API_URL as string) || '/api',
@@ -29,6 +30,8 @@ export const getCsrfToken = async (): Promise<string | null> => {
 // Add auth token and CSRF token to requests
 api.interceptors.request.use(
   async (config) => {
+    config.data = ensureMatchEventClientUuid(config.method, config.url, config.data);
+
     // Add Bearer token
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (token) {

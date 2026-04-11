@@ -1,5 +1,5 @@
 import express from 'express';
-import { body, param, validationResult } from 'express-validator';
+import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
@@ -8,23 +8,61 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(auth);
 
+const TIMEOUT_EVENT_STATUSES = ['confirmed', 'unconfirmed'];
+
+const fetchCompleteTimeoutById = async (timeoutId) => {
+  const timeoutResult = await db.query(`
+    SELECT 
+      t.*,
+      c.name as club_name
+    FROM timeouts t
+    LEFT JOIN clubs c ON t.club_id = c.id
+    WHERE t.id = $1
+  `, [timeoutId]);
+
+  return timeoutResult.rows[0] || null;
+};
+
 /**
  * Get all timeouts for a game
  * GET /api/timeouts/:gameId
  */
-router.get('/:gameId', async (req, res) => {
+router.get('/:gameId', [
+  param('gameId')
+    .isInt({ min: 1 })
+    .withMessage('Game ID must be a positive integer'),
+  query('event_status')
+    .optional()
+    .isIn(TIMEOUT_EVENT_STATUSES)
+    .withMessage('Invalid event status value')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
   const { gameId } = req.params;
+  const { event_status } = req.query;
 
   try {
-    const result = await db.query(`
+    let queryText = `
       SELECT 
         t.*,
         c.name as club_name
       FROM timeouts t
       LEFT JOIN clubs c ON t.club_id = c.id
       WHERE t.game_id = $1
-      ORDER BY t.created_at DESC
-    `, [gameId]);
+    `;
+    const params = [gameId];
+
+    if (event_status) {
+      queryText += ' AND t.event_status = $2';
+      params.push(event_status);
+    }
+
+    queryText += ' ORDER BY t.created_at DESC';
+
+    const result = await db.query(queryText, params);
 
     res.json(result.rows);
   } catch (error) {
@@ -73,7 +111,15 @@ router.post('/', [
     .optional({ nullable: true })
     .isString()
     .isLength({ max: 100 })
-    .withMessage('Called by must be a string with maximum 100 characters')
+    .withMessage('Called by must be a string with maximum 100 characters'),
+  body('client_uuid')
+    .optional()
+    .isUUID()
+    .withMessage('client_uuid must be a valid UUID'),
+  body('event_status')
+    .optional()
+    .isIn(TIMEOUT_EVENT_STATUSES)
+    .withMessage('event_status must be confirmed or unconfirmed')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -82,10 +128,23 @@ router.post('/', [
 
   const {
     game_id: gameId, club_id, timeout_type, period, time_remaining,
-    duration, reason, called_by
+    duration, reason, called_by, client_uuid, event_status
   } = req.body;
+  const normalizedEventStatus = event_status || 'confirmed';
 
   try {
+    if (client_uuid) {
+      const existingTimeoutResult = await db.query(
+        'SELECT id FROM timeouts WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+        [gameId, client_uuid]
+      );
+
+      if (existingTimeoutResult.rows.length > 0) {
+        const existingTimeout = await fetchCompleteTimeoutById(existingTimeoutResult.rows[0].id);
+        return res.status(200).json(existingTimeout);
+      }
+    }
+
     // Verify game exists and is in progress
     const gameResult = await db.query('SELECT * FROM games WHERE id = $1', [gameId]);
     if (gameResult.rows.length === 0) {
@@ -129,29 +188,37 @@ router.post('/', [
     const insertQuery = `
       INSERT INTO timeouts (
         game_id, club_id, timeout_type, period, time_remaining,
-        duration, reason, called_by
+        duration, reason, called_by, client_uuid, event_status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
 
     const result = await db.query(insertQuery, [
       gameId, club_id || null, timeout_type, period, time_remaining || null,
-      duration || '1 minute', reason || null, called_by || null
+      duration || '1 minute', reason || null, called_by || null, client_uuid || null, normalizedEventStatus
     ]);
 
-    // Fetch the complete timeout with joined data
-    const timeoutResult = await db.query(`
-      SELECT 
-        t.*,
-        c.name as club_name
-      FROM timeouts t
-      LEFT JOIN clubs c ON t.club_id = c.id
-      WHERE t.id = $1
-    `, [result.rows[0].id]);
+    const timeout = await fetchCompleteTimeoutById(result.rows[0].id);
 
-    res.status(201).json(timeoutResult.rows[0]);
+    res.status(201).json(timeout);
   } catch (error) {
+    if (error.code === '23505' && client_uuid) {
+      try {
+        const existingTimeoutResult = await db.query(
+          'SELECT id FROM timeouts WHERE game_id = $1 AND client_uuid = $2 LIMIT 1',
+          [gameId, client_uuid]
+        );
+
+        if (existingTimeoutResult.rows.length > 0) {
+          const existingTimeout = await fetchCompleteTimeoutById(existingTimeoutResult.rows[0].id);
+          return res.status(200).json(existingTimeout);
+        }
+      } catch (lookupError) {
+        console.error('Error resolving duplicate timeout by client_uuid:', lookupError);
+      }
+    }
+
     console.error('Error creating timeout:', error);
     res.status(500).json({ error: 'Failed to create timeout' });
   }
@@ -266,7 +333,11 @@ router.put('/:timeoutId', [
     .optional({ nullable: true })
     .isString()
     .isLength({ max: 100 })
-    .withMessage('Called by must be a string with maximum 100 characters')
+    .withMessage('Called by must be a string with maximum 100 characters'),
+  body('event_status')
+    .optional()
+    .isIn(TIMEOUT_EVENT_STATUSES)
+    .withMessage('event_status must be confirmed or unconfirmed')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -315,20 +386,60 @@ router.put('/:timeoutId', [
 
     await db.query(updateQuery, params);
 
-    // Fetch the complete updated timeout with joined data
-    const updatedResult = await db.query(`
-      SELECT 
-        t.*,
-        c.name as club_name
-      FROM timeouts t
-      LEFT JOIN clubs c ON t.club_id = c.id
-      WHERE t.id = $1
-    `, [timeoutId]);
+    const timeout = await fetchCompleteTimeoutById(timeoutId);
 
-    res.json(updatedResult.rows[0]);
+    res.json(timeout);
   } catch (error) {
     console.error('Error updating timeout:', error);
     res.status(500).json({ error: 'Failed to update timeout' });
+  }
+});
+
+/**
+ * Confirm a timeout
+ * POST /api/timeouts/:timeoutId/confirm
+ * Body: { game_id }
+ */
+router.post('/:timeoutId/confirm', [
+  requireRole(['admin', 'coach']),
+  param('timeoutId')
+    .isInt({ min: 1 })
+    .withMessage('Timeout ID must be a positive integer'),
+  body('game_id')
+    .notEmpty()
+    .isInt({ min: 1 })
+    .withMessage('Game ID must be a positive integer')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const { timeoutId } = req.params;
+  const { game_id: gameId } = req.body;
+
+  try {
+    const timeoutResult = await db.query(
+      'SELECT * FROM timeouts WHERE id = $1 AND game_id = $2',
+      [timeoutId, gameId]
+    );
+
+    if (timeoutResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Timeout not found' });
+    }
+
+    if (timeoutResult.rows[0].event_status !== 'confirmed') {
+      await db.query(
+        'UPDATE timeouts SET event_status = $1 WHERE id = $2',
+        ['confirmed', timeoutId]
+      );
+    }
+
+    const timeout = await fetchCompleteTimeoutById(timeoutId);
+    res.status(200).json(timeout);
+  } catch (error) {
+    console.error('Error confirming timeout:', error);
+    res.status(500).json({ error: 'Failed to confirm timeout' });
   }
 });
 

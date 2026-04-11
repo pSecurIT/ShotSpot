@@ -1,7 +1,9 @@
+import { useState, type ComponentProps } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import CourtVisualization from '../components/CourtVisualization';
 import { BrowserRouter } from 'react-router-dom';
+import api from '../utils/api';
 
 // Mock API module
 vi.mock('../utils/api', () => ({
@@ -83,10 +85,33 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
+    vi.mocked(api.post).mockResolvedValue({ data: { id: 1 } });
   });
 
-  const renderCourtVisualization = () => {
-    return render(
+  const mockCourtDimensions = (element: Element | null) => {
+    if (!element) {
+      return;
+    }
+
+    Object.defineProperty(element, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 0,
+        width: 1000,
+        height: 400,
+        right: 1000,
+        bottom: 400,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      })
+    });
+  };
+
+  const renderCourtVisualization = (overrides: Partial<ComponentProps<typeof CourtVisualization>> = {}) => {
+    const rendered = render(
       <BrowserRouter>
         <CourtVisualization
           gameId={1}
@@ -105,12 +130,18 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
           homePlayers={mockHomePlayers}
           awayPlayers={mockAwayPlayers}
           timerState="running"
+          timeRemaining="9:43"
           onResumeTimer={mockOnResumeTimer}
           onPauseTimer={mockOnPauseTimer}
           canAddEvents={mockCanAddEvents}
+          {...overrides}
         />
       </BrowserRouter>
     );
+
+    mockCourtDimensions(rendered.container.querySelector('.court-container'));
+
+    return rendered;
   };
 
   describe('Solution 3: Mobile Player Grid', () => {
@@ -225,7 +256,7 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
       });
 
       // Click on court to select shot location
-      const courtArea = container.querySelector('.korfball-court');
+      const courtArea = container.querySelector('.court-container');
       if (courtArea) {
         fireEvent.click(courtArea, { clientX: 300, clientY: 200 });
       }
@@ -254,7 +285,7 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
       });
 
       // Record first shot
-      const courtArea = container.querySelector('.korfball-court');
+      const courtArea = container.querySelector('.court-container');
       if (courtArea) {
         fireEvent.click(courtArea, { clientX: 300, clientY: 200 });
       }
@@ -307,6 +338,34 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
   });
 
   describe('Feature Integration', () => {
+    it('should auto-pause the timer when recording a goal while running', async () => {
+      const { container } = renderCourtVisualization({
+        timerState: 'running'
+      });
+
+      await waitFor(() => {
+        const playerCard = screen.getByText('#10').closest('button');
+        expect(playerCard).toBeInTheDocument();
+        if (playerCard) {
+          fireEvent.click(playerCard);
+        }
+      });
+
+      const courtArea = container.querySelector('.court-container');
+      if (courtArea) {
+        fireEvent.click(courtArea, { clientX: 300, clientY: 200 });
+      }
+
+      await waitFor(() => {
+        const goalButton = screen.getByText('⚽ Goal');
+        fireEvent.click(goalButton);
+      });
+
+      await waitFor(() => {
+        expect(mockOnPauseTimer).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('should work together: player grid selection persists after shot', async () => {
       const { container } = renderCourtVisualization();
 
@@ -320,7 +379,7 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
       });
 
       // Record a shot
-      const courtArea = container.querySelector('.korfball-court');
+      const courtArea = container.querySelector('.court-container');
       if (courtArea) {
         fireEvent.click(courtArea, { clientX: 300, clientY: 200 });
       }
@@ -335,6 +394,40 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
         const playerCard = screen.getByText('#10').closest('button');
         expect(playerCard).toHaveClass('selected');
       });
+    });
+
+    it('keeps the optimistic shot visible when the create request is queued offline', async () => {
+      vi.mocked(api.post).mockResolvedValue({
+        data: {
+          queued: true,
+          message: 'Action queued for sync when online'
+        }
+      });
+
+      const { container } = renderCourtVisualization();
+
+      await waitFor(() => {
+        const playerCard = screen.getByText('#10').closest('button');
+        expect(playerCard).toBeInTheDocument();
+        if (playerCard) {
+          fireEvent.click(playerCard);
+        }
+      });
+
+      const courtArea = container.querySelector('.court-container');
+      if (courtArea) {
+        fireEvent.click(courtArea, { clientX: 300, clientY: 200 });
+      }
+
+      await waitFor(() => {
+        fireEvent.click(screen.getByText('⚽ Goal'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Shot queued for sync when online')).toBeInTheDocument();
+      });
+
+      expect(container.querySelectorAll('.shot-marker').length).toBeGreaterThan(0);
     });
 
     it('should display compact player cards (smaller size optimization)', async () => {
@@ -353,6 +446,68 @@ describe('Court Interaction Features - Player Grid & Last Shooter', () => {
   });
 
   describe('Timer and Possession Integration', () => {
+    it('should use the field-click timestamp instead of the later action-click time', async () => {
+      const TimestampHarness = () => {
+        const [liveTimeRemaining, setLiveTimeRemaining] = useState('9:43');
+
+        return (
+          <BrowserRouter>
+            <button onClick={() => setLiveTimeRemaining('9:41')}>Advance Clock</button>
+            <CourtVisualization
+              gameId={1}
+              homeTeamId={1}
+              awayTeamId={2}
+              homeClubId={100}
+              awayClubId={101}
+              homeTeamName="Home Team"
+              awayTeamName="Away Team"
+              currentPeriod={1}
+              homeAttackingSide="left"
+              onShotRecorded={mockOnShotRecorded}
+              activePossession={null}
+              possessionDuration={0}
+              onCenterLineCross={mockOnCenterLineCross}
+              homePlayers={mockHomePlayers}
+              awayPlayers={mockAwayPlayers}
+              timerState="running"
+              timeRemaining={liveTimeRemaining}
+              onResumeTimer={mockOnResumeTimer}
+              onPauseTimer={mockOnPauseTimer}
+              canAddEvents={mockCanAddEvents}
+            />
+          </BrowserRouter>
+        );
+      };
+
+      const { container } = render(<TimestampHarness />);
+      mockCourtDimensions(container.querySelector('.court-container'));
+
+      await waitFor(() => {
+        expect(screen.getByText('#10')).toBeInTheDocument();
+      });
+
+      const courtArea = container.querySelector('.court-container');
+      if (courtArea) {
+        fireEvent.click(courtArea, { clientX: 300, clientY: 200 });
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText(/Timestamp:/)).toHaveTextContent('Timestamp: 00:09:43');
+      });
+
+      fireEvent.click(screen.getByText('Advance Clock'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Timestamp:/)).toHaveTextContent('Timestamp: 00:09:43');
+      });
+
+      fireEvent.click(screen.getByText('⚽ Goal'));
+
+      await waitFor(() => {
+        expect(mockOnShotRecorded).toHaveBeenCalled();
+      });
+    });
+
     it('should clear possession when timer reaches zero (period end)', async () => {
       const mockActivePossession = {
         id: 1,

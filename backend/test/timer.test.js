@@ -202,7 +202,7 @@ describe('⏱️ Timer API', () => {
       }
     });
 
-    it('❌ should reject start if already running', async () => {
+    it('✅ should return current state if start is called while already running', async () => {
       try {
         // Start timer first
         await request(app)
@@ -216,9 +216,11 @@ describe('⏱️ Timer API', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({});
 
-        expect(response.status).toBe(400);
-        expect(response.body.error).toBe('Timer is already running');
-        console.log('      ✅ Already running timer correctly rejected');
+        expect(response.status).toBe(200);
+        expect(response.body.message).toBe('Timer already running');
+        expect(response.body.timer_state).toBe('running');
+        expect(response.body.timer_started_at).toBeDefined();
+        console.log('      ✅ Already running timer returned current state');
       } catch (error) {
         console.log('      ❌ Already running test failed:', error.message);
         global.testContext.logTestError(error, 'Already running test failed');
@@ -315,6 +317,35 @@ describe('⏱️ Timer API', () => {
       } catch (error) {
         console.log('      ❌ Not running pause test failed:', error.message);
         global.testContext.logTestError(error, 'Not running pause test failed');
+        throw error;
+      }
+    });
+
+    it('✅ should return current state if pause is called while already paused', async () => {
+      try {
+        await request(app)
+          .post(`/api/timer/${game.id}/start`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({});
+
+        await request(app)
+          .post(`/api/timer/${game.id}/pause`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({});
+
+        const response = await request(app)
+          .post(`/api/timer/${game.id}/pause`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({});
+
+        expect(response.status).toBe(200);
+        expect(response.body.message).toBe('Timer already paused');
+        expect(response.body.timer_state).toBe('paused');
+        expect(response.body.time_remaining).toBeDefined();
+        console.log('      ✅ Already paused timer returned current state');
+      } catch (error) {
+        console.log('      ❌ Already paused test failed:', error.message);
+        global.testContext.logTestError(error, 'Already paused test failed');
         throw error;
       }
     });

@@ -29,10 +29,15 @@ vi.mock('../hooks/useTimer', () => ({
       time_remaining: { minutes: 10, seconds: 0 },
       period_duration: { minutes: 10, seconds: 0 }
     },
+    currentTimeMs: Date.now(),
+    loading: false,
+    error: null,
     refetch: mockRefetch,
     setTimerStateOptimistic: vi.fn(),
     periodHasEnded: false,
-    resetPeriodEndState: vi.fn()
+    resetPeriodEndState: vi.fn(),
+    startTimer: vi.fn(),
+    pauseTimer: vi.fn()
   })
 }));
 

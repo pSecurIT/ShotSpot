@@ -3,9 +3,54 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { configDefaults } from 'vitest/config';
 
+const shouldServeSpaEntry = (requestUrl: string | undefined, acceptHeader: string | undefined): boolean => {
+  if (!requestUrl || !acceptHeader?.includes('text/html')) {
+    return false;
+  }
+
+  const path = requestUrl.split('?')[0];
+
+  if (
+    path.startsWith('/api/') ||
+    path.startsWith('/@') ||
+    path.startsWith('/__vite') ||
+    path.startsWith('/__cypress') ||
+    path.startsWith('/cypress/') ||
+    path.startsWith('/src/') ||
+    path.startsWith('/assets/') ||
+    path === '/favicon.ico'
+  ) {
+    return false;
+  }
+
+  return !/\.[a-z0-9]+$/i.test(path);
+};
+
+const spaFallbackPlugin = {
+  name: 'shotspot-spa-fallback',
+  configureServer(server: { middlewares: { use: (handler: (req: { method?: string; url?: string; headers: Record<string, string | string[] | undefined> }, _res: unknown, next: () => void) => void) => void } }) {
+    server.middlewares.use((req, _res, next) => {
+      if (['GET', 'HEAD'].includes(req.method || '') && shouldServeSpaEntry(req.url, typeof req.headers.accept === 'string' ? req.headers.accept : undefined)) {
+        req.url = '/';
+      }
+
+      next();
+    });
+  },
+  configurePreviewServer(server: { middlewares: { use: (handler: (req: { method?: string; url?: string; headers: Record<string, string | string[] | undefined> }, _res: unknown, next: () => void) => void) => void } }) {
+    server.middlewares.use((req, _res, next) => {
+      if (['GET', 'HEAD'].includes(req.method || '') && shouldServeSpaEntry(req.url, typeof req.headers.accept === 'string' ? req.headers.accept : undefined)) {
+        req.url = '/index.html';
+      }
+
+      next();
+    });
+  }
+};
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), spaFallbackPlugin],
   build: {
     rollupOptions: {
       input: {
@@ -72,7 +117,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    open: true,
+    open: process.env.CYPRESS !== '1',
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

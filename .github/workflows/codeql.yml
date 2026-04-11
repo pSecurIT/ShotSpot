@@ -59,6 +59,9 @@ jobs:
           backend/package-lock.json
           frontend/package-lock.json
 
+    - name: Pin npm version
+      run: npm install -g npm@10.9.2
+
     - name: Install and Build (JavaScript/TypeScript)
       if: matrix.language == 'javascript-typescript'
       shell: bash

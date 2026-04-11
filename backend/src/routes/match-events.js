@@ -58,7 +58,7 @@ router.get('/games/:gameId/shots', [
       FROM shots s
       JOIN players p ON s.player_id = p.id
       JOIN clubs c ON s.club_id = c.id
-      WHERE s.game_id = $1
+      WHERE s.game_id = $1 AND s.event_status = 'confirmed'
       ORDER BY s.created_at DESC
     `, [gameId]);
     res.json(result.rows);
@@ -183,7 +183,7 @@ router.get('/games/:gameId/events', [
       FROM game_events e
       LEFT JOIN players p ON e.player_id = p.id
       JOIN clubs c ON e.club_id = c.id
-      WHERE e.game_id = $1
+      WHERE e.game_id = $1 AND e.event_status = 'confirmed'
       ORDER BY e.created_at DESC
     `, [gameId]);
     res.json(result.rows);

@@ -38,7 +38,7 @@ router.get('/shots/:gameId/heatmap', [
         COUNT(CASE WHEN result = 'blocked' THEN 1 END) as blocked,
         ROUND(AVG(CASE WHEN result = 'goal' THEN 100.0 ELSE 0 END), 2) as success_rate
       FROM shots
-      WHERE game_id = $2
+      WHERE game_id = $2 AND event_status = 'confirmed'
     `;
     const queryParams = [100.0 / grid_size, gameId];
     let paramIndex = 3;
@@ -114,7 +114,7 @@ router.get('/shots/:gameId/shot-chart', [
       FROM shots s
       JOIN players p ON s.player_id = p.id
       JOIN clubs c ON s.club_id = c.id
-      WHERE s.game_id = $1
+      WHERE s.game_id = $1 AND s.event_status = 'confirmed'
     `;
     const queryParams = [gameId];
     let paramIndex = 2;
@@ -180,7 +180,7 @@ router.get('/shots/:gameId/players', [
       LEFT JOIN game_rosters gr ON gr.player_id = p.id AND gr.game_id = $1
       WHERE (
         EXISTS (
-          SELECT 1 FROM shots WHERE player_id = p.id AND game_id = $1
+          SELECT 1 FROM shots WHERE player_id = p.id AND game_id = $1 AND event_status = 'confirmed'
         ) OR gr.game_id = $1
       )
     `;
@@ -217,7 +217,7 @@ router.get('/shots/:gameId/players', [
         COUNT(CASE WHEN s.x_coord >= 66.67 AND s.result = 'goal' THEN 1 END) as right_zone_goals
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      WHERE s.game_id = $1
+      WHERE s.game_id = $1 AND s.event_status = 'confirmed'
       GROUP BY p.id
     `;
     const shotsParams = [gameId];
@@ -231,7 +231,7 @@ router.get('/shots/:gameId/players', [
         EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
         'in' as type
       FROM substitutions
-      WHERE game_id = $1
+      WHERE game_id = $1 AND event_status = 'confirmed'
       UNION ALL
       SELECT 
         player_out_id as player_id,
@@ -239,7 +239,7 @@ router.get('/shots/:gameId/players', [
         EXTRACT(EPOCH FROM time_remaining) as time_remaining_seconds,
         'out' as type
       FROM substitutions
-      WHERE game_id = $1
+      WHERE game_id = $1 AND event_status = 'confirmed'
       ORDER BY period, time_remaining_seconds DESC, type DESC
     `;
     const subsResult = await db.query(subsQuery, [gameId]);
@@ -450,7 +450,7 @@ router.get('/shots/:gameId/summary', [
         ) as overall_fg_percentage,
         ROUND(AVG(distance), 2) as avg_shot_distance
       FROM shots
-      WHERE game_id = $1
+      WHERE game_id = $1 AND event_status = 'confirmed'
     `, [gameId]);
 
     const teamStats = await db.query(`
@@ -466,7 +466,7 @@ router.get('/shots/:gameId/summary', [
         ) as fg_percentage
       FROM shots s
       JOIN clubs c ON s.club_id = c.id
-      WHERE s.game_id = $1
+      WHERE s.game_id = $1 AND s.event_status = 'confirmed'
       GROUP BY c.id, c.name
     `, [gameId]);
 
@@ -523,7 +523,7 @@ router.get('/shots/:gameId/streaks', [
       FROM shots s
       JOIN players p ON s.player_id = p.id
       JOIN clubs c ON s.club_id = c.id
-      WHERE s.game_id = $1
+      WHERE s.game_id = $1 AND s.event_status = 'confirmed'
     `;
     const queryParams = [gameId];
 
@@ -636,7 +636,7 @@ router.get('/shots/:gameId/zones', [
           2
         ) as overall_fg_percentage
       FROM shots
-      WHERE game_id = $1
+      WHERE game_id = $1 AND event_status = 'confirmed'
     `;
     const overallParams = [gameId];
 
@@ -675,7 +675,7 @@ router.get('/shots/:gameId/zones', [
             2
           ) as fg_percentage
         FROM shots
-        WHERE game_id = $1
+        WHERE game_id = $1 AND event_status = 'confirmed'
           AND x_coord >= $2 AND x_coord < $3
           AND y_coord >= $4 AND y_coord < $5
       `;
@@ -750,7 +750,7 @@ router.get('/shots/:gameId/trends', [
         ROUND(AVG(distance), 2) as avg_distance,
         COUNT(DISTINCT player_id) as players_with_shots
       FROM shots
-      WHERE game_id = $1
+      WHERE game_id = $1 AND event_status = 'confirmed'
     `;
     const queryParams = [gameId];
 
@@ -835,7 +835,7 @@ router.get('/players/:playerId/development', [
       FROM shots s
       JOIN games g ON s.game_id = g.id
       JOIN clubs t ON s.club_id = t.id
-      WHERE s.player_id = $1
+      WHERE s.player_id = $1 AND s.event_status = 'confirmed'
     `;
     const queryParams = [playerId];
     let paramIndex = 2;
@@ -911,11 +911,11 @@ router.get('/clubs/:clubId/tendencies', [
         ROUND(AVG(s.x_coord), 2) as avg_x_coord,
         ROUND(AVG(s.y_coord), 2) as avg_y_coord
       FROM shots s
-      WHERE s.club_id = $1
+      WHERE s.club_id = $1 AND s.event_status = 'confirmed'
         AND s.game_id IN (
           SELECT g.id FROM games g
           JOIN shots s2 ON g.id = s2.game_id
-          WHERE s2.club_id = $1
+          WHERE s2.club_id = $1 AND s2.event_status = 'confirmed'
           GROUP BY g.id
           ORDER BY g.date DESC
           LIMIT $2
@@ -938,11 +938,11 @@ router.get('/clubs/:clubId/tendencies', [
           2
         ) as fg_percentage
       FROM shots s
-      WHERE s.club_id = $1
+      WHERE s.club_id = $1 AND s.event_status = 'confirmed'
         AND s.game_id IN (
           SELECT g.id FROM games g
           JOIN shots s2 ON g.id = s2.game_id
-          WHERE s2.club_id = $1
+          WHERE s2.club_id = $1 AND s2.event_status = 'confirmed'
           GROUP BY g.id
           ORDER BY g.date DESC
           LIMIT $2
@@ -967,11 +967,11 @@ router.get('/clubs/:clubId/tendencies', [
         ) as fg_percentage
       FROM shots s
       JOIN players p ON s.player_id = p.id
-      WHERE s.club_id = $1
+      WHERE s.club_id = $1 AND s.event_status = 'confirmed'
         AND s.game_id IN (
           SELECT g.id FROM games g
           JOIN shots s2 ON g.id = s2.game_id
-          WHERE s2.club_id = $1
+          WHERE s2.club_id = $1 AND s2.event_status = 'confirmed'
           GROUP BY g.id
           ORDER BY g.date DESC
           LIMIT $2
@@ -1066,7 +1066,7 @@ router.get('/clubs/:clubId/matchup/:opponentId', [
         ) as avg_fg_percentage,
         ROUND(AVG(distance), 2) as avg_distance
       FROM shots
-      WHERE club_id = $1 AND game_id = ANY($2)
+      WHERE club_id = $1 AND game_id = ANY($2) AND event_status = 'confirmed'
     `, [clubId, gameIds]);
 
     // Get opponent stats in these matchups
@@ -1081,7 +1081,7 @@ router.get('/clubs/:clubId/matchup/:opponentId', [
         ) as avg_fg_percentage,
         ROUND(AVG(distance), 2) as avg_distance
       FROM shots
-      WHERE club_id = $1 AND game_id = ANY($2)
+      WHERE club_id = $1 AND game_id = ANY($2) AND event_status = 'confirmed'
     `, [opponentId, gameIds]);
 
     res.json({
