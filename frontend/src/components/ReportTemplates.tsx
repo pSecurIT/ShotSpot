@@ -142,7 +142,7 @@ const ReportTemplates: React.FC = () => {
   }, [templates]);
 
   if (loading) {
-    return <div className="report-templates-page">Loading report templates...</div>;
+    return <div className="report-templates-page" role="status" aria-live="polite">Loading report templates...</div>;
   }
 
   return (
@@ -158,8 +158,8 @@ const ReportTemplates: React.FC = () => {
         </button>
       </header>
 
-      {error && <div className="report-templates__banner report-templates__banner--error">{error}</div>}
-      {success && <div className="report-templates__banner report-templates__banner--success">{success}</div>}
+      {error && <div className="report-templates__banner report-templates__banner--error" role="alert">{error}</div>}
+      {success && <div className="report-templates__banner report-templates__banner--success" role="status" aria-live="polite">{success}</div>}
 
       <div className="report-templates-page__layout">
         <aside className="report-templates-page__sidebar">
@@ -169,7 +169,7 @@ const ReportTemplates: React.FC = () => {
           </div>
 
           {templates.length === 0 ? (
-            <div className="report-templates-page__empty">
+            <div className="report-templates-page__empty" role="status" aria-live="polite">
               <h3>No templates yet</h3>
               <p>Create your first report template to define reusable report layouts.</p>
             </div>

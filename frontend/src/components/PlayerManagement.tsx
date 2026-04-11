@@ -59,6 +59,8 @@ const PlayerManagement: React.FC = () => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
 
+  const getValidationId = (fieldName: string, context: 'add' | 'edit') => `${context}-${fieldName}-error`;
+
   const fetchClubs = useCallback(async () => {
     try {
       const response = await api.get('/clubs');
@@ -343,7 +345,7 @@ const PlayerManagement: React.FC = () => {
         return { ...prev, is_active: value === 'true' };
       }
       if (name === 'jersey_number') {
-        return { ...prev, [name]: parseInt(value) };
+        return { ...prev, [name]: value === '' ? 0 : parseInt(value, 10) };
       }
       return { ...prev, [name]: value };
     });
@@ -436,8 +438,8 @@ const PlayerManagement: React.FC = () => {
         </div>
       </div>
       
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
       
       {/* Add New Player Form */}
       <div className="form-section">
@@ -454,6 +456,8 @@ const PlayerManagement: React.FC = () => {
                 required
                 disabled={clubs.length === 0}
                 className={validationErrors.club_id ? 'error' : ''}
+                aria-invalid={validationErrors.club_id ? 'true' : 'false'}
+                aria-describedby={validationErrors.club_id ? getValidationId('club_id', 'add') : clubs.length === 0 ? 'add-club-empty-hint' : undefined}
               >
                 <option value="">Select a club</option>
                 {clubs.map(club => (
@@ -461,10 +465,10 @@ const PlayerManagement: React.FC = () => {
                 ))}
               </select>
               {validationErrors.club_id && (
-                <span className="field-error">{validationErrors.club_id}</span>
+                <span className="field-error" id={getValidationId('club_id', 'add')}>{validationErrors.club_id}</span>
               )}
               {clubs.length === 0 && (
-                <span className="field-error">Create a club first to add players.</span>
+                <span className="field-error" id="add-club-empty-hint">Create a club first to add players.</span>
               )}
             </div>
 
@@ -478,6 +482,8 @@ const PlayerManagement: React.FC = () => {
                 required
                 disabled={!newPlayer.club_id || teamsForSelectedClub.length === 0}
                 className={validationErrors.team_id ? 'error' : ''}
+                aria-invalid={validationErrors.team_id ? 'true' : 'false'}
+                aria-describedby={validationErrors.team_id ? getValidationId('team_id', 'add') : newPlayer.club_id && teamsForSelectedClub.length === 0 ? 'add-team-empty-hint' : undefined}
               >
                 <option value="">Select a team</option>
                 {teamsForSelectedClub.map(team => (
@@ -485,10 +491,10 @@ const PlayerManagement: React.FC = () => {
                 ))}
               </select>
               {validationErrors.team_id && (
-                <span className="field-error">{validationErrors.team_id}</span>
+                <span className="field-error" id={getValidationId('team_id', 'add')}>{validationErrors.team_id}</span>
               )}
               {newPlayer.club_id && teamsForSelectedClub.length === 0 && (
-                <span className="field-error">No teams found for this club. Create a team first.</span>
+                <span className="field-error" id="add-team-empty-hint">No teams found for this club. Create a team first.</span>
               )}
             </div>
 
@@ -502,9 +508,11 @@ const PlayerManagement: React.FC = () => {
                 onChange={handleInputChange}
                 required
                 className={validationErrors.first_name ? 'error' : ''}
+                aria-invalid={validationErrors.first_name ? 'true' : 'false'}
+                aria-describedby={validationErrors.first_name ? getValidationId('first_name', 'add') : undefined}
               />
               {validationErrors.first_name && (
-                <span className="field-error">{validationErrors.first_name}</span>
+                <span className="field-error" id={getValidationId('first_name', 'add')}>{validationErrors.first_name}</span>
               )}
             </div>
 
@@ -518,9 +526,11 @@ const PlayerManagement: React.FC = () => {
                 onChange={handleInputChange}
                 required
                 className={validationErrors.last_name ? 'error' : ''}
+                aria-invalid={validationErrors.last_name ? 'true' : 'false'}
+                aria-describedby={validationErrors.last_name ? getValidationId('last_name', 'add') : undefined}
               />
               {validationErrors.last_name && (
-                <span className="field-error">{validationErrors.last_name}</span>
+                <span className="field-error" id={getValidationId('last_name', 'add')}>{validationErrors.last_name}</span>
               )}
             </div>
           </div>
@@ -538,9 +548,11 @@ const PlayerManagement: React.FC = () => {
                 max="99"
                 required
                 className={validationErrors.jersey_number ? 'error' : ''}
+                aria-invalid={validationErrors.jersey_number ? 'true' : 'false'}
+                aria-describedby={validationErrors.jersey_number ? getValidationId('jersey_number', 'add') : undefined}
               />
               {validationErrors.jersey_number && (
-                <span className="field-error">{validationErrors.jersey_number}</span>
+                <span className="field-error" id={getValidationId('jersey_number', 'add')}>{validationErrors.jersey_number}</span>
               )}
             </div>
 
@@ -552,13 +564,15 @@ const PlayerManagement: React.FC = () => {
                 value={newPlayer.gender}
                 onChange={handleInputChange}
                 className={validationErrors.gender ? 'error' : ''}
+                aria-invalid={validationErrors.gender ? 'true' : 'false'}
+                aria-describedby={validationErrors.gender ? getValidationId('gender', 'add') : undefined}
               >
                 <option value="">Select gender</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
               </select>
               {validationErrors.gender && (
-                <span className="field-error">{validationErrors.gender}</span>
+                <span className="field-error" id={getValidationId('gender', 'add')}>{validationErrors.gender}</span>
               )}
             </div>
           </div>
@@ -600,9 +614,11 @@ const PlayerManagement: React.FC = () => {
                   onChange={handleEditInputChange}
                   required
                   className={validationErrors.first_name ? 'error' : ''}
+                  aria-invalid={validationErrors.first_name ? 'true' : 'false'}
+                  aria-describedby={validationErrors.first_name ? getValidationId('first_name', 'edit') : undefined}
                 />
                 {validationErrors.first_name && (
-                  <span className="field-error">{validationErrors.first_name}</span>
+                  <span className="field-error" id={getValidationId('first_name', 'edit')}>{validationErrors.first_name}</span>
                 )}
               </div>
 
@@ -616,9 +632,11 @@ const PlayerManagement: React.FC = () => {
                   onChange={handleEditInputChange}
                   required
                   className={validationErrors.last_name ? 'error' : ''}
+                  aria-invalid={validationErrors.last_name ? 'true' : 'false'}
+                  aria-describedby={validationErrors.last_name ? getValidationId('last_name', 'edit') : undefined}
                 />
                 {validationErrors.last_name && (
-                  <span className="field-error">{validationErrors.last_name}</span>
+                  <span className="field-error" id={getValidationId('last_name', 'edit')}>{validationErrors.last_name}</span>
                 )}
               </div>
             </div>
@@ -636,9 +654,11 @@ const PlayerManagement: React.FC = () => {
                   max="99"
                   required
                   className={validationErrors.jersey_number ? 'error' : ''}
+                  aria-invalid={validationErrors.jersey_number ? 'true' : 'false'}
+                  aria-describedby={validationErrors.jersey_number ? getValidationId('jersey_number', 'edit') : undefined}
                 />
                 {validationErrors.jersey_number && (
-                  <span className="field-error">{validationErrors.jersey_number}</span>
+                  <span className="field-error" id={getValidationId('jersey_number', 'edit')}>{validationErrors.jersey_number}</span>
                 )}
               </div>
 
@@ -704,12 +724,14 @@ const PlayerManagement: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="search-input"
+                aria-label="Search players"
               />
               {searchQuery && (
                 <button
                   className="clear-search"
                   onClick={() => setSearchQuery('')}
                   title="Clear search"
+                  aria-label="Clear player search"
                 >
                   ✕
                 </button>
@@ -782,6 +804,7 @@ const PlayerManagement: React.FC = () => {
                   className="sort-order-btn"
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                   title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+                  aria-label={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
                 >
                   {sortOrder === 'asc' ? '↑' : '↓'}
                 </button>
@@ -800,7 +823,7 @@ const PlayerManagement: React.FC = () => {
             </div>
             
             {/* Results count */}
-            <div className="results-count">
+            <div className="results-count" role="status" aria-live="polite">
               Showing {filteredPlayers.length} of {players.length} players
             </div>
           </div>
@@ -808,7 +831,7 @@ const PlayerManagement: React.FC = () => {
 
         <div className="players-grid">
           {filteredPlayers.length === 0 ? (
-            <p className="no-players">No players found.</p>
+            <p className="no-players" role="status" aria-live="polite">No players found.</p>
           ) : (
             filteredPlayers.map(player => {
               const shootingPercentage = player.total_shots && player.total_shots > 0

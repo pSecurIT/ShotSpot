@@ -89,6 +89,7 @@ describe('ExportCenter', () => {
 
     await user.click(screen.getByText('Templates'));
 
+    expect(screen.getByRole('tab', { name: 'Templates' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Export templates help you quickly generate reports with predefined settings.')).toBeInTheDocument();
   });
 
@@ -171,7 +172,7 @@ describe('ExportCenter', () => {
     await user.click(screen.getByText('Scheduled Exports'));
 
     expect(screen.getByText('Schedule automatic exports to be generated at regular intervals.')).toBeInTheDocument();
-    expect(screen.getByText('No scheduled exports configured')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('No scheduled exports configured');
   });
 
   it('should format relative timestamps correctly', async () => {

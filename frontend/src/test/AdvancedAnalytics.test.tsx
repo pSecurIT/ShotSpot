@@ -246,13 +246,15 @@ describe('AdvancedAnalytics', () => {
     const user = userEvent.setup();
     render(<AdvancedAnalytics />);
 
-    await screen.findByRole('button', { name: 'Form Trends' });
+    await screen.findByRole('tab', { name: 'Form Trends' });
     expect(screen.getByRole('heading', { name: 'Form Trends' })).toBeInTheDocument();
 
     await user.clear(screen.getByLabelText('Date from'));
     await user.type(screen.getByLabelText('Date from'), '2026-03-01');
 
-    await user.click(screen.getByRole('button', { name: 'Video' }));
+    await user.click(screen.getByRole('tab', { name: 'Video' }));
+
+    expect(screen.getByRole('tab', { name: 'Video' })).toHaveAttribute('aria-selected', 'true');
 
     await waitFor(() => {
       expect(formTrendsMock).toHaveBeenLastCalledWith(2, 20, expect.objectContaining({
@@ -272,6 +274,22 @@ describe('AdvancedAnalytics', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Prediction service down');
     });
+  });
+
+  it('announces empty fatigue results for the selected date range', async () => {
+    const user = userEvent.setup();
+    fatigueMock.mockResolvedValueOnce({
+      player_id: 2,
+      games_analyzed: 0,
+      fatigue_analysis: [],
+    });
+
+    render(<AdvancedAnalytics />);
+
+    await screen.findByText('Advanced Analytics Dashboard');
+    await user.click(screen.getByRole('tab', { name: 'Fatigue' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('No fatigue samples match the selected date range.');
   });
 
   it('exports the dashboard as image and pdf', async () => {
@@ -300,7 +318,7 @@ describe('AdvancedAnalytics', () => {
     render(<AdvancedAnalytics />);
 
     await screen.findByText('Advanced Analytics Dashboard');
-    await user.click(screen.getByRole('button', { name: 'Fatigue' }));
+    await user.click(screen.getByRole('tab', { name: 'Fatigue' }));
     await screen.findByText('Court Load vs Degradation');
 
     const chartBars = screen.getAllByTestId('Bar');

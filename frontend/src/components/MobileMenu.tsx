@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { NavigationItem as NavigationItemType } from '../config/navigation';
 import NavigationItem from './NavigationItem';
 
 interface MobileMenuProps {
+  menuId?: string;
   isOpen: boolean;
   onClose: () => void;
   navigationItems: NavigationItemType[];
@@ -11,6 +12,7 @@ interface MobileMenuProps {
 }
 
 const MobileMenu: React.FC<MobileMenuProps> = ({
+  menuId,
   isOpen,
   onClose,
   navigationItems,
@@ -18,6 +20,10 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
   userMenuItems = []
 }) => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   const roleLabel = userRole.charAt(0).toUpperCase() + userRole.slice(1);
 
   // Lock body scroll when menu is open
@@ -31,6 +37,18 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
     return () => {
       document.body.style.overflow = '';
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      closeButtonRef.current?.focus();
+      return;
+    }
+
+    previousFocusRef.current?.focus();
   }, [isOpen]);
 
   // Close on Escape key
@@ -63,6 +81,27 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
     onClose();
   };
 
+  const handlePanelKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Tab') return;
+
+    const focusableElements = panelRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+
+    if (!focusableElements || focusableElements.length === 0) return;
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  };
+
   // Filter items based on user role
   const filterItemsByRole = (items: NavigationItemType[]): NavigationItemType[] => {
     return items.filter((item) => item.roles.includes(userRole as 'user' | 'coach' | 'admin'));
@@ -80,20 +119,24 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
       {/* Menu Panel */}
       <div
         className={`mobile-menu-panel ${isOpen ? 'open' : ''}`}
+        id={menuId}
+        ref={panelRef}
         role="dialog"
         aria-modal={isOpen ? true : undefined}
         aria-hidden={!isOpen}
-        aria-label="Navigation menu"
+        aria-labelledby={titleId}
+        onKeyDown={handlePanelKeyDown}
       >
         {/* Header */}
         <div className="mobile-menu-header">
           <div className="mobile-menu-header__copy">
             <span className="mobile-menu-header__eyebrow">Navigation</span>
-            <h2 className="mobile-menu-header__title">Match menu</h2>
+            <h2 className="mobile-menu-header__title" id={titleId}>Match menu</h2>
             <p className="mobile-menu-header__subtitle">Fast access to capture, review, and account tools.</p>
           </div>
           <span className="mobile-menu-header__role-chip">{roleLabel}</span>
           <button
+            ref={closeButtonRef}
             className="mobile-menu-header__close"
             onClick={onClose}
             aria-label="Close menu"

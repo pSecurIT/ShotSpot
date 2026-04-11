@@ -205,6 +205,20 @@ describe('AchievementsPage', () => {
     await screen.findByText('Copy summary');
     await user.click(screen.getByRole('button', { name: 'Copy summary' }));
 
-    expect(await screen.findByText('Achievement summary copied.')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent('Achievement summary copied.');
+  });
+
+  it('announces the empty badge collection when the selected player has no unlocked achievements', async () => {
+    const user = userEvent.setup();
+    render(
+      <BrowserRouter>
+        <AchievementsPage />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('Badge collection display');
+    await user.selectOptions(screen.getByLabelText('Player showcase'), '11');
+
+    expect(await screen.findByRole('status')).toHaveTextContent('No badges unlocked yet.');
   });
 });

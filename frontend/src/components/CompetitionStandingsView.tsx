@@ -47,14 +47,14 @@ const CompetitionStandingsView: React.FC = () => {
         </button>
       </div>
 
-      {loading && <div>Loading standings…</div>}
-      {error && <div className="alert alert-error">{error}</div>}
+      {loading && <div role="status" aria-live="polite">Loading standings…</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
 
-      {!loading && !error && standings.length === 0 && <div className="empty-state">No standings available</div>}
+      {!loading && !error && standings.length === 0 && <div className="empty-state" role="status" aria-live="polite">No standings available</div>}
 
       {!loading && !error && standings.length > 0 && (
         <div className="competition-card" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }} aria-label="Competition standings table">
             <thead>
               <tr>
                 <th style={{ textAlign: 'left', padding: '0.5rem' }}>#</th>

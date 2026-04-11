@@ -18,7 +18,7 @@ const AchievementGallery: React.FC<AchievementGalleryProps> = ({
   showDetails = true,
 }) => {
   if (achievements.length === 0) {
-    return <p className="achievements-page__empty">{emptyMessage}</p>;
+    return <p className="achievements-page__empty" role="status" aria-live="polite">{emptyMessage}</p>;
   }
 
   return (
