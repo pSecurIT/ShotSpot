@@ -10,6 +10,13 @@ describe('App', () => {
   it('renders without crashing', () => {
     render(<App />);
     expect(screen.getByRole('navigation')).toBeInTheDocument();
+    expect(screen.getByRole('main')).toBeInTheDocument();
+  });
+
+  it('renders a skip link to main content', () => {
+    render(<App />);
+
+    expect(screen.getByRole('link', { name: /skip to main content/i })).toHaveAttribute('href', '#app-main');
   });
 
   it('renders a 404 page for unknown routes', () => {
