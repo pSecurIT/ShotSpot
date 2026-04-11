@@ -434,9 +434,10 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('User Management')).toBeInTheDocument();
       });
       
-      // Should have table headers but no user rows
-      expect(screen.getByText('Username')).toBeInTheDocument();
-      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      expect(screen.getByText('No users found')).toBeInTheDocument();
+      expect(screen.getByText('Create the first user account to start assigning roles and permissions.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create user' })).toBeInTheDocument();
+      expect(screen.queryByText('Username')).not.toBeInTheDocument();
     });
 
     it('handles API response without error field', async () => {

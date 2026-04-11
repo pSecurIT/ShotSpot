@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useAuth } from '../contexts/AuthContext';
+import StatePanel from './ui/StatePanel';
+import Toast from './ui/Toast';
 
 interface Player {
   id: number;
@@ -37,6 +39,7 @@ const PlayerManagement: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
@@ -82,7 +85,9 @@ const PlayerManagement: React.FC = () => {
       });
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      console.error('Error fetching clubs:', err.response?.data?.error || err.message);
+      const message = err.response?.data?.error || err.message || 'Failed to load clubs';
+      console.error('Error fetching clubs:', message);
+      throw new Error(message);
     }
   }, [isAdmin, selectedClubFilter]);
 
@@ -92,7 +97,9 @@ const PlayerManagement: React.FC = () => {
       setTeams(response.data);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      console.error('Error fetching teams:', err.response?.data?.error || err.message);
+      const message = err.response?.data?.error || err.message || 'Failed to load teams';
+      console.error('Error fetching teams:', message);
+      throw new Error(message);
     }
   }, []);
 
@@ -102,16 +109,27 @@ const PlayerManagement: React.FC = () => {
       setPlayers(response.data);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      console.error('Error fetching players:', err.response?.data?.error || err.message);
+      const message = err.response?.data?.error || err.message || 'Failed to load players';
+      console.error('Error fetching players:', message);
+      throw new Error(message);
     }
   }, []);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchClubs();
-    fetchTeams();
-    fetchPlayers();
+  const loadInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      await Promise.all([fetchClubs(), fetchTeams(), fetchPlayers()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load players');
+    } finally {
+      setLoading(false);
+    }
   }, [fetchClubs, fetchTeams, fetchPlayers]);
+
+  useEffect(() => {
+    void loadInitialData();
+  }, [loadInitialData]);
 
   const teamsForSelectedClub = newPlayer.club_id
     ? teams.filter(t => t.club_id === Number(newPlayer.club_id))
@@ -438,10 +456,45 @@ const PlayerManagement: React.FC = () => {
         </div>
       </div>
       
-      {error && <div className="error-message" role="alert">{error}</div>}
-      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
+      {loading && (
+        <StatePanel
+          variant="loading"
+          title="Loading players"
+          message="Preparing clubs, teams, players, and export controls."
+          className="player-management__feedback"
+        />
+      )}
+
+      {!loading && error && players.length === 0 && (
+        <StatePanel
+          variant="error"
+          title="Couldn’t load players"
+          message={error}
+          actionLabel="Retry"
+          onAction={() => {
+            void loadInitialData();
+          }}
+          className="player-management__feedback"
+        />
+      )}
+
+      {!loading && error && players.length > 0 && (
+        <StatePanel
+          variant="error"
+          title="Player action failed"
+          message={error}
+          actionLabel="Reload players"
+          onAction={() => {
+            void loadInitialData();
+          }}
+          compact
+          className="player-management__feedback"
+        />
+      )}
       
       {/* Add New Player Form */}
+      {players.length > 0 || !error ? (
+      <>
       <div className="form-section">
         <h3>Add New Player</h3>
         <form onSubmit={handleAddPlayer} className="player-form">
@@ -831,7 +884,22 @@ const PlayerManagement: React.FC = () => {
 
         <div className="players-grid">
           {filteredPlayers.length === 0 ? (
-            <p className="no-players" role="status" aria-live="polite">No players found.</p>
+            <StatePanel
+              variant="empty"
+              title="No players found."
+              message={searchQuery || selectedTeamFilter || selectedGenderFilter || (isAdmin && selectedClubFilter) ? 'Try a broader filter or search to find the player you need.' : 'Add a player to start building the roster and report exports.'}
+              actionLabel={searchQuery || selectedTeamFilter || selectedGenderFilter || (isAdmin && selectedClubFilter) ? 'Clear filters' : undefined}
+              onAction={searchQuery || selectedTeamFilter || selectedGenderFilter || (isAdmin && selectedClubFilter) ? () => {
+                setSearchQuery('');
+                setSelectedTeamFilter('');
+                setSelectedGenderFilter('');
+                setShowInactive(true);
+                if (isAdmin && clubs.length > 0) {
+                  setSelectedClubFilter(String(clubs[0].id));
+                }
+              } : undefined}
+              className="player-management__feedback"
+            />
           ) : (
             filteredPlayers.map(player => {
               const shootingPercentage = player.total_shots && player.total_shots > 0
@@ -902,6 +970,16 @@ const PlayerManagement: React.FC = () => {
           onExport={handleExport}
           title={selectedPlayers.size > 0 ? `Export ${selectedPlayers.size} Selected Players` : 'Export Player Report'}
           dataType={selectedPlayers.size > 1 ? 'comparison' : 'player'}
+        />
+      )}
+      </>
+      ) : null}
+
+      {success && (
+        <Toast
+          title="Player updated"
+          message={success}
+          onDismiss={() => setSuccess('')}
         />
       )}
     </div>

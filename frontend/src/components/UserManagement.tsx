@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordDialog from './ChangePasswordDialog';
 import CreateUserDialog from './CreateUserDialog';
 import EditUserDialog from './EditUserDialog';
+import StatePanel from './ui/StatePanel';
+import Toast from './ui/Toast';
 
 interface User {
   id: number;
@@ -18,6 +20,7 @@ interface User {
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
@@ -30,12 +33,15 @@ const UserManagement: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
+      setLoading(true);
       setError(null);
       const response = await api.get('/users');
       setUsers(response.data);
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } }; message?: string };
       setError(error.response?.data?.error || 'Failed to fetch users');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -44,7 +50,6 @@ const UserManagement: React.FC = () => {
       return;
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
   }, [currentUser]);
 
@@ -215,6 +220,9 @@ const UserManagement: React.FC = () => {
     return <div>You don&apos;t have permission to access this page.</div>;
   }
 
+  const showLoadErrorState = !loading && Boolean(error) && users.length === 0;
+  const showInlineError = Boolean(error) && !showLoadErrorState;
+
   return (
     <div className="user-management">
       <div style={styles.headerContainer}>
@@ -265,18 +273,52 @@ const UserManagement: React.FC = () => {
         </div>
       )}
 
-      {error && (
-        <div className="alert alert-error" style={{ marginBottom: '1rem' }} role="alert">
-          {error}
-        </div>
+      {loading && (
+        <StatePanel
+          variant="loading"
+          title="Loading users"
+          message="Preparing the admin roster, bulk actions, and role controls."
+          className="user-management__feedback"
+        />
       )}
 
-      {success && (
-        <div className="alert alert-success" style={{ marginBottom: '1rem' }} role="status" aria-live="polite">
-          {success}
-        </div>
+      {showLoadErrorState && (
+        <StatePanel
+          variant="error"
+          title="Couldn’t load users"
+          message={error ?? undefined}
+          actionLabel="Retry"
+          onAction={() => {
+            void fetchUsers();
+          }}
+          className="user-management__feedback"
+        />
       )}
 
+      {showInlineError && (
+        <StatePanel
+          variant="error"
+          title="User action failed"
+          message={error ?? undefined}
+          actionLabel="Reload users"
+          onAction={() => {
+            void fetchUsers();
+          }}
+          compact
+          className="user-management__feedback"
+        />
+      )}
+
+      {!showLoadErrorState && !loading && users.length === 0 ? (
+        <StatePanel
+          variant="empty"
+          title="No users found"
+          message="Create the first user account to start assigning roles and permissions."
+          actionLabel="Create user"
+          onAction={() => setCreateDialogOpen(true)}
+          className="user-management__feedback"
+        />
+      ) : !loading && !showLoadErrorState ? (
       <table style={{ width: '100%', borderCollapse: 'collapse' }} aria-label="User management table">
         <thead>
           <tr>
@@ -374,6 +416,7 @@ const UserManagement: React.FC = () => {
           ))}
         </tbody>
       </table>
+      ) : null}
 
       <CreateUserDialog
         isOpen={createDialogOpen}
@@ -402,6 +445,14 @@ const UserManagement: React.FC = () => {
             setSelectedUser(null);
           }}
           onSuccess={handlePasswordChangeSuccess}
+        />
+      )}
+
+      {success && (
+        <Toast
+          title="User updated"
+          message={success}
+          onDismiss={() => setSuccess(null)}
         />
       )}
     </div>

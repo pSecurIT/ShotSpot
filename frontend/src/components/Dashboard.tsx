@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../utils/api';
 import DashboardWidget from './DashboardWidget';
 import QuickActions from './QuickActions';
+import StatePanel from './ui/StatePanel';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/Dashboard.css';
@@ -226,9 +227,22 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="dashboard__panel dashboard__panel--half">
-          <DashboardWidget title="Recent Matches" icon="🕒" loading={loading.recent} error={errors.recent}>
+          <DashboardWidget
+            title="Recent Matches"
+            icon="🕒"
+            loading={loading.recent}
+            error={errors.recent}
+            onRetry={() => {
+              void fetchRecentGames();
+            }}
+          >
             {recentGames.length === 0 ? (
-              <div>No recent matches found.</div>
+              <StatePanel
+                variant="empty"
+                compact
+                title="No recent matches yet"
+                message="Finished matches will appear here once games have been tracked."
+              />
             ) : (
               <ul className="dashboard-list">
                 {recentGames.map((g) => (
@@ -252,9 +266,22 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="dashboard__panel dashboard__panel--half">
-          <DashboardWidget title="Upcoming Games" icon="📅" loading={loading.upcoming} error={errors.upcoming}>
+          <DashboardWidget
+            title="Upcoming Games"
+            icon="📅"
+            loading={loading.upcoming}
+            error={errors.upcoming}
+            onRetry={() => {
+              void fetchUpcomingGames();
+            }}
+          >
             {upcomingGames.length === 0 ? (
-              <div>No upcoming games.</div>
+              <StatePanel
+                variant="empty"
+                compact
+                title="No upcoming games"
+                message="Schedule the next match to keep the sideline ready."
+              />
             ) : (
               <ul className="dashboard-list">
                 {upcomingGames.map((g) => (
@@ -276,7 +303,15 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="dashboard__panel dashboard__panel--half">
-          <DashboardWidget title="Quick Stats" icon="📈" loading={loading.summary} error={errors.summary}>
+          <DashboardWidget
+            title="Quick Stats"
+            icon="📈"
+            loading={loading.summary}
+            error={errors.summary}
+            onRetry={() => {
+              void fetchSummary();
+            }}
+          >
             {summary ? (
               <div className="stats-row">
                 <div className="stat-card">
@@ -293,7 +328,12 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div />
+              <StatePanel
+                variant="empty"
+                compact
+                title="No summary available"
+                message="Team, player, and game totals will appear here once data is available."
+              />
             )}
           </DashboardWidget>
         </div>
@@ -309,9 +349,22 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="dashboard__panel dashboard__panel--full">
-          <DashboardWidget title="Recent Achievements" icon="🏆" loading={loading.achievements} error={errors.achievements}>
+          <DashboardWidget
+            title="Recent Achievements"
+            icon="🏆"
+            loading={loading.achievements}
+            error={errors.achievements}
+            onRetry={() => {
+              void fetchRecentAchievements();
+            }}
+          >
             {recentAchievements.length === 0 ? (
-              <div>No recent achievements.</div>
+              <StatePanel
+                variant="empty"
+                compact
+                title="No recent achievements"
+                message="Unlocked milestones will show up here as soon as players start earning them."
+              />
             ) : (
               <ul className="dashboard-list">
                 {recentAchievements.map((a) => (

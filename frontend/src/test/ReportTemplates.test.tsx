@@ -112,6 +112,21 @@ describe('ReportTemplates', () => {
     });
   });
 
+  it('shows a retry state when the initial template load fails', async () => {
+    const user = userEvent.setup();
+    getAllMock.mockRejectedValueOnce(new Error('Failed to load templates')).mockResolvedValueOnce([seededTemplate]);
+
+    render(<ReportTemplates />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to load templates');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect((await screen.findAllByText('Game Summary')).length).toBeGreaterThan(0);
+  });
+
   it('creates a new template', async () => {
     const user = userEvent.setup();
     render(<ReportTemplates />);
