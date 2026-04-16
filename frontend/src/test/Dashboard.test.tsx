@@ -102,8 +102,8 @@ describe('Dashboard', () => {
       expect(within(quickStats).getByText('3')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Recent Achievements')).toBeInTheDocument();
-    expect(screen.getByText(/Sharpshooter/i)).toBeInTheDocument();
+    await screen.findByLabelText('Recent Achievements');
+    expect(await screen.findByText(/Sharpshooter/i)).toBeInTheDocument();
   });
 
   it('shows the coach/admin primary action when the user can manage matches', async () => {
@@ -201,7 +201,7 @@ describe('Dashboard', () => {
       </BrowserRouter>
     );
 
-    const achievementsWidget = screen.getByLabelText('Recent Achievements');
+    const achievementsWidget = await screen.findByLabelText('Recent Achievements');
 
     await waitFor(() => {
       expect(within(achievementsWidget).getByRole('alert')).toHaveTextContent('Failed to load achievements feed');
