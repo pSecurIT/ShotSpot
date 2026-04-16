@@ -4,6 +4,8 @@ import api from '../utils/api';
 import DashboardWidget from './DashboardWidget';
 import QuickActions from './QuickActions';
 import StatePanel from './ui/StatePanel';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/Dashboard.css';
@@ -51,6 +53,7 @@ type IdleWindow = Window & {
 };
 
 const Dashboard: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const { socket, connected } = useWebSocket();
   const { user } = useAuth();
   const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
@@ -302,14 +305,12 @@ const Dashboard: React.FC = () => {
   }, [connected, user?.passwordMustChange]);
 
   return (
-    <div className="dashboard">
-      <div className="dashboard__header">
-        <div className="dashboard__hero-copy">
-          <span className="dashboard__eyebrow">Performance hub</span>
-          <h1 className="dashboard__title">Dashboard</h1>
-          <p className="dashboard__subtitle">Matchday ops, live system signals, and the fastest path back into action.</p>
-        </div>
-
+    <PageLayout
+      title="Dashboard"
+      eyebrow="Performance hub"
+      description="Matchday ops, live system signals, and the fastest path back into action."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <div className="dashboard__header-actions">
           <button
             type="button"
@@ -326,6 +327,15 @@ const Dashboard: React.FC = () => {
           >
             {isCoachOrAdmin ? 'Open match center' : 'View analytics'}
           </Link>
+        </div>
+      )}
+    >
+    <div className="dashboard">
+      <div className="dashboard__header">
+        <div className="dashboard__hero-copy">
+          <span className="dashboard__eyebrow">Today</span>
+          <h2 className="dashboard__title">Dashboard focus</h2>
+          <p className="dashboard__subtitle">Live highlights, recovery status, and upcoming actions at a glance.</p>
         </div>
       </div>
 
@@ -527,6 +537,7 @@ const Dashboard: React.FC = () => {
         )}
       </div>
     </div>
+    </PageLayout>
   );
 };
 
