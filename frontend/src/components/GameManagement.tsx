@@ -45,8 +45,13 @@ interface ApiValidationError {
   msg?: string;
 }
 
+type ApiWithPerfHelpers = typeof api & {
+  getWithCache?: <T>(url: string, config?: unknown, options?: { ttlMs?: number; forceRefresh?: boolean }) => Promise<T>;
+};
+
 const GameManagement: React.FC = () => {
   const navigate = useNavigate();
+  const apiWithPerfHelpers = api as ApiWithPerfHelpers;
   const [games, setGames] = useState<Game[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [templates, setTemplates] = useState<MatchTemplate[]>([]);
@@ -101,13 +106,18 @@ const GameManagement: React.FC = () => {
   // Fetch functions
   const fetchTeams = useCallback(async () => {
     try {
-      const response = await api.get('/teams');
-      setTeams(response.data);
+      if (typeof apiWithPerfHelpers.getWithCache === 'function') {
+        const data = await apiWithPerfHelpers.getWithCache<Team[]>('/teams', undefined, { ttlMs: 12000 });
+        setTeams(data);
+      } else {
+        const response = await api.get('/teams');
+        setTeams(response.data);
+      }
     } catch (error) {
       console.error('Error fetching teams:', error);
       throw new Error('Failed to fetch teams');
     }
-  }, []);
+  }, [apiWithPerfHelpers]);
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -122,14 +132,19 @@ const GameManagement: React.FC = () => {
   const fetchGames = useCallback(async () => {
     try {
       const params = filterStatus ? { status: filterStatus } : {};
-      const response = await api.get('/games', { params });
-      setGames(response.data);
+      if (typeof apiWithPerfHelpers.getWithCache === 'function') {
+        const data = await apiWithPerfHelpers.getWithCache<Game[]>('/games', { params }, { ttlMs: 12000 });
+        setGames(data);
+      } else {
+        const response = await api.get('/games', { params });
+        setGames(response.data);
+      }
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      throw new Error(err.response?.data?.error || 'Error fetching games');
       console.error('Error fetching games:', error);
+      throw new Error(err.response?.data?.error || 'Error fetching games');
     }
-  }, [filterStatus]);
+  }, [apiWithPerfHelpers, filterStatus]);
 
   const loadInitialData = useCallback(async () => {
     try {
