@@ -370,4 +370,4 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({
   );
 };
 
-export default LiveDashboard;
+export default React.memo(LiveDashboard);
