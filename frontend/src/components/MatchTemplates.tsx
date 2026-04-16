@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/MatchTemplates.css';
 
 interface MatchTemplate {
@@ -26,6 +28,7 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
   onSelectTemplate,
   selectionMode = false 
 }) => {
+  const breadcrumbs = useBreadcrumbs();
   const [templates, setTemplates] = useState<MatchTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -183,21 +186,25 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
   }
 
   return (
+    <PageLayout
+      title="Match Templates"
+      eyebrow="Settings > Match Templates"
+      description="Create reusable match setup templates and rules."
+      breadcrumbs={breadcrumbs}
+      actions={!selectionMode ? (
+        <button 
+          className="primary-button"
+          onClick={() => {
+            resetForm();
+            setShowForm(!showForm);
+          }}
+          type="button"
+        >
+          {showForm ? 'Cancel' : '+ New Template'}
+        </button>
+      ) : undefined}
+    >
     <div className="match-templates-container">
-      <div className="match-templates-header">
-        <h2>📋 Match Templates</h2>
-        {!selectionMode && (
-          <button 
-            className="primary-button"
-            onClick={() => {
-              resetForm();
-              setShowForm(!showForm);
-            }}
-          >
-            {showForm ? 'Cancel' : '+ New Template'}
-          </button>
-        )}
-      </div>
 
       {error && <div className="error-message" role="alert">{error}</div>}
       {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
@@ -436,6 +443,7 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
         </div>
       )}
     </div>
+    </PageLayout>
   );
 };
 

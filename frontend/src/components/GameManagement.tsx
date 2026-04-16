@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import StatePanel from './ui/StatePanel';
 import Toast from './ui/Toast';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 
 interface Team {
   id: number;
@@ -50,6 +52,7 @@ type ApiWithPerfHelpers = typeof api & {
 };
 
 const GameManagement: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const navigate = useNavigate();
   const apiWithPerfHelpers = api as ApiWithPerfHelpers;
   const [games, setGames] = useState<Game[]>([]);
@@ -357,8 +360,13 @@ const GameManagement: React.FC = () => {
   };
 
   return (
+    <PageLayout
+      title="Game Management"
+      eyebrow="Matches > Games"
+      description="Create, schedule, and run matches with template-aware setup."
+      breadcrumbs={breadcrumbs}
+    >
     <div className="game-management-container">
-      <h2>Game Management</h2>
       
       {loading && (
         <StatePanel
@@ -746,6 +754,7 @@ const GameManagement: React.FC = () => {
         />
       )}
     </div>
+    </PageLayout>
   );
 };
 

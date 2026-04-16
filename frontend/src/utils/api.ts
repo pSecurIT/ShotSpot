@@ -229,8 +229,9 @@ api.interceptors.response.use(
       // Don't redirect if this is a login/register attempt (let the component handle the error)
       const isAuthEndpoint = originalRequest.url?.includes('/auth/login') || 
                             originalRequest.url?.includes('/auth/register');
+      const hasAuthToken = typeof window !== 'undefined' && Boolean(localStorage.getItem('token'));
       
-      if (!isAuthEndpoint && typeof window !== 'undefined') {
+      if (!isAuthEndpoint && hasAuthToken && typeof window !== 'undefined') {
         // Token expired or invalid - redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('user');

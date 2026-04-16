@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import TemplateDialog from './TemplateDialog';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/ExportCenter.css';
 import api from '../utils/api';
 
@@ -29,6 +31,7 @@ interface Team {
 }
 
 const ExportCenter: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [recentExports, setRecentExports] = useState<ExportRecord[]>([]);
   const [templates, setTemplates] = useState<ExportTemplate[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -351,16 +354,21 @@ const ExportCenter: React.FC = () => {
   };
 
   return (
-    <div className="export-center">
-      <div className="export-center-header">
-        <h2>Export Center</h2>
+    <PageLayout
+      title="Export Center"
+      eyebrow="Settings > Export Center"
+      description="Generate, download, and schedule report exports."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <button 
           className="primary-button"
           onClick={() => setShowExportDialog(true)}
         >
           + New Export
         </button>
-      </div>
+      )}
+    >
+    <div className="export-center">
 
       {teams.length > 0 && (
         <div className="team-selector">
@@ -611,6 +619,7 @@ const ExportCenter: React.FC = () => {
         />
       )}
     </div>
+    </PageLayout>
   );
 };
 

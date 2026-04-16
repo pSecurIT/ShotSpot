@@ -3,6 +3,8 @@ import { clubsApi } from '../services/clubsApi';
 import type { Club, ClubPlayer, ClubTeam } from '../types/clubs';
 import ClubCard from './ClubCard';
 import ClubDialog from './ClubDialog';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/ClubManagement.css';
 
 type DetailView =
@@ -13,6 +15,7 @@ type DetailView =
 const PAGE_SIZE = 12;
 
 const ClubManagement: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -140,13 +143,17 @@ const ClubManagement: React.FC = () => {
   };
 
   return (
-    <div className="club-management">
-      <div className="club-management__header">
-        <h2>Clubs Management</h2>
+    <PageLayout
+      title="Clubs Management"
+      eyebrow="Data > Clubs"
+      description="Organize club structures and drill into teams and players."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <button type="button" className="primary-button" onClick={openCreate}>
           Add Club
         </button>
-      </div>
+      )}
+    >
 
       <div className="club-management__controls">
         <input
@@ -281,7 +288,7 @@ const ClubManagement: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 };
 

@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { competitionsApi } from '../services/competitionsApi';
 import type { LeagueStanding } from '../types/competitions';
+import BackButton from './ui/BackButton';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/CompetitionManagement.css';
 
 const CompetitionStandingsView: React.FC = () => {
-  const navigate = useNavigate();
   const { id } = useParams();
+  const breadcrumbs = useBreadcrumbs();
 
   const competitionId = Number(id);
 
@@ -39,13 +42,13 @@ const CompetitionStandingsView: React.FC = () => {
   }, [competitionId]);
 
   return (
-    <div className="competition-management">
-      <div className="competition-management__header">
-        <h2>League Standings</h2>
-        <button type="button" className="secondary-button" onClick={() => navigate('/competitions')}>
-          Back
-        </button>
-      </div>
+    <PageLayout
+      title="League Standings"
+      eyebrow="Data > Competitions"
+      description="Track rankings, points, and goal differences for competition teams."
+      breadcrumbs={breadcrumbs}
+      actions={<BackButton to="/competitions" label="Back to Competitions" />}
+    >
 
       {loading && <div role="status" aria-live="polite">Loading standings…</div>}
       {error && <div className="alert alert-error" role="alert">{error}</div>}
@@ -89,7 +92,7 @@ const CompetitionStandingsView: React.FC = () => {
           </table>
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 };
 
