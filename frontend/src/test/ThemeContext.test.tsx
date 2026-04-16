@@ -26,6 +26,7 @@ describe('ThemeContext', () => {
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.removeAttribute('data-palette');
     document.documentElement.style.cssText = '';
+    localStorage.setItem('token', 'test-token');
     localStorage.setItem('user', JSON.stringify({ id: 12, username: 'theme-user' }));
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(LOCAL_INHERITED_STORAGE_KEY);

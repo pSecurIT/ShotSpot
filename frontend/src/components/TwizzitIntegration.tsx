@@ -22,11 +22,14 @@ import type {
   TeamMapping,
   PlayerMapping,
 } from '../types/twizzit';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import './TwizzitIntegration.css';
 
 type TabType = 'credentials' | 'sync' | 'config' | 'history' | 'mappings';
 
 const TwizzitIntegration: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [activeTab, setActiveTab] = useState<TabType>('credentials');
   const [credentials, setCredentials] = useState<TwizzitCredential[]>([]);
   const [selectedCredential, setSelectedCredential] = useState<number | null>(null);
@@ -901,13 +904,13 @@ const TwizzitIntegration: React.FC = () => {
   };
 
   return (
+    <PageLayout
+      title="Twizzit Integration"
+      eyebrow="Settings > Twizzit"
+      description="Sync teams and players from the Belgian Korfball Federation via Twizzit."
+      breadcrumbs={breadcrumbs}
+    >
     <div className="twizzit-integration">
-      <div className="page-header">
-        <h1>Twizzit Integration</h1>
-        <p className="page-description">
-          Integrate with Twizzit to sync teams and players from the Belgian Korfball Federation
-        </p>
-      </div>
 
       {error && (
         <div className="alert alert-error" role="alert">
@@ -967,6 +970,7 @@ const TwizzitIntegration: React.FC = () => {
         {activeTab === 'mappings' && renderMappings()}
       </div>
     </div>
+    </PageLayout>
   );
 };
 

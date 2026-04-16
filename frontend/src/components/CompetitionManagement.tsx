@@ -7,6 +7,8 @@ import CompetitionDialog from './CompetitionDialog';
 import TeamRegistrationDialog from './TeamRegistrationDialog';
 import StatePanel from './ui/StatePanel';
 import Toast from './ui/Toast';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/CompetitionManagement.css';
 
 type Filters = {
@@ -19,6 +21,7 @@ const PAGE_SIZE = 12;
 
 const CompetitionManagement: React.FC = () => {
   const navigate = useNavigate();
+  const breadcrumbs = useBreadcrumbs();
 
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,13 +127,17 @@ const CompetitionManagement: React.FC = () => {
   const showInlineError = Boolean(error && !showFullPageError);
 
   return (
-    <div className="competition-management">
-      <div className="competition-management__header">
-        <h2>Competitions Management</h2>
+    <PageLayout
+      title="Competitions Management"
+      eyebrow="Data > Competitions"
+      description="Create, filter, and manage tournaments and leagues."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <button type="button" className="primary-button" onClick={openCreate}>
           Create Competition
         </button>
-      </div>
+      )}
+    >
 
       <div className="competition-management__filters">
         <select
@@ -296,7 +303,7 @@ const CompetitionManagement: React.FC = () => {
           onDismiss={() => setSuccess(null)}
         />
       )}
-    </div>
+    </PageLayout>
   );
 };
 
