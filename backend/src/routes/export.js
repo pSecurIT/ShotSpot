@@ -3,6 +3,8 @@ import { param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -251,7 +253,7 @@ router.get('/match/:gameId/csv', [
     res.send(csvContent);
 
   } catch (err) {
-    console.error('Error exporting match data:', err);
+    logError('Error exporting match data:', err);
     res.status(500).json({ error: 'Failed to export match data' });
   }
 });
@@ -600,7 +602,7 @@ router.get('/season/csv', [
     res.send(csvContent);
 
   } catch (err) {
-    console.error('Error exporting season data:', err);
+    logError('Error exporting season data:', err);
     res.status(500).json({ error: 'Failed to export season data' });
   }
 });
@@ -889,7 +891,7 @@ router.get('/games/csv', [
     res.send(csvContent);
 
   } catch (err) {
-    console.error('Error exporting games data:', err);
+    logError('Error exporting games data:', err);
     res.status(500).json({ error: 'Failed to export games data' });
   }
 });

@@ -3,6 +3,7 @@ import { body, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { hasTrainerAccess } from '../middleware/trainerAccess.js';
+import { logError, logInfo } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -127,7 +128,7 @@ router.get('/', [
     const result = await db.query(query, params);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching games:', err);
+    logError('Error fetching games:', err);
     res.status(500).json({ error: 'Failed to fetch games' });
   }
 });
@@ -160,7 +161,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error fetching game:', err);
+    logError('Error fetching game:', err);
     res.status(500).json({ error: 'Failed to fetch game' });
   }
 });
@@ -283,7 +284,7 @@ router.post('/', [
 
     res.status(201).json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error creating game:', err);
+    logError('Error creating game:', err);
     res.status(500).json({ error: 'Failed to create game' });
   }
 });
@@ -447,7 +448,7 @@ router.put('/:id', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error updating game:', err);
+    logError('Error updating game:', err);
     res.status(500).json({ error: 'Failed to update game' });
   }
 });
@@ -516,7 +517,7 @@ router.post('/:id/start', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error starting game:', err);
+    logError('Error starting game:', err);
     res.status(500).json({ error: 'Failed to start game' });
   }
 });
@@ -565,7 +566,7 @@ router.post('/:id/end', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error ending game:', err);
+    logError('Error ending game:', err);
     res.status(500).json({ error: 'Failed to end game' });
   }
 });
@@ -614,7 +615,7 @@ router.post('/:id/cancel', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error cancelling game:', err);
+    logError('Error cancelling game:', err);
     res.status(500).json({ error: 'Failed to cancel game' });
   }
 });
@@ -692,7 +693,7 @@ router.post('/:id/reschedule', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error rescheduling game:', err);
+    logError('Error rescheduling game:', err);
     res.status(500).json({ error: 'Failed to reschedule game' });
   }
 });
@@ -737,16 +738,21 @@ router.delete('/:id', [
     }
     
     // Log the deletion for audit purposes
-    console.log(`Deleting game ${id}: ${game.home_team_name} vs ${game.away_team_name} (Status: ${game.status})`);
+    logInfo('Deleting game:', {
+      id,
+      homeTeamName: game.home_team_name,
+      awayTeamName: game.away_team_name,
+      status: game.status
+    });
     
     // Delete the game (cascade will handle related records)
     const _result = await db.query('DELETE FROM games WHERE id = $1 RETURNING id', [id]);
     
-    console.log(`Successfully deleted game ${id} and all related records`);
+    logInfo('Successfully deleted game and all related records:', { id });
     
     res.status(204).send();
   } catch (err) {
-    console.error('Error deleting game:', err);
+    logError('Error deleting game:', err);
     res.status(500).json({ error: 'Failed to delete game' });
   }
 });

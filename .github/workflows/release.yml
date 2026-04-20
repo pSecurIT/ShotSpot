@@ -112,13 +112,13 @@ jobs:
           if [ -n "${DIGEST}" ]; then
             echo "Attempting to pull by digest: $DIGEST"
             if docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"; then
-              echo "âœ… Successfully verified image by digest"
+              echo " Successfully verified image by digest"
               exit 0
             else
-              echo "âš ï¸ Failed to pull by digest; will attempt tag-based fallback"
+              echo " Failed to pull by digest; will attempt tag-based fallback"
             fi
           else
-            echo "âš ï¸ No digest available from build outputs"
+            echo " No digest available from build outputs"
           fi
 
           # Fallback: extract sha- tag created by docker/metadata-action
@@ -131,35 +131,35 @@ jobs:
           if [ -n "$SHA_TAG" ]; then
             echo "Attempting to pull tag: $SHA_TAG"
             if docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHA_TAG}"; then
-              echo "âœ… Successfully verified image by tag $SHA_TAG"
+              echo " Successfully verified image by tag $SHA_TAG"
               exit 0
             else
-              echo "âš ï¸ Failed to pull tag $SHA_TAG"
+              echo " Failed to pull tag $SHA_TAG"
             fi
           else
-            echo "âš ï¸ No sha- tag found in generated tags"
+            echo " No sha- tag found in generated tags"
           fi
 
-          # Final fallback: try shortened GITHUB_SHA (first 7 chars) â€” only if metadata didn't provide sha- tag
+          # Final fallback: try shortened GITHUB_SHA (first 7 chars)  only if metadata didn't provide sha- tag
           SHORT_SHA=$(echo "${GITHUB_SHA:-${{ github.sha }}}" | cut -c1-7)
           if [ -n "$SHORT_SHA" ]; then
             echo "Attempting to pull short-sha tag: sha-${SHORT_SHA}"
             if docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHORT_SHA}"; then
-              echo "âœ… Successfully verified image by short tag sha-${SHORT_SHA}"
+              echo " Successfully verified image by short tag sha-${SHORT_SHA}"
               exit 0
             else
-              echo "âš ï¸ Failed to pull short-sha tag sha-${SHORT_SHA}"
+              echo " Failed to pull short-sha tag sha-${SHORT_SHA}"
             fi
           fi
 
           echo ""
-          echo "âŒ Failed to verify pushed image with any method"
+          echo " Failed to verify pushed image with any method"
           echo "Available tags: ${{ steps.meta.outputs.tags }}"
           exit 1
 
       - name: Generate build summary
         run: |
-          echo "## ðŸ³ Docker Image Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "##  Docker Image Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -173,10 +173,10 @@ jobs:
           echo "**Platforms:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Features:**" >> $GITHUB_STEP_SUMMARY
-          echo "- âœ… Multi-platform support" >> $GITHUB_STEP_SUMMARY
-          echo "- âœ… SBOM included for supply chain security" >> $GITHUB_STEP_SUMMARY
-          echo "- âœ… Provenance attestation" >> $GITHUB_STEP_SUMMARY
-          echo "- âœ… Build cache enabled" >> $GITHUB_STEP_SUMMARY
+          echo "-  Multi-platform support" >> $GITHUB_STEP_SUMMARY
+          echo "-  SBOM included for supply chain security" >> $GITHUB_STEP_SUMMARY
+          echo "-  Provenance attestation" >> $GITHUB_STEP_SUMMARY
+          echo "-  Build cache enabled" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Pull commands:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
@@ -245,7 +245,7 @@ jobs:
             exit 1
           fi
           
-          echo "âœ… Image structure tests passed"
+          echo " Image structure tests passed"
 
       - name: Install docker-compose
         run: |
@@ -264,7 +264,7 @@ jobs:
           
           # Wait for pulls to complete
           wait $POSTGRES_PID
-          echo "âœ… Images pre-pulled"
+          echo " Images pre-pulled"
           
           # Create test environment
           cat > .env << EOF
@@ -356,7 +356,7 @@ jobs:
           
           if docker-compose ps | grep -q "Restarting"; then
             echo ""
-            echo "âš ï¸ Container is in restart loop - showing full logs..."
+            echo " Container is in restart loop - showing full logs..."
             docker-compose logs app --tail=300
             echo ""
             echo "Database logs:"
@@ -367,7 +367,7 @@ jobs:
           # Check if app container exited
           if docker-compose ps app | grep -q "Exit"; then
             echo ""
-            echo "âŒ App container exited unexpectedly"
+            echo " App container exited unexpectedly"
             docker-compose logs app
             exit 1
           fi
@@ -381,14 +381,14 @@ jobs:
               
               # Check for restart loop during wait
               if docker-compose ps | grep -q "Restarting"; then
-                echo "âš ï¸ Container restarting detected - showing recent logs..."
+                echo " Container restarting detected - showing recent logs..."
                 docker-compose logs app --tail=50
               fi
               
               sleep 5
             done
           ' || {
-            echo "âŒ Services did not become healthy after 5 minutes"
+            echo " Services did not become healthy after 5 minutes"
             echo "==== docker-compose ps ===="
             docker-compose ps
             echo "==== docker-compose logs (app) - last 200 lines ===="
@@ -397,17 +397,17 @@ jobs:
             docker-compose logs db --tail=100 || true
             exit 1
           }
-          echo "âœ… Services are healthy"
+          echo " Services are healthy"
           
           # Test health endpoint
           sleep 5
           curl -f http://localhost:3001/api/health || {
-            echo "âŒ Health check endpoint failed"
+            echo " Health check endpoint failed"
             docker-compose logs app
             exit 1
           }
           
-          echo "âœ… Image tests passed"
+          echo " Image tests passed"
 
       - name: Cleanup test environment
         if: always()
@@ -428,13 +428,42 @@ jobs:
           echo "## Docker Image Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ $? -eq 0 ]; then
-            echo "âœ… All tests passed" >> $GITHUB_STEP_SUMMARY
+            echo " All tests passed" >> $GITHUB_STEP_SUMMARY
           else
-            echo "âŒ Some tests failed" >> $GITHUB_STEP_SUMMARY
+            echo " Some tests failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  trivy-scan:
+    name: Trivy Security Scan
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.24.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }}
+          format: sarif
+          output: trivy-results.sarif
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
 
   create-release-notes:
     name: Create Release Notes
-    needs: [build-and-push, test-image]
+    needs: [build-and-push, test-image, trivy-scan]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     permissions:
@@ -452,7 +481,7 @@ jobs:
             
             ---
             
-            ## ðŸ³ Docker Image
+            ##  Docker Image
             
             **Pull command:**
             ```bash
@@ -469,4 +498,4 @@ jobs:
             
             **Security:** This image includes SBOM and provenance attestation for supply chain security.
             
-            ðŸ“– **Documentation:** [Docker Guide](https://github.com/pSecurIT/ShotSpot/blob/main/DOCKER.md)
+            **Documentation:** [Docker Guide](https://github.com/pSecurIT/ShotSpot/blob/main/DOCKER.md)

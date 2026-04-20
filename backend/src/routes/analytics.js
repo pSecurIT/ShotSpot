@@ -3,6 +3,8 @@ import { param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth } from '../middleware/auth.js';
 
+import { logInfo, logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication to all routes
@@ -72,7 +74,7 @@ router.get('/shots/:gameId/heatmap', [
       }))
     });
   } catch (err) {
-    console.error('Error fetching heatmap data:', err);
+    logError('Error fetching heatmap data:', err);
     res.status(500).json({ error: 'Failed to fetch heatmap data' });
   }
 });
@@ -143,7 +145,7 @@ router.get('/shots/:gameId/shot-chart', [
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching shot chart data:', err);
+    logError('Error fetching shot chart data:', err);
     res.status(500).json({ error: 'Failed to fetch shot chart data' });
   }
 });
@@ -258,12 +260,12 @@ router.get('/shots/:gameId/players', [
     const playTimeMap = new Map();
     
     if (process.env.NODE_ENV !== 'test') {
-      console.log('Play time calculation debug:');
-      console.log('- Period duration:', periodDuration, 'minutes');
-      console.log('- Number of periods:', numberOfPeriods);
-      console.log('- Total players:', playersResult.rows.length);
-      console.log('- Players with is_starting true:', playersResult.rows.filter(p => p.is_starting).length);
-      console.log('- Total substitutions:', subsResult.rows.length);
+      logInfo('Play time calculation debug:');
+      logInfo('- Period duration:', periodDuration, 'minutes');
+      logInfo('- Number of periods:', numberOfPeriods);
+      logInfo('- Total players:', playersResult.rows.length);
+      logInfo('- Players with is_starting true:', playersResult.rows.filter(p => p.is_starting).length);
+      logInfo('- Total substitutions:', subsResult.rows.length);
     }
     
     playersResult.rows.forEach(player => {
@@ -277,18 +279,18 @@ router.get('/shots/:gameId/players', [
       let currentPeriod = 1;
 
       if (process.env.NODE_ENV !== 'test') {
-        console.log(`\nPlayer: ${player.first_name} ${player.last_name} (#${player.jersey_number})`);
-        console.log(`  - is_starting: ${player.is_starting}`);
-        console.log(`  - isStarter: ${isStarter}`);
-        console.log(`  - Initial isOnCourt: ${isOnCourt}`);
-        console.log(`  - Initial lastTime: ${lastTime} seconds`);
+        logInfo(`\nPlayer: ${player.first_name} ${player.last_name} (#${player.jersey_number})`);
+        logInfo(`  - is_starting: ${player.is_starting}`);
+        logInfo(`  - isStarter: ${isStarter}`);
+        logInfo(`  - Initial isOnCourt: ${isOnCourt}`);
+        logInfo(`  - Initial lastTime: ${lastTime} seconds`);
       }
 
       // Process substitutions for this player
       const playerSubs = subsResult.rows.filter(sub => sub.player_id === playerId);
       
       if (process.env.NODE_ENV !== 'test') {
-        console.log(`  - Substitutions for this player: ${playerSubs.length}`);
+        logInfo(`  - Substitutions for this player: ${playerSubs.length}`);
       }
       
       playerSubs.forEach(sub => {
@@ -326,12 +328,12 @@ router.get('/shots/:gameId/players', [
         const remainingTime = (numberOfPeriods * periodDuration * 60) - lastTime;
         totalSeconds += remainingTime;
         if (process.env.NODE_ENV !== 'test') {
-          console.log(`  - Still on court at game end, adding remaining: ${remainingTime} seconds`);
+          logInfo(`  - Still on court at game end, adding remaining: ${remainingTime} seconds`);
         }
       }
 
       if (process.env.NODE_ENV !== 'test') {
-        console.log(`  - TOTAL PLAY TIME: ${totalSeconds} seconds (${Math.floor(totalSeconds/60)}:${(totalSeconds%60).toString().padStart(2,'0')})`);
+        logInfo(`  - TOTAL PLAY TIME: ${totalSeconds} seconds (${Math.floor(totalSeconds/60)}:${(totalSeconds%60).toString().padStart(2,'0')})`);
       }
 
       playTimeMap.set(playerId, Math.round(totalSeconds));
@@ -418,7 +420,7 @@ router.get('/shots/:gameId/players', [
 
     res.json(players);
   } catch (err) {
-    console.error('Error fetching player analytics:', err);
+    logError('Error fetching player analytics:', err);
     res.status(500).json({ error: 'Failed to fetch player analytics' });
   }
 });
@@ -488,7 +490,7 @@ router.get('/shots/:gameId/summary', [
       }))
     });
   } catch (err) {
-    console.error('Error fetching summary analytics:', err);
+    logError('Error fetching summary analytics:', err);
     res.status(500).json({ error: 'Failed to fetch summary analytics' });
   }
 });
@@ -605,7 +607,7 @@ router.get('/shots/:gameId/streaks', [
 
     res.json(Object.values(streaksByPlayer));
   } catch (err) {
-    console.error('Error fetching streaks:', err);
+    logError('Error fetching streaks:', err);
     res.status(500).json({ error: 'Failed to fetch streak data' });
   }
 });
@@ -713,7 +715,7 @@ router.get('/shots/:gameId/zones', [
       zones: zoneStats.filter(z => z.shots > 0)
     });
   } catch (err) {
-    console.error('Error fetching zone analysis:', err);
+    logError('Error fetching zone analysis:', err);
     res.status(500).json({ error: 'Failed to fetch zone analysis' });
   }
 });
@@ -796,7 +798,7 @@ router.get('/shots/:gameId/trends', [
 
     res.json(trends);
   } catch (err) {
-    console.error('Error fetching trends:', err);
+    logError('Error fetching trends:', err);
     res.status(500).json({ error: 'Failed to fetch trend data' });
   }
 });
@@ -874,7 +876,7 @@ router.get('/players/:playerId/development', [
 
     res.json(development);
   } catch (err) {
-    console.error('Error fetching player development:', err);
+    logError('Error fetching player development:', err);
     res.status(500).json({ error: 'Failed to fetch player development data' });
   }
 });
@@ -1010,7 +1012,7 @@ router.get('/clubs/:clubId/tendencies', [
       }))
     });
   } catch (err) {
-    console.error('Error fetching team tendencies:', err);
+    logError('Error fetching team tendencies:', err);
     res.status(500).json({ error: 'Failed to fetch team tendencies' });
   }
 });
@@ -1101,7 +1103,7 @@ router.get('/clubs/:clubId/matchup/:opponentId', [
       }
     });
   } catch (err) {
-    console.error('Error fetching matchup analysis:', err);
+    logError('Error fetching matchup analysis:', err);
     res.status(500).json({ error: 'Failed to fetch matchup analysis' });
   }
 });

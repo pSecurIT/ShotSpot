@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
 import { stringify } from 'csv-stringify';
+import { logError, logInfo } from './logger.js';
 
 const currentFilename = fileURLToPath(import.meta.url);
 const currentDirname = path.dirname(currentFilename);
@@ -48,9 +49,10 @@ export function enqueueExport(exportId, templateId, format, gameId, teamId, play
 
   jobQueue.push(job);
   
-  if (process.env.NODE_ENV !== 'test') {
-    console.log(`Export job queued: ${exportId}, Queue size: ${jobQueue.length}`);
-  }
+  logInfo('Export job queued:', {
+    exportId,
+    queueSize: jobQueue.length
+  });
 
   // Start processing if not already running
   if (!isProcessing) {
@@ -76,9 +78,10 @@ async function processQueue() {
     try {
       await processExportJob(job);
     } catch (err) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.error(`Export job ${job.exportId} failed:`, err);
-      }
+      logError('Export job failed:', {
+        exportId: job.exportId,
+        error: err
+      });
       
       // Mark export as failed
       try {
@@ -88,7 +91,7 @@ async function processQueue() {
         );
       } catch (updateErr) {
         if (process.env.NODE_ENV !== 'test') {
-          console.error('Failed to update export status:', updateErr);
+          logError('Failed to update export status:', updateErr);
         }
       }
     }
@@ -115,9 +118,11 @@ function sanitizeFilenameComponent(component) {
 async function processExportJob(job) {
   const { exportId, format, gameId, teamId, playerId } = job;
 
-  if (process.env.NODE_ENV !== 'test') {
-    console.log(`Processing export ${exportId}: format=${format}, gameId=${gameId}`);
-  }
+  logInfo('Processing export:', {
+    exportId,
+    format,
+    gameId
+  });
 
   await ensureExportsDir();
 
@@ -176,9 +181,11 @@ async function processExportJob(job) {
     [relativePath, fileSize, exportId]
   );
 
-  if (process.env.NODE_ENV !== 'test') {
-    console.log(`Export ${exportId} completed: ${fileName} (${(fileSize / 1024).toFixed(2)} KB)`);
-  }
+  logInfo('Export completed:', {
+    exportId,
+    fileName,
+    fileSizeKb: Number((fileSize / 1024).toFixed(2))
+  });
 }
 
 /**
