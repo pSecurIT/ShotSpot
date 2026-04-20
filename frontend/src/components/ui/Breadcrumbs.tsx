@@ -21,12 +21,13 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, className = '' }) => {
       <ol className="breadcrumbs__list">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
-          const canRenderLink = !isLast && Boolean(item.path) && isInRouterContext;
+          const linkPath = item.path ?? '';
+          const canRenderLink = !isLast && Boolean(linkPath) && isInRouterContext;
 
           return (
             <li key={`${item.label}-${index}`} className="breadcrumbs__item">
               {canRenderLink ? (
-                <Link to={item.path} className="breadcrumbs__link">
+                <Link to={linkPath} className="breadcrumbs__link">
                   {item.label}
                 </Link>
               ) : (
