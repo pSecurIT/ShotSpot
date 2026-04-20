@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import AdvancedAnalytics from '../components/AdvancedAnalytics';
 import api from '../utils/api';
@@ -89,6 +90,14 @@ describe('AdvancedAnalytics', () => {
   const videoEventsMock = advancedAnalyticsApi.videoEvents as unknown as Mock;
   const videoHighlightsMock = advancedAnalyticsApi.videoHighlights as unknown as Mock;
   const anchorClickMock = vi.fn();
+
+  const renderWithRouter = () => {
+    return render(
+      <MemoryRouter initialEntries={['/advanced-analytics']}>
+        <AdvancedAnalytics />
+      </MemoryRouter>
+    );
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -225,7 +234,7 @@ describe('AdvancedAnalytics', () => {
   });
 
   it('loads players, auto-selects one, and shows analytics summaries', async () => {
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
     await waitFor(() => {
       expect(formTrendsMock).toHaveBeenCalledWith(2, 20, expect.objectContaining({
@@ -244,7 +253,7 @@ describe('AdvancedAnalytics', () => {
 
   it('applies date filters and shows video insights through tab navigation', async () => {
     const user = userEvent.setup();
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
     await screen.findByRole('tab', { name: 'Form Trends' });
     expect(screen.getByRole('heading', { name: 'Form Trends' })).toBeInTheDocument();
@@ -269,7 +278,7 @@ describe('AdvancedAnalytics', () => {
   it('shows errors from analytics loading failures', async () => {
     formTrendsMock.mockRejectedValueOnce(new Error('Prediction service down'));
 
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Prediction service down');
@@ -284,7 +293,7 @@ describe('AdvancedAnalytics', () => {
       fatigue_analysis: [],
     });
 
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
     await screen.findByText('Advanced Analytics Dashboard');
     await user.click(screen.getByRole('tab', { name: 'Fatigue' }));
@@ -294,7 +303,7 @@ describe('AdvancedAnalytics', () => {
 
   it('exports the dashboard as image and pdf', async () => {
     const user = userEvent.setup();
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
     await screen.findByText('Advanced Analytics Dashboard');
 
@@ -315,7 +324,7 @@ describe('AdvancedAnalytics', () => {
 
   it('uses theme chart variables for analytics series colors', async () => {
     const user = userEvent.setup();
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
     await screen.findByText('Advanced Analytics Dashboard');
     await user.click(screen.getByRole('tab', { name: 'Fatigue' }));

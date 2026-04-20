@@ -223,6 +223,113 @@ textarea:focus-visible,
   width: 100%;
 }
 
+/* Shared page context layout */
+.page-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.page-layout__breadcrumbs {
+  margin-bottom: 0.125rem;
+}
+
+.page-layout__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.section-header__content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.section-header__eyebrow {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.section-header__title {
+  font-family: var(--font-heading);
+  font-size: clamp(1.2rem, 1.8vw, 1.6rem);
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.section-header__description {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.section-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
+.breadcrumbs {
+  display: flex;
+}
+
+.breadcrumbs__list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+}
+
+.breadcrumbs__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.breadcrumbs__link,
+.breadcrumbs__current {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.breadcrumbs__link:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+.breadcrumbs__current {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.breadcrumbs__separator {
+  color: var(--text-secondary);
+}
+
 /* Navigation */
 .navigation {
   display: flex;
@@ -274,6 +381,15 @@ textarea:focus-visible,
 
   .App-header h1 {
     font-size: clamp(1.2rem, 6vw, 1.7rem);
+  }
+
+  .section-header {
+    flex-direction: column;
+  }
+
+  .section-header__actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 

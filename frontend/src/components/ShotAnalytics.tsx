@@ -10,6 +10,8 @@ import AchievementNotification from './AchievementNotification';
 import InteractiveShotChart from './InteractiveShotChart';
 const PlayerComparisonRadar = React.lazy(() => import('./PlayerComparisonRadar'));
 import PossessionFlowDiagram from './PossessionFlowDiagram';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import { Achievement } from '../types/achievements';
 import api from '../utils/api';
 import courtImageUrl from '../img/Korfbalveld-breed.PNG';
@@ -218,6 +220,7 @@ type AnalyticsView = 'heatmap' | 'shot-chart' | 'players' | 'summary' | 'charts'
 const ShotAnalytics: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
+  const breadcrumbs = useBreadcrumbs();
   const { socket, joinGame, leaveGame } = useWebSocket();
   const [activeView, setActiveView] = useState<AnalyticsView>('heatmap');
   const [loading, setLoading] = useState(false);
@@ -1911,17 +1914,24 @@ const ShotAnalytics: React.FC = () => {
   };
 
   return (
-    <div className="shot-analytics-container">
-      <div className="analytics-header">
-        <div className="header-top">
-          <button className="back-button" onClick={() => navigate(`/match/${gameId}`)}>
+    <PageLayout
+      title="📊 Shot Analytics"
+      eyebrow="Analytics > Match Breakdown"
+      description="Shot quality, player trends, team summaries, and live match insights."
+      breadcrumbs={breadcrumbs}
+      actions={(
+        <div className="analytics-header-actions">
+          <button className="back-button" type="button" onClick={() => navigate(`/match/${gameId}`)}>
             ← Back to Match
           </button>
-          <h2>📊 Shot Analytics</h2>
-          <button className="retry-button" onClick={() => navigate('/achievements')}>
+          <button className="retry-button" type="button" onClick={() => navigate('/achievements')}>
             🏆 Achievements Hub
           </button>
         </div>
+      )}
+    >
+    <div className="shot-analytics-container">
+      <div className="analytics-header">
         <div className="view-tabs" role="tablist" aria-label="Shot analytics views">
           <button
             className={`view-tab ${activeView === 'heatmap' ? 'active' : ''}`}
@@ -2105,6 +2115,7 @@ const ShotAnalytics: React.FC = () => {
         />
       )}
     </div>
+    </PageLayout>
   );
 };
 

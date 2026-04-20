@@ -154,6 +154,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const clubPaletteId = clubScopeId === null ? localInheritedPaletteId : remoteClubPaletteId;
   const inheritedPaletteId = teamScopeId !== null && teamPaletteId ? teamPaletteId : clubPaletteId;
   const resolvedPaletteId = paletteSelection === 'team-default' ? inheritedPaletteId : paletteSelection;
+  const hasAuthToken = typeof window !== 'undefined' && Boolean(window.localStorage.getItem('token'));
 
   useEffect(() => {
     applyThemePreferenceToDocument(themePreference);
@@ -197,7 +198,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [teamScopeId]);
 
   useEffect(() => {
-    if (clubScopeId === null) return undefined;
+    if (clubScopeId === null || !hasAuthToken) return undefined;
 
     let ignore = false;
     clubScopeLoadingRef.current = true;
@@ -224,10 +225,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       ignore = true;
     };
-  }, [clubScopeId]);
+  }, [clubScopeId, hasAuthToken]);
 
   useEffect(() => {
-    if (teamScopeId === null) return undefined;
+    if (teamScopeId === null || !hasAuthToken) return undefined;
 
     let ignore = false;
     teamScopeLoadingRef.current = true;
@@ -271,9 +272,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       ignore = true;
     };
-  }, [clubScopeId, teamScopeId]);
+  }, [clubScopeId, hasAuthToken, teamScopeId]);
 
   useEffect(() => {
+    if (!hasAuthToken) return;
     if (clubScopeId === null) return;
     if (clubScopeLoadingRef.current) return;
     if (lastLoadedClubPaletteRef.current === remoteClubPaletteId) return;
@@ -285,9 +287,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .catch(() => {
         // Keep the selected palette applied locally even if persistence fails.
       });
-  }, [clubScopeId, remoteClubPaletteId]);
+  }, [clubScopeId, hasAuthToken, remoteClubPaletteId]);
 
   useEffect(() => {
+    if (!hasAuthToken) return;
     if (teamScopeId === null) return;
     if (teamScopeLoadingRef.current) return;
     if (lastLoadedTeamPaletteRef.current === teamPaletteId) return;
@@ -299,7 +302,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .catch(() => {
         // Keep the local selection applied even if backend persistence fails.
       });
-  }, [teamPaletteId, teamScopeId]);
+  }, [hasAuthToken, teamPaletteId, teamScopeId]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({

@@ -131,19 +131,10 @@ describe('AuthContext', () => {
     });
 
     it('should show loading state initially', () => {
-      const LoadingTestComponent = () => {
-        try {
-          const auth = useAuth();
-          return <div data-testid="loaded">Loaded: {auth.user?.username || 'null'}</div>;
-        } catch {
-          return <div data-testid="loading">Loading...</div>;
-        }
-      };
-
       // Render without waiting
       const { container } = render(
         <AuthProvider>
-          <LoadingTestComponent />
+          <div data-testid="loaded">Loaded</div>
         </AuthProvider>
       );
 

@@ -4,6 +4,8 @@ import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useAuth } from '../contexts/AuthContext';
 import StatePanel from './ui/StatePanel';
 import Toast from './ui/Toast';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 
 interface Team {
   id: number;
@@ -23,6 +25,7 @@ interface Club {
 const TeamManagement: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const breadcrumbs = useBreadcrumbs();
   const [teams, setTeams] = useState<Team[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null);
@@ -238,19 +241,22 @@ const TeamManagement: React.FC = () => {
   };
 
   return (
-    <div className="game-management-container team-management-container">
-      <div className="player-management-header">
-        <h2>Team Management</h2>
-        <div className="header-actions">
-          <button 
-            className="secondary-button"
-            onClick={() => setShowExportDialog(true)}
-            disabled={!selectedTeamId}
-          >
-            📥 Export Season Summary
-          </button>
-        </div>
-      </div>
+    <PageLayout
+      title="Team Management"
+      eyebrow="Data > Teams"
+      description="Create teams, update roster metadata, and export seasonal summaries."
+      breadcrumbs={breadcrumbs}
+      actions={(
+        <button
+          className="secondary-button"
+          onClick={() => setShowExportDialog(true)}
+          disabled={!selectedTeamId}
+          type="button"
+        >
+          📥 Export Season Summary
+        </button>
+      )}
+    >
 
       {loading && (
         <StatePanel
@@ -544,7 +550,7 @@ const TeamManagement: React.FC = () => {
           onDismiss={() => setSuccess(null)}
         />
       )}
-    </div>
+    </PageLayout>
   );
 };
 

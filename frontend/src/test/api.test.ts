@@ -271,6 +271,22 @@ describe('API Utility', () => {
         expect((error as { response: { status: number } }).response.status).toBe(404);
       }
     });
+
+    it('should not redirect on 401 when no auth token exists', async () => {
+      localStorage.removeItem('token');
+      localStorage.setItem('user', JSON.stringify({ id: 1, username: 'test' }));
+      mockAxios.onGet('/test').reply(401, { error: 'Unauthorized' });
+
+      try {
+        await api.get('/test');
+      } catch {
+        // Expected to throw
+      }
+
+      expect(localStorage.getItem('token')).toBeNull();
+      expect(localStorage.getItem('user')).toBe(JSON.stringify({ id: 1, username: 'test' }));
+      expect(mockLocation.href).toBe('');
+    });
   });
 
   describe('Response Interceptor - CSRF Token Refresh', () => {

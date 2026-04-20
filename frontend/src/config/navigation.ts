@@ -13,6 +13,9 @@ export interface NavigationItem {
   badge?: string;
   divider?: boolean;
   disabled?: boolean;
+  description?: string;
+  breadcrumbLabel?: string;
+  category?: 'matches' | 'analytics' | 'data' | 'settings' | 'user';
 }
 
 export const navigationConfig: NavigationItem[] = [
@@ -20,31 +23,38 @@ export const navigationConfig: NavigationItem[] = [
     label: 'Dashboard',
     path: '/dashboard',
     icon: '🏠',
-    roles: ['user', 'coach', 'admin']
+    roles: ['user', 'coach', 'admin'],
+    breadcrumbLabel: 'Dashboard'
   },
   {
     label: 'Matches',
     icon: '🎮',
     roles: ['user', 'coach', 'admin'],
+    description: 'Games, live capture, and templates',
+    category: 'matches',
     children: [
       {
         label: 'All Games',
         path: '/games',
         icon: '📋',
-        roles: ['user', 'coach', 'admin']
+        roles: ['user', 'coach', 'admin'],
+        breadcrumbLabel: 'Games',
+        category: 'matches'
       },
       {
         label: 'Live Match',
         // Live match requires selecting a game first; keep navigation working.
         path: '/match',
         icon: '⚡',
-        roles: ['user', 'coach', 'admin']
+        roles: ['user', 'coach', 'admin'],
+        category: 'matches'
       },
       {
         label: 'Match Templates',
         path: '/templates',
         icon: '📝',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        category: 'matches'
       }
     ]
   },
@@ -52,30 +62,37 @@ export const navigationConfig: NavigationItem[] = [
     label: 'Analytics',
     icon: '📊',
     roles: ['user', 'coach', 'admin'],
+    description: 'Insights, trends, and performance',
+    category: 'analytics',
     children: [
       {
         label: 'Match Analytics',
         path: '/analytics',
         icon: '🎯',
-        roles: ['user', 'coach', 'admin']
+        roles: ['user', 'coach', 'admin'],
+        category: 'analytics'
       },
       {
         label: 'Achievements',
         path: '/achievements',
         icon: '🏆',
-        roles: ['user', 'coach', 'admin']
+        roles: ['user', 'coach', 'admin'],
+        category: 'analytics'
       },
       {
         label: 'Advanced Analytics',
         path: '/advanced-analytics',
         icon: '📈',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        description: 'Predictions, fatigue, and video insights',
+        category: 'analytics'
       },
       {
         label: 'Team Analytics',
         path: '/team-analytics',
         icon: '👥',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        category: 'analytics'
       }
     ]
   },
@@ -83,36 +100,43 @@ export const navigationConfig: NavigationItem[] = [
     label: 'Data',
     icon: '🗂️',
     roles: ['user', 'coach', 'admin'],
+    description: 'Manage players, teams, and competitions',
+    category: 'data',
     children: [
       {
         label: 'Players',
         path: '/players',
         icon: '👥',
-        roles: ['user', 'coach', 'admin']
+        roles: ['user', 'coach', 'admin'],
+        category: 'data'
       },
       {
         label: 'Teams',
         path: '/teams',
         icon: '🏃',
-        roles: ['user', 'coach', 'admin']
+        roles: ['user', 'coach', 'admin'],
+        category: 'data'
       },
       {
         label: 'Clubs',
         path: '/clubs',
         icon: '🏢',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        category: 'data'
       },
       {
         label: 'Competitions',
         path: '/competitions',
         icon: '🏁',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        category: 'data'
       },
       {
         label: 'Series/Divisions',
         path: '/series',
         icon: '🗓️',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        category: 'data'
       }
     ]
   },
@@ -120,30 +144,37 @@ export const navigationConfig: NavigationItem[] = [
     label: 'Settings',
     icon: '⚙️',
     roles: ['coach', 'admin'],
+    description: 'Configuration, exports, and integrations',
+    category: 'settings',
     children: [
       {
         label: 'Export Center',
         path: '/exports',
         icon: '📤',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        category: 'settings'
       },
       {
         label: 'Report Templates',
         path: '/report-templates',
         icon: '📄',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        description: 'Customize report formats and sections',
+        category: 'settings'
       },
       {
         label: 'Scheduled Reports',
         path: '/scheduled-reports',
         icon: '⏰',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        category: 'settings'
       },
       {
         label: 'Settings',
         path: '/settings',
         icon: '⚙️',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        category: 'settings'
       },
       {
         label: 'settings-divider',
@@ -155,13 +186,15 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Twizzit Integration',
         path: '/twizzit',
         icon: '🔗',
-        roles: ['coach', 'admin']
+        roles: ['coach', 'admin'],
+        category: 'settings'
       },
       {
         label: 'User Management',
         path: '/users',
         icon: '👥',
-        roles: ['admin']
+        roles: ['admin'],
+        category: 'settings'
       }
     ]
   }
