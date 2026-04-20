@@ -15,7 +15,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const storedUser = localStorage.getItem('user');
     if (token && storedUser && storedUser !== 'undefined' && storedUser !== 'null') {
       try {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUser(JSON.parse(storedUser));
         // User is already authenticated, register service worker (production only)
         if (import.meta.env.PROD) {

@@ -119,13 +119,11 @@ export const useOfflineStatus = () => {
 
   // Update pending count on mount and when coming back online
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     updatePendingCount();
   }, [updatePendingCount]);
 
   useEffect(() => {
     if (status.isOnline) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       updatePendingCount();
     }
   }, [status.isOnline, updatePendingCount]);
