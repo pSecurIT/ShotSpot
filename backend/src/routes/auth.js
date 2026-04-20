@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import Tokens from 'csrf';
 import db from '../db.js';
+import { auth } from '../middleware/auth.js';
+import { logError } from '../utils/logger.js';
 
 const router = express.Router();
 const tokens = new Tokens();
@@ -19,7 +21,7 @@ router.get('/csrf', (req, res) => {
   req.session.save((err) => {
     if (err) {
       if (process.env.NODE_ENV !== 'test') {
-        console.error('Error saving session for CSRF:', err);
+        logError('Error saving session for CSRF:', err);
       }
       return res.status(500).json({ error: 'Failed to create CSRF token' });
     }
@@ -115,7 +117,7 @@ router.post('/register', validateRegistration, async (req, res) => {
       throw txError;
     }
   } catch (error) {
-    console.error('Registration error:', error);
+    logError('Registration error:', error);
     res.status(500).json({ error: 'Error creating user' });
   }
 });
@@ -226,14 +228,14 @@ router.post('/login', [
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logError('Login error:', error);
     res.status(500).json({ error: 'Error during login' });
   }
 });
 
 // Change password endpoint (works even if password_must_change is true)
 // Note: In production, also apply CSRF protection middleware to this endpoint
-router.post('/change-password', [
+router.post('/change-password', auth, [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   body('newPassword')
     .isLength({ min: 8 })
@@ -249,27 +251,12 @@ router.post('/change-password', [
 
     const { currentPassword, newPassword } = req.body;
 
-    // Get token from header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const token = authHeader.substring(7);
     const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
-
-    // Verify token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, jwtSecret);
-    } catch (_err) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
 
     // Get user from database
     const result = await db.query(
       'SELECT id, username, email, password_hash, role, password_must_change FROM users WHERE id = $1',
-      [decoded.userId]
+      [req.user.userId]
     );
 
     if (result.rows.length === 0) {
@@ -326,7 +313,7 @@ router.post('/change-password', [
       }
     });
   } catch (error) {
-    console.error('Change password error:', error);
+    logError('Change password error:', error);
     res.status(500).json({ error: 'Error changing password' });
   }
 });

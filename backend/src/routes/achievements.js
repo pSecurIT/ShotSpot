@@ -4,6 +4,8 @@ import { validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // All routes require authentication
@@ -50,7 +52,7 @@ router.get('/recent', [
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching recent achievements:', err);
+    logError('Error fetching recent achievements:', err);
     res.status(500).json({ error: 'Failed to fetch recent achievements' });
   }
 });
@@ -76,7 +78,7 @@ router.get('/list', async (req, res) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching achievements list:', err);
+    logError('Error fetching achievements list:', err);
     res.status(500).json({ error: 'Failed to fetch achievements' });
   }
 });
@@ -128,7 +130,7 @@ router.get('/player/:playerId', [
       total_points: parseInt(pointsResult.rows[0].total_points)
     });
   } catch (err) {
-    console.error('Error fetching player achievements:', err);
+    logError('Error fetching player achievements:', err);
     res.status(500).json({ error: 'Failed to fetch player achievements' });
   }
 });
@@ -200,7 +202,7 @@ router.post('/check/:playerId', [
       new_achievements: newAchievements
     });
   } catch (err) {
-    console.error('Error checking achievements:', err);
+    logError('Error checking achievements:', err);
     res.status(500).json({ error: 'Failed to check achievements' });
   }
 });
@@ -264,7 +266,7 @@ router.get('/leaderboard', [
       }))
     });
   } catch (err) {
-    console.error('Error fetching leaderboard:', err);
+    logError('Error fetching leaderboard:', err);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 });
@@ -327,7 +329,7 @@ router.get('/team/:teamId/leaderboard', [
       }))
     });
   } catch (err) {
-    console.error('Error fetching team leaderboard:', err);
+    logError('Error fetching team leaderboard:', err);
     res.status(500).json({ error: 'Failed to fetch team leaderboard' });
   }
 });

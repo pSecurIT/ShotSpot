@@ -3,6 +3,8 @@ import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -113,7 +115,7 @@ router.get('/:gameId', [
 
     res.json(freeShots);
   } catch (error) {
-    console.error('Error fetching free shots:', error);
+    logError('Error fetching free shots:', error);
     res.status(500).json({ error: 'Failed to fetch free shots' });
   }
 });
@@ -281,11 +283,11 @@ router.post('/', [
           return res.status(200).json(existingFreeShot);
         }
       } catch (lookupError) {
-        console.error('Error resolving duplicate free shot by client_uuid:', lookupError);
+        logError('Error resolving duplicate free shot by client_uuid:', lookupError);
       }
     }
 
-    console.error('Error creating free shot:', error);
+    logError('Error creating free shot:', error);
     res.status(500).json({ error: 'Failed to create free shot' });
   }
 });
@@ -405,7 +407,7 @@ router.put('/:freeShotId', [
 
     res.json(freeShot);
   } catch (error) {
-    console.error('Error updating free shot:', error);
+    logError('Error updating free shot:', error);
     res.status(500).json({ error: 'Failed to update free shot' });
   }
 });
@@ -453,7 +455,7 @@ router.post('/:freeShotId/confirm', [
     const freeShot = await fetchCompleteFreeShotById(freeShotId);
     res.status(200).json(freeShot);
   } catch (error) {
-    console.error('Error confirming free shot:', error);
+    logError('Error confirming free shot:', error);
     res.status(500).json({ error: 'Failed to confirm free shot' });
   }
 });
@@ -497,7 +499,7 @@ router.delete('/:freeShotId', [
 
     res.json({ message: 'Free shot deleted successfully' });
   } catch (error) {
-    console.error('Error deleting free shot:', error);
+    logError('Error deleting free shot:', error);
     res.status(500).json({ error: 'Failed to delete free shot' });
   }
 });

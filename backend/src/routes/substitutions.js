@@ -3,6 +3,8 @@ import { body, param, query, validationResult } from 'express-validator';
 import pool from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -104,7 +106,7 @@ router.get(
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (error) {
-      console.error('Error fetching substitutions:', error);
+      logError('Error fetching substitutions:', error);
       res.status(500).json({ error: 'Failed to fetch substitutions' });
     }
   }
@@ -214,7 +216,7 @@ router.get(
 
       res.json(response);
     } catch (error) {
-      console.error('Error fetching active players:', error);
+      logError('Error fetching active players:', error);
       res.status(500).json({ error: 'Failed to fetch active players' });
     }
   }
@@ -416,11 +418,11 @@ router.post(
             return res.status(200).json(existingSubstitution);
           }
         } catch (lookupError) {
-          console.error('Error resolving duplicate substitution by client_uuid:', lookupError);
+          logError('Error resolving duplicate substitution by client_uuid:', lookupError);
         }
       }
 
-      console.error('Error recording substitution:', error);
+      logError('Error recording substitution:', error);
       
       if (error.code === '23514') { // Check constraint violation
         return res.status(400).json({ error: 'Player in and player out must be different' });
@@ -510,7 +512,7 @@ router.put(
       const substitution = await fetchCompleteSubstitutionById(substitutionId);
       return res.status(200).json(substitution);
     } catch (error) {
-      console.error('Error updating substitution:', error);
+      logError('Error updating substitution:', error);
       return res.status(500).json({ error: 'Failed to update substitution' });
     }
   }
@@ -555,7 +557,7 @@ router.post(
       const substitution = await fetchCompleteSubstitutionById(substitutionId);
       res.status(200).json(substitution);
     } catch (error) {
-      console.error('Error confirming substitution:', error);
+      logError('Error confirming substitution:', error);
       res.status(500).json({ error: 'Failed to confirm substitution' });
     }
   }
@@ -611,7 +613,7 @@ router.delete(
 
       res.status(200).json({ message: 'Substitution deleted successfully' });
     } catch (error) {
-      console.error('Error deleting substitution:', error);
+      logError('Error deleting substitution:', error);
       res.status(500).json({ error: 'Failed to delete substitution' });
     }
   }

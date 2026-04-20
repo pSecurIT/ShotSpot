@@ -3,6 +3,8 @@ import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -88,7 +90,7 @@ router.get('/:gameId', [
     const result = await db.query(queryText, params);
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching match commentary:', error);
+    logError('Error fetching match commentary:', error);
     res.status(500).json({ error: 'Failed to fetch match commentary' });
   }
 });
@@ -193,11 +195,11 @@ router.post('/', [
           return res.status(200).json(existingCommentary);
         }
       } catch (lookupError) {
-        console.error('Error resolving duplicate commentary by client_uuid:', lookupError);
+        logError('Error resolving duplicate commentary by client_uuid:', lookupError);
       }
     }
 
-    console.error('Error creating match commentary:', error);
+    logError('Error creating match commentary:', error);
     res.status(500).json({ error: 'Failed to create match commentary' });
   }
 });
@@ -302,7 +304,7 @@ router.put('/:commentaryId', [
 
     res.json(updatedCommentary);
   } catch (error) {
-    console.error('Error updating match commentary:', error);
+    logError('Error updating match commentary:', error);
     res.status(500).json({ error: 'Failed to update match commentary' });
   }
 });
@@ -349,7 +351,7 @@ router.post('/:commentaryId/confirm', [
     const confirmedCommentary = await fetchCompleteCommentaryById(commentaryId);
     res.status(200).json(confirmedCommentary);
   } catch (error) {
-    console.error('Error confirming match commentary:', error);
+    logError('Error confirming match commentary:', error);
     res.status(500).json({ error: 'Failed to confirm match commentary' });
   }
 });
@@ -397,7 +399,7 @@ router.delete('/:commentaryId', [
 
     res.json({ message: 'Match commentary deleted successfully' });
   } catch (error) {
-    console.error('Error deleting match commentary:', error);
+    logError('Error deleting match commentary:', error);
     res.status(500).json({ error: 'Failed to delete match commentary' });
   }
 });

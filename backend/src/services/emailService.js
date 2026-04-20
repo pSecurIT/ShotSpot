@@ -6,6 +6,8 @@
 import nodemailer from 'nodemailer';
 import path from 'path';
 
+import { logInfo, logWarn, logError } from '../utils/logger.js';
+
 /**
  * Create email transporter based on environment configuration
  */
@@ -27,7 +29,7 @@ function createTransporter() {
   // Development/Test: Use ethereal.email test account
   // Note: In production, you should configure real SMTP settings
   if (process.env.NODE_ENV === 'development') {
-    console.log('⚠️  Using test email account. Configure SMTP_* environment variables for production.');
+    logInfo('⚠️  Using test email account. Configure SMTP_* environment variables for production.');
   }
   
   // Return null transporter for test environment to prevent actual emails
@@ -237,7 +239,7 @@ export async function sendReportEmail(options) {
   // Don't actually send emails in test environment
   if (process.env.NODE_ENV === 'test') {
     if (process.env.NODE_ENV !== 'test') {
-      console.log('📧 [TEST MODE] Would send email:', {
+      logInfo('📧 [TEST MODE] Would send email:', {
         to: recipients,
         subject,
         reportName
@@ -255,7 +257,7 @@ export async function sendReportEmail(options) {
   
   if (!transporter) {
     if (process.env.NODE_ENV !== 'test') {
-      console.warn('⚠️  Email transporter not configured. Skipping email send.');
+      logWarn('⚠️  Email transporter not configured. Skipping email send.');
     }
     return {
       success: false,
@@ -306,9 +308,9 @@ export async function sendReportEmail(options) {
     const info = await transporter.sendMail(mailOptions);
     
     if (process.env.NODE_ENV !== 'test') {
-      console.log('✅ Email sent successfully:', info.messageId);
+      logInfo('✅ Email sent successfully:', info.messageId);
       if (process.env.NODE_ENV === 'development' && info.preview) {
-        console.log('📧 Preview URL:', nodemailer.getTestMessageUrl(info));
+        logInfo('📧 Preview URL:', nodemailer.getTestMessageUrl(info));
       }
     }
 
@@ -319,7 +321,7 @@ export async function sendReportEmail(options) {
       previewUrl: process.env.NODE_ENV === 'development' ? nodemailer.getTestMessageUrl(info) : null
     };
   } catch (error) {
-    console.error('❌ Failed to send email:', error);
+    logError('❌ Failed to send email:', error);
     return {
       success: false,
       error: error.message,

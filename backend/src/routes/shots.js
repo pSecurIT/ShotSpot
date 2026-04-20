@@ -4,6 +4,8 @@ import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication to all routes
@@ -124,7 +126,7 @@ router.get('/:gameId', [
 
     res.json(shotsResult.rows);
   } catch (err) {
-    console.error('Error fetching shots:', err);
+    logError('Error fetching shots:', err);
     res.status(500).json({ error: 'Failed to fetch shots' });
   }
 });
@@ -289,11 +291,11 @@ router.post('/:gameId', [
           return res.status(200).json(existingShot);
         }
       } catch (lookupError) {
-        console.error('Error resolving duplicate shot by client_uuid:', lookupError);
+        logError('Error resolving duplicate shot by client_uuid:', lookupError);
       }
     }
 
-    console.error('Error creating shot:', err);
+    logError('Error creating shot:', err);
     res.status(500).json({ error: 'Failed to create shot' });
   }
 });
@@ -374,7 +376,7 @@ router.put('/:gameId/:shotId', [
     const completeShot = await fetchCompleteShotById(shotId);
     res.json(completeShot);
   } catch (err) {
-    console.error('Error updating shot:', err);
+    logError('Error updating shot:', err);
     res.status(500).json({ error: 'Failed to update shot' });
   }
 });
@@ -424,7 +426,7 @@ router.post('/:gameId/:shotId/confirm', [
     const completeShot = await fetchCompleteShotById(shotId);
     res.status(200).json(completeShot);
   } catch (err) {
-    console.error('Error confirming shot:', err);
+    logError('Error confirming shot:', err);
     res.status(500).json({ error: 'Failed to confirm shot' });
   }
 });
@@ -465,7 +467,7 @@ router.delete('/:gameId/:shotId', [
 
     res.status(204).send();
   } catch (err) {
-    console.error('Error deleting shot:', err);
+    logError('Error deleting shot:', err);
     res.status(500).json({ error: 'Failed to delete shot' });
   }
 });

@@ -1,4 +1,6 @@
 import pkg from 'pg';
+import { logInfo, logError } from './utils/logger.js';
+
 import {
   sanitizeDbError,
   createQueryLogMetadata,
@@ -41,7 +43,7 @@ const query = async (text, params) => {
     // Validate that query uses parameterized format for security
     if (params && params.length > 0 && !isParameterizedQuery(text)) {
       const sanitizedText = sanitizeQueryForLogging(text);
-      console.error('Invalid query format - must use parameterized placeholders:', sanitizedText);
+      logError('Invalid query format - must use parameterized placeholders:', sanitizedText);
       throw new Error('Query must use parameterized format ($1, $2, etc.) when parameters are provided');
     }
     
@@ -56,13 +58,13 @@ const query = async (text, params) => {
       // Only log param count, not actual param values to prevent sensitive data exposure
       const paramCount = Array.isArray(params) ? params.length : 0;
       const logMetadata = createQueryLogMetadata(sanitizedText, duration, res.rowCount, false);
-      console.log('Executed query', { ...logMetadata, paramCount });
+      logInfo('Executed query', { ...logMetadata, paramCount });
     }
     return res;
   } catch (err) {
     // Log sanitized error information to avoid exposing sensitive data
     const sanitizedError = sanitizeDbError(err);
-    console.error('Error executing query', sanitizedError);
+    logError('Error executing query', sanitizedError);
     throw err;
   } finally {
     client.release();
@@ -79,7 +81,7 @@ export async function dbHealthCheck() {
   } catch (err) {
     // Use sanitized error to avoid exposing sensitive connection details
     const sanitizedError = sanitizeDbError(err);
-    console.error('Database health check failed:', sanitizedError);
+    logError('Database health check failed:', sanitizedError);
     throw new Error(`Database connection failed: ${sanitizedError.message}`, { cause: err });
   }
 }
@@ -91,7 +93,7 @@ export async function closePool() {
     }
   } catch (err) {
     const sanitizedError = sanitizeDbError(err);
-    console.error('Error closing DB pool:', sanitizedError);
+    logError('Error closing DB pool:', sanitizedError);
   }
 }
 
