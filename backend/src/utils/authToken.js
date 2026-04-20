@@ -25,7 +25,8 @@ export const verifyAccessTokenClaims = (token, jwtSecret = getJwtSecret()) => {
     throw createJwtClaimError('Invalid token payload');
   }
 
-  const normalizedUserId = Number(decoded.userId);
+  const rawUserId = decoded.userId ?? decoded.id;
+  const normalizedUserId = Number(rawUserId);
   if (!Number.isInteger(normalizedUserId) || normalizedUserId <= 0 || typeof decoded.role !== 'string') {
     throw createJwtClaimError('Invalid token claims');
   }
