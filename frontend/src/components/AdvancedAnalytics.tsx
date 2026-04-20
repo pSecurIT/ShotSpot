@@ -28,6 +28,8 @@ import type {
   VideoEvent,
   VideoHighlightsResponse,
 } from '../types/advanced-analytics';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/AdvancedAnalytics.css';
 
 type AnalyticsTab = 'form' | 'fatigue' | 'predictions' | 'video';
@@ -71,6 +73,7 @@ const readThemeVariable = (name: string, fallback: string): string => {
 
 const AdvancedAnalytics: React.FC = () => {
   const exportRef = useRef<HTMLDivElement>(null);
+  const breadcrumbs = useBreadcrumbs();
   const [players, setPlayers] = useState<AnalyticsPlayerOption[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('form');
@@ -341,15 +344,12 @@ const AdvancedAnalytics: React.FC = () => {
   ];
 
   return (
-    <div className="advanced-analytics" ref={exportRef}>
-      <section className="advanced-analytics__hero">
-        <div>
-          <h2>Advanced Analytics Dashboard</h2>
-          <p>
-            Track player form, fatigue, and upcoming performance in one place. Date filters are sent to the analytics
-            endpoints so every chart and benchmark reflects the selected analysis window.
-          </p>
-        </div>
+    <PageLayout
+      title="Advanced Analytics Dashboard"
+      eyebrow="Analytics > Performance"
+      description="Track player form, fatigue, and upcoming performance in one place. Date filters are sent to analytics endpoints so every chart and benchmark reflects the selected analysis window."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <div className="advanced-analytics__actions">
           <button
             className="advanced-analytics__action-button"
@@ -368,7 +368,9 @@ const AdvancedAnalytics: React.FC = () => {
             {exporting === 'pdf' ? 'Exporting PDF…' : 'Export PDF'}
           </button>
         </div>
-      </section>
+      )}
+    >
+    <div className="advanced-analytics" ref={exportRef}>
 
       <section className="advanced-analytics__controls" aria-label="Advanced analytics filters">
         <div className="advanced-analytics__selector">
@@ -667,6 +669,7 @@ const AdvancedAnalytics: React.FC = () => {
         </>
       )}
     </div>
+    </PageLayout>
   );
 };
 

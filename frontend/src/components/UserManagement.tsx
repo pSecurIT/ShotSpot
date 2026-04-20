@@ -6,6 +6,8 @@ import CreateUserDialog from './CreateUserDialog';
 import EditUserDialog from './EditUserDialog';
 import StatePanel from './ui/StatePanel';
 import Toast from './ui/Toast';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 
 interface User {
   id: number;
@@ -19,6 +21,7 @@ interface User {
 }
 
 const UserManagement: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -224,13 +227,17 @@ const UserManagement: React.FC = () => {
   const showInlineError = Boolean(error) && !showLoadErrorState;
 
   return (
-    <div className="user-management">
-      <div style={styles.headerContainer}>
-        <h2>User Management</h2>
+    <PageLayout
+      title="User Management"
+      eyebrow="Settings > User Management"
+      description="Manage user roles, passwords, and account lifecycle."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <div style={styles.headerActions}>
           <button
             onClick={() => setCreateDialogOpen(true)}
             style={styles.createButton}
+            type="button"
           >
             + Create User
           </button>
@@ -238,11 +245,14 @@ const UserManagement: React.FC = () => {
             onClick={exportToCSV}
             style={styles.exportButton}
             title="Export users to CSV"
+            type="button"
           >
             📥 Export CSV
           </button>
         </div>
-      </div>
+      )}
+    >
+    <div className="user-management">
 
       {selectedUsers.size > 0 && (
         <div style={styles.bulkActionsBar}>
@@ -456,6 +466,7 @@ const UserManagement: React.FC = () => {
         />
       )}
     </div>
+    </PageLayout>
   );
 };
 

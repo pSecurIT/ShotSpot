@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AchievementGallery from './AchievementGallery';
 import Leaderboard from './Leaderboard';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import type { Achievement, LeaderboardPlayer } from '../types/achievements';
 import api from '../utils/api';
 import '../styles/AchievementsPage.css';
@@ -32,6 +34,7 @@ const CATEGORY_OPTIONS: Array<{ value: AchievementCategoryFilter; label: string 
 ];
 
 const AchievementsPage: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [players, setPlayers] = useState<PlayerOption[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
@@ -225,6 +228,12 @@ const AchievementsPage: React.FC = () => {
   };
 
   return (
+    <PageLayout
+      title="Achievements"
+      eyebrow="Analytics > Achievements"
+      description="Track badges, player milestones, and leaderboard momentum."
+      breadcrumbs={breadcrumbs}
+    >
     <div className="achievements-page">
       <header className="achievements-page__hero">
         <div>
@@ -459,6 +468,7 @@ const AchievementsPage: React.FC = () => {
         />
       </section>
     </div>
+    </PageLayout>
   );
 };
 

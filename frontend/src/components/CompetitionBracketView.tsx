@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { competitionsApi } from '../services/competitionsApi';
 import type { CompetitionTeam, TournamentBracket } from '../types/competitions';
 import { TournamentBracket as TournamentBracketSvg } from './TournamentBracket';
+import BackButton from './ui/BackButton';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/CompetitionManagement.css';
 
 const CompetitionBracketView: React.FC = () => {
-  const navigate = useNavigate();
   const { id } = useParams();
+  const breadcrumbs = useBreadcrumbs();
 
   const competitionId = Number(id);
 
@@ -46,13 +49,13 @@ const CompetitionBracketView: React.FC = () => {
   }, [competitionId]);
 
   return (
-    <div className="competition-management">
-      <div className="competition-management__header">
-        <h2>Tournament Bracket</h2>
-        <button type="button" className="secondary-button" onClick={() => navigate('/competitions')}>
-          Back
-        </button>
-      </div>
+    <PageLayout
+      title="Tournament Bracket"
+      eyebrow="Data > Competitions"
+      description="Manage tournament pairings, assign teams, and update winners."
+      breadcrumbs={breadcrumbs}
+      actions={<BackButton to="/competitions" label="Back to Competitions" />}
+    >
 
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
         <button
@@ -132,7 +135,7 @@ const CompetitionBracketView: React.FC = () => {
       {!loading && !error && !bracket && (
         <div className="empty-state" role="status" aria-live="polite">No bracket data available.</div>
       )}
-    </div>
+    </PageLayout>
   );
 };
 

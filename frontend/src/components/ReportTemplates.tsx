@@ -9,6 +9,8 @@ import {
 } from '../types/report-templates';
 import StatePanel from './ui/StatePanel';
 import Toast from './ui/Toast';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/ReportTemplates.css';
 
 const formatDate = (value?: string) => {
@@ -30,6 +32,7 @@ const downloadJson = (template: ReportTemplate) => {
 };
 
 const ReportTemplates: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -147,34 +150,36 @@ const ReportTemplates: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="report-templates-page">
-        <header className="report-templates-page__header">
-          <div>
-            <h1>Report Templates</h1>
-            <p>Loading your template library</p>
-          </div>
-        </header>
-        <StatePanel
-          variant="loading"
-          title="Loading report templates"
-          message="Preparing the saved layouts and the template editor."
-        />
-      </div>
+      <PageLayout
+        title="Report Templates"
+        eyebrow="Settings > Report Templates"
+        description="Design, duplicate, and manage reusable report layouts."
+        breadcrumbs={breadcrumbs}
+      >
+        <div className="report-templates-page">
+          <StatePanel
+            variant="loading"
+            title="Loading report templates"
+            message="Preparing the saved layouts and the template editor."
+          />
+        </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="report-templates-page">
-      <header className="report-templates-page__header">
-        <div>
-          <h1>Report Templates</h1>
-          <p>{templateSummary}</p>
-        </div>
-
+    <PageLayout
+      title="Report Templates"
+      eyebrow="Settings > Report Templates"
+      description={templateSummary}
+      breadcrumbs={breadcrumbs}
+      actions={(
         <button type="button" className="report-templates__primary-action" onClick={() => openCreate()}>
           + New Template
         </button>
-      </header>
+      )}
+    >
+      <div className="report-templates-page">
 
       {!showLoadErrorState && error && (
         <StatePanel
@@ -278,7 +283,8 @@ const ReportTemplates: React.FC = () => {
           onDismiss={() => setSuccess('')}
         />
       )}
-    </div>
+      </div>
+    </PageLayout>
   );
 };
 

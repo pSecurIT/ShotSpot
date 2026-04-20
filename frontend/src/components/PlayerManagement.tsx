@@ -4,6 +4,8 @@ import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useAuth } from '../contexts/AuthContext';
 import StatePanel from './ui/StatePanel';
 import Toast from './ui/Toast';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 
 interface Player {
   id: number;
@@ -36,6 +38,7 @@ interface Club {
 const PlayerManagement: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const breadcrumbs = useBreadcrumbs();
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
@@ -441,20 +444,23 @@ const PlayerManagement: React.FC = () => {
     });
 
   return (
-    <div className="player-management">
-      <div className="player-management-header">
-        <h2>Player Management</h2>
-        <div className="header-actions">
-          <button 
-            className="secondary-button"
-            onClick={() => setShowExportDialog(true)}
-            disabled={filteredPlayers.length === 0}
-          >
-            📥 Export Report
-            {selectedPlayers.size > 0 && ` (${selectedPlayers.size} selected)`}
-          </button>
-        </div>
-      </div>
+    <PageLayout
+      title="Player Management"
+      eyebrow="Data > Players"
+      description="Manage player records, filters, and export-ready reports."
+      breadcrumbs={breadcrumbs}
+      actions={(
+        <button
+          className="secondary-button"
+          onClick={() => setShowExportDialog(true)}
+          disabled={filteredPlayers.length === 0}
+          type="button"
+        >
+          📥 Export Report
+          {selectedPlayers.size > 0 && ` (${selectedPlayers.size} selected)`}
+        </button>
+      )}
+    >
       
       {loading && (
         <StatePanel
@@ -982,7 +988,7 @@ const PlayerManagement: React.FC = () => {
           onDismiss={() => setSuccess('')}
         />
       )}
-    </div>
+    </PageLayout>
   );
 };
 

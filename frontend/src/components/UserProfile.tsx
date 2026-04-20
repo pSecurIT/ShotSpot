@@ -1,9 +1,12 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/UserProfile.css';
 
 const UserProfile: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const { user } = useAuth();
   const { themePreference, setThemePreference } = useTheme();
 
@@ -12,13 +15,14 @@ const UserProfile: React.FC = () => {
   }
 
   return (
+    <PageLayout
+      title="My Profile"
+      eyebrow="Profile"
+      description="Account details and appearance preferences."
+      breadcrumbs={breadcrumbs}
+    >
     <div className="profile-page">
       <div className="profile-page__container">
-        <header className="profile-page__header">
-          <h2 className="profile-page__title">My Profile</h2>
-          <p className="profile-page__subtitle">Account details and preferences</p>
-        </header>
-
         <section className="card profile-card" aria-label="Account details">
           <dl className="profile-details">
             <div className="profile-details__row">
@@ -62,6 +66,7 @@ const UserProfile: React.FC = () => {
         <p className="profile-page__note">More profile settings can be added later.</p>
       </div>
     </div>
+    </PageLayout>
   );
 };
 

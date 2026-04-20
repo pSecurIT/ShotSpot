@@ -12,6 +12,8 @@ import ReportScheduleDialog from './ReportScheduleDialog';
 import ExecutionHistory from './ExecutionHistory';
 import StatePanel from './ui/StatePanel';
 import Toast from './ui/Toast';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/ScheduledReports.css';
 
 const scheduleTypeLabel: Record<ScheduleType, string> = {
@@ -45,6 +47,7 @@ const computeFallbackNextRun = (schedule: ScheduledReport): string => {
 };
 
 const ScheduledReports: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [scheduledReports, setScheduledReports] = useState<ScheduledReport[]>([]);
   const [templates, setTemplates] = useState<ReportTemplateOption[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
@@ -190,31 +193,32 @@ const ScheduledReports: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="scheduled-reports-page">
-        <div className="scheduled-reports-header">
-          <div>
-            <h2>Scheduled Reports</h2>
-            <p>Loading your automations</p>
-          </div>
+      <PageLayout
+        title="Scheduled Reports"
+        eyebrow="Settings > Scheduled Reports"
+        description="Automate report generation and delivery workflows."
+        breadcrumbs={breadcrumbs}
+      >
+        <div className="scheduled-reports-page">
+          <StatePanel
+            variant="loading"
+            title="Loading scheduled reports"
+            message="Pulling schedules, templates, teams, and execution history entry points together."
+          />
         </div>
-        <StatePanel
-          variant="loading"
-          title="Loading scheduled reports"
-          message="Pulling schedules, templates, teams, and execution history entry points together."
-        />
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="scheduled-reports-page">
-      <div className="scheduled-reports-header">
-        <div>
-          <h2>Scheduled Reports</h2>
-          <p>{scheduleCountLabel}</p>
-        </div>
-        <button type="button" onClick={handleOpenCreate}>+ New Schedule</button>
-      </div>
+    <PageLayout
+      title="Scheduled Reports"
+      eyebrow="Settings > Scheduled Reports"
+      description={scheduleCountLabel}
+      breadcrumbs={breadcrumbs}
+      actions={<button type="button" onClick={handleOpenCreate}>+ New Schedule</button>}
+    >
+      <div className="scheduled-reports-page">
 
       {!showLoadErrorState && error && (
         <StatePanel
@@ -326,7 +330,8 @@ const ScheduledReports: React.FC = () => {
           onDismiss={() => setSuccess('')}
         />
       )}
-    </div>
+      </div>
+    </PageLayout>
   );
 };
 
