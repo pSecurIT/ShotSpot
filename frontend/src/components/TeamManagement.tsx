@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,6 +23,7 @@ interface Club {
 }
 
 const TeamManagement: React.FC = () => {
+  const TEAM_LIST_PREFS_KEY = 'shotspot:teams:list-prefs:v1';
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const breadcrumbs = useBreadcrumbs();
@@ -31,6 +32,8 @@ const TeamManagement: React.FC = () => {
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null);
   const [selectedClubFilter, setSelectedClubFilter] = useState<string>('');
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'club_asc' | 'age_group_asc'>('name_asc');
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamAgeGroup, setNewTeamAgeGroup] = useState('');
   const [newTeamGender, setNewTeamGender] = useState('');
@@ -88,15 +91,134 @@ const TeamManagement: React.FC = () => {
     void loadInitialData();
   }, [loadInitialData]);
 
-  const filteredTeams = teams.filter((team) => {
-    if (selectedClubFilter && team.club_id?.toString() !== selectedClubFilter) return false;
-    if (selectedTeamFilter && team.id.toString() !== selectedTeamFilter) return false;
-    return true;
-  });
+  useEffect(() => {
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    try {
+      const rawValue = window.localStorage.getItem(TEAM_LIST_PREFS_KEY);
+      if (!rawValue) {
+        return;
+      }
+
+      const prefs = JSON.parse(rawValue) as {
+        selectedClubFilter?: string;
+        selectedTeamFilter?: string;
+        searchQuery?: string;
+        sortBy?: 'name_asc' | 'name_desc' | 'club_asc' | 'age_group_asc';
+      };
+
+      if (typeof prefs.selectedClubFilter === 'string') {
+        setSelectedClubFilter(prefs.selectedClubFilter);
+      }
+
+      if (typeof prefs.selectedTeamFilter === 'string') {
+        setSelectedTeamFilter(prefs.selectedTeamFilter);
+      }
+
+      if (typeof prefs.searchQuery === 'string') {
+        setSearchQuery(prefs.searchQuery);
+      }
+
+      if (prefs.sortBy === 'name_asc' || prefs.sortBy === 'name_desc' || prefs.sortBy === 'club_asc' || prefs.sortBy === 'age_group_asc') {
+        setSortBy(prefs.sortBy);
+      }
+    } catch {
+      // Ignore invalid persisted preferences.
+    }
+  }, [TEAM_LIST_PREFS_KEY]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    window.localStorage.setItem(
+      TEAM_LIST_PREFS_KEY,
+      JSON.stringify({
+        selectedClubFilter,
+        selectedTeamFilter,
+        searchQuery,
+        sortBy
+      })
+    );
+  }, [TEAM_LIST_PREFS_KEY, selectedClubFilter, selectedTeamFilter, searchQuery, sortBy]);
+
+  const filteredTeams = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return teams
+      .filter((team) => {
+        if (selectedClubFilter && team.club_id?.toString() !== selectedClubFilter) return false;
+        if (selectedTeamFilter && team.id.toString() !== selectedTeamFilter) return false;
+
+        if (!query) {
+          return true;
+        }
+
+        const teamName = team.name.toLowerCase();
+        const clubName = (team.club_name || '').toLowerCase();
+        const ageGroup = (team.age_group || '').toLowerCase();
+        const gender = (team.gender || '').toLowerCase();
+        return teamName.includes(query) || clubName.includes(query) || ageGroup.includes(query) || gender.includes(query);
+      })
+      .sort((left, right) => {
+        if (sortBy === 'name_asc') {
+          return left.name.localeCompare(right.name);
+        }
+
+        if (sortBy === 'name_desc') {
+          return right.name.localeCompare(left.name);
+        }
+
+        if (sortBy === 'club_asc') {
+          return (left.club_name || '').localeCompare(right.club_name || '');
+        }
+
+        return (left.age_group || '').localeCompare(right.age_group || '');
+      });
+  }, [teams, selectedClubFilter, selectedTeamFilter, searchQuery, sortBy]);
 
   const filterTeamOptions = selectedClubFilter
     ? teams.filter((team) => team.club_id?.toString() === selectedClubFilter)
     : teams;
+
+  const activeFilterChips = useMemo(() => {
+    const chips: string[] = [];
+    const sortLabelMap: Record<'name_asc' | 'name_desc' | 'club_asc' | 'age_group_asc', string> = {
+      name_asc: 'Name A-Z',
+      name_desc: 'Name Z-A',
+      club_asc: 'Club A-Z',
+      age_group_asc: 'Age group A-Z'
+    };
+
+    if (searchQuery.trim()) {
+      chips.push(`Search: "${searchQuery.trim()}"`);
+    }
+
+    if (selectedClubFilter) {
+      const clubName = clubs.find((club) => String(club.id) === selectedClubFilter)?.name || 'Selected club';
+      chips.push(`Club: ${clubName}`);
+    }
+
+    if (selectedTeamFilter) {
+      const teamName = teams.find((team) => String(team.id) === selectedTeamFilter)?.name || 'Selected team';
+      chips.push(`Team: ${teamName}`);
+    }
+
+    if (sortBy !== 'name_asc') {
+      chips.push(`Sort: ${sortLabelMap[sortBy]}`);
+    }
+
+    return chips;
+  }, [searchQuery, selectedClubFilter, selectedTeamFilter, sortBy, clubs, teams]);
+
+  const clearAllRefinements = useCallback(() => {
+    setSearchQuery('');
+    setSelectedClubFilter('');
+    setSelectedTeamFilter('');
+    setSortBy('name_asc');
+  }, []);
 
   const showLoadErrorState = !loading && Boolean(error) && teams.length === 0;
   const showInlineError = Boolean(error) && !showLoadErrorState;
@@ -440,6 +562,28 @@ const TeamManagement: React.FC = () => {
         <div className="list-header">
           <h3>Teams</h3>
           <div className="search-filters-container">
+            <div className="search-box">
+              <input
+                type="search"
+                placeholder="Search team, club, age group, or gender"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="search-input"
+                aria-label="Search teams"
+              />
+              {searchQuery.trim() && (
+                <button
+                  type="button"
+                  className="clear-search"
+                  onClick={() => setSearchQuery('')}
+                  title="Clear team search"
+                  aria-label="Clear team search"
+                >
+                  x
+                </button>
+              )}
+            </div>
+
             <div className="filters-row">
               <div className="filter-group">
                 <label htmlFor="club_filter">Club</label>
@@ -473,6 +617,40 @@ const TeamManagement: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              <div className="filter-group">
+                <label htmlFor="team_sort">Sort by</label>
+                <select
+                  id="team_sort"
+                  value={sortBy}
+                  onChange={(event) => setSortBy(event.target.value as 'name_asc' | 'name_desc' | 'club_asc' | 'age_group_asc')}
+                  className="filter-select"
+                >
+                  <option value="name_asc">Name A-Z</option>
+                  <option value="name_desc">Name Z-A</option>
+                  <option value="club_asc">Club A-Z</option>
+                  <option value="age_group_asc">Age group A-Z</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={clearAllRefinements}
+                disabled={!searchQuery.trim() && !selectedClubFilter && !selectedTeamFilter && sortBy === 'name_asc'}
+              >
+                Clear all
+              </button>
+            </div>
+
+            <div className="active-filters" aria-label="Active team filters">
+              {activeFilterChips.length > 0 ? (
+                activeFilterChips.map((chip) => (
+                  <span key={chip} className="active-filter-chip">{chip}</span>
+                ))
+              ) : (
+                <span className="active-filter-chip active-filter-chip--muted">No active filters</span>
+              )}
             </div>
 
             <div className="results-count" role="status" aria-live="polite">
@@ -486,12 +664,9 @@ const TeamManagement: React.FC = () => {
             <StatePanel
               variant="empty"
               title="No teams found."
-              message={selectedClubFilter || selectedTeamFilter ? 'Try a different club or team filter to find the team you need.' : 'Create a team to start managing rosters and exports.'}
-              actionLabel={selectedClubFilter || selectedTeamFilter ? 'Clear filters' : undefined}
-              onAction={selectedClubFilter || selectedTeamFilter ? () => {
-                setSelectedClubFilter('');
-                setSelectedTeamFilter('');
-              } : undefined}
+              message={searchQuery.trim() || selectedClubFilter || selectedTeamFilter || sortBy !== 'name_asc' ? 'Try broadening your search or clear all filters to find the right team.' : 'Create a team to start managing rosters and exports.'}
+              actionLabel={searchQuery.trim() || selectedClubFilter || selectedTeamFilter || sortBy !== 'name_asc' ? 'Clear all filters' : undefined}
+              onAction={searchQuery.trim() || selectedClubFilter || selectedTeamFilter || sortBy !== 'name_asc' ? clearAllRefinements : undefined}
               className="team-management__feedback"
             />
           ) : (
