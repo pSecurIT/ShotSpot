@@ -58,6 +58,10 @@ const ScheduledReports: React.FC = () => {
   const [editingSchedule, setEditingSchedule] = useState<ScheduledReport | null>(null);
   const [historyScheduleId, setHistoryScheduleId] = useState<number | null>(null);
   const [busyScheduleId, setBusyScheduleId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | ScheduleType>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [sortBy, setSortBy] = useState<'name_asc' | 'next_run_asc' | 'updated_desc'>('next_run_asc');
 
   const loadAllData = useCallback(async () => {
     setLoading(true);
@@ -189,6 +193,82 @@ const ScheduledReports: React.FC = () => {
     return `${activeCount} active of ${scheduledReports.length} schedules`;
   }, [scheduledReports]);
 
+  const filteredSchedules = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    const result = scheduledReports.filter((schedule) => {
+      if (typeFilter !== 'all' && schedule.schedule_type !== typeFilter) {
+        return false;
+      }
+
+      if (statusFilter === 'active' && !schedule.is_active) {
+        return false;
+      }
+
+      if (statusFilter === 'inactive' && schedule.is_active) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return (
+        schedule.name.toLowerCase().includes(query)
+        || (schedule.template_name || '').toLowerCase().includes(query)
+        || (schedule.team_name || 'all teams').toLowerCase().includes(query)
+        || scheduleTypeLabel[schedule.schedule_type].toLowerCase().includes(query)
+      );
+    });
+
+    return result.sort((left, right) => {
+      if (sortBy === 'name_asc') {
+        return left.name.localeCompare(right.name);
+      }
+
+      if (sortBy === 'updated_desc') {
+        return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+      }
+
+      const leftRun = left.next_run_at ? new Date(left.next_run_at).getTime() : Number.MAX_SAFE_INTEGER;
+      const rightRun = right.next_run_at ? new Date(right.next_run_at).getTime() : Number.MAX_SAFE_INTEGER;
+      return leftRun - rightRun;
+    });
+  }, [scheduledReports, searchQuery, typeFilter, statusFilter, sortBy]);
+
+  const hasActiveRefinements = Boolean(searchQuery.trim() || typeFilter !== 'all' || statusFilter !== 'all' || sortBy !== 'next_run_asc');
+
+  const activeFilterChips = useMemo(() => {
+    const chips: string[] = [];
+    const sortLabelMap: Record<'name_asc' | 'next_run_asc' | 'updated_desc', string> = {
+      name_asc: 'Name A-Z',
+      next_run_asc: 'Next run soonest',
+      updated_desc: 'Recently updated'
+    };
+
+    if (searchQuery.trim()) {
+      chips.push(`Search: ${searchQuery.trim()}`);
+    }
+    if (typeFilter !== 'all') {
+      chips.push(`Type: ${scheduleTypeLabel[typeFilter]}`);
+    }
+    if (statusFilter !== 'all') {
+      chips.push(`Status: ${statusFilter}`);
+    }
+    if (sortBy !== 'next_run_asc') {
+      chips.push(`Sort: ${sortLabelMap[sortBy]}`);
+    }
+
+    return chips;
+  }, [searchQuery, typeFilter, statusFilter, sortBy]);
+
+  const clearAllRefinements = useCallback(() => {
+    setSearchQuery('');
+    setTypeFilter('all');
+    setStatusFilter('all');
+    setSortBy('next_run_asc');
+  }, []);
+
   const showLoadErrorState = Boolean(error && scheduledReports.length === 0);
 
   if (loading) {
@@ -234,6 +314,101 @@ const ScheduledReports: React.FC = () => {
         />
       )}
 
+      {!showLoadErrorState && (
+        <div className="search-filters-container">
+          <div className="search-box">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="search-input"
+              placeholder="Search schedules, templates, teams, or schedule type"
+              aria-label="Search scheduled reports"
+            />
+            {searchQuery.trim() && (
+              <button
+                type="button"
+                className="clear-search"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear scheduled report search"
+                title="Clear search"
+              >
+                x
+              </button>
+            )}
+          </div>
+
+          <div className="filters-row">
+            <div className="filter-group">
+              <label htmlFor="scheduled_reports_type_filter">Type</label>
+              <select
+                id="scheduled_reports_type_filter"
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value as 'all' | ScheduleType)}
+                className="filter-select"
+              >
+                <option value="all">All types</option>
+                <option value="after_match">After Match</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="season_end">Season End</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="scheduled_reports_status_filter">Status</label>
+              <select
+                id="scheduled_reports_status_filter"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+                className="filter-select"
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="scheduled_reports_sort">Sort by</label>
+              <select
+                id="scheduled_reports_sort"
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as 'name_asc' | 'next_run_asc' | 'updated_desc')}
+                className="filter-select"
+              >
+                <option value="next_run_asc">Next run soonest</option>
+                <option value="updated_desc">Recently updated</option>
+                <option value="name_asc">Name A-Z</option>
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={clearAllRefinements}
+              className="secondary-button"
+              disabled={!hasActiveRefinements}
+            >
+              Clear all
+            </button>
+          </div>
+
+          <div className="active-filters" aria-label="Active scheduled report filters">
+            {activeFilterChips.length > 0 ? (
+              activeFilterChips.map((chip) => (
+                <span key={chip} className="active-filter-chip">{chip}</span>
+              ))
+            ) : (
+              <span className="active-filter-chip active-filter-chip--muted">No active filters</span>
+            )}
+          </div>
+
+          <div className="results-count" aria-live="polite">
+            Showing {filteredSchedules.length} of {scheduledReports.length} schedules
+          </div>
+        </div>
+      )}
+
       {showLoadErrorState ? (
         <StatePanel
           variant="error"
@@ -244,18 +419,18 @@ const ScheduledReports: React.FC = () => {
             void loadAllData();
           }}
         />
-      ) : scheduledReports.length === 0 ? (
+      ) : filteredSchedules.length === 0 ? (
         <StatePanel
           variant="empty"
-          title="No schedules configured yet"
-          message="Create a schedule to automate recurring report delivery."
-          actionLabel="Create First Schedule"
-          onAction={handleOpenCreate}
+          title={hasActiveRefinements ? 'No schedules match your filters' : 'No schedules configured yet'}
+          message={hasActiveRefinements ? 'Try broadening your search or clear all filters to find the right schedule.' : 'Create a schedule to automate recurring report delivery.'}
+          actionLabel={hasActiveRefinements ? 'Clear all filters' : 'Create First Schedule'}
+          onAction={hasActiveRefinements ? clearAllRefinements : handleOpenCreate}
           className="scheduled-reports-empty"
         />
       ) : (
         <div className="scheduled-reports-list" aria-label="Scheduled reports list">
-          {scheduledReports.map((schedule) => {
+          {filteredSchedules.map((schedule) => {
             const isBusy = busyScheduleId === schedule.id;
             const isHistoryOpen = historyScheduleId === schedule.id;
 
