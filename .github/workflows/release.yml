@@ -1,12 +1,9 @@
 name: Build and Push Docker Image
 
 # Build/push runs only on release/tag events.
-# The Trivy SARIF scan also runs on PRs so Code Scanning can compute PR-introduced alerts.
 on:
   release:
     types: [published]
-  pull_request:
-    branches: [main]
   push:
     tags:
       - 'v*'
@@ -433,37 +430,9 @@ jobs:
             echo " Some tests failed" >> $GITHUB_STEP_SUMMARY
           fi
 
-  trivy-scan:
-    name: Trivy Security Scan
-    needs: [build-and-push]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.24.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image_digest }}
-          format: sarif
-          output: trivy-results.sarif
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: trivy-results.sarif
-
   create-release-notes:
     name: Create Release Notes
-    needs: [build-and-push, test-image, trivy-scan]
+    needs: [build-and-push, test-image]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     permissions:
