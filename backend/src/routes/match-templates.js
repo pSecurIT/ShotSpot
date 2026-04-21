@@ -3,6 +3,8 @@ import { body, param, validationResult } from 'express-validator';
 import pool from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -30,7 +32,7 @@ router.get('/', async (req, res) => {
 
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching match templates:', error);
+    logError('Error fetching match templates:', error);
     res.status(500).json({ error: 'Failed to fetch match templates' });
   }
 });
@@ -66,7 +68,7 @@ router.get('/:id', [
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error fetching match template:', error);
+    logError('Error fetching match template:', error);
     res.status(500).json({ error: 'Failed to fetch match template' });
   }
 });
@@ -136,7 +138,7 @@ router.post('/', [
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Error creating match template:', error);
+    logError('Error creating match template:', error);
     
     if (error.code === '23505') {
       return res.status(409).json({ error: 'A template with this name already exists' });
@@ -246,7 +248,7 @@ router.put('/:id', [
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error updating match template:', error);
+    logError('Error updating match template:', error);
     res.status(500).json({ error: 'Failed to update match template' });
   }
 });
@@ -295,7 +297,7 @@ router.delete('/:id', [
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting match template:', error);
+    logError('Error deleting match template:', error);
     res.status(500).json({ error: 'Failed to delete match template' });
   }
 });
@@ -385,7 +387,7 @@ router.post('/:id/apply-to-game/:gameId', [
       game: gameResponse.rows[0]
     });
   } catch (error) {
-    console.error('Error applying template to game:', error);
+    logError('Error applying template to game:', error);
     res.status(500).json({ error: 'Failed to apply template to game' });
   }
 });
@@ -450,7 +452,7 @@ router.post('/:id/clone', [
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Error cloning match template:', error);
+    logError('Error cloning match template:', error);
     
     if (error.code === '23505') {
       return res.status(409).json({ error: 'A template with this name already exists' });

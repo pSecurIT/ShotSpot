@@ -2,6 +2,8 @@ import express from 'express';
 import db from '../db.js';
 import { auth } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -34,7 +36,7 @@ router.get('/', async (req, res) => {
     const result = await db.query(query, params);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching seasons:', err);
+    logError('Error fetching seasons:', err);
     res.status(500).json({ error: 'Failed to fetch seasons' });
   }
 });

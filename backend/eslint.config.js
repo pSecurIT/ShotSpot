@@ -30,6 +30,14 @@ export default [
     },
   },
   {
+    // Enforce centralized safe logging in backend source files.
+    files: ['src/**/*.js'],
+    ignores: ['src/utils/logger.js'],
+    rules: {
+      'no-console': 'error'
+    },
+  },
+  {
     files: ['**/*.test.js', '**/*.spec.js', 'test/**/*.js'],
     languageOptions: {
       globals: {

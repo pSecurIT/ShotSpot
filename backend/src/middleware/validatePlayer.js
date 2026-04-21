@@ -1,5 +1,7 @@
 import db from '../db.js';
 
+import { logError } from '../utils/logger.js';
+
 /**
  * Middleware to validate if all players in a match are registered in Twizzit
  */
@@ -31,7 +33,7 @@ export async function validatePlayersInMatch(req, res, next) {
 
     next();
   } catch (error) {
-    console.error('Error validating players in match:', error.message);
+    logError('Error validating players in match:', error.message);
     res.status(500).json({
       error: 'Failed to validate players in match',
       message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
