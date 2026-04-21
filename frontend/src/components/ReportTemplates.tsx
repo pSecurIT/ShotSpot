@@ -41,6 +41,10 @@ const ReportTemplates: React.FC = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [editorDraft, setEditorDraft] = useState<ReportTemplateDraft>(createEmptyTemplateDraft());
   const [editorKey, setEditorKey] = useState('template-new');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'summary' | 'detailed' | 'coach_focused' | 'custom'>('all');
+  const [scopeFilter, setScopeFilter] = useState<'all' | 'default' | 'custom'>('all');
+  const [sortBy, setSortBy] = useState<'updated_desc' | 'name_asc' | 'sections_desc'>('updated_desc');
 
   const selectedTemplate = useMemo(
     () => templates.find((template) => template.id === selectedTemplateId) || null,
@@ -146,6 +150,79 @@ const ReportTemplates: React.FC = () => {
     return `${templates.length} templates, ${customCount} custom`; 
   }, [templates]);
 
+  const filteredTemplates = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    const result = templates.filter((template) => {
+      if (typeFilter !== 'all' && template.type !== typeFilter) {
+        return false;
+      }
+
+      if (scopeFilter === 'default' && !template.is_default) {
+        return false;
+      }
+
+      if (scopeFilter === 'custom' && template.is_default) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return (
+        template.name.toLowerCase().includes(query)
+        || (template.description || '').toLowerCase().includes(query)
+        || template.type.toLowerCase().includes(query)
+      );
+    });
+
+    return result.sort((left, right) => {
+      if (sortBy === 'name_asc') {
+        return left.name.localeCompare(right.name);
+      }
+
+      if (sortBy === 'sections_desc') {
+        return right.sections.length - left.sections.length;
+      }
+
+      return new Date(right.updated_at || right.created_at || 0).getTime() - new Date(left.updated_at || left.created_at || 0).getTime();
+    });
+  }, [templates, searchQuery, typeFilter, scopeFilter, sortBy]);
+
+  const hasActiveRefinements = Boolean(searchQuery.trim() || typeFilter !== 'all' || scopeFilter !== 'all' || sortBy !== 'updated_desc');
+
+  const activeFilterChips = useMemo(() => {
+    const chips: string[] = [];
+    const sortLabelMap: Record<'updated_desc' | 'name_asc' | 'sections_desc', string> = {
+      updated_desc: 'Recently updated',
+      name_asc: 'Name A-Z',
+      sections_desc: 'Most sections'
+    };
+
+    if (searchQuery.trim()) {
+      chips.push(`Search: ${searchQuery.trim()}`);
+    }
+    if (typeFilter !== 'all') {
+      chips.push(`Type: ${typeFilter.replace('_', ' ')}`);
+    }
+    if (scopeFilter !== 'all') {
+      chips.push(`Scope: ${scopeFilter}`);
+    }
+    if (sortBy !== 'updated_desc') {
+      chips.push(`Sort: ${sortLabelMap[sortBy]}`);
+    }
+
+    return chips;
+  }, [searchQuery, typeFilter, scopeFilter, sortBy]);
+
+  const clearAllRefinements = useCallback(() => {
+    setSearchQuery('');
+    setTypeFilter('all');
+    setScopeFilter('all');
+    setSortBy('updated_desc');
+  }, []);
+
   const showLoadErrorState = Boolean(error && templates.length === 0);
 
   if (loading) {
@@ -202,6 +279,101 @@ const ReportTemplates: React.FC = () => {
             <p>Select a template to preview or edit it.</p>
           </div>
 
+          {!showLoadErrorState && (
+            <div className="search-filters-container">
+              <div className="search-box">
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="search-input"
+                  placeholder="Search templates by name, type, or description"
+                  aria-label="Search report templates"
+                />
+                {searchQuery.trim() && (
+                  <button
+                    type="button"
+                    className="clear-search"
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Clear template search"
+                    title="Clear search"
+                  >
+                    x
+                  </button>
+                )}
+              </div>
+
+              <div className="filters-row">
+                <div className="filter-group">
+                  <label htmlFor="report_template_type_filter">Type</label>
+                  <select
+                    id="report_template_type_filter"
+                    value={typeFilter}
+                    onChange={(event) => setTypeFilter(event.target.value as 'all' | 'summary' | 'detailed' | 'coach_focused' | 'custom')}
+                    className="filter-select"
+                  >
+                    <option value="all">All types</option>
+                    <option value="summary">Summary</option>
+                    <option value="detailed">Detailed</option>
+                    <option value="coach_focused">Coach focused</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+
+                <div className="filter-group">
+                  <label htmlFor="report_template_scope_filter">Scope</label>
+                  <select
+                    id="report_template_scope_filter"
+                    value={scopeFilter}
+                    onChange={(event) => setScopeFilter(event.target.value as 'all' | 'default' | 'custom')}
+                    className="filter-select"
+                  >
+                    <option value="all">All templates</option>
+                    <option value="default">Default templates</option>
+                    <option value="custom">Custom templates</option>
+                  </select>
+                </div>
+
+                <div className="filter-group">
+                  <label htmlFor="report_template_sort">Sort by</label>
+                  <select
+                    id="report_template_sort"
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value as 'updated_desc' | 'name_asc' | 'sections_desc')}
+                    className="filter-select"
+                  >
+                    <option value="updated_desc">Recently updated</option>
+                    <option value="name_asc">Name A-Z</option>
+                    <option value="sections_desc">Most sections</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={clearAllRefinements}
+                  className="secondary-button"
+                  disabled={!hasActiveRefinements}
+                >
+                  Clear all
+                </button>
+              </div>
+
+              <div className="active-filters" aria-label="Active report template filters">
+                {activeFilterChips.length > 0 ? (
+                  activeFilterChips.map((chip) => (
+                    <span key={chip} className="active-filter-chip">{chip}</span>
+                  ))
+                ) : (
+                  <span className="active-filter-chip active-filter-chip--muted">No active filters</span>
+                )}
+              </div>
+
+              <div className="results-count" aria-live="polite">
+                Showing {filteredTemplates.length} of {templates.length} templates
+              </div>
+            </div>
+          )}
+
           {showLoadErrorState ? (
             <StatePanel
               variant="error"
@@ -212,17 +384,17 @@ const ReportTemplates: React.FC = () => {
                 void loadTemplates();
               }}
             />
-          ) : templates.length === 0 ? (
+          ) : filteredTemplates.length === 0 ? (
             <StatePanel
               variant="empty"
-              title="No templates yet"
-              message="Create your first report template to define reusable report layouts."
-              actionLabel="Create template"
-              onAction={() => openCreate()}
+              title={hasActiveRefinements ? 'No templates match these filters' : 'No templates yet'}
+              message={hasActiveRefinements ? 'Try broadening your search or clear all filters to find the right template.' : 'Create your first report template to define reusable report layouts.'}
+              actionLabel={hasActiveRefinements ? 'Clear all filters' : 'Create template'}
+              onAction={hasActiveRefinements ? clearAllRefinements : () => openCreate()}
             />
           ) : (
             <div className="report-templates-page__list">
-              {templates.map((template) => (
+              {filteredTemplates.map((template) => (
                 <article
                   key={template.id}
                   className={`report-templates-page__list-item ${selectedTemplateId === template.id ? 'is-selected' : ''}`}

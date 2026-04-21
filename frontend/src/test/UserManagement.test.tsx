@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { vi } from 'vitest';
 import UserManagement from '../components/UserManagement';
 import api from '../utils/api';
@@ -151,7 +151,7 @@ describe('UserManagement Component', () => {
       renderUserManagement();
       
       await waitFor(() => {
-        const roleDropdowns = screen.getAllByRole('combobox');
+        const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
         expect(roleDropdowns).toHaveLength(3); // One for each user
       });
     });
@@ -178,7 +178,7 @@ describe('UserManagement Component', () => {
       });
       
       // Find the role dropdown for user1 (should be the third one)
-      const roleDropdowns = screen.getAllByRole('combobox');
+      const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
       const user1Dropdown = roleDropdowns[2]; // user1 is the third user
       
       fireEvent.change(user1Dropdown, { target: { value: 'coach' } });
@@ -197,7 +197,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const roleDropdowns = screen.getAllByRole('combobox');
+      const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
       const user1Dropdown = roleDropdowns[2];
       
       fireEvent.change(user1Dropdown, { target: { value: 'coach' } });
@@ -216,7 +216,7 @@ describe('UserManagement Component', () => {
       });
       
       // Find admin's role dropdown (first one)
-      const roleDropdowns = screen.getAllByRole('combobox');
+      const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
       const adminDropdown = roleDropdowns[0];
       
       fireEvent.change(adminDropdown, { target: { value: 'user' } });
@@ -232,7 +232,7 @@ describe('UserManagement Component', () => {
       renderUserManagement({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
       
       await waitFor(() => {
-        const roleDropdowns = screen.getAllByRole('combobox');
+        const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
         const adminDropdown = roleDropdowns[0];
         expect(adminDropdown).toBeDisabled();
       });
@@ -242,7 +242,7 @@ describe('UserManagement Component', () => {
       renderUserManagement({ id: 1, username: 'admin', role: 'admin', email: 'admin@example.com' });
       
       await waitFor(() => {
-        const roleDropdowns = screen.getAllByRole('combobox');
+        const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
         const coachDropdown = roleDropdowns[1]; // coach1
         const userDropdown = roleDropdowns[2]; // user1
         
@@ -266,7 +266,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const roleDropdowns = screen.getAllByRole('combobox');
+      const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
       const user1Dropdown = roleDropdowns[2];
       
       fireEvent.change(user1Dropdown, { target: { value: 'admin' } });
@@ -285,7 +285,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const roleDropdowns = screen.getAllByRole('combobox');
+      const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
       const user1Dropdown = roleDropdowns[2];
       
       fireEvent.change(user1Dropdown, { target: { value: 'admin' } });
@@ -304,7 +304,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const roleDropdowns = screen.getAllByRole('combobox');
+      const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
       const user1Dropdown = roleDropdowns[2];
       
       // Initial fetch on mount
@@ -359,7 +359,7 @@ describe('UserManagement Component', () => {
       });
       
       // Trigger role update that should clear any previous error state
-      const roleDropdowns = screen.getAllByRole('combobox');
+      const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
       fireEvent.change(roleDropdowns[2], { target: { value: 'coach' } });
       
       await waitFor(() => {
@@ -376,7 +376,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const roleDropdowns = screen.getAllByRole('combobox');
+      const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
       const user1Dropdown = roleDropdowns[2];
       
       // First role change
@@ -400,7 +400,7 @@ describe('UserManagement Component', () => {
       renderUserManagement();
       
       await waitFor(() => {
-        const roleDropdowns = screen.getAllByRole('combobox');
+        const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
         const dropdown = roleDropdowns[1]; // coach1's dropdown
         
         const options = Array.from(dropdown.querySelectorAll('option')).map(option => option.textContent);
@@ -412,7 +412,7 @@ describe('UserManagement Component', () => {
       renderUserManagement();
       
       await waitFor(() => {
-        const roleDropdowns = screen.getAllByRole('combobox');
+        const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
         
         // Check admin dropdown
         expect(roleDropdowns[0]).toHaveValue('admin');
@@ -473,7 +473,7 @@ describe('UserManagement Component', () => {
         expect(screen.getByText('user1')).toBeInTheDocument();
       });
       
-      const roleDropdowns = screen.getAllByRole('combobox');
+      const roleDropdowns = within(screen.getByRole('table', { name: 'User management table' })).getAllByRole('combobox');
       const user1Dropdown = roleDropdowns[2];
       
       fireEvent.change(user1Dropdown, { target: { value: 'admin' } });
@@ -1230,3 +1230,4 @@ describe('UserManagement Component', () => {
     });
   });
 });
+

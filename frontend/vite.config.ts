@@ -61,7 +61,9 @@ export default defineConfig({
           if (id.includes('node_modules')) {
             if (id.includes('/recharts/')) return 'charts';
             if (id.includes('/socket.io-client/')) return 'realtime';
-            if (id.includes('/html2canvas/') || id.includes('/jspdf/')) return 'export';
+            if (id.includes('/jspdf/')) return 'pdf';
+            if (id.includes('/html2canvas/')) return 'canvas';
+            if (id.includes('/xlsx/')) return 'spreadsheet';
             return 'vendor';
           }
         }
