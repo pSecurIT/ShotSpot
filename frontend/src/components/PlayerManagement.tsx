@@ -36,6 +36,7 @@ interface Club {
 }
 
 const PlayerManagement: React.FC = () => {
+  const PLAYER_LIST_PREFS_KEY = 'shotspot:players:list-prefs:v1';
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const breadcrumbs = useBreadcrumbs();
@@ -64,6 +65,18 @@ const PlayerManagement: React.FC = () => {
   });
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
+
+  const resetPlayerRefinements = useCallback(() => {
+    setSearchQuery('');
+    setSelectedTeamFilter('');
+    setSelectedGenderFilter('');
+    setShowInactive(true);
+    setSortBy('name');
+    setSortOrder('asc');
+    if (isAdmin && clubs.length > 0) {
+      setSelectedClubFilter(String(clubs[0].id));
+    }
+  }, [isAdmin, clubs]);
 
   const getValidationId = (fieldName: string, context: 'add' | 'edit') => `${context}-${fieldName}-error`;
 
@@ -133,6 +146,81 @@ const PlayerManagement: React.FC = () => {
   useEffect(() => {
     void loadInitialData();
   }, [loadInitialData]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    try {
+      const rawValue = window.localStorage.getItem(PLAYER_LIST_PREFS_KEY);
+      if (!rawValue) {
+        return;
+      }
+
+      const prefs = JSON.parse(rawValue) as {
+        selectedClubFilter?: string;
+        selectedTeamFilter?: string;
+        selectedGenderFilter?: string;
+        searchQuery?: string;
+        showInactive?: boolean;
+        sortBy?: 'name' | 'jersey' | 'team' | 'goals';
+        sortOrder?: 'asc' | 'desc';
+      };
+
+      if (typeof prefs.selectedClubFilter === 'string') {
+        setSelectedClubFilter(prefs.selectedClubFilter);
+      }
+      if (typeof prefs.selectedTeamFilter === 'string') {
+        setSelectedTeamFilter(prefs.selectedTeamFilter);
+      }
+      if (typeof prefs.selectedGenderFilter === 'string') {
+        setSelectedGenderFilter(prefs.selectedGenderFilter);
+      }
+      if (typeof prefs.searchQuery === 'string') {
+        setSearchQuery(prefs.searchQuery);
+      }
+      if (typeof prefs.showInactive === 'boolean') {
+        setShowInactive(prefs.showInactive);
+      }
+      if (prefs.sortBy === 'name' || prefs.sortBy === 'jersey' || prefs.sortBy === 'team' || prefs.sortBy === 'goals') {
+        setSortBy(prefs.sortBy);
+      }
+      if (prefs.sortOrder === 'asc' || prefs.sortOrder === 'desc') {
+        setSortOrder(prefs.sortOrder);
+      }
+    } catch {
+      // Ignore invalid persisted preferences.
+    }
+  }, [PLAYER_LIST_PREFS_KEY]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    window.localStorage.setItem(
+      PLAYER_LIST_PREFS_KEY,
+      JSON.stringify({
+        selectedClubFilter,
+        selectedTeamFilter,
+        selectedGenderFilter,
+        searchQuery,
+        showInactive,
+        sortBy,
+        sortOrder
+      })
+    );
+  }, [
+    PLAYER_LIST_PREFS_KEY,
+    selectedClubFilter,
+    selectedTeamFilter,
+    selectedGenderFilter,
+    searchQuery,
+    showInactive,
+    sortBy,
+    sortOrder
+  ]);
 
   const teamsForSelectedClub = newPlayer.club_id
     ? teams.filter(t => t.club_id === Number(newPlayer.club_id))
@@ -442,6 +530,26 @@ const PlayerManagement: React.FC = () => {
       
       return sortOrder === 'asc' ? comparison : -comparison;
     });
+
+  const defaultClubFilter = isAdmin && clubs.length > 0 ? String(clubs[0].id) : '';
+  const hasActiveRefinements = Boolean(
+    searchQuery.trim()
+    || selectedTeamFilter
+    || selectedGenderFilter
+    || !showInactive
+    || sortBy !== 'name'
+    || sortOrder !== 'asc'
+    || (isAdmin && selectedClubFilter !== defaultClubFilter)
+  );
+
+  const activeFilterChips = [
+    searchQuery.trim() ? `Search: "${searchQuery.trim()}"` : null,
+    isAdmin && selectedClubFilter ? `Club: ${clubs.find((club) => String(club.id) === selectedClubFilter)?.name || 'Selected club'}` : null,
+    selectedTeamFilter ? `Team: ${teams.find((team) => String(team.id) === selectedTeamFilter)?.name || 'Selected team'}` : null,
+    selectedGenderFilter ? `Gender: ${selectedGenderFilter}` : null,
+    !showInactive ? 'Active players only' : null,
+    `Sort: ${sortBy} (${sortOrder === 'asc' ? 'ascending' : 'descending'})`
+  ].filter((chip): chip is string => Boolean(chip));
 
   return (
     <PageLayout
@@ -879,6 +987,25 @@ const PlayerManagement: React.FC = () => {
                   Show inactive
                 </label>
               </div>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={resetPlayerRefinements}
+                disabled={!hasActiveRefinements}
+              >
+                Clear all
+              </button>
+            </div>
+
+            <div className="active-filters" aria-label="Active player filters">
+              {activeFilterChips.length > 0 ? (
+                activeFilterChips.map((chip) => (
+                  <span key={chip} className="active-filter-chip">{chip}</span>
+                ))
+              ) : (
+                <span className="active-filter-chip active-filter-chip--muted">No active filters</span>
+              )}
             </div>
             
             {/* Results count */}
@@ -893,17 +1020,9 @@ const PlayerManagement: React.FC = () => {
             <StatePanel
               variant="empty"
               title="No players found."
-              message={searchQuery || selectedTeamFilter || selectedGenderFilter || (isAdmin && selectedClubFilter) ? 'Try a broader filter or search to find the player you need.' : 'Add a player to start building the roster and report exports.'}
-              actionLabel={searchQuery || selectedTeamFilter || selectedGenderFilter || (isAdmin && selectedClubFilter) ? 'Clear filters' : undefined}
-              onAction={searchQuery || selectedTeamFilter || selectedGenderFilter || (isAdmin && selectedClubFilter) ? () => {
-                setSearchQuery('');
-                setSelectedTeamFilter('');
-                setSelectedGenderFilter('');
-                setShowInactive(true);
-                if (isAdmin && clubs.length > 0) {
-                  setSelectedClubFilter(String(clubs[0].id));
-                }
-              } : undefined}
+              message={hasActiveRefinements ? 'Try broadening your search or clear all refinements to find the right player faster.' : 'Add a player to start building the roster and report exports.'}
+              actionLabel={hasActiveRefinements ? 'Clear all filters' : undefined}
+              onAction={hasActiveRefinements ? resetPlayerRefinements : undefined}
               className="player-management__feedback"
             />
           ) : (

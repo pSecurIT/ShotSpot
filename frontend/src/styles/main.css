@@ -637,6 +637,11 @@ select option {
   flex-wrap: wrap;
 }
 
+.game-controls__search {
+  flex: 1 1 280px;
+  min-width: 240px;
+}
+
 .game-controls select {
   padding: 12px 16px;
   border: 2px solid var(--border-color);
@@ -3512,6 +3517,30 @@ select.error:focus {
   font-weight: 500;
   padding: 0.5rem 0;
   border-top: 1px solid var(--border-color);
+}
+
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.active-filter-chip--muted {
+  color: var(--text-secondary);
+  border-style: dashed;
 }
 
 .players-grid {
