@@ -12,6 +12,8 @@ import TwizzitApiClient from '../services/twizzit-api-client.js';
 import db from '../db.js';
 import * as twizzitService from '../services/twizzitService.js';
 
+import { logInfo, logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication to all routes
@@ -78,7 +80,7 @@ router.post(
         }
       });
     } catch (error) {
-      console.error('Failed to store credentials:', error);
+      logError('Failed to store credentials:', error);
       res.status(500).json({ 
         error: 'Failed to store credentials',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -99,7 +101,7 @@ router.get(
       const credentials = await twizzitAuth.listCredentials();
       res.json({ credentials });
     } catch (error) {
-      console.error('Failed to list credentials:', error);
+      logError('Failed to list credentials:', error);
       res.status(500).json({ 
         error: 'Failed to list credentials',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -124,7 +126,7 @@ router.delete(
       await twizzitAuth.deleteCredentials(parseInt(req.params.id));
       res.json({ message: 'Credentials deleted successfully' });
     } catch (error) {
-      console.error('Failed to delete credentials:', error);
+      logError('Failed to delete credentials:', error);
       res.status(500).json({ 
         error: 'Failed to delete credentials',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -171,7 +173,7 @@ router.post(
         });
       }
     } catch (error) {
-      console.error('Failed to verify connection:', error);
+      logError('Failed to verify connection:', error);
       res.status(500).json({ 
         error: 'Failed to verify connection',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -212,7 +214,7 @@ router.get(
         organizationName: credentials.organizationName
       });
     } catch (error) {
-      console.error('Failed to get organization info:', error);
+      logError('Failed to get organization info:', error);
       res.status(500).json({ 
         error: 'Failed to get organization information',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -240,7 +242,7 @@ router.get(
       const credentialId = parseInt(req.params.credentialId);
       const credentials = await twizzitAuth.getCredentials(credentialId);
 
-      console.log('[Twizzit Groups] Credentials loaded:', {
+      logInfo('[Twizzit Groups] Credentials loaded:', {
         organizationName: credentials.organizationName,
         apiEndpoint: credentials.apiEndpoint,
         username: credentials.apiUsername,
@@ -263,9 +265,9 @@ router.get(
         options.groupType = req.query.groupType;
       }
 
-      console.log('[Twizzit Groups] Fetching with options:', options);
+      logInfo('[Twizzit Groups] Fetching with options:', options);
       const result = await apiClient.getGroups(options);
-      console.log('[Twizzit Groups] Success! Received result:', { 
+      logInfo('[Twizzit Groups] Success! Received result:', { 
         groupCount: result.groups?.length || 0,
         total: result.total,
         hasMore: result.hasMore,
@@ -273,7 +275,7 @@ router.get(
       });
       res.json(result);
     } catch (error) {
-      console.error('[Twizzit Groups] Error details:', {
+      logError('[Twizzit Groups] Error details:', {
         message: error.message,
         status: error.status,
         response: error.response?.data,
@@ -315,19 +317,19 @@ router.get(
         organizationId: req.query.organizationId || undefined
       });
 
-      console.log('[Twizzit Seasons] Fetching seasons from API...');
+      logInfo('[Twizzit Seasons] Fetching seasons from API...');
       
       // Fetch seasons directly from Twizzit API
       const result = await apiClient.getSeasons({});
       
-      console.log('[Twizzit Seasons] Successfully fetched seasons:', { 
+      logInfo('[Twizzit Seasons] Successfully fetched seasons:', { 
         seasonCount: result.seasons.length,
         sampleSeason: result.seasons[0] ? { id: result.seasons[0].id, name: result.seasons[0].name } : null
       });
       
       res.json(result);
     } catch (error) {
-      console.error('[Twizzit Seasons] Error details:', {
+      logError('[Twizzit Seasons] Error details:', {
         message: error.message,
         status: error.status,
         response: error.response?.data,
@@ -355,7 +357,7 @@ router.get('/verify', async (req, res) => {
     }
     return res.status(500).json({ message: 'Failed to verify Twizzit API connection.' });
   } catch (error) {
-    console.error('Error verifying Twizzit API connection:', error);
+    logError('Error verifying Twizzit API connection:', error);
     return res.status(500).json({ 
       error: 'Failed to verify Twizzit API connection',
       message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -392,7 +394,7 @@ router.post(
           message: error.message
         });
       }
-      console.error('Failed to sync clubs:', error);
+      logError('Failed to sync clubs:', error);
       res.status(500).json({ 
         error: 'Failed to sync clubs',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -436,7 +438,7 @@ router.post(
           message: error.message
         });
       }
-      console.error('Failed to sync teams:', error);
+      logError('Failed to sync teams:', error);
       res.status(500).json({ 
         error: 'Failed to sync teams',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -477,7 +479,7 @@ router.post(
           message: error.message
         });
       }
-      console.error('Failed to sync players:', error);
+      logError('Failed to sync players:', error);
       res.status(500).json({ 
         error: 'Failed to sync players',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -513,7 +515,7 @@ router.post(
       res.json(preview);
     } catch (error) {
       const status = error?.status || 500;
-      console.error('Failed to preview players:', error);
+      logError('Failed to preview players:', error);
       res.status(status).json({
         error: 'Failed to preview players',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
@@ -559,7 +561,7 @@ router.get(
 
       res.json({ config: apiConfig });
     } catch (error) {
-      console.error('Failed to get sync config:', error);
+      logError('Failed to get sync config:', error);
       res.status(500).json({ 
         error: 'Failed to get sync configuration',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -617,7 +619,7 @@ router.put(
         config: apiConfig
       });
     } catch (error) {
-      console.error('Failed to update sync config:', error);
+      logError('Failed to update sync config:', error);
       res.status(500).json({ 
         error: 'Failed to update sync configuration',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -667,7 +669,7 @@ router.get(
       
       res.json({ history });
     } catch (error) {
-      console.error('Failed to get sync history:', error);
+      logError('Failed to get sync history:', error);
       res.status(500).json({ 
         error: 'Failed to get sync history',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -714,7 +716,7 @@ router.get(
 
       res.json({ mappings });
     } catch (error) {
-      console.error('Failed to get team mappings:', error);
+      logError('Failed to get team mappings:', error);
       res.status(500).json({ 
         error: 'Failed to get team mappings',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
@@ -784,7 +786,7 @@ router.get(
       
       res.json({ mappings });
     } catch (error) {
-      console.error('Failed to get player mappings:', error);
+      logError('Failed to get player mappings:', error);
       res.status(500).json({ 
         error: 'Failed to get player mappings',
         message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message

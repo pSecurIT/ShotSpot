@@ -2,6 +2,8 @@ import express from 'express';
 import db from '../db.js';
 import { auth } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // All routes require authentication
@@ -25,7 +27,7 @@ router.get('/summary', async (_req, res) => {
       games: gamesResult.rows[0]?.count ?? 0
     });
   } catch (err) {
-    console.error('Error fetching dashboard summary:', err);
+    logError('Error fetching dashboard summary:', err);
     res.status(500).json({ error: 'Failed to fetch dashboard summary' });
   }
 });

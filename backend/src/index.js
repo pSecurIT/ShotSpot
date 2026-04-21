@@ -53,11 +53,13 @@ if (process.env.NODE_ENV === 'test') {
   }
 } else {
   // Production: do not load local .env files so docker/compose env vars win
-  console.log('NODE_ENV=production — using container environment variables');
+  logInfo('NODE_ENV=production — using container environment variables');
 }
 
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+
+import { logInfo, logWarn, logError } from './utils/logger.js';
 
 const [{ default: validateEnv }, { default: app }, authModule, { default: db }, initAdminModule] =
   await Promise.all([
@@ -76,8 +78,8 @@ validateEnv();
 
 // Critical: Handle unhandled promise rejections and exceptions to prevent silent crashes
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ UNHANDLED REJECTION:', reason);
-  console.error('Promise:', promise);
+  logError('❌ UNHANDLED REJECTION:', reason);
+  logError('Promise:', promise);
   // Don't exit in development to keep debugging
   if (process.env.NODE_ENV === 'production') {
     process.exit(1);
@@ -85,7 +87,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('❌ UNCAUGHT EXCEPTION:', error);
+  logError('❌ UNCAUGHT EXCEPTION:', error);
   // Don't exit in development to keep debugging
   if (process.env.NODE_ENV === 'production') {
     process.exit(1);
@@ -94,7 +96,7 @@ process.on('uncaughtException', (error) => {
 
 try {
   await db.healthCheck();
-  console.log('✓ Database connection established');
+  logInfo('✓ Database connection established');
   
   // Ensure exports directory exists
   if (process.env.NODE_ENV !== 'test') {
@@ -106,9 +108,9 @@ try {
       const __dirname = path.dirname(__filename);
       const exportsDir = path.join(__dirname, '../exports');
       await fs.access(exportsDir).catch(() => fs.mkdir(exportsDir, { recursive: true }));
-      console.log('✓ Exports directory ready');
+      logInfo('✓ Exports directory ready');
     } catch (dirErr) {
-      console.warn('⚠️  Could not create exports directory:', dirErr.message);
+      logWarn('⚠️  Could not create exports directory:', dirErr.message);
     }
   }
   
@@ -117,18 +119,18 @@ try {
     try {
       await initDefaultAdmin();
     } catch (adminErr) {
-      console.warn('⚠️  Default admin initialization encountered an issue:', adminErr.message);
+      logWarn('⚠️  Default admin initialization encountered an issue:', adminErr.message);
       // Don't exit - this is not fatal, admin might already exist or be created manually
     }
   }
 } catch (err) {
-  console.error('✗ Failed to connect to database:', err.message);
-  console.error('  Connection details:', {
+  logError('✗ Failed to connect to database:', err.message);
+  logError('  Connection details:', {
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'not set'
   });
-  console.error('  Please check your database configuration and ensure PostgreSQL is running.');
+  logError('  Please check your database configuration and ensure PostgreSQL is running.');
   process.exit(1);
 }
 
@@ -155,7 +157,7 @@ io.use((socket, next) => {
   
   if (!token) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('WebSocket auth failed: No token provided');
+      logError('WebSocket auth failed: No token provided');
     }
     return next(new Error('Authentication token required'));
   }
@@ -165,12 +167,12 @@ io.use((socket, next) => {
     socket.userId = decoded.userId;
     socket.userRole = decoded.role;
     if (process.env.NODE_ENV !== 'test') {
-      console.log(`✓ WebSocket auth successful for user: ${socket.userId}`);
+      logInfo(`✓ WebSocket auth successful for user: ${socket.userId}`);
     }
     next();
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('WebSocket auth failed:', err.message);
+      logError('WebSocket auth failed:', err.message);
     }
     next(new Error('Invalid authentication token'));
   }
@@ -179,14 +181,14 @@ io.use((socket, next) => {
 // WebSocket connection handler
 io.on('connection', (socket) => {
   if (process.env.NODE_ENV !== 'test') {
-    console.log(`✓ WebSocket client connected: ${socket.id} (User: ${socket.userId})`);
+    logInfo(`✓ WebSocket client connected: ${socket.id} (User: ${socket.userId})`);
   }
 
   // Join game room for live updates
   socket.on('join-game', (gameId) => {
     socket.join(`game-${gameId}`);
     if (process.env.NODE_ENV !== 'test') {
-      console.log(`User ${socket.userId} joined game room: ${gameId}`);
+      logInfo(`User ${socket.userId} joined game room: ${gameId}`);
     }
   });
 
@@ -194,13 +196,13 @@ io.on('connection', (socket) => {
   socket.on('leave-game', (gameId) => {
     socket.leave(`game-${gameId}`);
     if (process.env.NODE_ENV !== 'test') {
-      console.log(`User ${socket.userId} left game room: ${gameId}`);
+      logInfo(`User ${socket.userId} left game room: ${gameId}`);
     }
   });
 
   socket.on('disconnect', () => {
     if (process.env.NODE_ENV !== 'test') {
-      console.log(`✗ WebSocket client disconnected: ${socket.id}`);
+      logInfo(`✗ WebSocket client disconnected: ${socket.id}`);
     }
   });
 });
@@ -209,6 +211,6 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log('WebSocket server ready for connections');
+  logInfo(`Server running on port ${PORT}`);
+  logInfo('WebSocket server ready for connections');
 });

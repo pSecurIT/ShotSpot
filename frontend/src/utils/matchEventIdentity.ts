@@ -1,3 +1,5 @@
+import { createSecureUuidV4 } from './secureRandom';
+
 const MATCH_EVENT_CREATE_PATHS = [
   /^\/api\/shots\/\d+$/,
   /^\/api\/events\/\d+$/,
@@ -17,20 +19,8 @@ const MATCH_EVENT_CREATE_PATHS = [
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const createFallbackUuid = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
-    const randomValue = Math.floor(Math.random() * 16);
-    const nibble = char === 'x' ? randomValue : ((randomValue & 0x3) | 0x8);
-    return nibble.toString(16);
-  });
-};
-
 export const createClientUuid = (): string => {
-  if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID();
-  }
-
-  return createFallbackUuid();
+  return createSecureUuidV4();
 };
 
 const normalizePath = (url: string): string => {

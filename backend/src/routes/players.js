@@ -4,6 +4,8 @@ import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
+import { logInfo, logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Validation middleware
@@ -51,7 +53,7 @@ router.use(auth);
 
 // Debug middleware to log all requests
 router.use((req, res, next) => {
-  console.log('Player Route Request:', {
+  logInfo('Player Route Request:', {
     method: req.method,
     path: req.path,
     user: req.user,
@@ -236,7 +238,7 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
     if (err.code === '23503') { // Foreign key violation
       return res.status(400).json({ error: 'Team does not exist' });
     }
-    console.error('Create player error:', err);
+    logError('Create player error:', err);
     res.status(500).json({ error: 'Failed to create player' });
   }
 });
@@ -316,7 +318,7 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
     if (err.code === '23503') { // Foreign key violation
       return res.status(400).json({ error: 'Team does not exist' });
     }
-    console.error('Update player error:', err);
+    logError('Update player error:', err);
     res.status(500).json({ error: 'Failed to update player' });
   }
 });

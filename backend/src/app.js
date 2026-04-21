@@ -10,6 +10,7 @@ import path from 'node:path';
 import fs from 'fs';
 import csrf from './middleware/csrf.js';
 import { errorNotificationService } from './utils/errorNotification.js';
+import { logError, logInfo, logWarn } from './utils/logger.js';
 import authRoutes from './routes/auth.js';
 import clubRoutes from './routes/clubs.js';
 import teamRoutes from './routes/teams.js';
@@ -90,7 +91,7 @@ app.use(helmet({
 
 // Custom CSP report handler
 app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), (req, res) => {
-  console.error('CSP Violation:', req.body);
+  logError('CSP Violation:', req.body);
   res.status(204).end();
 });
 
@@ -156,7 +157,7 @@ const corsOptions = {
     } else {
       // Log but don't crash - just deny the request
       if (process.env.NODE_ENV !== 'test') {
-        console.warn(`⚠️  CORS: Blocked request from origin: ${origin}`);
+        logWarn('CORS: Blocked request from origin:', origin);
       }
       // Return false to deny, but DON'T throw error (causes crash)
       callback(null, false);
@@ -181,22 +182,20 @@ const corsOptions = {
 try {
   app.use(cors(corsOptions));
 } catch (corsError) {
-  console.error('❌ CORS middleware error:', corsError);
+  logError('CORS middleware error:', corsError);
   throw corsError;
 }
 
 // Debug middleware (silent in test environment)
 app.use((req, res, next) => {
-  if (process.env.NODE_ENV !== 'test') {
-    console.log('Request:', {
-      method: req.method,
-      path: req.path,
-      headers: {
-        authorization: req.headers.authorization ? 'present' : 'missing',
-        'content-type': req.headers['content-type']
-      }
-    });
-  }
+  logInfo('Request:', {
+    method: req.method,
+    path: req.path,
+    headers: {
+      authorization: req.headers.authorization ? 'present' : 'missing',
+      'content-type': req.headers['content-type']
+    }
+  });
   next();
 });
 
@@ -332,7 +331,7 @@ app.use('/api/seasons', seasonsRoutes);
 app.use((err, req, res, _next) => {
   // Log error details securely
   const errorId = crypto.randomUUID();
-  const logError = {
+  const errorContext = {
     id: errorId,
     timestamp: new Date().toISOString(),
     method: req.method,
@@ -347,7 +346,7 @@ app.use((err, req, res, _next) => {
   };
   
   // Always log errors to console for debugging
-  console.error('Error caught by global handler:', logError);
+  logError('Error caught by global handler:', errorContext);
   
   // Log based on environment configuration
   if (process.env.ENABLE_ERROR_LOGGING === 'true') {
@@ -363,7 +362,7 @@ app.use((err, req, res, _next) => {
       // Write to log file
       fs.appendFileSync(
         logPath,
-        JSON.stringify({ ...logError, level: logLevel }) + '\n'
+        JSON.stringify({ ...errorContext, level: logLevel }) + '\n'
       );
       
       // Send notification for critical errors if webhook is configured
@@ -371,10 +370,10 @@ app.use((err, req, res, _next) => {
         fetch(process.env.ERROR_NOTIFICATION_WEBHOOK, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(logError)
+          body: JSON.stringify(errorContext)
         }).catch(webhookErr => {
           // Log webhook failures but don't crash the app
-          console.error('Failed to send error notification to webhook:', webhookErr.message);
+          logError('Failed to send error notification to webhook:', webhookErr.message);
         });
       }
     }
@@ -435,7 +434,7 @@ app.use((err, req, res, _next) => {
   if (error.status >= 500 || error.status === 429 || error.status === 401) {
     errorNotificationService.notifyTeam(logError).catch(notifyErr => {
       // Don't crash the app if notification fails
-      console.error('Failed to send error notification:', notifyErr.message);
+      logError('Failed to send error notification:', notifyErr.message);
     });
   }
 });
@@ -463,7 +462,7 @@ if (process.env.NODE_ENV !== 'test') {
   const serveFrontend = Boolean(frontendDistPath);
 
   if (serveFrontend) {
-    console.log('Frontend dist folder found, serving static files from:', frontendDistPath);
+    logInfo('Frontend dist folder found, serving static files from:', frontendDistPath);
 
     // Serve static files
     app.use(
@@ -500,7 +499,7 @@ if (process.env.NODE_ENV !== 'test') {
       return res.status(404).json({ error: 'Route not found' });
     });
   } else {
-    console.log('Frontend dist folder not found. Run "npm run build" in frontend directory to build.');
+    logInfo('Frontend dist folder not found. Run "npm run build" in frontend directory to build.');
 
     // 404 handler when frontend is not built
     app.use((req, res) => {

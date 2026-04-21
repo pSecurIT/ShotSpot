@@ -3,6 +3,8 @@ import { body, param, query, validationResult } from 'express-validator';
 import pool from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -105,11 +107,11 @@ router.post(
             return res.status(200).json(existingPossession);
           }
         } catch (lookupError) {
-          console.error('Error resolving duplicate possession by client_uuid:', lookupError);
+          logError('Error resolving duplicate possession by client_uuid:', lookupError);
         }
       }
 
-      console.error('Error creating possession:', error);
+      logError('Error creating possession:', error);
       
       // Defensive mapping for FK errors if they still occur
       if (error && error.code === '23503') {
@@ -163,7 +165,7 @@ router.put(
 
       res.json(updateResult.rows[0]);
     } catch (error) {
-      console.error('Error ending possession:', error);
+      logError('Error ending possession:', error);
       res.status(500).json({ error: 'Failed to end possession' });
     }
   }
@@ -223,7 +225,7 @@ router.get(
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (error) {
-      console.error('Error fetching possessions:', error);
+      logError('Error fetching possessions:', error);
       res.status(500).json({ error: 'Failed to fetch possessions' });
     }
   }
@@ -261,7 +263,7 @@ router.get(
 
       res.json(result.rows[0]);
     } catch (error) {
-      console.error('Error fetching active possession:', error);
+      logError('Error fetching active possession:', error);
       res.status(500).json({ error: 'Failed to fetch active possession' });
     }
   }
@@ -301,7 +303,7 @@ router.get(
 
       res.json(result.rows);
     } catch (error) {
-      console.error('Error fetching possession stats:', error);
+      logError('Error fetching possession stats:', error);
       res.status(500).json({ error: 'Failed to fetch possession stats' });
     }
   }
@@ -346,7 +348,7 @@ router.post(
       const possession = await fetchCompletePossessionById(possessionId);
       res.status(200).json(possession);
     } catch (error) {
-      console.error('Error confirming possession:', error);
+      logError('Error confirming possession:', error);
       res.status(500).json({ error: 'Failed to confirm possession' });
     }
   }
@@ -384,7 +386,7 @@ router.patch(
 
       res.json(result.rows[0]);
     } catch (error) {
-      console.error('Error incrementing shots:', error);
+      logError('Error incrementing shots:', error);
       res.status(500).json({ error: 'Failed to increment shots' });
     }
   }

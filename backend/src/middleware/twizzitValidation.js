@@ -6,6 +6,8 @@
 
 import db from '../db.js';
 
+import { logError } from '../utils/logger.js';
+
 /**
  * Check if a single player is eligible for official match participation
  * @param {number} playerId - The local player ID
@@ -155,7 +157,7 @@ export const validateGameRosterTwizzit = async (req, res, next) => {
     
     next();
   } catch (error) {
-    console.error('Twizzit validation error:', error);
+    logError('Twizzit validation error:', error);
     return res.status(500).json({ 
       error: 'Failed to validate Twizzit registration',
       details: error.message 

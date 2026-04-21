@@ -1,70 +1,28 @@
-import jwt from 'jsonwebtoken';
-
-// Helper to log errors only in non-test environments
-const isTest = process.env.NODE_ENV === 'test';
-const logError = (...args) => {
-  if (!isTest) console.error(...args);
-};
+import { logError, logInfo } from '../utils/logger.js';
+import { extractBearerToken, getJwtSecret, verifyAccessTokenClaims } from '../utils/authToken.js';
 
 const auth = (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      logError('auth: No authorization header');
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1]; // Bearer <token>
+    const token = extractBearerToken(req.headers.authorization);
     if (!token) {
-      logError('auth: Missing token in authorization header');
+      logError('auth: Missing or malformed Bearer token');
       return res.status(401).json({ error: 'Invalid token format' });
     }
 
-    // Validate JWT token structure (must have 3 parts: header.payload.signature)
-    const tokenParts = token.split('.');
-    if (tokenParts.length !== 3) {
-      logError('auth: Malformed JWT token - expected 3 parts, got', tokenParts.length);
-      return res.status(401).json({ error: 'Invalid token format' });
-    }
-
-    const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
-    
-    // Decode token payload for logging (without verification)
-    const payloadB64 = tokenParts[1];
-    let rawPayload;
-    try {
-      if (!payloadB64 || payloadB64.length === 0) {
-        throw new Error('Empty payload');
-      }
-      rawPayload = Buffer.from(payloadB64, 'base64').toString();
-      // Only log in non-test environments
-      if (process.env.NODE_ENV !== 'test') {
-        console.log('Auth: Raw token payload:', rawPayload);
-      }
-    } catch (err) {
-      logError('auth: Error decoding token payload:', err.message);
-      return res.status(401).json({ error: 'Invalid token format' });
-    }
-
-    // Verify and decode token
-    const decoded = jwt.verify(token, jwtSecret);
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('Auth: Verified token payload:', decoded);
-    }
-    
-    req.user = {
-      ...decoded,
-      role: decoded.role.toLowerCase(), // Normalize role here
-      passwordMustChange: decoded.passwordMustChange || false
-    };
-
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('Auth: Final user object:', req.user);
-    }
+    const reqUser = verifyAccessTokenClaims(token, getJwtSecret());
+    req.user = reqUser;
+    logInfo('Auth: Verified token payload:', reqUser);
+    logInfo('Auth: Final user object:', req.user);
 
     // Check if password must be changed (allow only change-password and logout endpoints)
     if (req.user.passwordMustChange) {
-      const allowedPaths = ['/api/auth/change-password', '/api/auth/logout', '/api/health'];
+      const allowedPaths = [
+        '/api/auth/change-password',
+        '/api/auth/logout',
+        '/api/health',
+        '/change-password',
+        '/logout'
+      ];
       const isAllowedPath = allowedPaths.some(path => req.path === path || req.path.startsWith(path));
       
       if (!isAllowedPath) {
@@ -94,14 +52,12 @@ const auth = (req, res, next) => {
 const requireRole = (roles) => {
   return (req, res, next) => {
     // Debug info for request (only in non-test environments)
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('requireRole: Checking request', {
-        path: req.path,
-        method: req.method,
-        user: req.user,
-        requestedRoles: roles
-      });
-    }
+    logInfo('requireRole: Checking request', {
+      path: req.path,
+      method: req.method,
+      user: req.user,
+      requestedRoles: roles
+    });
 
     if (!req.user) {
       logError('requireRole: No user object found in request');
@@ -120,14 +76,12 @@ const requireRole = (roles) => {
       : [roles.toLowerCase()];
 
     // Debug information for role check (only in non-test environments)
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('requireRole: Role validation:', {
-        userRole,
-        allowedRoles,
-        hasRequiredRole: allowedRoles.includes(userRole),
-        userObject: req.user
-      });
-    }
+    logInfo('requireRole: Role validation:', {
+      userRole,
+      allowedRoles,
+      hasRequiredRole: allowedRoles.includes(userRole),
+      userObject: req.user
+    });
 
     if (!allowedRoles.includes(userRole)) {
       logError(`requireRole: User role ${userRole} not in allowed roles:`, allowedRoles);
@@ -143,11 +97,10 @@ const requireRole = (roles) => {
 
 // Export token verification function for WebSocket auth
 const verifyToken = (token) => {
-  const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
-  const decoded = jwt.verify(token, jwtSecret);
+  const decoded = verifyAccessTokenClaims(token, getJwtSecret());
   return {
     userId: decoded.userId,
-    role: decoded.role.toLowerCase()
+    role: decoded.role
   };
 };
 

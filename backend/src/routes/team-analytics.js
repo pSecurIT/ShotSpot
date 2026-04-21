@@ -3,6 +3,8 @@ import { param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 const POINTS_PER_WIN = 2;
@@ -125,7 +127,7 @@ router.get('/head-to-head/:club1Id/:club2Id', [
       recent_games: recentGames.rows,
     });
   } catch (err) {
-    console.error('Error fetching head-to-head:', err);
+    logError('Error fetching head-to-head:', err);
     return res.status(500).json({ error: 'Failed to fetch head-to-head data' });
   }
 });
@@ -145,7 +147,7 @@ router.get('/rankings', [
   try {
     return res.json(await calculateTeamRankings(seasonId, limit));
   } catch (err) {
-    console.error('Error fetching rankings:', err);
+    logError('Error fetching rankings:', err);
     return res.status(500).json({ error: 'Failed to fetch rankings' });
   }
 });
@@ -170,7 +172,7 @@ router.get('/rankings/team/:teamId', [
 
     return res.json(await calculateTeamRanking(clubId, seasonId));
   } catch (err) {
-    console.error('Error fetching team ranking:', err);
+    logError('Error fetching team ranking:', err);
     return res.status(500).json({ error: 'Failed to fetch team ranking' });
   }
 });
@@ -188,7 +190,7 @@ router.post('/rankings/recalculate', [
   try {
     return res.json({ message: 'Rankings recalculated successfully', rankings: await calculateTeamRankings(seasonId) });
   } catch (err) {
-    console.error('Error recalculating rankings:', err);
+    logError('Error recalculating rankings:', err);
     return res.status(500).json({ error: 'Failed to recalculate rankings' });
   }
 });
@@ -303,7 +305,7 @@ router.get('/compare', [
       ]
     });
   } catch (err) {
-    console.error('Error comparing teams:', err);
+    logError('Error comparing teams:', err);
     return res.status(500).json({ error: 'Failed to compare teams' });
   }
 });
@@ -363,7 +365,7 @@ router.get('/:teamId/season-overview', [
       previous_season_comparison: previousSeasonComparison,
     });
   } catch (err) {
-    console.error('Error fetching season overview:', err);
+    logError('Error fetching season overview:', err);
     return res.status(500).json({ error: 'Failed to fetch season overview' });
   }
 });
@@ -410,7 +412,7 @@ router.get('/:teamId/momentum', [
       },
     });
   } catch (err) {
-    console.error('Error fetching momentum:', err);
+    logError('Error fetching momentum:', err);
     return res.status(500).json({ error: 'Failed to fetch momentum data' });
   }
 });
@@ -450,7 +452,7 @@ router.get('/:teamId/strengths-weaknesses', [
       period_breakdown: summary.period_breakdown,
     });
   } catch (err) {
-    console.error('Error fetching strengths and weaknesses:', err);
+    logError('Error fetching strengths and weaknesses:', err);
     return res.status(500).json({ error: 'Failed to fetch strengths and weaknesses' });
   }
 });

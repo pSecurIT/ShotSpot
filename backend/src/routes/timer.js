@@ -3,6 +3,8 @@ import { body, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logInfo, logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -10,7 +12,7 @@ router.use(auth);
 
 const logTimerDebug = (...args) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log(...args);
+    logInfo(...args);
   }
 };
 
@@ -172,7 +174,7 @@ router.get('/:gameId', async (req, res) => {
       timer_paused_at: game.timer_paused_at
     });
   } catch (error) {
-    console.error('Error fetching timer state:', error);
+    logError('Error fetching timer state:', error);
     res.status(500).json({ error: 'Failed to fetch timer state' });
   }
 });
@@ -261,7 +263,7 @@ router.post('/:gameId/start', [
     } catch {
       // Ignore rollback errors after a failed transaction.
     }
-    console.error('Error starting timer:', error);
+    logError('Error starting timer:', error);
     res.status(500).json({ error: 'Failed to start timer' });
   }
 });
@@ -347,7 +349,7 @@ router.post('/:gameId/pause', [
     } catch {
       // Ignore rollback errors after a failed transaction.
     }
-    console.error('Error pausing timer:', error);
+    logError('Error pausing timer:', error);
     res.status(500).json({ error: 'Failed to pause timer' });
   }
 });
@@ -385,7 +387,7 @@ router.post('/:gameId/stop', [
       timer_state: result.rows[0].timer_state
     });
   } catch (error) {
-    console.error('Error stopping timer:', error);
+    logError('Error stopping timer:', error);
     res.status(500).json({ error: 'Failed to stop timer' });
   }
 });
@@ -473,7 +475,7 @@ router.post('/:gameId/next-period', [
     } catch {
       // Ignore rollback errors after a failed transaction.
     }
-    console.error('Error changing period:', error);
+    logError('Error changing period:', error);
     res.status(500).json({ error: 'Failed to change period' });
   }
 });
@@ -523,7 +525,7 @@ router.put('/:gameId/period', [
       timer_state: result.rows[0].timer_state
     });
   } catch (error) {
-    console.error('Error updating period:', error);
+    logError('Error updating period:', error);
     res.status(500).json({ error: 'Failed to update period' });
   }
 });
@@ -570,7 +572,7 @@ router.put('/:gameId/duration', [
       period_duration: result.rows[0].period_duration
     });
   } catch (error) {
-    console.error('Error updating period duration:', error);
+    logError('Error updating period duration:', error);
     res.status(500).json({ error: 'Failed to update period duration' });
   }
 });
@@ -641,7 +643,7 @@ router.post('/:gameId/reset-match', [
       throw error;
     }
   } catch (error) {
-    console.error('Error resetting match:', error);
+    logError('Error resetting match:', error);
     res.status(500).json({ error: 'Failed to reset match' });
   }
 });

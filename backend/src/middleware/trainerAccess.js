@@ -1,5 +1,7 @@
 import db from '../db.js';
 
+import { logError } from '../utils/logger.js';
+
 const isAdmin = (req) => req.user && req.user.role && req.user.role.toLowerCase() === 'admin';
 
 export async function hasTrainerAccess(userId, { clubId = null, teamId = null }) {
@@ -57,7 +59,7 @@ export const requireTrainerForClubOrTeam = (extractTarget) => async (req, res, n
 
     return next();
   } catch (error) {
-    console.error('Trainer access check failed:', error);
+    logError('Trainer access check failed:', error);
     return res.status(500).json({ error: 'Trainer access verification failed' });
   }
 };
