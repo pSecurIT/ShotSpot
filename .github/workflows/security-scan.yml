@@ -36,7 +36,7 @@ jobs:
           docker build -t local/shotspot:scan-${{ github.sha }} .
 
       - name: Run Trivy vulnerability scanner (SARIF)
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: local/shotspot:scan-${{ github.sha }}
           format: 'sarif'
@@ -63,8 +63,16 @@ jobs:
           # Backward-compatible category retained for old code-scanning baselines.
           category: 'trivy-container-scan'
 
+      - name: Upload Trivy results with legacy release category
+        uses: github/codeql-action/upload-sarif@v4
+        if: ${{ hashFiles('trivy-results.sarif') != '' }}
+        with:
+          sarif_file: 'trivy-results.sarif'
+          # Refresh the stale Trivy configuration that GitHub still tracks from release.yml.
+          category: '.github/workflows/release.yml:scan-vulnerabilities'
+
       - name: Fail on critical vulnerabilities
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: local/shotspot:scan-${{ github.sha }}
           format: 'table'
@@ -86,7 +94,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy filesystem scanner (SARIF)
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -105,7 +113,7 @@ jobs:
           category: 'trivy-filesystem-scan'
 
       - name: Fail on critical dependency vulnerabilities
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'

@@ -102,6 +102,9 @@ ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
 # Multi-arch: Use --no-optional to avoid problematic native dependencies
 RUN npm ci --only=production --ignore-scripts --no-optional && \
     npm cache clean --force && \
+    # Runtime container does not need npm or npx after dependencies are installed.
+    rm -rf /usr/local/lib/node_modules/npm && \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx && \
     # Security: Remove unnecessary files
     find . -name "*.md" -type f -delete && \
     find . -name "*.ts" -type f -delete && \

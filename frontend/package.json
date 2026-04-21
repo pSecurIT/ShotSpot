@@ -34,7 +34,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.1",
-    "@vitest/coverage-v8": "4.1.2",
+    "@vitest/coverage-v8": "4.1.4",
     "axios-mock-adapter": "^2.1.0",
     "cypress": "^15.11.0",
     "del": "^8.0.1",
@@ -45,11 +45,11 @@
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.4.0",
     "jsdom": "29.0.2",
-    "start-server-and-test": "^2.1.5",
+    "start-server-and-test": "^3.0.2",
     "typescript": "6.0.2",
     "typescript-eslint": "8.58.2",
     "vite": "^8.0.8",
-    "vitest": "4.1.2"
+    "vitest": "4.1.4"
   },
   "scripts": {
     "dev": "vite",
