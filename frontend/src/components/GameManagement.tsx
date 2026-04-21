@@ -52,6 +52,7 @@ type ApiWithPerfHelpers = typeof api & {
 };
 
 const GameManagement: React.FC = () => {
+  const GAME_LIST_PREFS_KEY = 'shotspot:games:list-prefs:v1';
   const breadcrumbs = useBreadcrumbs();
   const navigate = useNavigate();
   const apiWithPerfHelpers = api as ApiWithPerfHelpers;
@@ -62,6 +63,8 @@ const GameManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'default' | 'date_desc' | 'date_asc' | 'matchup_asc' | 'status_asc'>('default');
   
   // Form state for creating new game
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -106,6 +109,73 @@ const GameManagement: React.FC = () => {
     return teams.filter((team) => team.club_id === selectedAwayClubId);
   }, [teams, newGame.away_club_id]);
 
+  const filteredGames = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const result = games.filter((game) => {
+        if (filterStatus && game.status !== filterStatus) {
+          return false;
+        }
+
+        if (!query) {
+          return true;
+        }
+
+        const matchup = `${game.home_team_name} ${game.away_team_name}`.toLowerCase();
+        const status = game.status.replace('_', ' ').toLowerCase();
+        const dateText = new Date(game.date).toLocaleString().toLowerCase();
+        return matchup.includes(query) || status.includes(query) || dateText.includes(query);
+      });
+
+    if (sortBy === 'default') {
+      return result;
+    }
+
+    return [...result].sort((left, right) => {
+      if (sortBy === 'date_desc') {
+        return new Date(right.date).getTime() - new Date(left.date).getTime();
+      }
+
+      if (sortBy === 'date_asc') {
+        return new Date(left.date).getTime() - new Date(right.date).getTime();
+      }
+
+      if (sortBy === 'matchup_asc') {
+        const leftMatchup = `${left.home_team_name} vs ${left.away_team_name}`;
+        const rightMatchup = `${right.home_team_name} vs ${right.away_team_name}`;
+        return leftMatchup.localeCompare(rightMatchup);
+      }
+
+      return left.status.localeCompare(right.status);
+    });
+  }, [games, filterStatus, searchQuery, sortBy]);
+
+  const activeFilterChips = useMemo(() => {
+    const chips: string[] = [];
+    const sortLabelMap: Record<'default' | 'date_desc' | 'date_asc' | 'matchup_asc' | 'status_asc', string> = {
+      default: 'Default order',
+      date_desc: 'Newest first',
+      date_asc: 'Oldest first',
+      matchup_asc: 'Matchup A-Z',
+      status_asc: 'Status A-Z'
+    };
+    if (searchQuery.trim()) {
+      chips.push(`Search: "${searchQuery.trim()}"`);
+    }
+    if (filterStatus) {
+      chips.push(`Status: ${filterStatus.replace('_', ' ')}`);
+    }
+    if (sortBy !== 'default') {
+      chips.push(`Sort: ${sortLabelMap[sortBy]}`);
+    }
+    return chips;
+  }, [searchQuery, filterStatus, sortBy]);
+
+  const resetFilters = useCallback(() => {
+    setSearchQuery('');
+    setFilterStatus('');
+    setSortBy('default');
+  }, []);
+
   // Fetch functions
   const fetchTeams = useCallback(async () => {
     try {
@@ -132,9 +202,10 @@ const GameManagement: React.FC = () => {
     }
   }, []);
 
-  const fetchGames = useCallback(async () => {
+  const fetchGames = useCallback(async (statusFilter?: string) => {
     try {
-      const params = filterStatus ? { status: filterStatus } : {};
+      const params = statusFilter ? { status: statusFilter } : {};
+
       if (typeof apiWithPerfHelpers.getWithCache === 'function') {
         const data = await apiWithPerfHelpers.getWithCache<Game[]>('/games', { params }, { ttlMs: 12000 });
         setGames(data);
@@ -147,19 +218,19 @@ const GameManagement: React.FC = () => {
       console.error('Error fetching games:', error);
       throw new Error(err.response?.data?.error || 'Error fetching games');
     }
-  }, [apiWithPerfHelpers, filterStatus]);
+  }, [apiWithPerfHelpers]);
 
   const loadInitialData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      await Promise.all([fetchTeams(), fetchTemplates(), fetchGames()]);
+      await Promise.all([fetchTeams(), fetchTemplates(), fetchGames(filterStatus)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load games');
     } finally {
       setLoading(false);
     }
-  }, [fetchGames, fetchTeams, fetchTemplates]);
+  }, [fetchGames, fetchTeams, fetchTemplates, filterStatus]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -170,21 +241,50 @@ const GameManagement: React.FC = () => {
   }, [loadInitialData]);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      if (!loading) {
-        void (async () => {
-          try {
-            setError(null);
-            await fetchGames();
-          } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load games');
-          }
-        })();
-      }
-    }, 0);
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') {
+      return;
+    }
 
-    return () => window.clearTimeout(timeoutId);
-  }, [fetchGames, loading]);
+    try {
+      const rawValue = window.localStorage.getItem(GAME_LIST_PREFS_KEY);
+      if (!rawValue) {
+        return;
+      }
+
+      const prefs = JSON.parse(rawValue) as {
+        filterStatus?: string;
+        searchQuery?: string;
+        sortBy?: 'default' | 'date_desc' | 'date_asc' | 'matchup_asc' | 'status_asc';
+      };
+
+      if (typeof prefs.filterStatus === 'string') {
+        setFilterStatus(prefs.filterStatus);
+      }
+      if (typeof prefs.searchQuery === 'string') {
+        setSearchQuery(prefs.searchQuery);
+      }
+      if (prefs.sortBy === 'default' || prefs.sortBy === 'date_desc' || prefs.sortBy === 'date_asc' || prefs.sortBy === 'matchup_asc' || prefs.sortBy === 'status_asc') {
+        setSortBy(prefs.sortBy);
+      }
+    } catch {
+      // Ignore invalid persisted preferences.
+    }
+  }, [GAME_LIST_PREFS_KEY]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    window.localStorage.setItem(
+      GAME_LIST_PREFS_KEY,
+      JSON.stringify({
+        filterStatus,
+        searchQuery,
+        sortBy
+      })
+    );
+  }, [GAME_LIST_PREFS_KEY, filterStatus, searchQuery, sortBy]);
 
   // Handle game creation
   const handleCreateGame = async (e: React.FormEvent) => {
@@ -405,7 +505,30 @@ const GameManagement: React.FC = () => {
       )}
 
       <div className="game-controls">
+        <div className="search-box game-controls__search">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="search-input"
+            placeholder="Search matches, status, or date"
+            aria-label="Search games"
+          />
+          {searchQuery.trim() && (
+            <button
+              type="button"
+              className="clear-search"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear game search"
+              title="Clear search"
+            >
+              x
+            </button>
+          )}
+        </div>
+
         <button 
+          type="button"
           className="primary-button"
           onClick={() => setShowCreateForm(!showCreateForm)}
         >
@@ -414,7 +537,12 @@ const GameManagement: React.FC = () => {
 
         <select
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
+          onChange={(event) => {
+            const nextStatus = event.target.value;
+            setFilterStatus(nextStatus);
+            void fetchGames(nextStatus);
+          }}
+          aria-label="Filter games by status"
         >
           <option value="">All Games</option>
           <option value="scheduled">Scheduled</option>
@@ -424,12 +552,51 @@ const GameManagement: React.FC = () => {
           <option value="cancelled">Cancelled</option>
         </select>
 
-        <button onClick={fetchGames} className="secondary-button">
+        <select
+          value={sortBy}
+          onChange={(event) => setSortBy(event.target.value as 'default' | 'date_desc' | 'date_asc' | 'matchup_asc' | 'status_asc')}
+          aria-label="Sort games"
+        >
+          <option value="default">Default order</option>
+          <option value="date_desc">Newest first</option>
+          <option value="date_asc">Oldest first</option>
+          <option value="matchup_asc">Matchup A-Z</option>
+          <option value="status_asc">Status A-Z</option>
+        </select>
+
+        <button type="button" onClick={() => void fetchGames(filterStatus)} className="secondary-button">
           Refresh
+        </button>
+
+        <button
+          type="button"
+          onClick={resetFilters}
+          className="secondary-button"
+          disabled={!searchQuery.trim() && !filterStatus && sortBy === 'default'}
+        >
+          Clear all
         </button>
       </div>
 
-      {!loading && !(error && games.length === 0) && (
+      <div className="search-filters-container">
+        {activeFilterChips.length > 0 ? (
+          <div className="active-filters" aria-label="Active game filters">
+            {activeFilterChips.map((chip) => (
+              <span key={chip} className="active-filter-chip">{chip}</span>
+            ))}
+          </div>
+        ) : (
+          <div className="active-filters" aria-label="Active game filters">
+            <span className="active-filter-chip active-filter-chip--muted">No active filters</span>
+          </div>
+        )}
+
+        <div className="results-count" role="status" aria-live="polite">
+          Showing {filteredGames.length} of {games.length} games
+        </div>
+      </div>
+
+      {!loading && (
       <>
       {showCreateForm && (
         <div className="create-game-form">
@@ -618,19 +785,19 @@ const GameManagement: React.FC = () => {
       )}
 
       <div className="games-list">
-        <h3>Games ({games.length})</h3>
-        {games.length === 0 ? (
+        <h3>Games ({filteredGames.length})</h3>
+        {filteredGames.length === 0 ? (
           <StatePanel
             variant="empty"
             title="No games found"
-            message={filterStatus ? 'Try another status filter or create a new game.' : 'Create a game to start preparing matches and analytics.'}
-            actionLabel={filterStatus ? 'Clear filter' : 'Create New Game'}
-            onAction={filterStatus ? () => setFilterStatus('') : () => setShowCreateForm(true)}
+            message={searchQuery.trim() || filterStatus || sortBy !== 'default' ? 'Try broadening your search or clearing filters to find the match faster.' : 'Create a game to start preparing matches and analytics.'}
+            actionLabel={searchQuery.trim() || filterStatus || sortBy !== 'default' ? 'Clear all filters' : 'Create New Game'}
+            onAction={searchQuery.trim() || filterStatus || sortBy !== 'default' ? resetFilters : () => setShowCreateForm(true)}
             className="game-management__feedback"
           />
         ) : (
           <div>
-            {games.map(game => (
+            {filteredGames.map(game => (
               <div key={game.id} className="game-card">
                 <div className="game-card-header">
                   <div>
