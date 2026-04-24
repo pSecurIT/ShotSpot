@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 import StatePanel from './ui/StatePanel';
 import Toast from './ui/Toast';
 import PageLayout from './ui/PageLayout';
@@ -53,6 +54,7 @@ type ApiWithPerfHelpers = typeof api & {
 
 const GameManagement: React.FC = () => {
   const GAME_LIST_PREFS_KEY = 'shotspot:games:list-prefs:v1';
+  const { user } = useAuth();
   const breadcrumbs = useBreadcrumbs();
   const navigate = useNavigate();
   const apiWithPerfHelpers = api as ApiWithPerfHelpers;
@@ -169,6 +171,8 @@ const GameManagement: React.FC = () => {
     }
     return chips;
   }, [searchQuery, filterStatus, sortBy]);
+
+  const showContextHelp = user?.role === 'coach' || user?.role === 'user';
 
   const resetFilters = useCallback(() => {
     setSearchQuery('');
@@ -502,6 +506,13 @@ const GameManagement: React.FC = () => {
           compact
           className="game-management__feedback"
         />
+      )}
+
+      {showContextHelp && (
+        <div className="context-help-card" aria-label="Games quick help">
+          <h3>Quick help: Games</h3>
+          <p>Start with status and search filters, then create or reopen matches from the refined list.</p>
+        </div>
       )}
 
       <div className="game-controls">
