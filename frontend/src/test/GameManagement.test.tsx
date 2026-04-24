@@ -6,6 +6,12 @@ import GameManagement from '../components/GameManagement';
 import api from '../utils/api';
 import { waitForSelectOptions } from './helpers/testHelpers';
 
+const mockUseAuth = vi.fn();
+
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => mockUseAuth()
+}));
+
 // Mock the api module
 vi.mock('../utils/api', () => ({
   default: {
@@ -77,6 +83,12 @@ describe('GameManagement', () => {
     vi.clearAllMocks();
     mockNavigate.mockClear();
     (window.confirm as jest.Mock).mockReturnValue(true);
+    mockUseAuth.mockReturnValue({
+      user: {
+        id: 9,
+        role: 'coach'
+      }
+    });
     
     // Mock successful API responses
     (api.get as jest.Mock).mockImplementation((url) => {
@@ -128,6 +140,13 @@ describe('GameManagement', () => {
       expect(api.get).toHaveBeenCalledWith('/teams');
       expect(api.get).toHaveBeenCalledWith('/games', { params: {} });
     });
+  });
+
+  it('shows contextual help for coach/player roles', async () => {
+    render(<GameManagementWrapper />);
+
+    expect(screen.getByText('Quick help: Games')).toBeInTheDocument();
+    expect(screen.getByLabelText('Games quick help')).toBeInTheDocument();
   });
 
   it('fetches and displays teams and games on mount', async () => {
