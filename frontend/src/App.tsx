@@ -7,13 +7,14 @@ import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
+import Dashboard from './components/Dashboard';
+import GameManagement from './components/GameManagement';
+import LiveMatch from './components/LiveMatch';
 import OfflineIndicator from './components/OfflineIndicator';
 import NotFound from './components/NotFound';
+import RoutePending from './components/ui/RoutePending';
 import logo from './img/ShotSpot_logo.png';
 
-const Dashboard = React.lazy(() => import('./components/Dashboard'));
-const GameManagement = React.lazy(() => import('./components/GameManagement'));
-const LiveMatch = React.lazy(() => import('./components/LiveMatch'));
 const ShotAnalytics = React.lazy(() => import('./components/ShotAnalytics'));
 const TeamManagement = React.lazy(() => import('./components/TeamManagement'));
 const ClubManagement = React.lazy(() => import('./components/ClubManagement'));
@@ -28,6 +29,7 @@ const MyAchievements = React.lazy(() => import('./components/MyAchievements'));
 const CompetitionManagement = React.lazy(() => import('./components/CompetitionManagement'));
 const CompetitionBracketView = React.lazy(() => import('./components/CompetitionBracketView'));
 const CompetitionStandingsView = React.lazy(() => import('./components/CompetitionStandingsView'));
+const SeriesManagement = React.lazy(() => import('./components/SeriesManagement'));
 const AdvancedAnalytics = React.lazy(() => import('./components/AdvancedAnalytics'));
 const TeamAnalytics = React.lazy(() => import('./components/TeamAnalytics'));
 const ScheduledReports = React.lazy(() => import('./components/ScheduledReports'));
@@ -35,18 +37,19 @@ const ReportTemplates = React.lazy(() => import('./components/ReportTemplates'))
 const SettingsPage = React.lazy(() => import('./components/SettingsPage'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
-  <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
+  <Suspense fallback={<RoutePending />}>
     {children}
   </Suspense>
 );
 
 const App: React.FC = () => {
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
         <WebSocketProvider>
           <Router>
             <div className="App">
+            <a className="skip-link" href="#app-main">Skip to main content</a>
             <OfflineIndicator />
             <header className="App-header">
               <div className="header-content">
@@ -57,7 +60,7 @@ const App: React.FC = () => {
                 <Navigation />
               </div>
             </header>
-            <main>
+            <main id="app-main" className="App-main" tabIndex={-1}>
               <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />
@@ -236,7 +239,7 @@ const App: React.FC = () => {
                 path="/series"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <Navigate to="/competitions" replace />
+                    <RouteLoader><SeriesManagement /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
@@ -275,8 +278,8 @@ const App: React.FC = () => {
           </div>
           </Router>
         </WebSocketProvider>
-      </AuthProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 };
 

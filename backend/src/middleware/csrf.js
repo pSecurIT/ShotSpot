@@ -1,5 +1,7 @@
 import Tokens from 'csrf';
 
+import { logError } from '../utils/logger.js';
+
 const tokens = new Tokens();
 
 // Initialize CSRF middleware
@@ -41,7 +43,7 @@ const csrf = (req, res, next) => {
     // Check if session has a CSRF secret
     if (!req.session || !req.session.csrfSecret) {
       if (process.env.NODE_ENV !== 'test') {
-        console.error('CSRF validation failed: No CSRF secret in session', {
+        logError('CSRF validation failed: No CSRF secret in session', {
           hasSession: !!req.session,
           sessionId: req.sessionID,
           hasSecret: !!(req.session && req.session.csrfSecret),
@@ -58,7 +60,7 @@ const csrf = (req, res, next) => {
 
     // Verify the token
     if (!csrfToken || !tokens.verify(req.session.csrfSecret, csrfToken)) {
-      console.error('CSRF validation failed:', {
+      logError('CSRF validation failed:', {
         hasToken: !!csrfToken,
         hasSecret: !!req.session.csrfSecret,
         path: req.path,

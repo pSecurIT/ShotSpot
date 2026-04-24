@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ExportFormat, ExportOptions } from './ExportDialog';
 import '../styles/ExportDialog.css';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 interface ExportTemplate {
   id: number;
@@ -23,6 +24,7 @@ const TemplateDialog: React.FC<TemplateDialogProps> = ({
   onSave,
   template
 }) => {
+  const nameInputRef = useRef<HTMLInputElement>(null);
   // Initialize state from template prop - component will re-mount when template changes due to key prop
   const [name, setName] = useState(template?.name || '');
   const [description, setDescription] = useState(template?.description || '');
@@ -31,6 +33,11 @@ const TemplateDialog: React.FC<TemplateDialogProps> = ({
     includeCharts: true,
     includePlayerStats: false,
     includeTimeline: false
+  });
+  const { dialogRef, titleId, onDialogKeyDown } = useAccessibleDialog({
+    isOpen,
+    onClose,
+    initialFocusRef: nameInputRef,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -53,10 +60,19 @@ const TemplateDialog: React.FC<TemplateDialogProps> = ({
 
   return (
     <div className="export-dialog-overlay" onClick={onClose}>
-      <div className="export-dialog" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        className="export-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={onDialogKeyDown}
+        tabIndex={-1}
+      >
         <div className="export-dialog-header">
-          <h2>{template ? 'Edit Template' : 'Create Template'}</h2>
-          <button className="export-dialog-close" onClick={onClose}>×</button>
+          <h2 id={titleId}>{template ? 'Edit Template' : 'Create Template'}</h2>
+          <button className="export-dialog-close" onClick={onClose} aria-label="Close dialog">×</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -64,6 +80,7 @@ const TemplateDialog: React.FC<TemplateDialogProps> = ({
             <div className="form-group">
               <label htmlFor="template-name">Template Name *</label>
               <input
+                ref={nameInputRef}
                 id="template-name"
                 type="text"
                 className="form-input"
@@ -72,7 +89,9 @@ const TemplateDialog: React.FC<TemplateDialogProps> = ({
                 placeholder="e.g., Match Summary Report"
                 required
                 maxLength={100}
+                aria-describedby="template-name-hint"
               />
+              <small id="template-name-hint">Use a short label that coaches can recognize in the export list.</small>
             </div>
 
             <div className="form-group">

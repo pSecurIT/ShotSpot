@@ -1,9 +1,13 @@
 # Multi-stage build for ShotSpot application
 # Security: Use Node LTS with Alpine for minimal attack surface and multi-arch support
+# Pin npm to avoid vulnerable transitive dependencies in bundled npm modules.
+ARG NPM_VERSION=11.12.1
+
 # Stage 1: Build frontend
 FROM node:lts-alpine AS frontend-builder
 
-RUN npm install -g npm@latest
+ARG NPM_VERSION
+RUN npm install -g npm@${NPM_VERSION}
 
 WORKDIR /app/frontend
 
@@ -32,7 +36,8 @@ RUN npm run build
 # Stage 2: Build backend
 FROM node:lts-alpine AS backend-builder
 
-RUN npm install -g npm@latest
+ARG NPM_VERSION
+RUN npm install -g npm@${NPM_VERSION}
 
 WORKDIR /app/backend
 
@@ -58,6 +63,8 @@ COPY backend/ ./
 # Stage 3: Production image
 FROM node:lts-alpine
 
+ARG NPM_VERSION
+
 # Security: Update packages, npm, and install only necessary tools
 RUN apk update && \
     apk upgrade --no-cache && \
@@ -65,7 +72,7 @@ RUN apk update && \
     dumb-init \
     tini && \
     rm -rf /var/cache/apk/* && \
-    npm install -g npm@latest
+    npm install -g npm@${NPM_VERSION}
 
 # Security: Create non-root user (no chown on /app yet - faster)
 RUN addgroup -g 1001 -S nodejs && \
@@ -95,6 +102,9 @@ ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
 # Multi-arch: Use --no-optional to avoid problematic native dependencies
 RUN npm ci --only=production --ignore-scripts --no-optional && \
     npm cache clean --force && \
+    # Runtime container does not need npm or npx after dependencies are installed.
+    rm -rf /usr/local/lib/node_modules/npm && \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx && \
     # Security: Remove unnecessary files
     find . -name "*.md" -type f -delete && \
     find . -name "*.ts" -type f -delete && \

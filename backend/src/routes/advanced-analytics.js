@@ -3,6 +3,8 @@ import { param, query, body, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication to all routes
@@ -133,7 +135,7 @@ router.get('/predictions/form-trends/:playerId', [
 
     res.json(formAnalysis);
   } catch (err) {
-    console.error('Error analyzing form trends:', err);
+    logError('Error analyzing form trends:', err);
     res.status(500).json({ error: 'Failed to analyze form trends' });
   }
 });
@@ -346,7 +348,7 @@ router.get('/predictions/fatigue/:playerId', [
       fatigue_analysis: fatigueAnalysis
     });
   } catch (err) {
-    console.error('Error analyzing fatigue:', err);
+    logError('Error analyzing fatigue:', err);
     res.status(500).json({ error: 'Failed to analyze fatigue' });
   }
 });
@@ -523,7 +525,7 @@ router.get('/predictions/next-game/:playerId', [
 
     res.json(prediction);
   } catch (err) {
-    console.error('Error generating next game prediction:', err);
+    logError('Error generating next game prediction:', err);
     res.status(500).json({ error: 'Failed to generate next game prediction' });
   }
 });
@@ -656,7 +658,7 @@ router.get('/benchmarks/league-averages', [
 
     res.json(benchmarks);
   } catch (err) {
-    console.error('Error calculating league averages:', err);
+    logError('Error calculating league averages:', err);
     res.status(500).json({ error: 'Failed to calculate league averages' });
   }
 });
@@ -782,7 +784,7 @@ router.get('/benchmarks/player-comparison/:playerId', [
 
     res.json(comparison);
   } catch (err) {
-    console.error('Error comparing player to league:', err);
+    logError('Error comparing player to league:', err);
     res.status(500).json({ error: 'Failed to compare player to league averages' });
   }
 });
@@ -914,7 +916,7 @@ router.get('/benchmarks/historical/:entityType/:entityId', [
       historical_benchmarks: historicalData
     });
   } catch (err) {
-    console.error('Error fetching historical benchmarks:', err);
+    logError('Error fetching historical benchmarks:', err);
     res.status(500).json({ error: 'Failed to fetch historical benchmarks' });
   }
 });
@@ -966,7 +968,7 @@ router.post('/video/link-event', requireRole(['admin', 'coach']), [
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('Error linking video event:', err);
+    logError('Error linking video event:', err);
     res.status(500).json({ error: 'Failed to link video event' });
   }
 });
@@ -1012,7 +1014,7 @@ router.get('/video/game/:gameId', [
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching video events:', err);
+    logError('Error fetching video events:', err);
     res.status(500).json({ error: 'Failed to fetch video events' });
   }
 });
@@ -1087,7 +1089,7 @@ router.get('/video/highlights/:gameId', [
       }
     });
   } catch (err) {
-    console.error('Error generating highlight reel:', err);
+    logError('Error generating highlight reel:', err);
     res.status(500).json({ error: 'Failed to generate highlight reel' });
   }
 });
@@ -1142,7 +1144,7 @@ router.get('/video/report-data/:gameId', [
       }
     });
   } catch (err) {
-    console.error('Error fetching video report data:', err);
+    logError('Error fetching video report data:', err);
     res.status(500).json({ error: 'Failed to fetch video report data' });
   }
 });
@@ -1205,7 +1207,7 @@ async function calculatePercentile(playerId, metric, value, startDate = null, en
     const percentile = result.rows[0]?.percentile;
     return percentile !== null && percentile !== undefined ? parseFloat(parseFloat(percentile).toFixed(1)) : 50;
   } catch (err) {
-    console.error('Error calculating percentile:', err);
+    logError('Error calculating percentile:', err);
     return 50; // Default to 50th percentile on error
   }
 }

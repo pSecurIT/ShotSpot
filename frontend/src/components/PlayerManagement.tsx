@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useAuth } from '../contexts/AuthContext';
+import StatePanel from './ui/StatePanel';
+import Toast from './ui/Toast';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 
 interface Player {
   id: number;
@@ -32,11 +36,15 @@ interface Club {
 }
 
 const PlayerManagement: React.FC = () => {
+  const PLAYER_LIST_PREFS_KEY = 'shotspot:players:list-prefs:v1';
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isCoachOrPlayer = user?.role === 'coach' || user?.role === 'user';
+  const breadcrumbs = useBreadcrumbs();
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
@@ -59,6 +67,20 @@ const PlayerManagement: React.FC = () => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
 
+  const resetPlayerRefinements = useCallback(() => {
+    setSearchQuery('');
+    setSelectedTeamFilter('');
+    setSelectedGenderFilter('');
+    setShowInactive(true);
+    setSortBy('name');
+    setSortOrder('asc');
+    if (isAdmin && clubs.length > 0) {
+      setSelectedClubFilter(String(clubs[0].id));
+    }
+  }, [isAdmin, clubs]);
+
+  const getValidationId = (fieldName: string, context: 'add' | 'edit') => `${context}-${fieldName}-error`;
+
   const fetchClubs = useCallback(async () => {
     try {
       const response = await api.get('/clubs');
@@ -80,7 +102,9 @@ const PlayerManagement: React.FC = () => {
       });
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      console.error('Error fetching clubs:', err.response?.data?.error || err.message);
+      const message = err.response?.data?.error || err.message || 'Failed to load clubs';
+      console.error('Error fetching clubs:', message);
+      throw new Error(message);
     }
   }, [isAdmin, selectedClubFilter]);
 
@@ -90,7 +114,9 @@ const PlayerManagement: React.FC = () => {
       setTeams(response.data);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      console.error('Error fetching teams:', err.response?.data?.error || err.message);
+      const message = err.response?.data?.error || err.message || 'Failed to load teams';
+      console.error('Error fetching teams:', message);
+      throw new Error(message);
     }
   }, []);
 
@@ -100,16 +126,102 @@ const PlayerManagement: React.FC = () => {
       setPlayers(response.data);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
-      console.error('Error fetching players:', err.response?.data?.error || err.message);
+      const message = err.response?.data?.error || err.message || 'Failed to load players';
+      console.error('Error fetching players:', message);
+      throw new Error(message);
     }
   }, []);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchClubs();
-    fetchTeams();
-    fetchPlayers();
+  const loadInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      await Promise.all([fetchClubs(), fetchTeams(), fetchPlayers()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load players');
+    } finally {
+      setLoading(false);
+    }
   }, [fetchClubs, fetchTeams, fetchPlayers]);
+
+  useEffect(() => {
+    void loadInitialData();
+  }, [loadInitialData]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    try {
+      const rawValue = window.localStorage.getItem(PLAYER_LIST_PREFS_KEY);
+      if (!rawValue) {
+        return;
+      }
+
+      const prefs = JSON.parse(rawValue) as {
+        selectedClubFilter?: string;
+        selectedTeamFilter?: string;
+        selectedGenderFilter?: string;
+        searchQuery?: string;
+        showInactive?: boolean;
+        sortBy?: 'name' | 'jersey' | 'team' | 'goals';
+        sortOrder?: 'asc' | 'desc';
+      };
+
+      if (typeof prefs.selectedClubFilter === 'string') {
+        setSelectedClubFilter(prefs.selectedClubFilter);
+      }
+      if (typeof prefs.selectedTeamFilter === 'string') {
+        setSelectedTeamFilter(prefs.selectedTeamFilter);
+      }
+      if (typeof prefs.selectedGenderFilter === 'string') {
+        setSelectedGenderFilter(prefs.selectedGenderFilter);
+      }
+      if (typeof prefs.searchQuery === 'string') {
+        setSearchQuery(prefs.searchQuery);
+      }
+      if (typeof prefs.showInactive === 'boolean') {
+        setShowInactive(prefs.showInactive);
+      }
+      if (prefs.sortBy === 'name' || prefs.sortBy === 'jersey' || prefs.sortBy === 'team' || prefs.sortBy === 'goals') {
+        setSortBy(prefs.sortBy);
+      }
+      if (prefs.sortOrder === 'asc' || prefs.sortOrder === 'desc') {
+        setSortOrder(prefs.sortOrder);
+      }
+    } catch {
+      // Ignore invalid persisted preferences.
+    }
+  }, [PLAYER_LIST_PREFS_KEY]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    window.localStorage.setItem(
+      PLAYER_LIST_PREFS_KEY,
+      JSON.stringify({
+        selectedClubFilter,
+        selectedTeamFilter,
+        selectedGenderFilter,
+        searchQuery,
+        showInactive,
+        sortBy,
+        sortOrder
+      })
+    );
+  }, [
+    PLAYER_LIST_PREFS_KEY,
+    selectedClubFilter,
+    selectedTeamFilter,
+    selectedGenderFilter,
+    searchQuery,
+    showInactive,
+    sortBy,
+    sortOrder
+  ]);
 
   const teamsForSelectedClub = newPlayer.club_id
     ? teams.filter(t => t.club_id === Number(newPlayer.club_id))
@@ -343,7 +455,7 @@ const PlayerManagement: React.FC = () => {
         return { ...prev, is_active: value === 'true' };
       }
       if (name === 'jersey_number') {
-        return { ...prev, [name]: parseInt(value) };
+        return { ...prev, [name]: value === '' ? 0 : parseInt(value, 10) };
       }
       return { ...prev, [name]: value };
     });
@@ -420,26 +532,91 @@ const PlayerManagement: React.FC = () => {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
+  const defaultClubFilter = isAdmin && clubs.length > 0 ? String(clubs[0].id) : '';
+  const hasActiveRefinements = Boolean(
+    searchQuery.trim()
+    || selectedTeamFilter
+    || selectedGenderFilter
+    || !showInactive
+    || sortBy !== 'name'
+    || sortOrder !== 'asc'
+    || (isAdmin && selectedClubFilter !== defaultClubFilter)
+  );
+
+  const activeFilterChips = [
+    searchQuery.trim() ? `Search: "${searchQuery.trim()}"` : null,
+    isAdmin && selectedClubFilter ? `Club: ${clubs.find((club) => String(club.id) === selectedClubFilter)?.name || 'Selected club'}` : null,
+    selectedTeamFilter ? `Team: ${teams.find((team) => String(team.id) === selectedTeamFilter)?.name || 'Selected team'}` : null,
+    selectedGenderFilter ? `Gender: ${selectedGenderFilter}` : null,
+    !showInactive ? 'Active players only' : null,
+    `Sort: ${sortBy} (${sortOrder === 'asc' ? 'ascending' : 'descending'})`
+  ].filter((chip): chip is string => Boolean(chip));
+
   return (
-    <div className="player-management">
-      <div className="player-management-header">
-        <h2>Player Management</h2>
-        <div className="header-actions">
-          <button 
-            className="secondary-button"
-            onClick={() => setShowExportDialog(true)}
-            disabled={filteredPlayers.length === 0}
-          >
-            📥 Export Report
-            {selectedPlayers.size > 0 && ` (${selectedPlayers.size} selected)`}
-          </button>
-        </div>
-      </div>
+    <PageLayout
+      title="Player Management"
+      eyebrow="Data > Players"
+      description="Manage player records, filters, and export-ready reports."
+      breadcrumbs={breadcrumbs}
+      actions={(
+        <button
+          className="secondary-button"
+          onClick={() => setShowExportDialog(true)}
+          disabled={filteredPlayers.length === 0}
+          type="button"
+        >
+          📥 Export Report
+          {selectedPlayers.size > 0 && ` (${selectedPlayers.size} selected)`}
+        </button>
+      )}
+    >
       
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {loading && (
+        <StatePanel
+          variant="loading"
+          title="Loading players"
+          message="Preparing clubs, teams, players, and export controls."
+          className="player-management__feedback"
+        />
+      )}
+
+      {!loading && error && players.length === 0 && (
+        <StatePanel
+          variant="error"
+          title="Couldn’t load players"
+          message={error}
+          actionLabel="Retry"
+          onAction={() => {
+            void loadInitialData();
+          }}
+          className="player-management__feedback"
+        />
+      )}
+
+      {!loading && error && players.length > 0 && (
+        <StatePanel
+          variant="error"
+          title="Player action failed"
+          message={error}
+          actionLabel="Reload players"
+          onAction={() => {
+            void loadInitialData();
+          }}
+          compact
+          className="player-management__feedback"
+        />
+      )}
+
+      {isCoachOrPlayer && (
+        <div className="context-help-card" aria-label="Players quick help">
+          <h3>Quick help: Players</h3>
+          <p>Filter first, then update roster details. Use export when you need a shareable player list.</p>
+        </div>
+      )}
       
       {/* Add New Player Form */}
+      {players.length > 0 || !error ? (
+      <>
       <div className="form-section">
         <h3>Add New Player</h3>
         <form onSubmit={handleAddPlayer} className="player-form">
@@ -454,6 +631,8 @@ const PlayerManagement: React.FC = () => {
                 required
                 disabled={clubs.length === 0}
                 className={validationErrors.club_id ? 'error' : ''}
+                aria-invalid={validationErrors.club_id ? 'true' : 'false'}
+                aria-describedby={validationErrors.club_id ? getValidationId('club_id', 'add') : clubs.length === 0 ? 'add-club-empty-hint' : undefined}
               >
                 <option value="">Select a club</option>
                 {clubs.map(club => (
@@ -461,10 +640,10 @@ const PlayerManagement: React.FC = () => {
                 ))}
               </select>
               {validationErrors.club_id && (
-                <span className="field-error">{validationErrors.club_id}</span>
+                <span className="field-error" id={getValidationId('club_id', 'add')}>{validationErrors.club_id}</span>
               )}
               {clubs.length === 0 && (
-                <span className="field-error">Create a club first to add players.</span>
+                <span className="field-error" id="add-club-empty-hint">Create a club first to add players.</span>
               )}
             </div>
 
@@ -478,6 +657,8 @@ const PlayerManagement: React.FC = () => {
                 required
                 disabled={!newPlayer.club_id || teamsForSelectedClub.length === 0}
                 className={validationErrors.team_id ? 'error' : ''}
+                aria-invalid={validationErrors.team_id ? 'true' : 'false'}
+                aria-describedby={validationErrors.team_id ? getValidationId('team_id', 'add') : newPlayer.club_id && teamsForSelectedClub.length === 0 ? 'add-team-empty-hint' : undefined}
               >
                 <option value="">Select a team</option>
                 {teamsForSelectedClub.map(team => (
@@ -485,10 +666,10 @@ const PlayerManagement: React.FC = () => {
                 ))}
               </select>
               {validationErrors.team_id && (
-                <span className="field-error">{validationErrors.team_id}</span>
+                <span className="field-error" id={getValidationId('team_id', 'add')}>{validationErrors.team_id}</span>
               )}
               {newPlayer.club_id && teamsForSelectedClub.length === 0 && (
-                <span className="field-error">No teams found for this club. Create a team first.</span>
+                <span className="field-error" id="add-team-empty-hint">No teams found for this club. Create a team first.</span>
               )}
             </div>
 
@@ -502,9 +683,11 @@ const PlayerManagement: React.FC = () => {
                 onChange={handleInputChange}
                 required
                 className={validationErrors.first_name ? 'error' : ''}
+                aria-invalid={validationErrors.first_name ? 'true' : 'false'}
+                aria-describedby={validationErrors.first_name ? getValidationId('first_name', 'add') : undefined}
               />
               {validationErrors.first_name && (
-                <span className="field-error">{validationErrors.first_name}</span>
+                <span className="field-error" id={getValidationId('first_name', 'add')}>{validationErrors.first_name}</span>
               )}
             </div>
 
@@ -518,9 +701,11 @@ const PlayerManagement: React.FC = () => {
                 onChange={handleInputChange}
                 required
                 className={validationErrors.last_name ? 'error' : ''}
+                aria-invalid={validationErrors.last_name ? 'true' : 'false'}
+                aria-describedby={validationErrors.last_name ? getValidationId('last_name', 'add') : undefined}
               />
               {validationErrors.last_name && (
-                <span className="field-error">{validationErrors.last_name}</span>
+                <span className="field-error" id={getValidationId('last_name', 'add')}>{validationErrors.last_name}</span>
               )}
             </div>
           </div>
@@ -538,9 +723,11 @@ const PlayerManagement: React.FC = () => {
                 max="99"
                 required
                 className={validationErrors.jersey_number ? 'error' : ''}
+                aria-invalid={validationErrors.jersey_number ? 'true' : 'false'}
+                aria-describedby={validationErrors.jersey_number ? getValidationId('jersey_number', 'add') : undefined}
               />
               {validationErrors.jersey_number && (
-                <span className="field-error">{validationErrors.jersey_number}</span>
+                <span className="field-error" id={getValidationId('jersey_number', 'add')}>{validationErrors.jersey_number}</span>
               )}
             </div>
 
@@ -552,13 +739,15 @@ const PlayerManagement: React.FC = () => {
                 value={newPlayer.gender}
                 onChange={handleInputChange}
                 className={validationErrors.gender ? 'error' : ''}
+                aria-invalid={validationErrors.gender ? 'true' : 'false'}
+                aria-describedby={validationErrors.gender ? getValidationId('gender', 'add') : undefined}
               >
                 <option value="">Select gender</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
               </select>
               {validationErrors.gender && (
-                <span className="field-error">{validationErrors.gender}</span>
+                <span className="field-error" id={getValidationId('gender', 'add')}>{validationErrors.gender}</span>
               )}
             </div>
           </div>
@@ -600,9 +789,11 @@ const PlayerManagement: React.FC = () => {
                   onChange={handleEditInputChange}
                   required
                   className={validationErrors.first_name ? 'error' : ''}
+                  aria-invalid={validationErrors.first_name ? 'true' : 'false'}
+                  aria-describedby={validationErrors.first_name ? getValidationId('first_name', 'edit') : undefined}
                 />
                 {validationErrors.first_name && (
-                  <span className="field-error">{validationErrors.first_name}</span>
+                  <span className="field-error" id={getValidationId('first_name', 'edit')}>{validationErrors.first_name}</span>
                 )}
               </div>
 
@@ -616,9 +807,11 @@ const PlayerManagement: React.FC = () => {
                   onChange={handleEditInputChange}
                   required
                   className={validationErrors.last_name ? 'error' : ''}
+                  aria-invalid={validationErrors.last_name ? 'true' : 'false'}
+                  aria-describedby={validationErrors.last_name ? getValidationId('last_name', 'edit') : undefined}
                 />
                 {validationErrors.last_name && (
-                  <span className="field-error">{validationErrors.last_name}</span>
+                  <span className="field-error" id={getValidationId('last_name', 'edit')}>{validationErrors.last_name}</span>
                 )}
               </div>
             </div>
@@ -636,9 +829,11 @@ const PlayerManagement: React.FC = () => {
                   max="99"
                   required
                   className={validationErrors.jersey_number ? 'error' : ''}
+                  aria-invalid={validationErrors.jersey_number ? 'true' : 'false'}
+                  aria-describedby={validationErrors.jersey_number ? getValidationId('jersey_number', 'edit') : undefined}
                 />
                 {validationErrors.jersey_number && (
-                  <span className="field-error">{validationErrors.jersey_number}</span>
+                  <span className="field-error" id={getValidationId('jersey_number', 'edit')}>{validationErrors.jersey_number}</span>
                 )}
               </div>
 
@@ -704,12 +899,14 @@ const PlayerManagement: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="search-input"
+                aria-label="Search players"
               />
               {searchQuery && (
                 <button
                   className="clear-search"
                   onClick={() => setSearchQuery('')}
                   title="Clear search"
+                  aria-label="Clear player search"
                 >
                   ✕
                 </button>
@@ -782,6 +979,7 @@ const PlayerManagement: React.FC = () => {
                   className="sort-order-btn"
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                   title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+                  aria-label={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
                 >
                   {sortOrder === 'asc' ? '↑' : '↓'}
                 </button>
@@ -797,10 +995,29 @@ const PlayerManagement: React.FC = () => {
                   Show inactive
                 </label>
               </div>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={resetPlayerRefinements}
+                disabled={!hasActiveRefinements}
+              >
+                Clear all
+              </button>
+            </div>
+
+            <div className="active-filters" aria-label="Active player filters">
+              {activeFilterChips.length > 0 ? (
+                activeFilterChips.map((chip) => (
+                  <span key={chip} className="active-filter-chip">{chip}</span>
+                ))
+              ) : (
+                <span className="active-filter-chip active-filter-chip--muted">No active filters</span>
+              )}
             </div>
             
             {/* Results count */}
-            <div className="results-count">
+            <div className="results-count" role="status" aria-live="polite">
               Showing {filteredPlayers.length} of {players.length} players
             </div>
           </div>
@@ -808,7 +1025,14 @@ const PlayerManagement: React.FC = () => {
 
         <div className="players-grid">
           {filteredPlayers.length === 0 ? (
-            <p className="no-players">No players found.</p>
+            <StatePanel
+              variant="empty"
+              title="No players found."
+              message={hasActiveRefinements ? 'Try broadening your search or clear all refinements to find the right player faster.' : 'Add a player to start building the roster and report exports.'}
+              actionLabel={hasActiveRefinements ? 'Clear all filters' : undefined}
+              onAction={hasActiveRefinements ? resetPlayerRefinements : undefined}
+              className="player-management__feedback"
+            />
           ) : (
             filteredPlayers.map(player => {
               const shootingPercentage = player.total_shots && player.total_shots > 0
@@ -881,7 +1105,17 @@ const PlayerManagement: React.FC = () => {
           dataType={selectedPlayers.size > 1 ? 'comparison' : 'player'}
         />
       )}
-    </div>
+      </>
+      ) : null}
+
+      {success && (
+        <Toast
+          title="Player updated"
+          message={success}
+          onDismiss={() => setSuccess('')}
+        />
+      )}
+    </PageLayout>
   );
 };
 

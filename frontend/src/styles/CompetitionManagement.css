@@ -35,6 +35,10 @@
   padding: 0.75rem 0;
 }
 
+.competition-management__feedback {
+  margin: 1rem 0;
+}
+
 .competition-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -225,6 +229,29 @@
   .competition-management__header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .competition-management__filters {
+    gap: 0.75rem;
+  }
+
+  .competition-management__filters select,
+  .competition-management__filters input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .competition-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .competition-card {
+    padding: 1rem;
+  }
+
+  .competition-card__actions > button {
+    width: 100%;
   }
 
   .competition-dialog__grid {

@@ -225,11 +225,11 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({
   };
 
   if (loading && !homeStats && !awayStats) {
-    return <div className="live-dashboard loading">Loading statistics...</div>;
+    return <div className="live-dashboard loading" role="status" aria-live="polite">Loading statistics...</div>;
   }
 
   if (error && !homeStats && !awayStats) {
-    return <div className="live-dashboard error">{error}</div>;
+    return <div className="live-dashboard error" role="alert">{error}</div>;
   }
 
   return (
@@ -237,12 +237,12 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({
       <div className="dashboard-header">
         <h3>📊 Live Match Dashboard</h3>
         {timerState === 'running' && (
-          <span className="live-indicator">🔴 LIVE</span>
+          <span className="live-indicator" role="status" aria-live="polite">🔴 LIVE</span>
         )}
       </div>
 
       {/* Period Breakdown */}
-      <div className="period-breakdown">
+      <div className="period-breakdown" aria-label="Score by period">
         <h4>Score by Period</h4>
         <div className="period-scores-table">
           <div className="period-scores-header">
@@ -278,7 +278,7 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({
       </div>
 
       {/* Performance Metrics */}
-      <div className="performance-metrics">
+      <div className="performance-metrics" aria-label="Performance metrics">
         <h4>Performance Metrics</h4>
         <div className="metrics-grid">
           {/* Shooting Stats */}
@@ -370,4 +370,4 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({
   );
 };
 
-export default LiveDashboard;
+export default React.memo(LiveDashboard);

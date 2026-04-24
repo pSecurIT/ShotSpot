@@ -64,6 +64,10 @@
   color: #145a2e;
 }
 
+.scheduled-reports__feedback {
+  margin-bottom: 1rem;
+}
+
 .scheduled-reports-empty {
   border: 1px dashed #bac6d5;
   border-radius: 12px;

@@ -1,5 +1,7 @@
 import TwizzitApiClient from './twizzit-api-client.js';
 
+import { logError } from '../utils/logger.js';
+
 // Lazy client initialization to avoid import-time failures in tests
 let twizzitClient = null;
 
@@ -52,7 +54,7 @@ export async function syncClubs() {
 
     return clubs;
   } catch (error) {
-    console.error('Failed to sync clubs:', error);
+    logError('Failed to sync clubs:', error);
     throw error;
   }
 }
@@ -79,7 +81,7 @@ export async function syncPlayers(clubId) {
     return players;
   } catch (error) {
     // Avoid user-controlled format strings in logs
-    console.error('Failed to sync players for club %s:', clubId, error);
+    logError('Failed to sync players for club %s:', clubId, error);
     throw error;
   }
 }
@@ -103,7 +105,7 @@ export async function syncSeasons() {
 
     return mappedSeasons;
   } catch (error) {
-    console.error('Failed to sync seasons:', error);
+    logError('Failed to sync seasons:', error);
     throw error;
   }
 }
@@ -116,7 +118,7 @@ export async function verifyTwizzitConnection() {
   try {
     return await getTwizzitClient().verifyConnection();
   } catch (error) {
-    console.error('Twizzit API connection verification failed:', error);
+    logError('Twizzit API connection verification failed:', error);
     return false;
   }
 }

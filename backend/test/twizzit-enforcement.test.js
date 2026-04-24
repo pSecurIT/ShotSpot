@@ -79,11 +79,37 @@ describe('🔐 Twizzit Registration Enforcement', () => {
   });
 
   afterAll(async () => {
-    await db.query('DELETE FROM game_rosters WHERE game_id IN ($1, $2)', [officialGame.id, friendlyGame.id]);
-    await db.query('DELETE FROM games WHERE id IN ($1, $2)', [officialGame.id, friendlyGame.id]);
+    // Remove rosters for ALL games involving either club (covers games created in edge-case
+    // tests that may not have been cleaned up inline if those tests threw before their cleanup).
+    await db.query(
+      `DELETE FROM game_rosters
+       WHERE game_id IN (
+         SELECT id FROM games WHERE home_club_id IN ($1,$2) OR away_club_id IN ($1,$2)
+       )`,
+      [homeClub.id, awayClub.id]
+    );
+
+    // Remove ALL games involving either club (same reason as above).
+    await db.query(
+      'DELETE FROM games WHERE home_club_id IN ($1,$2) OR away_club_id IN ($1,$2)',
+      [homeClub.id, awayClub.id]
+    );
+
+    // Remove any orphaned competitions created by edge-case tests (friendlyComp etc.).
+    // These have no games left at this point so there are no FK dependencies.
+    await db.query(
+      `DELETE FROM competitions
+       WHERE name LIKE $1 AND id != $2`,
+      [`%${uniqueId}%`, officialCompetition.id]
+    );
+
     await db.query('DELETE FROM competition_teams WHERE competition_id = $1', [officialCompetition.id]);
     await db.query('DELETE FROM competitions WHERE id = $1', [officialCompetition.id]);
-    await db.query('DELETE FROM twizzit_player_mappings WHERE local_player_id IN ($1, $2)', [registeredPlayer.id, unregisteredPlayer.id]);
+
+    await db.query(
+      'DELETE FROM twizzit_player_mappings WHERE local_player_id IN ($1, $2)',
+      [registeredPlayer.id, unregisteredPlayer.id]
+    );
     await db.query('DELETE FROM players WHERE id IN ($1, $2)', [registeredPlayer.id, unregisteredPlayer.id]);
     await db.query('DELETE FROM teams WHERE id = $1', [homeTeam.id]);
     await db.query('DELETE FROM clubs WHERE id IN ($1, $2)', [homeClub.id, awayClub.id]);

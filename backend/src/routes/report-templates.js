@@ -3,6 +3,8 @@ import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 const allowedTemplateTypes = ['summary', 'detailed', 'coach_focused', 'custom'];
 
@@ -70,7 +72,7 @@ router.get('/', [
     const result = await db.query(queryText, queryParams);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching report templates:', err);
+    logError('Error fetching report templates:', err);
     res.status(500).json({ error: 'Failed to fetch report templates' });
   }
 });
@@ -115,7 +117,7 @@ router.get('/:id', [
 
     res.json(template);
   } catch (err) {
-    console.error('Error fetching report template:', err);
+    logError('Error fetching report template:', err);
     res.status(500).json({ error: 'Failed to fetch report template' });
   }
 });
@@ -196,7 +198,7 @@ router.post('/', [
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('Error creating report template:', err);
+    logError('Error creating report template:', err);
     if (err.code === '23505') { // Unique violation
       return res.status(409).json({ error: 'A template with this name already exists' });
     }
@@ -311,7 +313,7 @@ router.put('/:id', [
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating report template:', err);
+    logError('Error updating report template:', err);
     res.status(500).json({ error: 'Failed to update report template' });
   }
 });
@@ -363,7 +365,7 @@ router.delete('/:id', [
 
     res.json({ message: 'Report template deleted successfully' });
   } catch (err) {
-    console.error('Error deleting report template:', err);
+    logError('Error deleting report template:', err);
     res.status(500).json({ error: 'Failed to delete report template' });
   }
 });

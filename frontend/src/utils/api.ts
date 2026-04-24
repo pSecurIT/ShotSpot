@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { AxiosRequestConfig } from 'axios';
 import { queueAction } from './offlineSync';
 import { ensureMatchEventClientUuid } from './matchEventIdentity';
 
@@ -9,6 +10,104 @@ const api = axios.create({
   },
   withCredentials: true, // Important: enables cookies/session
 });
+
+type CacheOptions = {
+  ttlMs?: number;
+  forceRefresh?: boolean;
+};
+
+const DEFAULT_GET_CACHE_TTL_MS = 10000;
+const getResponseCache = new Map<string, { expiresAt: number; data: unknown }>();
+const inflightGetRequests = new Map<string, Promise<unknown>>();
+
+const sortObjectKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(sortObjectKeys);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((acc, key) => {
+        acc[key] = sortObjectKeys((value as Record<string, unknown>)[key]);
+        return acc;
+      }, {});
+  }
+
+  return value;
+};
+
+const buildGetCacheKey = (url: string, config?: AxiosRequestConfig): string => {
+  const sortedParams = sortObjectKeys(config?.params || null);
+  const sortedHeaders = sortObjectKeys(config?.headers || null);
+  return `${url}::${JSON.stringify(sortedParams)}::${JSON.stringify(sortedHeaders)}`;
+};
+
+export const clearGetCache = (): void => {
+  getResponseCache.clear();
+  inflightGetRequests.clear();
+};
+
+export const getWithCache = async <T>(
+  url: string,
+  config?: AxiosRequestConfig,
+  options?: CacheOptions
+): Promise<T> => {
+  const now = Date.now();
+  const key = buildGetCacheKey(url, config);
+
+  if (!options?.forceRefresh) {
+    const cachedEntry = getResponseCache.get(key);
+    if (cachedEntry && cachedEntry.expiresAt > now) {
+      return cachedEntry.data as T;
+    }
+  }
+
+  const inflight = inflightGetRequests.get(key);
+  if (inflight) {
+    return inflight as Promise<T>;
+  }
+
+  const requestPromise = api.get<T>(url, config)
+    .then((response) => {
+      const ttlMs = options?.ttlMs ?? DEFAULT_GET_CACHE_TTL_MS;
+      if (ttlMs > 0) {
+        getResponseCache.set(key, {
+          expiresAt: Date.now() + ttlMs,
+          data: response.data
+        });
+      }
+      return response.data;
+    })
+    .finally(() => {
+      inflightGetRequests.delete(key);
+    });
+
+  inflightGetRequests.set(key, requestPromise);
+  return requestPromise;
+};
+
+export const prefetchGet = async (
+  url: string,
+  config?: AxiosRequestConfig,
+  options?: CacheOptions
+): Promise<void> => {
+  try {
+    await getWithCache(url, config, options);
+  } catch {
+    // Prefetch failures are non-blocking and should not interrupt navigation.
+  }
+};
+
+type ApiWithPerfHelpers = typeof api & {
+  getWithCache?: typeof getWithCache;
+  prefetchGet?: typeof prefetchGet;
+  clearGetCache?: typeof clearGetCache;
+};
+
+(api as ApiWithPerfHelpers).getWithCache = getWithCache;
+(api as ApiWithPerfHelpers).prefetchGet = prefetchGet;
+(api as ApiWithPerfHelpers).clearGetCache = clearGetCache;
 
 // Store CSRF token
 let csrfToken: string | null = null;
@@ -130,8 +229,9 @@ api.interceptors.response.use(
       // Don't redirect if this is a login/register attempt (let the component handle the error)
       const isAuthEndpoint = originalRequest.url?.includes('/auth/login') || 
                             originalRequest.url?.includes('/auth/register');
+      const hasAuthToken = typeof window !== 'undefined' && Boolean(localStorage.getItem('token'));
       
-      if (!isAuthEndpoint && typeof window !== 'undefined') {
+      if (!isAuthEndpoint && hasAuthToken && typeof window !== 'undefined') {
         // Token expired or invalid - redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('user');

@@ -42,7 +42,7 @@ function validateEnvVars() {
   }
   
   // Log database configuration for debugging
-  console.log('Database configuration validation:', {
+  logInfo('Database configuration validation:', {
     DB_USER: process.env.DB_USER,
     DB_HOST: process.env.DB_HOST,
     DB_NAME: process.env.DB_NAME,
@@ -90,28 +90,30 @@ function validateEnvVars() {
     if (!/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9])/.test(password)) {
       insecure.push('DEFAULT_ADMIN_PASSWORD (must include uppercase, lowercase, number, and special character)');
     }
-    console.warn('⚠️  DEFAULT_ADMIN_PASSWORD is set. Consider leaving it empty for auto-generation.');
+    logWarn('⚠️  DEFAULT_ADMIN_PASSWORD is set. Consider leaving it empty for auto-generation.');
   }
 
   // Report findings
   if (missing.length > 0) {
-    console.error('Missing required environment variables:');
-    console.error(missing.join('\n'));
+    logError('Missing required environment variables:');
+    logError(missing.join('\n'));
     process.exit(1);
   }
 
   if (insecure.length > 0) {
-    console.error('Insecure environment variable configurations:');
-    console.error(insecure.join('\n'));
+    logError('Insecure environment variable configurations:');
+    logError(insecure.join('\n'));
     process.exit(1);
   }
 
-  console.log('Environment validation passed successfully!');
+  logInfo('Environment validation passed successfully!');
   return true;
 }
 
 // Execute validation if this file is run directly
 import { fileURLToPath } from 'url';
+import { logInfo, logWarn, logError } from './logger.js';
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   validateEnvVars();
 }

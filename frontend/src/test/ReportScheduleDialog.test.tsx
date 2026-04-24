@@ -82,6 +82,29 @@ describe('ReportScheduleDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
+  it('focuses the close button and closes on Escape', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+
+    render(
+      <ReportScheduleDialog
+        isOpen
+        templates={templates}
+        teams={teams}
+        onClose={onClose}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Close dialog' })).toHaveFocus();
+    });
+
+    await user.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('saves a new schedule and closes the dialog', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Mock } from 'vitest';
 import PlayerManagement from '../components/PlayerManagement';
@@ -114,12 +114,26 @@ describe('PlayerManagement', () => {
     });
   });
 
-  it('renders the player management interface', () => {
-    act(() => {
-      render(<PlayerManagement />);
-    });
+  it('renders the player management interface', async () => {
+    render(<PlayerManagement />);
     expect(screen.getByText('Player Management')).toBeInTheDocument();
-    expect(screen.getByText('Add Player')).toBeInTheDocument();
+    expect(screen.getByText('Add New Player')).toBeInTheDocument();
+    expect(screen.getByText('Quick help: Players')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/clubs');
+    });
+  });
+
+  it('hides contextual help for admin users', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 99, role: 'admin' } });
+    render(<PlayerManagement />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/players');
+    });
+
+    expect(screen.queryByText('Quick help: Players')).not.toBeInTheDocument();
   });
 
   it('fetches and displays teams and players on mount', async () => {
@@ -198,6 +212,8 @@ describe('PlayerManagement', () => {
       response: { data: { error: 'Jersey number already taken' } }
     });
 
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
     render(<PlayerManagement />);
 
     // Wait for initial data load
@@ -222,8 +238,34 @@ describe('PlayerManagement', () => {
     await userEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Jersey number already taken')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Jersey number already taken');
     });
+
+    consoleSpy.mockRestore();
+  });
+
+  it('wires add-form validation errors to the relevant fields', async () => {
+    render(<PlayerManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Select a club')).toBeInTheDocument();
+    });
+
+    await userEvent.selectOptions(document.getElementById('club_id') as HTMLSelectElement, '1');
+    await userEvent.selectOptions(document.getElementById('team_id') as HTMLSelectElement, '1');
+    await userEvent.type(screen.getByRole('textbox', { name: /first name/i }), 'A');
+    await userEvent.type(screen.getByRole('textbox', { name: /last name/i }), 'B');
+    await userEvent.type(screen.getByRole('spinbutton', { name: /jersey number/i }), '10');
+
+    await userEvent.click(screen.getByText('Add Player'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Please fix the validation errors below');
+    });
+
+    expect(screen.getByRole('textbox', { name: /first name/i })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('textbox', { name: /first name/i })).toHaveAttribute('aria-describedby', 'add-first_name-error');
+    expect(screen.getByText('First name must be at least 2 characters')).toHaveAttribute('id', 'add-first_name-error');
   });
 
   it('clears form after successful player creation', async () => {
@@ -664,8 +706,13 @@ describe('PlayerManagement', () => {
 
     render(<PlayerManagement />);
 
-    // Should still render the component even with API errors
-    expect(screen.getByText('Player Management')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Couldn’t load players')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Failed to fetch teams');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(consoleSpy).toHaveBeenCalled();
     
     consoleSpy.mockRestore();
   });

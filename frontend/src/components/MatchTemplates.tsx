@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/MatchTemplates.css';
 
 interface MatchTemplate {
@@ -26,6 +28,7 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
   onSelectTemplate,
   selectionMode = false 
 }) => {
+  const breadcrumbs = useBreadcrumbs();
   const [templates, setTemplates] = useState<MatchTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +37,11 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MatchTemplate | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'system' | 'custom'>('all');
+  const [competitionFilter, setCompetitionFilter] = useState<'all' | 'league' | 'cup' | 'tournament' | 'friendly' | 'none'>('all');
+  const [sameTeamFilter, setSameTeamFilter] = useState<'all' | 'allowed' | 'not_allowed'>('all');
+  const [sortBy, setSortBy] = useState<'updated_desc' | 'name_asc' | 'periods_desc'>('updated_desc');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -50,7 +58,9 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
       const response = await api.get('/match-templates');
       setTemplates(response.data);
     } catch (err) {
-      console.error('Error fetching templates:', err);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error fetching templates:', err);
+      }
       setError('Failed to load match templates');
     } finally {
       setLoading(false);
@@ -173,32 +183,234 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
     return type.charAt(0).toUpperCase() + type.slice(1);
   };
 
-  const systemTemplates = templates.filter(t => t.is_system_template);
-  const userTemplates = templates.filter(t => !t.is_system_template);
+  const filteredTemplates = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    const result = templates.filter((template) => {
+      if (typeFilter === 'system' && !template.is_system_template) {
+        return false;
+      }
+
+      if (typeFilter === 'custom' && template.is_system_template) {
+        return false;
+      }
+
+      if (competitionFilter !== 'all') {
+        if (competitionFilter === 'none' && template.competition_type) {
+          return false;
+        }
+
+        if (competitionFilter !== 'none' && template.competition_type !== competitionFilter) {
+          return false;
+        }
+      }
+
+      if (sameTeamFilter === 'allowed' && !template.allow_same_team) {
+        return false;
+      }
+
+      if (sameTeamFilter === 'not_allowed' && template.allow_same_team) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return (
+        template.name.toLowerCase().includes(query)
+        || (template.description || '').toLowerCase().includes(query)
+        || (template.competition_type || 'none').toLowerCase().includes(query)
+      );
+    });
+
+    return result.sort((left, right) => {
+      if (sortBy === 'name_asc') {
+        return left.name.localeCompare(right.name);
+      }
+
+      if (sortBy === 'periods_desc') {
+        return right.number_of_periods - left.number_of_periods;
+      }
+
+      return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+    });
+  }, [templates, searchQuery, typeFilter, competitionFilter, sameTeamFilter, sortBy]);
+
+  const systemTemplates = filteredTemplates.filter(t => t.is_system_template);
+  const userTemplates = filteredTemplates.filter(t => !t.is_system_template);
+  const hasActiveRefinements = Boolean(searchQuery.trim() || typeFilter !== 'all' || competitionFilter !== 'all' || sameTeamFilter !== 'all' || sortBy !== 'updated_desc');
+
+  const activeFilterChips = useMemo(() => {
+    const chips: string[] = [];
+    const sortLabelMap: Record<'updated_desc' | 'name_asc' | 'periods_desc', string> = {
+      updated_desc: 'Recently updated',
+      name_asc: 'Name A-Z',
+      periods_desc: 'Most periods'
+    };
+
+    if (searchQuery.trim()) {
+      chips.push(`Search: ${searchQuery.trim()}`);
+    }
+    if (typeFilter !== 'all') {
+      chips.push(`Scope: ${typeFilter}`);
+    }
+    if (competitionFilter !== 'all') {
+      chips.push(`Competition: ${competitionFilter === 'none' ? 'none' : competitionFilter}`);
+    }
+    if (sameTeamFilter !== 'all') {
+      chips.push(`Same team: ${sameTeamFilter === 'allowed' ? 'allowed' : 'not allowed'}`);
+    }
+    if (sortBy !== 'updated_desc') {
+      chips.push(`Sort: ${sortLabelMap[sortBy]}`);
+    }
+
+    return chips;
+  }, [searchQuery, typeFilter, competitionFilter, sameTeamFilter, sortBy]);
+
+  const clearAllRefinements = useCallback(() => {
+    setSearchQuery('');
+    setTypeFilter('all');
+    setCompetitionFilter('all');
+    setSameTeamFilter('all');
+    setSortBy('updated_desc');
+  }, []);
 
   if (loading) {
-    return <div className="loading">Loading templates...</div>;
+    return <div className="loading" role="status" aria-live="polite">Loading templates...</div>;
   }
 
   return (
+    <PageLayout
+      title="Match Templates"
+      eyebrow="Settings > Match Templates"
+      description="Create reusable match setup templates and rules."
+      breadcrumbs={breadcrumbs}
+      actions={!selectionMode ? (
+        <button 
+          className="primary-button"
+          onClick={() => {
+            resetForm();
+            setShowForm(!showForm);
+          }}
+          type="button"
+        >
+          {showForm ? 'Cancel' : '+ New Template'}
+        </button>
+      ) : undefined}
+    >
     <div className="match-templates-container">
-      <div className="match-templates-header">
-        <h2>📋 Match Templates</h2>
-        {!selectionMode && (
-          <button 
-            className="primary-button"
-            onClick={() => {
-              resetForm();
-              setShowForm(!showForm);
-            }}
-          >
-            {showForm ? 'Cancel' : '+ New Template'}
-          </button>
-        )}
-      </div>
 
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
+
+      <div className="search-filters-container">
+        <div className="search-box">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="search-input"
+            placeholder="Search templates by name, description, or competition type"
+            aria-label="Search match templates"
+          />
+          {searchQuery.trim() && (
+            <button
+              type="button"
+              className="clear-search"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear match template search"
+              title="Clear search"
+            >
+              x
+            </button>
+          )}
+        </div>
+
+        <div className="filters-row">
+          <div className="filter-group">
+            <label htmlFor="match_template_scope_filter">Scope</label>
+            <select
+              id="match_template_scope_filter"
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value as 'all' | 'system' | 'custom')}
+              className="filter-select"
+            >
+              <option value="all">All templates</option>
+              <option value="system">System only</option>
+              <option value="custom">My templates only</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="match_template_competition_filter">Competition</label>
+            <select
+              id="match_template_competition_filter"
+              value={competitionFilter}
+              onChange={(event) => setCompetitionFilter(event.target.value as 'all' | 'league' | 'cup' | 'tournament' | 'friendly' | 'none')}
+              className="filter-select"
+            >
+              <option value="all">All competitions</option>
+              <option value="league">League only</option>
+              <option value="cup">Cup only</option>
+              <option value="tournament">Tournament only</option>
+              <option value="friendly">Friendly only</option>
+              <option value="none">No competition type</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="match_template_same_team_filter">Same Team</label>
+            <select
+              id="match_template_same_team_filter"
+              value={sameTeamFilter}
+              onChange={(event) => setSameTeamFilter(event.target.value as 'all' | 'allowed' | 'not_allowed')}
+              className="filter-select"
+            >
+              <option value="all">All rules</option>
+              <option value="allowed">Allowed</option>
+              <option value="not_allowed">Not allowed</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="match_template_sort">Sort by</label>
+            <select
+              id="match_template_sort"
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value as 'updated_desc' | 'name_asc' | 'periods_desc')}
+              className="filter-select"
+            >
+              <option value="updated_desc">Recently updated</option>
+              <option value="name_asc">Name A-Z</option>
+              <option value="periods_desc">Most periods</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={clearAllRefinements}
+            className="secondary-button"
+            disabled={!hasActiveRefinements}
+          >
+            Clear all
+          </button>
+        </div>
+
+        <div className="active-filters" aria-label="Active match template filters">
+          {activeFilterChips.length > 0 ? (
+            activeFilterChips.map((chip) => (
+              <span key={chip} className="active-filter-chip">{chip}</span>
+            ))
+          ) : (
+            <span className="active-filter-chip active-filter-chip--muted">No active filters</span>
+          )}
+        </div>
+
+        <div className="results-count" aria-live="polite">
+          Showing {filteredTemplates.length} of {templates.length} templates
+        </div>
+      </div>
 
       {showForm && !selectionMode && (
         <form onSubmit={handleSubmit} className="template-form">
@@ -300,6 +512,7 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
       )}
 
       {/* System Templates */}
+      {systemTemplates.length > 0 && (
       <div className="templates-section">
         <h3>📌 System Templates</h3>
         <p className="section-description">Pre-configured templates for common match formats</p>
@@ -359,6 +572,7 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
           ))}
         </div>
       </div>
+      )}
 
       {/* User Templates */}
       {userTemplates.length > 0 && (
@@ -422,8 +636,21 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
         </div>
       )}
 
-      {!selectionMode && userTemplates.length === 0 && (
-        <div className="empty-state">
+      {!selectionMode && filteredTemplates.length === 0 && (
+        <div className="empty-state" role="status" aria-live="polite">
+          <p>No templates match the current filters.</p>
+          <button
+            className="primary-button"
+            onClick={clearAllRefinements}
+            type="button"
+          >
+            Clear all filters
+          </button>
+        </div>
+      )}
+
+      {!selectionMode && filteredTemplates.length > 0 && userTemplates.length === 0 && typeFilter !== 'system' && (
+        <div className="empty-state" role="status" aria-live="polite">
           <p>You haven&apos;t created any custom templates yet.</p>
           <button 
             className="primary-button"
@@ -434,6 +661,7 @@ const MatchTemplates: React.FC<MatchTemplatesProps> = ({
         </div>
       )}
     </div>
+    </PageLayout>
   );
 };
 

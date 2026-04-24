@@ -201,16 +201,25 @@ describe('ScheduledReports', () => {
 
     render(<ScheduledReports />);
 
-    expect(await screen.findByText('No schedules configured yet')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('No schedules configured yet');
+    });
     expect(screen.getByRole('button', { name: 'Create First Schedule' })).toBeInTheDocument();
   });
 
   it('shows error banner when loading schedules fails', async () => {
-    mockGetAll.mockRejectedValueOnce(new Error('Failed to load data'));
+    const user = userEvent.setup();
+    mockGetAll.mockRejectedValueOnce(new Error('Failed to load data')).mockResolvedValueOnce([seededSchedule]);
 
     render(<ScheduledReports />);
 
-    expect(await screen.findByText('Failed to load data')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to load data');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('Weekly Team Insights')).toBeInTheDocument();
   });
 
   it('toggles schedule active state', async () => {
@@ -225,7 +234,9 @@ describe('ScheduledReports', () => {
       expect(mockUpdate).toHaveBeenCalledWith(10, { is_active: false });
     });
 
-    expect(await screen.findByText('Schedule disabled successfully')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('Schedule disabled successfully');
+    });
   });
 
   it('does not delete schedule when confirmation is cancelled', async () => {

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import api from '../utils/api';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 interface CreateUserDialogProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface CreateUserDialogProps {
 }
 
 const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, onSuccess }) => {
+  const usernameRef = useRef<HTMLInputElement>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,6 +22,11 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const { dialogRef, titleId, onDialogKeyDown } = useAccessibleDialog({
+    isOpen,
+    onClose,
+    initialFocusRef: usernameRef,
+  });
 
   // Returns a cryptographically secure random integer between min (inclusive) and max (exclusive)
   function secureRandomInt(min: number, max: number): number {
@@ -119,10 +126,26 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
   if (!isOpen) return null;
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.dialog}>
+    <div
+      style={styles.overlay}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        style={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={onDialogKeyDown}
+        onMouseDown={(event) => event.stopPropagation()}
+        tabIndex={-1}
+      >
         <div style={styles.header}>
-          <h3 style={styles.title}>Create New User</h3>
+          <h3 style={styles.title} id={titleId}>Create New User</h3>
           <button
             onClick={onClose}
             style={styles.closeButton}
@@ -133,7 +156,7 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
         </div>
 
         {error && (
-          <div style={styles.errorAlert}>
+          <div style={styles.errorAlert} role="alert">
             {error}
           </div>
         )}
@@ -144,6 +167,7 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
               Username *
             </label>
             <input
+              ref={usernameRef}
               id="username"
               type="text"
               value={username}
@@ -155,8 +179,9 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
               title="Username can only contain letters, numbers, underscores, and hyphens"
               style={styles.input}
               disabled={loading}
+              aria-describedby="username-hint"
             />
-            <small style={styles.hint}>3-50 characters, letters, numbers, _ and - only</small>
+            <small style={styles.hint} id="username-hint">3-50 characters, letters, numbers, _ and - only</small>
           </div>
 
           <div style={styles.formGroup}>
@@ -188,6 +213,7 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
                 minLength={8}
                 style={{ ...styles.input, marginBottom: 0 }}
                 disabled={loading}
+                aria-describedby="create-user-password-hint"
               />
               <button
                 type="button"
@@ -208,7 +234,7 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
                 Generate Secure Password
               </button>
             </div>
-            <small style={styles.hint}>
+            <small style={styles.hint} id="create-user-password-hint">
               Min 8 chars with uppercase, lowercase, number, and special character
             </small>
           </div>
@@ -223,12 +249,13 @@ const CreateUserDialog: React.FC<CreateUserDialogProps> = ({ isOpen, onClose, on
               onChange={(e) => setRole(e.target.value as 'user' | 'coach' | 'admin')}
               style={styles.select}
               disabled={loading}
+              aria-describedby="role-hint"
             >
               <option value="user">User</option>
               <option value="coach">Coach</option>
               <option value="admin">Admin</option>
             </select>
-            <small style={styles.hint}>
+            <small style={styles.hint} id="role-hint">
               User: View only • Coach: Manage teams/games • Admin: Full access
             </small>
           </div>

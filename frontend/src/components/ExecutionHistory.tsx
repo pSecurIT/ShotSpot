@@ -52,20 +52,20 @@ const ExecutionHistory: React.FC<ExecutionHistoryProps> = ({ scheduleId }) => {
   }, [scheduleId]);
 
   if (loading) {
-    return <div className="scheduled-reports-history">Loading history...</div>;
+    return <div className="scheduled-reports-history" role="status" aria-live="polite">Loading history...</div>;
   }
 
   if (error) {
-    return <div className="scheduled-reports-history scheduled-reports-history--error">{error}</div>;
+    return <div className="scheduled-reports-history scheduled-reports-history--error" role="alert">{error}</div>;
   }
 
   if (history.length === 0) {
-    return <div className="scheduled-reports-history">No executions yet.</div>;
+    return <div className="scheduled-reports-history" role="status" aria-live="polite">No executions yet.</div>;
   }
 
   return (
     <div className="scheduled-reports-history" aria-live="polite">
-      <table>
+      <table aria-label="Execution history">
         <thead>
           <tr>
             <th>Run At</th>

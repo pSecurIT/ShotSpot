@@ -3,6 +3,8 @@ import { body, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -45,7 +47,7 @@ router.get('/', async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error fetching export settings:', err);
+    logError('Error fetching export settings:', err);
     res.status(500).json({ error: 'Failed to fetch export settings' });
   }
 });
@@ -197,7 +199,7 @@ router.put('/', [
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating export settings:', err);
+    logError('Error updating export settings:', err);
     res.status(500).json({ error: 'Failed to update export settings' });
   }
 });
@@ -237,7 +239,7 @@ router.post('/reset', async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error resetting export settings:', err);
+    logError('Error resetting export settings:', err);
     res.status(500).json({ error: 'Failed to reset export settings' });
   }
 });
