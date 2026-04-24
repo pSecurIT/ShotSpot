@@ -118,10 +118,22 @@ describe('PlayerManagement', () => {
     render(<PlayerManagement />);
     expect(screen.getByText('Player Management')).toBeInTheDocument();
     expect(screen.getByText('Add New Player')).toBeInTheDocument();
+    expect(screen.getByText('Quick help: Players')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/clubs');
     });
+  });
+
+  it('hides contextual help for admin users', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 99, role: 'admin' } });
+    render(<PlayerManagement />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/players');
+    });
+
+    expect(screen.queryByText('Quick help: Players')).not.toBeInTheDocument();
   });
 
   it('fetches and displays teams and players on mount', async () => {

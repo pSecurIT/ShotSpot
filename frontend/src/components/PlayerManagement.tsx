@@ -39,6 +39,7 @@ const PlayerManagement: React.FC = () => {
   const PLAYER_LIST_PREFS_KEY = 'shotspot:players:list-prefs:v1';
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isCoachOrPlayer = user?.role === 'coach' || user?.role === 'user';
   const breadcrumbs = useBreadcrumbs();
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -604,6 +605,13 @@ const PlayerManagement: React.FC = () => {
           compact
           className="player-management__feedback"
         />
+      )}
+
+      {isCoachOrPlayer && (
+        <div className="context-help-card" aria-label="Players quick help">
+          <h3>Quick help: Players</h3>
+          <p>Filter first, then update roster details. Use export when you need a shareable player list.</p>
+        </div>
       )}
       
       {/* Add New Player Form */}
