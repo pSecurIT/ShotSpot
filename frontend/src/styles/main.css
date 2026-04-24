@@ -289,6 +289,26 @@ textarea:focus-visible,
   max-width: 100%;
 }
 
+.context-help-card {
+  border: 1px solid var(--border-color);
+  background: var(--surface-panel);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.85rem 1rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.context-help-card h3 {
+  font-size: 0.98rem;
+  margin-bottom: 0.2rem;
+}
+
+.context-help-card p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
 .breadcrumbs {
   display: flex;
 }
@@ -925,9 +945,11 @@ select.error:focus {
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  z-index: 1000;
+  padding: 1rem;
+  overflow-y: auto;
+  z-index: 1400;
 }
 
 .modal-content {
@@ -936,7 +958,8 @@ select.error:focus {
   padding: 2rem;
   max-width: 600px;
   width: 90%;
-  max-height: 90vh;
+  max-height: calc(100vh - 2rem);
+  margin: auto;
   overflow-y: auto;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
