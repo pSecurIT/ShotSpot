@@ -138,6 +138,7 @@ describe('Navigation Component', () => {
       expect(screen.getByRole('button', { name: 'Matches' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Analytics' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Data' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument();
     });
 
@@ -221,10 +222,11 @@ describe('Navigation Component', () => {
       expect(within(userManagement).getByText('Admin')).toBeInTheDocument();
     });
 
-    it('hides Users link for non-admin users', () => {
+    it('hides User Management link for non-admin users while keeping Settings visible', () => {
       renderNavigation(regularUser);
       
-      expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+      expect(screen.getByRole('menuitem', { name: /Settings/i })).toBeInTheDocument();
       expect(screen.queryByText('User Management')).not.toBeInTheDocument();
     });
 
