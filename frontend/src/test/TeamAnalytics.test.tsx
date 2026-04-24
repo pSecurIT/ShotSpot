@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Mock } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import TeamAnalytics from '../components/TeamAnalytics';
 import api from '../utils/api';
@@ -75,6 +76,14 @@ describe('TeamAnalytics', () => {
   const momentumMock = teamAnalyticsApi.momentum as unknown as Mock;
   const strengthsMock = teamAnalyticsApi.strengthsWeaknesses as unknown as Mock;
 
+  const renderWithRouter = () => {
+    return render(
+      <MemoryRouter initialEntries={['/team-analytics']}>
+        <TeamAnalytics />
+      </MemoryRouter>
+    );
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -139,7 +148,7 @@ describe('TeamAnalytics', () => {
   });
 
   it('loads the dashboard and renders season overview content', async () => {
-    render(<TeamAnalytics />);
+    renderWithRouter();
 
     expect(await screen.findByText('Team Analytics Dashboard')).toBeInTheDocument();
 
@@ -156,7 +165,7 @@ describe('TeamAnalytics', () => {
 
   it('reloads analytics when the team selection changes', async () => {
     const user = userEvent.setup();
-    render(<TeamAnalytics />);
+    renderWithRouter();
 
     await screen.findByText('Team Analytics Dashboard');
     await user.selectOptions(screen.getByLabelText('Team'), '8');
@@ -168,7 +177,7 @@ describe('TeamAnalytics', () => {
 
   it('exports the dashboard as pdf', async () => {
     const user = userEvent.setup();
-    render(<TeamAnalytics />);
+    renderWithRouter();
 
     await screen.findByText('Team Analytics Dashboard');
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
@@ -183,7 +192,7 @@ describe('TeamAnalytics', () => {
   it('shows API errors in an alert', async () => {
     seasonOverviewMock.mockRejectedValueOnce(new Error('Analytics service unavailable'));
 
-    render(<TeamAnalytics />);
+    renderWithRouter();
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Analytics service unavailable');
@@ -192,7 +201,7 @@ describe('TeamAnalytics', () => {
 
   it('reloads analytics when the season selection changes', async () => {
     const user = userEvent.setup();
-    render(<TeamAnalytics />);
+    renderWithRouter();
 
     await screen.findByText('Team Analytics Dashboard');
     await user.selectOptions(screen.getByLabelText('Season'), '11');
@@ -216,8 +225,26 @@ describe('TeamAnalytics', () => {
       previous_season_comparison: null,
     });
 
-    render(<TeamAnalytics />);
+    renderWithRouter();
 
     expect(await screen.findByText(/older matches are not linked to team IDs/i)).toBeInTheDocument();
+  });
+
+  it('announces when strengths and weaknesses are empty', async () => {
+    strengthsMock.mockResolvedValueOnce({
+      team: { id: 4, name: 'U19 A', club_id: 2, club_name: 'Falcons', season_id: 10 },
+      season: { id: 10, name: '2025-2026', start_date: '2025-09-01', end_date: '2026-05-31', is_active: true },
+      scope_mode: 'team',
+      benchmarks: { win_percentage: 48.5, goals_for_per_game: 9.2, goals_against_per_game: 9.7, fg_percentage: 51.8, goal_difference_per_game: -0.1 },
+      strengths: [],
+      weaknesses: [],
+      period_breakdown: [],
+    });
+
+    renderWithRouter();
+
+    await screen.findByText('Team Analytics Dashboard');
+    expect(await screen.findByText('No strengths identified yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No weaknesses identified yet.')).toBeInTheDocument();
   });
 });

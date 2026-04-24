@@ -87,7 +87,18 @@ describe('LiveDashboard Component', () => {
 
     render(<LiveDashboard {...mockGameProps} />);
 
-    expect(screen.getByText('Loading statistics...')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading statistics...');
+  });
+
+  it('should expose fatal load errors as alerts', async () => {
+    const mockApiGet = vi.mocked(api.get);
+    mockApiGet.mockRejectedValue(new Error('Boom'));
+
+    render(<LiveDashboard {...mockGameProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to load statistics');
+    });
   });
 
   it('should fetch and display team statistics', async () => {

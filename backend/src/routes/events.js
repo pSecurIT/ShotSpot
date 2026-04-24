@@ -4,6 +4,8 @@ import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -119,7 +121,7 @@ router.get('/:gameId', [
     const result = await db.query(queryText, params);
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching events:', error);
+    logError('Error fetching events:', error);
     res.status(500).json({ error: 'Failed to fetch events' });
   }
 });
@@ -323,11 +325,11 @@ router.post('/:gameId', [
           return res.status(200).json(existingEvent);
         }
       } catch (lookupError) {
-        console.error('Error resolving duplicate event by client_uuid:', lookupError);
+        logError('Error resolving duplicate event by client_uuid:', lookupError);
       }
     }
 
-    console.error('Error creating event:', error);
+    logError('Error creating event:', error);
     res.status(500).json({ error: 'Failed to create event' });
   }
 });
@@ -480,7 +482,7 @@ router.put('/:gameId/:eventId', [
     const updatedEvent = await fetchCompleteGameEventById(eventId);
     res.json(updatedEvent);
   } catch (error) {
-    console.error('Error updating event:', error);
+    logError('Error updating event:', error);
     res.status(500).json({ error: 'Failed to update event' });
   }
 });
@@ -518,7 +520,7 @@ router.post('/:gameId/:eventId/confirm', [
     const confirmedEvent = await fetchCompleteGameEventById(eventId);
     return res.status(200).json(confirmedEvent);
   } catch (error) {
-    console.error('Error confirming event:', error);
+    logError('Error confirming event:', error);
     return res.status(500).json({ error: 'Failed to confirm event' });
   }
 });
@@ -572,7 +574,7 @@ router.delete('/:gameId/:eventId', [
 
     res.json({ message: 'Event deleted successfully' });
   } catch (error) {
-    console.error('Error deleting event:', error);
+    logError('Error deleting event:', error);
     res.status(500).json({ error: 'Failed to delete event' });
   }
 });
@@ -834,7 +836,7 @@ router.get('/comprehensive/:gameId', [
 
     res.json(allEvents);
   } catch (error) {
-    console.error('Error fetching comprehensive events:', error);
+    logError('Error fetching comprehensive events:', error);
     res.status(500).json({ error: 'Failed to fetch comprehensive events' });
   }
 });

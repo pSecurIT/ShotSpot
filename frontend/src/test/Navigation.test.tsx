@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
@@ -42,6 +42,17 @@ const renderNavigation = (user: { username: string; role: string } | null = null
   );
 };
 
+const setViewportWidth = (width: number) => {
+  act(() => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: width
+    });
+    window.dispatchEvent(new Event('resize'));
+  });
+};
+
 const openUserMenu = async () => {
   const trigger = screen.getByRole('button', { name: 'User' });
   if (trigger.getAttribute('aria-expanded') === 'true') {
@@ -65,6 +76,11 @@ describe('Navigation Component', () => {
     vi.clearAllMocks();
     // Mock window.alert
     global.alert = vi.fn();
+    window.localStorage.clear();
+    window.localStorage.setItem('shotspot:onboarding:v1:1:user', 'done');
+    window.localStorage.setItem('shotspot:onboarding:v1:2:admin', 'done');
+    window.localStorage.setItem('shotspot:onboarding:v1:3:coach', 'done');
+    setViewportWidth(1280);
   });
 
   describe('Unauthenticated State', () => {
@@ -123,6 +139,56 @@ describe('Navigation Component', () => {
       expect(screen.getByRole('button', { name: 'Analytics' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Data' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument();
+    });
+
+    it('shows Help menu for coach/player roles only', () => {
+      const { unmount } = renderNavigation(regularUser);
+      expect(screen.getByRole('button', { name: 'Help' })).toBeInTheDocument();
+
+      unmount();
+
+      renderNavigation(adminUser);
+      expect(screen.queryByRole('button', { name: 'Help' })).not.toBeInTheDocument();
+    });
+
+    it('shows first-run checklist for coach and allows skipping', async () => {
+      window.localStorage.removeItem('shotspot:onboarding:v1:3:coach');
+      const user = userEvent.setup();
+      renderNavigation(coachUser);
+
+      expect(screen.getByText('Welcome to ShotSpot')).toBeInTheDocument();
+      await user.click(screen.getByText('Skip for now'));
+
+      await waitFor(() => {
+        expect(screen.queryByText('Welcome to ShotSpot')).not.toBeInTheDocument();
+      });
+
+      expect(window.localStorage.getItem('shotspot:onboarding:v1:3:coach')).toBe('skipped');
+    });
+
+    it('opens targeted help content from the Help menu', async () => {
+      const user = userEvent.setup();
+      renderNavigation(regularUser);
+
+      await user.click(screen.getByRole('button', { name: 'Help' }));
+      await user.click(screen.getByRole('menuitem', { name: /Games tips/i }));
+
+      expect(screen.getByText('Games Tips')).toBeInTheDocument();
+      expect(screen.getByText('Game flow tips')).toBeInTheDocument();
+    });
+
+    it('supports opening dropdown menus with keyboard and focuses the first item', async () => {
+      renderNavigation(regularUser);
+
+      const trigger = screen.getByRole('button', { name: 'Matches' });
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+
+      await waitFor(() => {
+        expect(screen.getByRole('menu', { name: 'Matches menu' })).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole('menuitem', { name: /All Games/i })).toHaveFocus();
     });
 
     it('displays user information', () => {
@@ -480,5 +546,11 @@ describe('Navigation Component', () => {
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
     });
+  });
+
+  it('exposes a skip link to main content', () => {
+    renderNavigation(null);
+
+    expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument();
   });
 });

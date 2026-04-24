@@ -127,6 +127,44 @@ describe('CompetitionManagement', () => {
     });
   });
 
+  it('announces empty state accessibly', async () => {
+    listMock.mockResolvedValue([]);
+
+    renderAtCompetitions();
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('No competitions yet');
+    });
+  });
+
+  it('shows a retry state when the initial load fails', async () => {
+    const user = userEvent.setup();
+    listMock
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValueOnce([
+        makeCompetition({
+          id: 1,
+          name: 'Summer Tournament',
+          type: 'tournament',
+          status: 'upcoming',
+          start_date: '2025-06-01',
+        }),
+      ]);
+
+    renderAtCompetitions();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to load competitions');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => {
+      expect(listMock).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Summer Tournament')).toBeInTheDocument();
+    });
+  });
+
   it('filters competitions by type, status and search', async () => {
     listMock.mockResolvedValue([
       makeCompetition({ id: 1, name: 'Summer Tournament', type: 'tournament', status: 'upcoming', start_date: '2025-06-01' }),

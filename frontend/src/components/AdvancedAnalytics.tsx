@@ -28,6 +28,8 @@ import type {
   VideoEvent,
   VideoHighlightsResponse,
 } from '../types/advanced-analytics';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/AdvancedAnalytics.css';
 
 type AnalyticsTab = 'form' | 'fatigue' | 'predictions' | 'video';
@@ -63,8 +65,15 @@ const clipDuration = (event: { timestamp_start?: string | null; timestamp_end?: 
   return 'Timing unavailable';
 };
 
+const readThemeVariable = (name: string, fallback: string): string => {
+  if (typeof window === 'undefined') return fallback;
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+};
+
 const AdvancedAnalytics: React.FC = () => {
   const exportRef = useRef<HTMLDivElement>(null);
+  const breadcrumbs = useBreadcrumbs();
   const [players, setPlayers] = useState<AnalyticsPlayerOption[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('form');
@@ -271,8 +280,9 @@ const AdvancedAnalytics: React.FC = () => {
 
     setExporting('image');
     try {
+      const backgroundColor = readThemeVariable('--surface-canvas', '#f4f8fb');
       const canvas = await html2canvas(exportRef.current, {
-        backgroundColor: '#f4f8fb',
+        backgroundColor,
         scale: 2,
       });
 
@@ -290,8 +300,9 @@ const AdvancedAnalytics: React.FC = () => {
 
     setExporting('pdf');
     try {
+      const backgroundColor = readThemeVariable('--surface-canvas', '#f4f8fb');
       const canvas = await html2canvas(exportRef.current, {
-        backgroundColor: '#f4f8fb',
+        backgroundColor,
         scale: 2,
       });
 
@@ -333,15 +344,12 @@ const AdvancedAnalytics: React.FC = () => {
   ];
 
   return (
-    <div className="advanced-analytics" ref={exportRef}>
-      <section className="advanced-analytics__hero">
-        <div>
-          <h2>Advanced Analytics Dashboard</h2>
-          <p>
-            Track player form, fatigue, and upcoming performance in one place. Date filters are sent to the analytics
-            endpoints so every chart and benchmark reflects the selected analysis window.
-          </p>
-        </div>
+    <PageLayout
+      title="Advanced Analytics Dashboard"
+      eyebrow="Analytics > Performance"
+      description="Track player form, fatigue, and upcoming performance in one place. Date filters are sent to analytics endpoints so every chart and benchmark reflects the selected analysis window."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <div className="advanced-analytics__actions">
           <button
             className="advanced-analytics__action-button"
@@ -360,7 +368,9 @@ const AdvancedAnalytics: React.FC = () => {
             {exporting === 'pdf' ? 'Exporting PDF…' : 'Export PDF'}
           </button>
         </div>
-      </section>
+      )}
+    >
+    <div className="advanced-analytics" ref={exportRef}>
 
       <section className="advanced-analytics__controls" aria-label="Advanced analytics filters">
         <div className="advanced-analytics__selector">
@@ -413,7 +423,7 @@ const AdvancedAnalytics: React.FC = () => {
       )}
 
       {loading ? (
-        <div className="advanced-analytics__status">Loading advanced analytics…</div>
+        <div className="advanced-analytics__status" role="status" aria-live="polite">Loading advanced analytics…</div>
       ) : (
         <>
           <section className="advanced-analytics__summary-grid" aria-label="Advanced analytics summary">
@@ -426,7 +436,7 @@ const AdvancedAnalytics: React.FC = () => {
             ))}
           </section>
 
-          <section className="advanced-analytics__tabs" aria-label="Advanced analytics tabs">
+          <section className="advanced-analytics__tabs" role="tablist" aria-label="Advanced analytics tabs">
             {[
               { id: 'form', label: 'Form Trends' },
               { id: 'fatigue', label: 'Fatigue' },
@@ -438,6 +448,11 @@ const AdvancedAnalytics: React.FC = () => {
                 type="button"
                 className={`advanced-analytics__tab ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id as AnalyticsTab)}
+                role="tab"
+                id={`advanced-analytics-tab-${tab.id}`}
+                aria-selected={activeTab === tab.id}
+                aria-controls={`advanced-analytics-panel-${tab.id}`}
+                tabIndex={activeTab === tab.id ? 0 : -1}
               >
                 {tab.label}
               </button>
@@ -445,16 +460,26 @@ const AdvancedAnalytics: React.FC = () => {
           </section>
 
           {activeTab === 'form' && (
-            <section className="advanced-analytics__tab-panel" aria-label="Form trends panel">
+            <section
+              id="advanced-analytics-panel-form"
+              className="advanced-analytics__tab-panel"
+              role="tabpanel"
+              aria-labelledby="advanced-analytics-tab-form"
+            >
               <FormTrends games={filteredFormGames} />
             </section>
           )}
 
           {activeTab === 'fatigue' && (
-            <section className="advanced-analytics__tab-panel" aria-label="Fatigue panel">
+            <section
+              id="advanced-analytics-panel-fatigue"
+              className="advanced-analytics__tab-panel"
+              role="tabpanel"
+              aria-labelledby="advanced-analytics-tab-fatigue"
+            >
               <h3>Fatigue Analysis</h3>
               {filteredFatigueGames.length === 0 ? (
-                <p className="advanced-analytics__empty">No fatigue samples match the selected date range.</p>
+                <p className="advanced-analytics__empty" role="status" aria-live="polite">No fatigue samples match the selected date range.</p>
               ) : (
                 <div className="advanced-analytics__chart-grid">
                   <article className="advanced-analytics__chart-card">
@@ -467,8 +492,8 @@ const AdvancedAnalytics: React.FC = () => {
                           <YAxis />
                           <Tooltip />
                           <Legend />
-                          <Bar dataKey="play_time_percent" fill="#1f6f78" name="Play time %" />
-                          <Bar dataKey="degradation" fill="#d1495b" name="Performance degradation" />
+                          <Bar dataKey="play_time_percent" fill="var(--chart-series-1)" name="Play time %" />
+                          <Bar dataKey="degradation" fill="var(--chart-series-2)" name="Performance degradation" />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -477,7 +502,7 @@ const AdvancedAnalytics: React.FC = () => {
                   <article className="advanced-analytics__chart-card">
                     <h3>Latest In-Game Split</h3>
                     {fatiguePeriodChart.length === 0 ? (
-                      <p className="advanced-analytics__empty">No period splits available.</p>
+                      <p className="advanced-analytics__empty" role="status" aria-live="polite">No period splits available.</p>
                     ) : (
                       <div className="advanced-analytics__chart-shell">
                         <ResponsiveContainer width="100%" height="100%">
@@ -487,8 +512,8 @@ const AdvancedAnalytics: React.FC = () => {
                             <YAxis />
                             <Tooltip />
                             <Legend />
-                            <Line type="monotone" dataKey="fg_percentage" stroke="#d1495b" strokeWidth={3} name="FG%" />
-                            <Line type="monotone" dataKey="shots" stroke="#edae49" strokeWidth={2} name="Shots" />
+                            <Line type="monotone" dataKey="fg_percentage" stroke="var(--chart-series-2)" strokeWidth={3} name="FG%" />
+                            <Line type="monotone" dataKey="shots" stroke="var(--chart-series-4)" strokeWidth={2} name="Shots" />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -519,7 +544,12 @@ const AdvancedAnalytics: React.FC = () => {
           )}
 
           {activeTab === 'predictions' && (
-            <section className="advanced-analytics__tab-panel" aria-label="Predictions panel">
+            <section
+              id="advanced-analytics-panel-predictions"
+              className="advanced-analytics__tab-panel"
+              role="tabpanel"
+              aria-labelledby="advanced-analytics-tab-predictions"
+            >
               <PredictionsPanel
                 prediction={prediction}
                 comparison={comparison}
@@ -529,7 +559,12 @@ const AdvancedAnalytics: React.FC = () => {
           )}
 
           {activeTab === 'video' && (
-            <section className="advanced-analytics__tab-panel" aria-label="Video panel">
+            <section
+              id="advanced-analytics-panel-video"
+              className="advanced-analytics__tab-panel"
+              role="tabpanel"
+              aria-labelledby="advanced-analytics-tab-video"
+            >
               <div className="advanced-analytics__video-toolbar">
                 <div>
                   <h3>Video Insights</h3>
@@ -557,9 +592,9 @@ const AdvancedAnalytics: React.FC = () => {
               )}
 
               {videoLoading ? (
-                <div className="advanced-analytics__status">Loading video insights…</div>
+                <div className="advanced-analytics__status" role="status" aria-live="polite">Loading video insights…</div>
               ) : availableVideoGameIds.length === 0 ? (
-                <p className="advanced-analytics__empty">No recent games are available for video analysis within the selected date range.</p>
+                <p className="advanced-analytics__empty" role="status" aria-live="polite">No recent games are available for video analysis within the selected date range.</p>
               ) : (
                 <div className="advanced-analytics__video-grid">
                   <article className="advanced-analytics__video-card">
@@ -603,13 +638,13 @@ const AdvancedAnalytics: React.FC = () => {
                             <XAxis dataKey="event_type" />
                             <YAxis allowDecimals={false} />
                             <Tooltip />
-                            <Bar dataKey="count" fill="#1f6f78" name="Tagged events" />
+                            <Bar dataKey="count" fill="var(--chart-series-1)" name="Tagged events" />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
                     )}
                     {videoEvents.length === 0 ? (
-                      <p className="advanced-analytics__empty">No linked video events were found for this game.</p>
+                      <p className="advanced-analytics__empty" role="status" aria-live="polite">No linked video events were found for this game.</p>
                     ) : (
                       <ul className="advanced-analytics__list">
                         {videoEvents.slice(0, 5).map((event, index) => (
@@ -634,6 +669,7 @@ const AdvancedAnalytics: React.FC = () => {
         </>
       )}
     </div>
+    </PageLayout>
   );
 };
 

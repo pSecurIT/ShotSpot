@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import CourtVisualization from './CourtVisualization';
@@ -104,6 +104,7 @@ interface AssignableTeam {
 }
 
 type PreMatchSetupMode = 'single_team' | 'both_teams';
+type LiveMatchTab = 'timeline' | 'faults' | 'timeouts' | 'freeshots' | 'commentary';
 
 interface Possession {
   id: number;
@@ -221,7 +222,7 @@ const LiveMatch: React.FC = () => {
   const resetMatchMutationRef = useRef<Promise<void> | null>(null);
 
   // Active tab for Enhanced Match Events
-  const [activeTab, setActiveTab] = useState<'timeline' | 'faults' | 'timeouts' | 'freeshots' | 'commentary'>('timeline');
+  const [activeTab, setActiveTab] = useState<LiveMatchTab>('timeline');
 
   // Export dialog state
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -244,7 +245,17 @@ const LiveMatch: React.FC = () => {
   const [focusMode, setFocusMode] = useState<boolean>(false);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
 
-  const currentUserRole = (() => {
+  const handleTabChange = useCallback((nextTab: LiveMatchTab) => {
+    startTransition(() => {
+      setActiveTab((currentTab) => (currentTab === nextTab ? currentTab : nextTab));
+    });
+  }, []);
+
+  const apiWithPerfHelpers = api as typeof api & {
+    prefetchGet?: (url: string, config?: unknown, options?: { ttlMs?: number }) => Promise<void>;
+  };
+
+  const currentUserRole = useMemo(() => {
     if (typeof window === 'undefined') {
       return 'admin';
     }
@@ -259,7 +270,7 @@ const LiveMatch: React.FC = () => {
     } catch {
       return 'admin';
     }
-  })();
+  }, []);
 
   const isAdminUser = currentUserRole === 'admin';
   const effectiveSetupMode: PreMatchSetupMode = isAdminUser ? preMatchSetupMode : 'single_team';
@@ -270,13 +281,26 @@ const LiveMatch: React.FC = () => {
       ? [effectiveSingleTeam]
       : [];
 
+  const safePrefetch = useCallback(async (url: string, ttlMs: number): Promise<void> => {
+    if (typeof apiWithPerfHelpers.prefetchGet === 'function') {
+      await apiWithPerfHelpers.prefetchGet(url, undefined, { ttlMs });
+      return;
+    }
+
+    try {
+      await api.get(url);
+    } catch {
+      // Prefetch is best-effort only.
+    }
+  }, [apiWithPerfHelpers]);
+
   // Fetch game data
   const fetchGame = useCallback(async () => {
     if (!gameId) return;
     
     try {
       setError(null);
-      const response = await api.get(`/games/${gameId}`);
+      const response = await api.get<Game>(`/games/${gameId}`);
       setGame(response.data);
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
@@ -321,7 +345,7 @@ const LiveMatch: React.FC = () => {
       // Use different endpoints based on game status
       if (game.status === 'in_progress') {
         // During match: Fetch from game roster to get starting_position data
-        const rosterResponse = await api.get(`/game-rosters/${game.id}`);
+        const rosterResponse = await api.get<Array<Player & { is_starting: boolean; player_id: number; club_id?: number }>>(`/game-rosters/${game.id}`);
         const rosterPlayers = rosterResponse.data;
         
         // Separate by team and include starting_position
@@ -360,8 +384,8 @@ const LiveMatch: React.FC = () => {
       } else {
         // Pre-match: Fetch ALL players from both teams
         const [homeResponse, awayResponse] = await Promise.all([
-          api.get(`/players?team_id=${game.home_team_id}`),
-          api.get(`/players?team_id=${game.away_team_id}`)
+          api.get<Player[]>(`/players?team_id=${game.home_team_id}`),
+          api.get<Player[]>(`/players?team_id=${game.away_team_id}`)
         ]);
         
         const homePlayers = homeResponse.data
@@ -419,7 +443,7 @@ const LiveMatch: React.FC = () => {
   const validateTeamRequirements = (side: 'home' | 'away'): { valid: boolean; message: string } => {
     const teamName = side === 'home' ? game?.home_team_name : game?.away_team_name;
     const selectedPlayers = side === 'home' ? selectedHomePlayers : selectedAwayPlayers;
-    const playersList = side === 'home' ? homePlayers : awayPlayers;
+    const playersById = side === 'home' ? homePlayersById : awayPlayersById;
     const captainId = side === 'home' ? homeCaptainId : awayCaptainId;
     const offensePlayers = side === 'home' ? homeOffensePlayers : awayOffensePlayers;
 
@@ -430,7 +454,7 @@ const LiveMatch: React.FC = () => {
       };
     }
 
-    const genderCount = getGenderCount(Array.from(selectedPlayers), playersList);
+    const genderCount = getGenderCount(Array.from(selectedPlayers), playersById);
     if (genderCount.male !== 4 || genderCount.female !== 4) {
       return {
         valid: false,
@@ -452,7 +476,7 @@ const LiveMatch: React.FC = () => {
       };
     }
 
-    const offenseGenderCount = getGenderCount(Array.from(offensePlayers), playersList);
+    const offenseGenderCount = getGenderCount(Array.from(offensePlayers), playersById);
     if (offenseGenderCount.male !== 2 || offenseGenderCount.female !== 2) {
       return {
         valid: false,
@@ -461,7 +485,7 @@ const LiveMatch: React.FC = () => {
     }
 
     const defensePlayers = Array.from(selectedPlayers).filter(id => !offensePlayers.has(id));
-    const defenseGenderCount = getGenderCount(defensePlayers, playersList);
+    const defenseGenderCount = getGenderCount(defensePlayers, playersById);
     if (defenseGenderCount.male !== 2 || defenseGenderCount.female !== 2) {
       return {
         valid: false,
@@ -495,12 +519,20 @@ const LiveMatch: React.FC = () => {
     return { valid: true, message: `${configuredTeamName} meets all requirements` };
   };
 
+  const homePlayersById = useMemo(() => {
+    return new Map(homePlayers.map((player) => [player.id, player]));
+  }, [homePlayers]);
+
+  const awayPlayersById = useMemo(() => {
+    return new Map(awayPlayers.map((player) => [player.id, player]));
+  }, [awayPlayers]);
+
   // Helper function to count genders in selected players
-  const getGenderCount = (selectedIds: number[], playersList: Player[]): { male: number; female: number; unknown: number } => {
+  const getGenderCount = (selectedIds: number[], playersById: Map<number, Player>): { male: number; female: number; unknown: number } => {
     const counts = { male: 0, female: 0, unknown: 0 };
     
     selectedIds.forEach(id => {
-      const player = playersList.find(p => p.id === id);
+      const player = playersById.get(id);
       if (player) {
         if (player.gender === 'male') {
           counts.male++;
@@ -532,7 +564,7 @@ const LiveMatch: React.FC = () => {
           }
         } else {
           // Check if adding this player would exceed gender limit
-          const currentCounts = getGenderCount(Array.from(newSet), homePlayers);
+          const currentCounts = getGenderCount(Array.from(newSet), homePlayersById);
           
           if (player.gender === 'male' && currentCounts.male >= 4) {
             setError('Cannot select more than 4 male players for the home team');
@@ -562,7 +594,7 @@ const LiveMatch: React.FC = () => {
           }
         } else {
           // Check if adding this player would exceed gender limit
-          const currentCounts = getGenderCount(Array.from(newSet), awayPlayers);
+          const currentCounts = getGenderCount(Array.from(newSet), awayPlayersById);
           
           if (player.gender === 'male' && currentCounts.male >= 4) {
             setError('Cannot select more than 4 male players for the away team');
@@ -653,7 +685,7 @@ const LiveMatch: React.FC = () => {
           }
           
           // Check gender limits for offense (2 males, 2 females)
-          const currentOffenseCounts = getGenderCount(Array.from(newSet), homePlayers);
+          const currentOffenseCounts = getGenderCount(Array.from(newSet), homePlayersById);
           if (player.gender === 'male' && currentOffenseCounts.male >= 2) {
             setError('Offense can only have 2 male players');
             setTimeout(() => setError(null), 3000);
@@ -684,7 +716,7 @@ const LiveMatch: React.FC = () => {
           }
           
           // Check gender limits for offense (2 males, 2 females)
-          const currentOffenseCounts = getGenderCount(Array.from(newSet), awayPlayers);
+          const currentOffenseCounts = getGenderCount(Array.from(newSet), awayPlayersById);
           if (player.gender === 'male' && currentOffenseCounts.male >= 2) {
             setError('Offense can only have 2 male players');
             setTimeout(() => setError(null), 3000);
@@ -789,8 +821,11 @@ const LiveMatch: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchGame(), fetchPendingReviewCount()]);
+      await fetchGame();
       setLoading(false);
+
+      // Non-blocking: pending review count is useful context but not required for initial interaction.
+      void fetchPendingReviewCount();
     };
     
     loadData();
@@ -799,7 +834,16 @@ const LiveMatch: React.FC = () => {
   // Fetch players when game is loaded or status changes
   useEffect(() => {
     if (game) {
-      fetchPlayers();
+      void fetchPlayers();
+
+      if (game.status === 'in_progress') {
+        // Warm frequent live-match panels to make first interactions feel instant.
+        void Promise.all([
+          safePrefetch(`/shots/${game.id}`, 3000),
+          safePrefetch(`/events/${game.id}`, 3000),
+          safePrefetch(`/substitutions/${game.id}`, 3000)
+        ]);
+      }
       
       // Show pre-match setup if game is scheduled
       if (game.status === 'scheduled' || game.status === 'to_reschedule') {
@@ -811,8 +855,7 @@ const LiveMatch: React.FC = () => {
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.id, game?.status, game?.home_attacking_side]);
+  }, [game, fetchPlayers, safePrefetch]);
 
   // Fetch user's assigned team when game is loaded
   useEffect(() => {
@@ -1371,9 +1414,9 @@ const LiveMatch: React.FC = () => {
   };
 
   // Toggle focus mode for mobile-optimized experience
-  const toggleFocusMode = () => {
+  const toggleFocusMode = useCallback(() => {
     setFocusMode(prev => !prev);
-  };
+  }, []);
 
   // Keyboard shortcut for focus mode (F key)
   useEffect(() => {
@@ -1396,7 +1439,7 @@ const LiveMatch: React.FC = () => {
 
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, []);
+  }, [toggleFocusMode]);
 
   // Auto-hide cursor in focus mode for cleaner mobile experience
   useEffect(() => {
@@ -1432,11 +1475,11 @@ const LiveMatch: React.FC = () => {
   }, [focusMode]);
 
   if (loading) {
-    return <div className="loading">Loading match data...</div>;
+    return <div className="loading" role="status" aria-live="polite">Loading match data...</div>;
   }
 
   if (!game) {
-    return <div className="error-message">Game not found</div>;
+    return <div className="error-message" role="alert">Game not found</div>;
   }
 
   // Show pre-match setup for scheduled games
@@ -1446,8 +1489,8 @@ const LiveMatch: React.FC = () => {
     const showAwaySetup = teamsToConfigure.includes('away');
     
     // Calculate gender counts for display
-    const homeGenderCount = getGenderCount(Array.from(selectedHomePlayers), homePlayers);
-    const awayGenderCount = getGenderCount(Array.from(selectedAwayPlayers), awayPlayers);
+    const homeGenderCount = getGenderCount(Array.from(selectedHomePlayers), homePlayersById);
+    const awayGenderCount = getGenderCount(Array.from(selectedAwayPlayers), awayPlayersById);
     
     return (
       <div className="live-match-container">
@@ -1458,8 +1501,8 @@ const LiveMatch: React.FC = () => {
           <h2>Pre-Match Setup</h2>
         </div>
 
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
+        {error && <div className="error-message" role="alert">{error}</div>}
+        {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
 
         <div className="pre-match-setup">
           <h3>{game.home_team_name} vs {game.away_team_name}</h3>
@@ -1536,10 +1579,10 @@ const LiveMatch: React.FC = () => {
                   {selectedHomePlayers.size === 8 && (
                     <div className="position-count">
                       {(() => {
-                        const offenseCount = getGenderCount(Array.from(homeOffensePlayers), homePlayers);
+                        const offenseCount = getGenderCount(Array.from(homeOffensePlayers), homePlayersById);
                         const defenseCount = getGenderCount(
                           Array.from(selectedHomePlayers).filter(id => !homeOffensePlayers.has(id)),
-                          homePlayers
+                          homePlayersById
                         );
                         return (
                           <>
@@ -1619,10 +1662,10 @@ const LiveMatch: React.FC = () => {
                   {selectedAwayPlayers.size === 8 && (
                     <div className="position-count">
                       {(() => {
-                        const offenseCount = getGenderCount(Array.from(awayOffensePlayers), awayPlayers);
+                        const offenseCount = getGenderCount(Array.from(awayOffensePlayers), awayPlayersById);
                         const defenseCount = getGenderCount(
                           Array.from(selectedAwayPlayers).filter(id => !awayOffensePlayers.has(id)),
-                          awayPlayers
+                          awayPlayersById
                         );
                         return (
                           <>
@@ -1687,7 +1730,7 @@ const LiveMatch: React.FC = () => {
             </div>
 
             {!requirements.valid && (
-              <div className="requirements-error">
+              <div className="requirements-error" role="alert">
                 {requirements.message}
               </div>
             )}
@@ -1871,7 +1914,7 @@ const LiveMatch: React.FC = () => {
   // Check if game is in progress
   if (game.status !== 'in_progress') {
     return (
-      <div className="error-message">
+      <div className="error-message" role="alert">
         This game is not in progress. Status: {game.status}
         <button onClick={() => navigate('/games')} className="secondary-button">
           Back to Games
@@ -1936,8 +1979,8 @@ const LiveMatch: React.FC = () => {
         </button>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
 
       {/* Scoreboard */}
       <div className="scoreboard">
@@ -2091,31 +2134,31 @@ const LiveMatch: React.FC = () => {
                 <div className="tab-navigation">
                   <button
                     className={`tab-button ${activeTab === 'timeline' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('timeline')}
+                    onClick={() => handleTabChange('timeline')}
                   >
                     📊 Timeline {pendingReviewCount > 0 ? `(${pendingReviewCount})` : ''}
                   </button>
                   <button
                     className={`tab-button ${activeTab === 'faults' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('faults')}
+                    onClick={() => handleTabChange('faults')}
                   >
                     ⚠️ Faults
                   </button>
                   <button
                     className={`tab-button ${activeTab === 'timeouts' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('timeouts')}
+                    onClick={() => handleTabChange('timeouts')}
                   >
                     ⏸️ Timeouts
                   </button>
                   <button
                     className={`tab-button ${activeTab === 'freeshots' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('freeshots')}
+                    onClick={() => handleTabChange('freeshots')}
                   >
                     🎯 Free Shots
                   </button>
                   <button
                     className={`tab-button ${activeTab === 'commentary' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('commentary')}
+                    onClick={() => handleTabChange('commentary')}
                   >
                     📝 Commentary
                   </button>

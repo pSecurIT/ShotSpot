@@ -5,6 +5,8 @@ import { auth, requireRole } from '../middleware/auth.js';
 import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 import { validateGameRosterTwizzit } from '../middleware/twizzitValidation.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -55,7 +57,7 @@ router.get(
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (error) {
-      console.error('Error fetching game roster:', error);
+      logError('Error fetching game roster:', error);
       res.status(500).json({ error: 'Failed to fetch game roster' });
     }
   }
@@ -167,16 +169,16 @@ router.post(
       await pool.query('DELETE FROM game_rosters WHERE game_id = $1', [gameId]);
 
       // Validate that only one captain per club
-      const captainsByClub = {};
+      const captainClubIds = new Set();
       for (const player of players) {
         if (player.is_captain) {
-          if (captainsByClub[player.club_id]) {
+          if (captainClubIds.has(player.club_id)) {
             await pool.query('ROLLBACK');
             return res.status(400).json({ 
               error: 'Only one captain allowed per club' 
             });
           }
-          captainsByClub[player.club_id] = true;
+          captainClubIds.add(player.club_id);
         }
       }
 
@@ -223,7 +225,7 @@ router.post(
       res.status(201).json({ roster: insertedPlayers, warnings });
     } catch (error) {
       await pool.query('ROLLBACK');
-      console.error('Error adding players to roster:', error);
+      logError('Error adding players to roster:', error);
       
       if (error.code === '23503') {
         return res.status(400).json({ error: 'Invalid game, club, or player ID' });
@@ -323,7 +325,7 @@ router.put(
       res.json(result.rows[0]);
     } catch (error) {
       await pool.query('ROLLBACK');
-      console.error('Error updating roster entry:', error);
+      logError('Error updating roster entry:', error);
       res.status(500).json({ error: 'Failed to update roster entry' });
     }
   }
@@ -372,7 +374,7 @@ router.delete(
 
       res.status(204).send();
     } catch (error) {
-      console.error('Error removing player from roster:', error);
+      logError('Error removing player from roster:', error);
       res.status(500).json({ error: 'Failed to remove player from roster' });
     }
   }

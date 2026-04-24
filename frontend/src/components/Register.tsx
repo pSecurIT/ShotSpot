@@ -61,7 +61,7 @@ const Register: React.FC = () => {
   return (
     <div className="form-container">
       <h2>Create Your Account</h2>
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="username">Username</label>
@@ -96,8 +96,9 @@ const Register: React.FC = () => {
             onChange={handleChange}
             required
             minLength={8}
+            aria-describedby="register-password-help"
           />
-          <small className="form-help">
+          <small className="form-help" id="register-password-help">
             Password must contain at least 8 characters, one uppercase letter,<br/>
             one lowercase letter, one number, and one special character.
           </small>

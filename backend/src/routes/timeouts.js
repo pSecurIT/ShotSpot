@@ -3,6 +3,8 @@ import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -66,7 +68,7 @@ router.get('/:gameId', [
 
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching timeouts:', error);
+    logError('Error fetching timeouts:', error);
     res.status(500).json({ error: 'Failed to fetch timeouts' });
   }
 });
@@ -215,11 +217,11 @@ router.post('/', [
           return res.status(200).json(existingTimeout);
         }
       } catch (lookupError) {
-        console.error('Error resolving duplicate timeout by client_uuid:', lookupError);
+        logError('Error resolving duplicate timeout by client_uuid:', lookupError);
       }
     }
 
-    console.error('Error creating timeout:', error);
+    logError('Error creating timeout:', error);
     res.status(500).json({ error: 'Failed to create timeout' });
   }
 });
@@ -285,7 +287,7 @@ router.put('/:timeoutId/end', [
 
     res.json(updatedResult.rows[0]);
   } catch (error) {
-    console.error('Error ending timeout:', error);
+    logError('Error ending timeout:', error);
     res.status(500).json({ error: 'Failed to end timeout' });
   }
 });
@@ -390,7 +392,7 @@ router.put('/:timeoutId', [
 
     res.json(timeout);
   } catch (error) {
-    console.error('Error updating timeout:', error);
+    logError('Error updating timeout:', error);
     res.status(500).json({ error: 'Failed to update timeout' });
   }
 });
@@ -438,7 +440,7 @@ router.post('/:timeoutId/confirm', [
     const timeout = await fetchCompleteTimeoutById(timeoutId);
     res.status(200).json(timeout);
   } catch (error) {
-    console.error('Error confirming timeout:', error);
+    logError('Error confirming timeout:', error);
     res.status(500).json({ error: 'Failed to confirm timeout' });
   }
 });
@@ -482,7 +484,7 @@ router.delete('/:timeoutId', [
 
     res.json({ message: 'Timeout deleted successfully' });
   } catch (error) {
-    console.error('Error deleting timeout:', error);
+    logError('Error deleting timeout:', error);
     res.status(500).json({ error: 'Failed to delete timeout' });
   }
 });

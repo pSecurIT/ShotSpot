@@ -1,13 +1,30 @@
 import express from 'express';
-import { body, validationResult } from 'express-validator';
+import { body, param, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
 const router = express.Router();
+const TEAM_THEME_PALETTE_IDS = [
+  'shotspot-blue',
+  'emerald-club',
+  'sunset-flare',
+  'crimson-strike',
+  'violet-pulse',
+  'graphite-gold'
+];
 
 // Apply authentication middleware to all routes
 router.use(auth);
+
+async function loadTeam(teamId) {
+  const result = await db.query(
+    'SELECT id, club_id, team_theme_palette_id FROM teams WHERE id = $1',
+    [teamId]
+  );
+
+  return result.rows[0] || null;
+}
 
 // Get all teams (age groups)
 router.get('/', async (req, res) => {
@@ -100,6 +117,82 @@ router.post('/', [
       return res.status(409).json({ error: 'Team with this name already exists for this club and season' });
     }
     res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+router.get('/:id/theme', [
+  param('id').isInt({ min: 1 }).withMessage('Team ID must be a positive integer')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const team = await loadTeam(Number(req.params.id));
+  if (!team) {
+    return res.status(404).json({ error: 'Team not found' });
+  }
+
+  try {
+    const clubResult = await db.query(
+      'SELECT club_theme_palette_id FROM clubs WHERE id = $1',
+      [team.club_id]
+    );
+    const clubPaletteId = clubResult.rows[0]?.club_theme_palette_id || 'shotspot-blue';
+
+    return res.json({
+      team_id: team.id,
+      club_id: team.club_id,
+      palette_id: team.team_theme_palette_id,
+      club_palette_id: clubPaletteId,
+      effective_palette_id: team.team_theme_palette_id || clubPaletteId,
+      is_inherited: !team.team_theme_palette_id
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+router.put('/:id/theme', [
+  requireRole(['admin', 'coach']),
+  param('id').isInt({ min: 1 }).withMessage('Team ID must be a positive integer'),
+  body('palette_id')
+    .custom((value) => value === null || TEAM_THEME_PALETTE_IDS.includes(value))
+    .withMessage(`Palette ID must be one of: ${TEAM_THEME_PALETTE_IDS.join(', ')}`)
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  const team = await loadTeam(Number(req.params.id));
+  if (!team) {
+    return res.status(404).json({ error: 'Team not found' });
+  }
+
+  if (req.user.role === 'coach') {
+    const allowed = await hasTrainerAccess(req.user.userId, { clubId: Number(team.club_id), teamId: team.id });
+    if (!allowed) {
+      return res.status(403).json({ error: 'Trainer assignment required for this team' });
+    }
+  }
+
+  try {
+    const result = await db.query(
+      `UPDATE teams
+       SET team_theme_palette_id = $1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING id, team_theme_palette_id`,
+      [req.body.palette_id ?? null, req.params.id]
+    );
+
+    return res.json({
+      team_id: result.rows[0].id,
+      palette_id: result.rows[0].team_theme_palette_id
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
 

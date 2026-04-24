@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../utils/api';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 interface ChangePasswordDialogProps {
   userId: number;
@@ -20,11 +22,21 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
   onSuccess,
   isForced = false
 }) => {
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
+  const newPasswordRef = useRef<HTMLInputElement>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { dialogRef, titleId, onDialogKeyDown } = useAccessibleDialog({
+    isOpen,
+    onClose: () => {
+      if (!isForced) handleClose();
+    },
+    closeOnEscape: !isForced,
+    initialFocusRef: isOwnPassword ? currentPasswordRef : newPasswordRef,
+  });
 
   const validatePassword = (password: string): string | null => {
     if (password.length < 8) {
@@ -111,11 +123,26 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div style={styles.overlay}>
-      <div style={styles.dialog}>
+  const dialogContent = (
+    <div
+      style={styles.overlay}
+      onMouseDown={(event) => {
+        if (!isForced && event.target === event.currentTarget) {
+          handleClose();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        style={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={onDialogKeyDown}
+        tabIndex={-1}
+      >
         <div style={styles.header}>
-          <h3 style={styles.title}>
+          <h3 style={styles.title} id={titleId}>
             {isOwnPassword ? 'Change Your Password' : `Reset Password for ${username}`}
           </h3>
           {!isForced && (
@@ -132,13 +159,13 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
 
         <form onSubmit={handleSubmit}>
           {isForced && (
-            <div style={styles.warning}>
+            <div style={styles.warning} role="status" aria-live="polite">
               ⚠️ You must change your password before continuing. This is your first login or your password was reset by an administrator.
             </div>
           )}
           
           {error && (
-            <div style={styles.error}>
+            <div style={styles.error} role="alert">
               {error}
             </div>
           )}
@@ -149,6 +176,7 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
                 Current Password *
               </label>
               <input
+                ref={currentPasswordRef}
                 type="password"
                 id="currentPassword"
                 value={currentPassword}
@@ -166,6 +194,7 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
               New Password *
             </label>
             <input
+              ref={newPasswordRef}
               type="password"
               id="newPassword"
               value={newPassword}
@@ -174,8 +203,9 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
               disabled={loading}
               required
               autoComplete="new-password"
+              aria-describedby="new-password-hint"
             />
-            <small style={styles.hint}>
+            <small style={styles.hint} id="new-password-hint">
               Must be at least 8 characters with uppercase, lowercase, number, and special character
             </small>
           </div>
@@ -219,6 +249,8 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(dialogContent, document.body);
 };
 
 const styles = {
@@ -230,9 +262,11 @@ const styles = {
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
-    zIndex: 1000
+    padding: 'clamp(12px, 4vh, 32px) 16px',
+    overflowY: 'auto' as const,
+    zIndex: 2000
   },
   dialog: {
     backgroundColor: 'var(--bg-light)',
@@ -240,8 +274,9 @@ const styles = {
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
     maxWidth: '500px',
     width: '90%',
-    maxHeight: '90vh',
-    overflow: 'auto'
+    maxHeight: 'calc(100vh - clamp(24px, 8vh, 64px))',
+    overflowY: 'auto' as const,
+    margin: 'auto 0'
   },
   header: {
     display: 'flex',

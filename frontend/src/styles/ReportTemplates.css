@@ -191,6 +191,10 @@
   border: 1px solid #a8e2c3;
 }
 
+.report-templates__feedback {
+  margin-bottom: 1rem;
+}
+
 .report-templates__builder-shell,
 .report-templates__builder,
 .report-templates__builder-grid,

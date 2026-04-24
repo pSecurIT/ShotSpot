@@ -6,6 +6,8 @@ import { auth, requireRole } from '../middleware/auth.js';
 import rateLimit from 'express-rate-limit';
 import { composeReport, writeReportFile } from '../services/reportComposer.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -102,7 +104,7 @@ router.get('/', [
     const result = await db.query(queryText, queryParams);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching report exports:', err);
+    logError('Error fetching report exports:', err);
     res.status(500).json({ error: 'Failed to fetch report exports' });
   }
 });
@@ -151,7 +153,7 @@ router.get('/:id', [
 
     res.json(report);
   } catch (err) {
-    console.error('Error fetching report export:', err);
+    logError('Error fetching report export:', err);
     res.status(500).json({ error: 'Failed to fetch report export' });
   }
 });
@@ -320,7 +322,7 @@ router.post('/generate', [
       message: 'Report generated successfully'
     });
   } catch (err) {
-    console.error('Error generating report:', err);
+    logError('Error generating report:', err);
     res.status(500).json({ error: 'Failed to generate report' });
   }
 });
@@ -362,7 +364,7 @@ router.delete('/:id', [
 
     res.json({ message: 'Report deleted successfully' });
   } catch (err) {
-    console.error('Error deleting report:', err);
+    logError('Error deleting report:', err);
     res.status(500).json({ error: 'Failed to delete report' });
   }
 });

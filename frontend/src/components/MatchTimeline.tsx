@@ -162,6 +162,63 @@ const normalizeSubstitution = (raw: Record<string, unknown>): Substitution => ({
 
 const formatEventTypeLabel = (eventType: string) => eventType.replace(/_/g, ' ').toUpperCase();
 
+const arraysEqualBySignature = <T,>(
+  prev: T[],
+  next: T[],
+  getSignature: (item: T) => string
+): boolean => {
+  if (prev.length !== next.length) {
+    return false;
+  }
+
+  for (let i = 0; i < prev.length; i += 1) {
+    if (getSignature(prev[i]) !== getSignature(next[i])) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const eventSignature = (item: TimelineEvent): string => [
+  item.id,
+  item.event_status,
+  item.created_at,
+  item.event_type,
+  item.period,
+  item.time_remaining,
+  item.team_id,
+  item.player_id,
+  item.source_table,
+  item.client_uuid,
+  item.details ? JSON.stringify(item.details) : ''
+].join('|');
+
+const shotSignature = (item: Shot): string => [
+  item.id,
+  item.event_status,
+  item.created_at,
+  item.result,
+  item.period,
+  item.time_remaining,
+  item.team_id,
+  item.player_id,
+  item.client_uuid
+].join('|');
+
+const substitutionSignature = (item: Substitution): string => [
+  item.id,
+  item.event_status,
+  item.created_at,
+  item.reason,
+  item.period,
+  item.time_remaining,
+  item.team_id,
+  item.player_in_id,
+  item.player_out_id,
+  item.client_uuid
+].join('|');
+
 const MatchTimeline: React.FC<MatchTimelineProps> = ({
   gameId,
   homeTeamId,
@@ -183,11 +240,25 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
   const fetchEvents = useCallback(async () => {
     try {
       const response = await api.get(`/events/comprehensive/${gameId}`);
-      setEvents((response.data || []).map((item: Record<string, unknown>) => normalizeEvent(item)));
+      const normalizedEvents = (response.data || []).map((item: Record<string, unknown>) => normalizeEvent(item));
+      setEvents((previousEvents) => {
+        if (arraysEqualBySignature(previousEvents, normalizedEvents, eventSignature)) {
+          return previousEvents;
+        }
+
+        return normalizedEvents;
+      });
     } catch (err) {
       try {
         const fallbackResponse = await api.get(`/events/${gameId}`);
-        setEvents((fallbackResponse.data || []).map((item: Record<string, unknown>) => normalizeEvent(item)));
+        const normalizedFallbackEvents = (fallbackResponse.data || []).map((item: Record<string, unknown>) => normalizeEvent(item));
+        setEvents((previousEvents) => {
+          if (arraysEqualBySignature(previousEvents, normalizedFallbackEvents, eventSignature)) {
+            return previousEvents;
+          }
+
+          return normalizedFallbackEvents;
+        });
       } catch (fallbackErr) {
         console.error('Error fetching events:', err);
         setError(fallbackErr instanceof Error ? fallbackErr.message : 'Failed to fetch events');
@@ -198,7 +269,14 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
   const fetchShots = useCallback(async () => {
     try {
       const response = await api.get(`/shots/${gameId}`);
-      setShots((response.data || []).map((item: Record<string, unknown>) => normalizeShot(item)));
+      const normalizedShots = (response.data || []).map((item: Record<string, unknown>) => normalizeShot(item));
+      setShots((previousShots) => {
+        if (arraysEqualBySignature(previousShots, normalizedShots, shotSignature)) {
+          return previousShots;
+        }
+
+        return normalizedShots;
+      });
     } catch (err) {
       console.error('Error fetching shots:', err);
     }
@@ -207,25 +285,36 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
   const fetchSubstitutions = useCallback(async () => {
     try {
       const response = await api.get(`/substitutions/${gameId}`);
-      setSubstitutions((response.data || []).map((item: Record<string, unknown>) => normalizeSubstitution(item)));
+      const normalizedSubstitutions = (response.data || []).map((item: Record<string, unknown>) => normalizeSubstitution(item));
+      setSubstitutions((previousSubstitutions) => {
+        if (arraysEqualBySignature(previousSubstitutions, normalizedSubstitutions, substitutionSignature)) {
+          return previousSubstitutions;
+        }
+
+        return normalizedSubstitutions;
+      });
     } catch (err) {
       console.error('Error fetching substitutions:', err);
     }
   }, [gameId]);
 
-  const fetchTimeline = useCallback(async () => {
-    setLoading(true);
+  const fetchTimeline = useCallback(async (showLoading: boolean = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
     await Promise.all([fetchEvents(), fetchShots(), fetchSubstitutions()]);
-    setLoading(false);
+    if (showLoading) {
+      setLoading(false);
+    }
   }, [fetchEvents, fetchShots, fetchSubstitutions]);
 
   useEffect(() => {
     const initialFetch = setTimeout(() => {
-      void fetchTimeline();
+      void fetchTimeline(true);
     }, 0);
     const interval = setInterval(() => {
-      void fetchTimeline();
+      void fetchTimeline(false);
     }, 5000);
     return () => {
       clearTimeout(initialFetch);
@@ -644,7 +733,7 @@ const MatchTimeline: React.FC<MatchTimelineProps> = ({
           <div className="filter-stats">Showing {combinedTimeline.length} of {events.length + shots.length + substitutions.length} events</div>
         </div>
         <div className="timeline-actions">
-          <button onClick={() => void fetchTimeline()} className="refresh-button" disabled={loading}>🔄 {loading ? 'Refreshing...' : 'Refresh'}</button>
+          <button onClick={() => void fetchTimeline(true)} className="refresh-button" disabled={loading}>🔄 {loading ? 'Refreshing...' : 'Refresh'}</button>
           <button onClick={() => latestEditableItem && void handleEditItem(latestEditableItem)} className="edit-button" disabled={!latestEditableItem}>✏️ Edit Last Event</button>
           <button
             onClick={() => latestReviewableItem && void handleUpdateReviewStatus(latestReviewableItem, 'unconfirmed')}

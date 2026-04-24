@@ -14,20 +14,15 @@ const Login: React.FC = () => {
     setError(''); // Only clear on new submit
 
     try {
-      console.log('[Login] Attempting login...');
       const result = await login(username, password);
-      console.log('[Login] Login result:', result);
       
       if (result.success) {
-        console.log('[Login] Success, navigating to /dashboard');
         navigate('/dashboard');
       } else {
-        console.log('[Login] Failed, setting error:', result.error);
         setError(result.error || 'An error occurred during login');
-        console.log('[Login] Error state set, waiting for render...');
       }
     } catch (err) {
-      console.error('[Login] Exception during login:', err);
+      console.error('Login exception:', err);
       setError('An unexpected error occurred during login');
     }
   };
@@ -40,7 +35,7 @@ const Login: React.FC = () => {
   return (
     <div className="form-container">
       <h2>Login to ShotSpot</h2>
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="username">Username or Email</label>

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import AdvancedAnalytics from '../components/AdvancedAnalytics';
 import api from '../utils/api';
@@ -47,8 +48,8 @@ vi.mock('jspdf', () => ({
 
 vi.mock('recharts', () => {
   const passthrough = (name: string) => {
-    const MockChartComponent = ({ children }: { children?: React.ReactNode }) =>
-      React.createElement('div', { 'data-testid': name }, children);
+    const MockChartComponent = ({ children, fill, stroke, dataKey, name: seriesName }: { children?: React.ReactNode; fill?: string; stroke?: string; dataKey?: string; name?: string }) =>
+      React.createElement('div', { 'data-testid': name, 'data-fill': fill, 'data-stroke': stroke, 'data-key': dataKey, 'data-name': seriesName }, children);
 
     MockChartComponent.displayName = name;
     return MockChartComponent;
@@ -90,8 +91,17 @@ describe('AdvancedAnalytics', () => {
   const videoHighlightsMock = advancedAnalyticsApi.videoHighlights as unknown as Mock;
   const anchorClickMock = vi.fn();
 
+  const renderWithRouter = () => {
+    return render(
+      <MemoryRouter initialEntries={['/advanced-analytics']}>
+        <AdvancedAnalytics />
+      </MemoryRouter>
+    );
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
+    document.documentElement.style.setProperty('--surface-canvas', '#faf3e8');
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(anchorClickMock);
 
     apiGetMock.mockResolvedValue({
@@ -224,7 +234,7 @@ describe('AdvancedAnalytics', () => {
   });
 
   it('loads players, auto-selects one, and shows analytics summaries', async () => {
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
     await waitFor(() => {
       expect(formTrendsMock).toHaveBeenCalledWith(2, 20, expect.objectContaining({
@@ -243,15 +253,17 @@ describe('AdvancedAnalytics', () => {
 
   it('applies date filters and shows video insights through tab navigation', async () => {
     const user = userEvent.setup();
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
-    await screen.findByRole('button', { name: 'Form Trends' });
+    await screen.findByRole('tab', { name: 'Form Trends' });
     expect(screen.getByRole('heading', { name: 'Form Trends' })).toBeInTheDocument();
 
     await user.clear(screen.getByLabelText('Date from'));
     await user.type(screen.getByLabelText('Date from'), '2026-03-01');
 
-    await user.click(screen.getByRole('button', { name: 'Video' }));
+    await user.click(screen.getByRole('tab', { name: 'Video' }));
+
+    expect(screen.getByRole('tab', { name: 'Video' })).toHaveAttribute('aria-selected', 'true');
 
     await waitFor(() => {
       expect(formTrendsMock).toHaveBeenLastCalledWith(2, 20, expect.objectContaining({
@@ -266,22 +278,39 @@ describe('AdvancedAnalytics', () => {
   it('shows errors from analytics loading failures', async () => {
     formTrendsMock.mockRejectedValueOnce(new Error('Prediction service down'));
 
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Prediction service down');
     });
   });
 
+  it('announces empty fatigue results for the selected date range', async () => {
+    const user = userEvent.setup();
+    fatigueMock.mockResolvedValueOnce({
+      player_id: 2,
+      games_analyzed: 0,
+      fatigue_analysis: [],
+    });
+
+    renderWithRouter();
+
+    await screen.findByText('Advanced Analytics Dashboard');
+    await user.click(screen.getByRole('tab', { name: 'Fatigue' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('No fatigue samples match the selected date range.');
+  });
+
   it('exports the dashboard as image and pdf', async () => {
     const user = userEvent.setup();
-    render(<AdvancedAnalytics />);
+    renderWithRouter();
 
     await screen.findByText('Advanced Analytics Dashboard');
 
     await user.click(screen.getByRole('button', { name: 'Export Image' }));
     await waitFor(() => {
       expect(html2canvasMock).toHaveBeenCalledTimes(1);
+      expect(html2canvasMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ backgroundColor: '#faf3e8' }));
       expect(anchorClickMock).toHaveBeenCalledTimes(1);
     });
 
@@ -291,5 +320,18 @@ describe('AdvancedAnalytics', () => {
       expect(addImageMock).toHaveBeenCalled();
       expect(saveMock).toHaveBeenCalled();
     });
+  });
+
+  it('uses theme chart variables for analytics series colors', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await screen.findByText('Advanced Analytics Dashboard');
+    await user.click(screen.getByRole('tab', { name: 'Fatigue' }));
+    await screen.findByText('Court Load vs Degradation');
+
+    const chartBars = screen.getAllByTestId('Bar');
+    expect(chartBars.some((element) => element.getAttribute('data-fill') === 'var(--chart-series-1)')).toBe(true);
+    expect(chartBars.some((element) => element.getAttribute('data-fill') === 'var(--chart-series-2)')).toBe(true);
   });
 });

@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordDialog from './ChangePasswordDialog';
 import CreateUserDialog from './CreateUserDialog';
 import EditUserDialog from './EditUserDialog';
+import StatePanel from './ui/StatePanel';
+import Toast from './ui/Toast';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 
 interface User {
   id: number;
@@ -17,7 +21,9 @@ interface User {
 }
 
 const UserManagement: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
@@ -26,23 +32,121 @@ const UserManagement: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'coach' | 'admin'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [sortBy, setSortBy] = useState<'username_asc' | 'username_desc' | 'role_asc' | 'last_login_desc' | 'created_desc'>('username_asc');
   const { user: currentUser, updateUser } = useAuth();
+
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    const result = users.filter((user) => {
+      if (roleFilter !== 'all' && user.role !== roleFilter) {
+        return false;
+      }
+
+      if (statusFilter === 'active' && !user.is_active) {
+        return false;
+      }
+
+      if (statusFilter === 'inactive' && user.is_active) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const lastLogin = user.last_login ? formatLastLogin(user.last_login).toLowerCase() : 'never';
+      return (
+        user.username.toLowerCase().includes(query)
+        || user.email.toLowerCase().includes(query)
+        || user.role.toLowerCase().includes(query)
+        || lastLogin.includes(query)
+      );
+    });
+
+    return result.sort((left, right) => {
+      if (sortBy === 'username_asc') {
+        return left.username.localeCompare(right.username);
+      }
+
+      if (sortBy === 'username_desc') {
+        return right.username.localeCompare(left.username);
+      }
+
+      if (sortBy === 'role_asc') {
+        return left.role.localeCompare(right.role) || left.username.localeCompare(right.username);
+      }
+
+      if (sortBy === 'last_login_desc') {
+        const leftValue = left.last_login ? new Date(left.last_login).getTime() : 0;
+        const rightValue = right.last_login ? new Date(right.last_login).getTime() : 0;
+        return rightValue - leftValue;
+      }
+
+      return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+    });
+  }, [users, searchQuery, roleFilter, statusFilter, sortBy]);
+
+  const hasActiveRefinements = Boolean(searchQuery.trim() || roleFilter !== 'all' || statusFilter !== 'all' || sortBy !== 'username_asc');
+
+  const activeFilterChips = useMemo(() => {
+    const chips: string[] = [];
+
+    const sortLabelMap: Record<'username_asc' | 'username_desc' | 'role_asc' | 'last_login_desc' | 'created_desc', string> = {
+      username_asc: 'Username A-Z',
+      username_desc: 'Username Z-A',
+      role_asc: 'Role A-Z',
+      last_login_desc: 'Recently logged in',
+      created_desc: 'Newest accounts'
+    };
+
+    if (searchQuery.trim()) {
+      chips.push(`Search: ${searchQuery.trim()}`);
+    }
+    if (roleFilter !== 'all') {
+      chips.push(`Role: ${roleFilter}`);
+    }
+    if (statusFilter !== 'all') {
+      chips.push(`Status: ${statusFilter}`);
+    }
+    if (sortBy !== 'username_asc') {
+      chips.push(`Sort: ${sortLabelMap[sortBy]}`);
+    }
+
+    return chips;
+  }, [searchQuery, roleFilter, statusFilter, sortBy]);
+
+  const clearAllRefinements = useCallback(() => {
+    setSearchQuery('');
+    setRoleFilter('all');
+    setStatusFilter('all');
+    setSortBy('username_asc');
+  }, []);
 
   const fetchUsers = async () => {
     try {
+      setLoading(true);
       setError(null);
       const response = await api.get('/users');
       setUsers(response.data);
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } }; message?: string };
       setError(error.response?.data?.error || 'Failed to fetch users');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!currentUser || currentUser.role !== 'admin') {
+      return;
+    }
+
     fetchUsers();
-  }, []);
+  }, [currentUser]);
 
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
@@ -168,11 +272,19 @@ const UserManagement: React.FC = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedUsers.size === users.length) {
-      setSelectedUsers(new Set());
-    } else {
-      setSelectedUsers(new Set(users.map(u => u.id)));
+    const filteredUserIds = filteredUsers.map((item) => item.id);
+    const allFilteredSelected = filteredUserIds.length > 0 && filteredUserIds.every((id) => selectedUsers.has(id));
+
+    if (allFilteredSelected) {
+      const nextSelected = new Set(selectedUsers);
+      filteredUserIds.forEach((id) => nextSelected.delete(id));
+      setSelectedUsers(nextSelected);
+      return;
     }
+
+    const nextSelected = new Set(selectedUsers);
+    filteredUserIds.forEach((id) => nextSelected.add(id));
+    setSelectedUsers(nextSelected);
   };
 
   const handleBulkRoleChange = async (newRole: string) => {
@@ -211,14 +323,23 @@ const UserManagement: React.FC = () => {
     return <div>You don&apos;t have permission to access this page.</div>;
   }
 
+  const showLoadErrorState = !loading && Boolean(error) && users.length === 0;
+  const showInlineError = Boolean(error) && !showLoadErrorState;
+  const filteredUserIds = filteredUsers.map((item) => item.id);
+  const allFilteredSelected = filteredUserIds.length > 0 && filteredUserIds.every((id) => selectedUsers.has(id));
+
   return (
-    <div className="user-management">
-      <div style={styles.headerContainer}>
-        <h2>User Management</h2>
+    <PageLayout
+      title="User Management"
+      eyebrow="Settings > User Management"
+      description="Manage user roles, passwords, and account lifecycle."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <div style={styles.headerActions}>
           <button
             onClick={() => setCreateDialogOpen(true)}
             style={styles.createButton}
+            type="button"
           >
             + Create User
           </button>
@@ -226,15 +347,18 @@ const UserManagement: React.FC = () => {
             onClick={exportToCSV}
             style={styles.exportButton}
             title="Export users to CSV"
+            type="button"
           >
             📥 Export CSV
           </button>
         </div>
-      </div>
+      )}
+    >
+    <div className="user-management">
 
       {selectedUsers.size > 0 && (
         <div style={styles.bulkActionsBar}>
-          <span>{selectedUsers.size} user(s) selected</span>
+          <span role="status" aria-live="polite">{selectedUsers.size} user(s) selected</span>
           <div style={styles.bulkButtons}>
             <select
               onChange={(e) => {
@@ -261,27 +385,157 @@ const UserManagement: React.FC = () => {
         </div>
       )}
 
-      {error && (
-        <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
-          {error}
+      {loading && (
+        <StatePanel
+          variant="loading"
+          title="Loading users"
+          message="Preparing the admin roster, bulk actions, and role controls."
+          className="user-management__feedback"
+        />
+      )}
+
+      {showLoadErrorState && (
+        <StatePanel
+          variant="error"
+          title="Couldn’t load users"
+          message={error ?? undefined}
+          actionLabel="Retry"
+          onAction={() => {
+            void fetchUsers();
+          }}
+          className="user-management__feedback"
+        />
+      )}
+
+      {showInlineError && (
+        <StatePanel
+          variant="error"
+          title="User action failed"
+          message={error ?? undefined}
+          actionLabel="Reload users"
+          onAction={() => {
+            void fetchUsers();
+          }}
+          compact
+          className="user-management__feedback"
+        />
+      )}
+
+      {!showLoadErrorState && !loading && (
+        <div className="search-filters-container">
+          <div className="search-box">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="search-input"
+              placeholder="Search by username, email, role, or last login"
+              aria-label="Search users"
+            />
+            {searchQuery.trim() && (
+              <button
+                type="button"
+                className="clear-search"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear user search"
+                title="Clear search"
+              >
+                x
+              </button>
+            )}
+          </div>
+
+          <div className="filters-row">
+            <div className="filter-group">
+              <label htmlFor="users_role_filter">Role filter</label>
+              <select
+                id="users_role_filter"
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value as 'all' | 'user' | 'coach' | 'admin')}
+                className="filter-select"
+              >
+                <option value="all">All roles</option>
+                <option value="user">User</option>
+                <option value="coach">Coach</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="users_status_filter">Status filter</label>
+              <select
+                id="users_status_filter"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+                className="filter-select"
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="users_sort">Sort by</label>
+              <select
+                id="users_sort"
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as 'username_asc' | 'username_desc' | 'role_asc' | 'last_login_desc' | 'created_desc')}
+                className="filter-select"
+              >
+                <option value="username_asc">Username A-Z</option>
+                <option value="username_desc">Username Z-A</option>
+                <option value="role_asc">Role A-Z</option>
+                <option value="last_login_desc">Recently logged in</option>
+                <option value="created_desc">Newest accounts</option>
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={clearAllRefinements}
+              className="secondary-button"
+              disabled={!hasActiveRefinements}
+            >
+              Clear all
+            </button>
+          </div>
+
+          <div className="active-filters" aria-label="Active user filters">
+            {activeFilterChips.length > 0 ? (
+              activeFilterChips.map((chip) => (
+                <span key={chip} className="active-filter-chip">{chip}</span>
+              ))
+            ) : (
+              <span className="active-filter-chip active-filter-chip--muted">No active filters</span>
+            )}
+          </div>
+
+          <div className="results-count" aria-live="polite">
+            Showing {filteredUsers.length} of {users.length} users
+          </div>
         </div>
       )}
 
-      {success && (
-        <div className="alert alert-success" style={{ marginBottom: '1rem' }}>
-          {success}
-        </div>
-      )}
-
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      {!showLoadErrorState && !loading && filteredUsers.length === 0 ? (
+        <StatePanel
+          variant="empty"
+          title="No users found"
+          message={hasActiveRefinements ? 'Try broadening your search or clear all filters to find the user faster.' : 'Create the first user account to start assigning roles and permissions.'}
+          actionLabel={hasActiveRefinements ? 'Clear all filters' : 'Create user'}
+          onAction={hasActiveRefinements ? clearAllRefinements : () => setCreateDialogOpen(true)}
+          className="user-management__feedback"
+        />
+      ) : !loading && !showLoadErrorState ? (
+      <table style={{ width: '100%', borderCollapse: 'collapse' }} aria-label="User management table">
         <thead>
           <tr>
             <th style={styles.th}>
               <input
                 type="checkbox"
-                checked={selectedUsers.size === users.length && users.length > 0}
+                checked={allFilteredSelected}
                 onChange={toggleSelectAll}
-                title="Select all users"
+                title="Select all visible users"
               />
             </th>
             <th style={styles.th}>Username</th>
@@ -292,7 +546,7 @@ const UserManagement: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {users.map(user => (
+          {filteredUsers.map(user => (
             <tr key={user.id} style={selectedUsers.has(user.id) ? styles.selectedRow : undefined}>
               <td style={styles.td}>
                 <input
@@ -370,6 +624,7 @@ const UserManagement: React.FC = () => {
           ))}
         </tbody>
       </table>
+      ) : null}
 
       <CreateUserDialog
         isOpen={createDialogOpen}
@@ -400,7 +655,16 @@ const UserManagement: React.FC = () => {
           onSuccess={handlePasswordChangeSuccess}
         />
       )}
+
+      {success && (
+        <Toast
+          title="User updated"
+          message={success}
+          onDismiss={() => setSuccess(null)}
+        />
+      )}
     </div>
+    </PageLayout>
   );
 };
 

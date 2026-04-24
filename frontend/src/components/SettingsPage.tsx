@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ExportSettings from './ExportSettings';
 import UserPreferences from './UserPreferences';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import type { SettingsTab } from '../types/settings';
 import '../styles/Settings.css';
 
@@ -26,6 +28,7 @@ function roleAtLeast(userRole: string, minRole: string): boolean {
 }
 
 const SettingsPage: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const { user } = useAuth();
 
   const visibleTabs = ALL_TABS.filter(t => !t.minRole || (user && roleAtLeast(user.role, t.minRole)));
@@ -37,11 +40,13 @@ const SettingsPage: React.FC = () => {
   }
 
   return (
+    <PageLayout
+      title="Settings"
+      eyebrow="Settings"
+      description="Manage your preferences and configuration."
+      breadcrumbs={breadcrumbs}
+    >
     <div className="settings-page">
-      <header className="settings-page__header">
-        <h2>Settings</h2>
-        <p className="settings-page__subtitle">Manage your preferences and configuration</p>
-      </header>
 
       <nav className="settings-tabs" aria-label="Settings sections">
         {visibleTabs.map(tab => (
@@ -63,6 +68,7 @@ const SettingsPage: React.FC = () => {
         {activeTab === 'system' && user.role === 'admin' && <SystemConfigTab />}
       </div>
     </div>
+    </PageLayout>
   );
 };
 
