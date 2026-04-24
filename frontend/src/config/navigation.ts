@@ -143,8 +143,8 @@ export const navigationConfig: NavigationItem[] = [
   {
     label: 'Settings',
     icon: '⚙️',
-    roles: ['coach', 'admin'],
-    description: 'Configuration, exports, and integrations',
+    roles: ['user', 'coach', 'admin'],
+    description: 'Configuration, notifications, exports, and integrations',
     category: 'settings',
     children: [
       {
@@ -173,7 +173,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Settings',
         path: '/settings',
         icon: '⚙️',
-        roles: ['coach', 'admin'],
+        roles: ['user', 'coach', 'admin'],
         category: 'settings'
       },
       {

@@ -30,4 +30,25 @@ export interface UserPreferences {
   emailNotifications: boolean;
 }
 
-export type SettingsTab = 'export' | 'preferences' | 'account' | 'system';
+export interface NotificationPreferences {
+  enabled: boolean;
+  channels: {
+    email: boolean;
+    inApp: boolean;
+    push: boolean;
+  };
+  categories: {
+    scheduledReports: boolean;
+    matchReminders: boolean;
+    lineupUpdates: boolean;
+    systemAnnouncements: boolean;
+  };
+  quietHours: {
+    enabled: boolean;
+    start: string;
+    end: string;
+  };
+  frequency: 'realtime' | 'hourly' | 'daily';
+}
+
+export type SettingsTab = 'export' | 'preferences' | 'notifications' | 'account' | 'system';

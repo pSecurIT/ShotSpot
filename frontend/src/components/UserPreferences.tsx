@@ -5,7 +5,6 @@ import api from '../utils/api';
 import type { Language } from '../types/settings';
 
 const LANGUAGE_KEY = 'language';
-const NOTIFICATIONS_KEY = 'emailNotifications';
 
 interface ThemeTeamOption {
   id: number;
@@ -30,10 +29,6 @@ function getStoredLanguage(): Language {
   return 'en';
 }
 
-function getStoredNotifications(): boolean {
-  return localStorage.getItem(NOTIFICATIONS_KEY) === 'true';
-}
-
 const UserPreferences: React.FC = () => {
   const { user } = useAuth();
   const {
@@ -55,7 +50,6 @@ const UserPreferences: React.FC = () => {
   const [clubs, setClubs] = useState<ThemeClubOption[]>([]);
   const [teams, setTeams] = useState<ThemeTeamOption[]>([]);
   const [language, setLanguage] = useState<Language>(getStoredLanguage);
-  const [emailNotifications, setEmailNotifications] = useState(getStoredNotifications);
   const [success, setSuccess] = useState('');
 
   const canManageClubTheme = user?.role === 'admin';
@@ -112,7 +106,6 @@ const UserPreferences: React.FC = () => {
 
   const handleSave = () => {
     localStorage.setItem(LANGUAGE_KEY, language);
-    localStorage.setItem(NOTIFICATIONS_KEY, String(emailNotifications));
     setSuccess('Preferences saved.');
     setTimeout(() => setSuccess(''), 3000);
   };
@@ -125,9 +118,7 @@ const UserPreferences: React.FC = () => {
     setTeamScopeId(null);
     setTeamPaletteId(null);
     setLanguage('en');
-    setEmailNotifications(false);
     localStorage.setItem(LANGUAGE_KEY, 'en');
-    localStorage.setItem(NOTIFICATIONS_KEY, 'false');
     setSuccess('Preferences reset to defaults.');
     setTimeout(() => setSuccess(''), 3000);
   };
@@ -320,25 +311,11 @@ const UserPreferences: React.FC = () => {
         </p>
       </div>
 
-      <div className="settings-field settings-field--checkbox">
-        <label>
-          <input
-            type="checkbox"
-            checked={emailNotifications}
-            onChange={e => setEmailNotifications(e.target.checked)}
-          />
-          Email notifications for scheduled reports
-        </label>
-        <p className="settings-field__help">
-          Receive an email when a scheduled report is ready.
-        </p>
-      </div>
-
       <div className="settings-actions">
-        <button className="btn btn-primary" onClick={handleSave}>
+        <button className="primary-button" onClick={handleSave}>
           Save Preferences
         </button>
-        <button className="btn btn-secondary" onClick={handleReset}>
+        <button className="secondary-button" onClick={handleReset}>
           Reset to Defaults
         </button>
       </div>
