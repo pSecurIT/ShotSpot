@@ -115,6 +115,7 @@ describe('SettingsPage', () => {
     await setup();
     expect(screen.getByRole('button', { name: 'Export Settings' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'User Preferences' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Account Settings' })).toBeInTheDocument();
     // System Configuration must NOT appear for coach
     expect(screen.queryByRole('button', { name: 'System Configuration' })).not.toBeInTheDocument();
@@ -198,7 +199,6 @@ describe('SettingsPage', () => {
 
   it('🔄 reset User Preferences restores defaults in localStorage', async () => {
     localStorage.setItem('language', 'fr');
-    localStorage.setItem('emailNotifications', 'true');
 
     const { ue } = await setup();
     await ue.click(screen.getByRole('button', { name: 'User Preferences' }));
@@ -206,8 +206,21 @@ describe('SettingsPage', () => {
     await ue.click(screen.getByRole('button', { name: /reset to defaults/i }));
 
     expect(localStorage.getItem('language')).toBe('en');
-    expect(localStorage.getItem('emailNotifications')).toBe('false');
     expect(await screen.findByRole('status')).toHaveTextContent('Preferences reset to defaults.');
+  });
+
+  it('🔔 notifications tab shows granular controls and immediate feedback', async () => {
+    const { ue } = await setup();
+    await ue.click(screen.getByRole('button', { name: 'Notifications' }));
+
+    expect(screen.getByRole('heading', { name: 'Notification center' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Enable notifications')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email channel')).toBeInTheDocument();
+    expect(screen.getByLabelText('Match reminders category')).toBeInTheDocument();
+
+    await ue.click(screen.getByLabelText('Email channel'));
+    expect(await screen.findByRole('status')).toHaveTextContent('Email notifications enabled.');
+    expect(localStorage.getItem('notificationPreferences:v1')).toContain('"email":true');
   });
 
   it('⛔ Export Settings shows error for invalid auto-delete days', async () => {

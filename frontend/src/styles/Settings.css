@@ -275,6 +275,147 @@
   flex-shrink: 0;
 }
 
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface-panel, #fff);
+}
+
+.settings-toggle-row__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.settings-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+}
+
+.settings-switch input[type='checkbox'] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.settings-switch__slider {
+  width: 2.4rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: #b9c2ce;
+  position: relative;
+  transition: background-color var(--transition-fast);
+}
+
+.settings-switch__slider::after {
+  content: '';
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--transition-fast);
+}
+
+.settings-switch input[type='checkbox']:checked + .settings-switch__slider {
+  background: var(--primary-color);
+}
+
+.settings-switch input[type='checkbox']:checked + .settings-switch__slider::after {
+  transform: translateX(1.05rem);
+}
+
+.settings-switch__label {
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 4.7rem;
+  text-align: right;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.75rem;
+}
+
+.settings-grid--times {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.settings-check-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--surface-panel, #fff);
+}
+
+.settings-check-card input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+}
+
+.settings-check-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.settings-check-card__content strong {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.settings-check-card__content small {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.settings-check-card__state {
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  letter-spacing: 0.01em;
+}
+
+.settings-check-card__state.is-enabled {
+  background: rgba(0, 200, 83, 0.15);
+  color: #10783a;
+}
+
+.settings-check-card__state.is-disabled {
+  background: rgba(95, 111, 130, 0.16);
+  color: #4f5f73;
+}
+
+.settings-state-chip {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  border-radius: 999px;
+  border: 1px dashed var(--border-color, #e2e8f0);
+  padding: 0.35rem 0.75rem;
+  width: fit-content;
+}
+
 /* Roles checkboxes */
 .settings-field__roles {
   display: flex;
@@ -395,6 +536,24 @@
 
   .settings-actions > * {
     width: 100%;
+  }
+
+  .settings-toggle-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-switch__label {
+    text-align: left;
+  }
+
+  .settings-check-card {
+    grid-template-columns: auto 1fr;
+  }
+
+  .settings-check-card__state {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 }
 
