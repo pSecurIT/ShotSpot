@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ExportSettings from './ExportSettings';
 import UserPreferences from './UserPreferences';
+import NotificationPreferences from './NotificationPreferences';
 import PageLayout from './ui/PageLayout';
 import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import type { SettingsTab } from '../types/settings';
@@ -17,6 +18,7 @@ interface Tab {
 const ALL_TABS: Tab[] = [
   { id: 'export', label: 'Export Settings', minRole: 'coach' },
   { id: 'preferences', label: 'User Preferences' },
+  { id: 'notifications', label: 'Notifications' },
   { id: 'account', label: 'Account Settings' },
   { id: 'system', label: 'System Configuration', minRole: 'admin' },
 ];
@@ -64,6 +66,7 @@ const SettingsPage: React.FC = () => {
       <div className="settings-content">
         {activeTab === 'export' && <ExportSettings />}
         {activeTab === 'preferences' && <UserPreferences />}
+        {activeTab === 'notifications' && <NotificationPreferences />}
         {activeTab === 'account' && <AccountSettingsTab />}
         {activeTab === 'system' && user.role === 'admin' && <SystemConfigTab />}
       </div>

@@ -266,7 +266,7 @@ const App: React.FC = () => {
               <Route
                 path="/settings"
                 element={
-                  <ProtectedRoute minRole="coach">
+                  <ProtectedRoute>
                     <RouteLoader><SettingsPage /></RouteLoader>
                   </ProtectedRoute>
                 }
