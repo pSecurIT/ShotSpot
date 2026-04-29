@@ -415,8 +415,8 @@ const FatigueAnalysis: React.FC<FatigueAnalysisProps> = ({
           icon="📋"
         >
           <div className="fatigue-analysis__period-details">
-            {fatigueData.fatigue_analysis.slice(0, 3).map((game) => (
-              <div key={game.game_id} className="fatigue-analysis__game-card">
+            {fatigueData.fatigue_analysis.slice(0, 3).map((game, gameIndex) => (
+              <div key={`${game.game_id}-${game.game_date}-${gameIndex}`} className="fatigue-analysis__game-card">
                 <h4 className="fatigue-analysis__game-date">
                   {new Date(game.game_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </h4>
@@ -446,8 +446,8 @@ const FatigueAnalysis: React.FC<FatigueAnalysisProps> = ({
                   <div className="fatigue-analysis__periods">
                     <p className="fatigue-analysis__periods-label">By Period:</p>
                     <div className="fatigue-analysis__periods-grid">
-                      {game.period_performance.map((period) => (
-                        <div key={period.period} className="fatigue-analysis__period-box">
+                      {game.period_performance.map((period, periodIndex) => (
+                        <div key={`${game.game_id}-period-${period.period}-${periodIndex}`} className="fatigue-analysis__period-box">
                           <span className="fatigue-analysis__period-num">P{period.period}</span>
                           <span className="fatigue-analysis__period-fg">{period.fg_percentage.toFixed(0)}%</span>
                           <span className="fatigue-analysis__period-shots">{period.shots} shots</span>

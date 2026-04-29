@@ -256,7 +256,11 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
     });
   }
 
-  const { id } = req.params;
+  const playerId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    return res.status(400).json({ error: 'Invalid player id' });
+  }
+
   // Handle both camelCase and snake_case property names
   const {
     club_id = req.body.clubId,
@@ -269,6 +273,12 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
   } = req.body;
   
   try {
+    // Return 404 before further validation checks if player does not exist.
+    const playerExists = await db.query('SELECT id FROM players WHERE id = $1', [playerId]);
+    if (playerExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
     // Verify club exists
     const clubExists = await db.query('SELECT id FROM clubs WHERE id = $1', [club_id]);
     if (clubExists.rows.length === 0) {
@@ -292,7 +302,7 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
       // Check for duplicate jersey number in the same team, excluding current player
       const existingPlayer = await db.query(
         'SELECT id FROM players WHERE team_id = $1 AND jersey_number = $2 AND id != $3',
-        [team_id, jersey_number, id]
+        [team_id, jersey_number, playerId]
       );
 
       if (existingPlayer.rows.length > 0) {
@@ -308,9 +318,9 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
            jersey_number = $5, is_active = $6, gender = $7,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $8 RETURNING *`,
-      [club_id, team_id || null, first_name, last_name, jersey_number, is_active, gender || null, id]
+      [club_id, team_id || null, first_name, last_name, jersey_number, is_active, gender || null, playerId]
     );
-    if (result.rows.length === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Player not found' });
     }
     res.json(result.rows[0]);

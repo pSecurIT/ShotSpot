@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { cancelFlowTiming, startFlowTiming } from '../utils/uxObservability';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -12,6 +13,7 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); // Only clear on new submit
+    startFlowTiming('login_to_dashboard', '/dashboard');
 
     try {
       const result = await login(username, password);
@@ -19,9 +21,11 @@ const Login: React.FC = () => {
       if (result.success) {
         navigate('/dashboard');
       } else {
+        cancelFlowTiming('login_to_dashboard', '/dashboard');
         setError(result.error || 'An error occurred during login');
       }
     } catch (err) {
+      cancelFlowTiming('login_to_dashboard', '/dashboard');
       console.error('Login exception:', err);
       setError('An unexpected error occurred during login');
     }

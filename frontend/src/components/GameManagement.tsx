@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,6 +6,7 @@ import StatePanel from './ui/StatePanel';
 import Toast from './ui/Toast';
 import PageLayout from './ui/PageLayout';
 import useBreadcrumbs from '../hooks/useBreadcrumbs';
+import { completeFlowTiming } from '../utils/uxObservability';
 
 interface Team {
   id: number;
@@ -83,6 +84,7 @@ const GameManagement: React.FC = () => {
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleGameId, setRescheduleGameId] = useState<number | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
+  const gamesFlowCompletedRef = useRef(false);
 
   // Computed values
   const clubs = useMemo<ClubOption[]>(() => {
@@ -289,6 +291,17 @@ const GameManagement: React.FC = () => {
       })
     );
   }, [GAME_LIST_PREFS_KEY, filterStatus, searchQuery, sortBy]);
+
+  useEffect(() => {
+    if (loading || gamesFlowCompletedRef.current) {
+      return;
+    }
+
+    completeFlowTiming('open_games_list', '/games', {
+      gameCount: games.length,
+    });
+    gamesFlowCompletedRef.current = true;
+  }, [loading, games.length]);
 
   // Handle game creation
   const handleCreateGame = async (e: React.FormEvent) => {

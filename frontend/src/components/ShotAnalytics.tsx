@@ -14,6 +14,7 @@ import PageLayout from './ui/PageLayout';
 import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import { Achievement } from '../types/achievements';
 import api from '../utils/api';
+import { completeFlowTiming } from '../utils/uxObservability';
 import courtImageUrl from '../img/Korfbalveld-breed.PNG';
 import '../styles/ShotAnalytics.css';
 
@@ -274,6 +275,7 @@ const ShotAnalytics: React.FC = () => {
   // Court ref for positioning
   const courtRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const analyticsFlowCompletedRef = useRef(false);
 
   // Fetch heatmap data
   const fetchHeatmap = useCallback(async () => {
@@ -371,6 +373,37 @@ const ShotAnalytics: React.FC = () => {
       setLoading(false);
     }
   }, [gameId]);
+
+  useEffect(() => {
+    if (!gameId || analyticsFlowCompletedRef.current || loading) {
+      return;
+    }
+
+    const hasData = Boolean(
+      heatmapData
+      || gameSummary
+      || shotChartData.length > 0
+      || playerStats.length > 0
+    );
+
+    if (!hasData) {
+      return;
+    }
+
+    completeFlowTiming('open_match_analytics', `/analytics/${gameId}`, {
+      readySource: 'analytics_data_loaded',
+      activeView,
+    });
+    analyticsFlowCompletedRef.current = true;
+  }, [
+    gameId,
+    loading,
+    heatmapData,
+    gameSummary,
+    shotChartData.length,
+    playerStats.length,
+    activeView,
+  ]);
 
   // Phase 3: Fetch streak data
   const fetchStreaks = useCallback(async () => {
