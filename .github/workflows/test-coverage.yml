@@ -6,6 +6,8 @@ permissions:
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   schedule:
     - cron: "0 2 * * 1"
   workflow_dispatch:
@@ -15,8 +17,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pr-coverage-placeholder:
+    name: PR Coverage Placeholder
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Skip heavy coverage on PR
+        run: echo "Full coverage is deferred to main/schedule/manual runs."
+
   frontend-coverage:
     name: Frontend Coverage
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -57,6 +69,7 @@ jobs:
 
   backend-coverage:
     name: Backend Coverage
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 

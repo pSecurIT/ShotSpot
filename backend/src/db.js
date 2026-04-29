@@ -15,6 +15,10 @@ let pool = null;
 
 function getPool() {
   if (!pool) {
+    const isTestEnv = process.env.NODE_ENV === 'test';
+    const configuredMin = Number(process.env.DB_MIN_CONNECTIONS);
+    const configuredMax = Number(process.env.DB_MAX_CONNECTIONS) || Number(process.env.DB_MAX_CLIENTS);
+
     // Construct connection string from individual variables if DATABASE_URL is not provided
     const connectionConfig = process.env.DATABASE_URL
       ? { connectionString: process.env.DATABASE_URL }
@@ -28,10 +32,13 @@ function getPool() {
 
     pool = new Pool({
       ...connectionConfig,
-      min: Number(process.env.DB_MIN_CONNECTIONS) || 5,
-      max: Number(process.env.DB_MAX_CONNECTIONS) || Number(process.env.DB_MAX_CLIENTS) || 20,
+      // Keep tests lightweight and deterministic to avoid pool-related flakiness.
+      min: isTestEnv ? 0 : (Number.isFinite(configuredMin) ? configuredMin : 5),
+      max: isTestEnv ? 5 : (Number.isFinite(configuredMax) ? configuredMax : 20),
       idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 120000,
       connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 5000,
+      // Allows Node to exit once no queries are active, even with idle clients.
+      allowExitOnIdle: isTestEnv,
     });
   }
   return pool;
@@ -92,6 +99,7 @@ export async function closePool() {
   try {
     if (pool) {
       await pool.end();
+      pool = null;
     }
   } catch (err) {
     const sanitizedError = sanitizeDbError(err);
