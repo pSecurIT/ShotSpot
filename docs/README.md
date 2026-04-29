@@ -14,6 +14,7 @@ This directory collects feature-specific, domain-specific, and maintenance docum
 - [DOMAIN.md](DOMAIN.md): domain concepts and terminology
 - [MIGRATIONS.md](MIGRATIONS.md): migration structure and operational rules
 - [NAVIGATION_ROLE_MATRIX.md](NAVIGATION_ROLE_MATRIX.md): navigation and permissions mapping
+- [UX_METRICS_PLAYBOOK.md](UX_METRICS_PLAYBOOK.md): tracked UX metrics, thresholds, and dashboard usage
 - [TWIZZIT_INTEGRATION.md](TWIZZIT_INTEGRATION.md): Twizzit setup, sync flows, and security notes
 - [TWIZZIT_FRONTEND.md](TWIZZIT_FRONTEND.md): frontend considerations for Twizzit-connected flows
 - [REPOSITORY_PROFILE_CHECKLIST.md](REPOSITORY_PROFILE_CHECKLIST.md): manual GitHub settings to update outside the codebase

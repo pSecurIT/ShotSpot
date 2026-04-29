@@ -93,6 +93,14 @@ export const navigationConfig: NavigationItem[] = [
         icon: '👥',
         roles: ['coach', 'admin'],
         category: 'analytics'
+      },
+      {
+        label: 'UX Observability',
+        path: '/ux-observability',
+        icon: '🧭',
+        roles: ['admin'],
+        description: 'Flow timing, latency impact, and friction signals',
+        category: 'analytics'
       }
     ]
   },

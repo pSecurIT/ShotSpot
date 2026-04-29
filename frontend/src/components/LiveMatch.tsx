@@ -12,6 +12,7 @@ import FocusMode from './FocusMode';
 import LiveDashboard from './LiveDashboard';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useTimer } from '../hooks/useTimer';
+import { completeFlowTiming } from '../utils/uxObservability';
 
 /**
  * Retry utility for API calls with exponential backoff
@@ -218,6 +219,7 @@ const LiveMatch: React.FC = () => {
 
   // Reset tracking - incrementing this key forces CourtVisualization to remount and refetch shots
   const [courtResetKey, setCourtResetKey] = useState<number>(0);
+  const liveMatchFlowCompletedRef = useRef(false);
   const nextPeriodMutationRef = useRef<Promise<void> | null>(null);
   const resetMatchMutationRef = useRef<Promise<void> | null>(null);
 
@@ -293,6 +295,17 @@ const LiveMatch: React.FC = () => {
       // Prefetch is best-effort only.
     }
   }, [apiWithPerfHelpers]);
+
+  useEffect(() => {
+    if (loading || liveMatchFlowCompletedRef.current || !gameId) {
+      return;
+    }
+
+    completeFlowTiming('start_live_match', `/match/${gameId}`, {
+      readySource: 'live_match_loaded',
+    });
+    liveMatchFlowCompletedRef.current = true;
+  }, [loading, gameId]);
 
   // Fetch game data
   const fetchGame = useCallback(async () => {
