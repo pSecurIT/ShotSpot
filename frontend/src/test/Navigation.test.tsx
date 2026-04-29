@@ -214,6 +214,13 @@ describe('Navigation Component', () => {
       expect(screen.getByText('User Management')).toBeInTheDocument();
     });
 
+    it('shows UX Observability link for admin users under Analytics', () => {
+      renderNavigation(adminUser);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Analytics' }));
+      expect(screen.getByText('UX Observability')).toBeInTheDocument();
+    });
+
     it('shows an Admin badge for admin-only items', () => {
       renderNavigation(adminUser);
 
@@ -228,6 +235,13 @@ describe('Navigation Component', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
       expect(screen.getByRole('menuitem', { name: /Settings/i })).toBeInTheDocument();
       expect(screen.queryByText('User Management')).not.toBeInTheDocument();
+    });
+
+    it('hides UX Observability link for non-admin users', () => {
+      renderNavigation(regularUser);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Analytics' }));
+      expect(screen.queryByText('UX Observability')).not.toBeInTheDocument();
     });
 
     it('shows Users link for coach users', () => {

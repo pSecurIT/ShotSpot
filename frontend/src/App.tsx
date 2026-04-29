@@ -13,6 +13,7 @@ import LiveMatch from './components/LiveMatch';
 import OfflineIndicator from './components/OfflineIndicator';
 import NotFound from './components/NotFound';
 import RoutePending from './components/ui/RoutePending';
+import UxObservabilityBootstrap from './components/UxObservabilityBootstrap';
 import logo from './img/ShotSpot_logo.png';
 
 const ShotAnalytics = React.lazy(() => import('./components/ShotAnalytics'));
@@ -35,6 +36,7 @@ const TeamAnalytics = React.lazy(() => import('./components/TeamAnalytics'));
 const ScheduledReports = React.lazy(() => import('./components/ScheduledReports'));
 const ReportTemplates = React.lazy(() => import('./components/ReportTemplates'));
 const SettingsPage = React.lazy(() => import('./components/SettingsPage'));
+const UxObservabilityDashboard = React.lazy(() => import('./components/UxObservabilityDashboard'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<RoutePending />}>
@@ -48,6 +50,7 @@ const App: React.FC = () => {
       <ThemeProvider>
         <WebSocketProvider>
           <Router>
+            <UxObservabilityBootstrap />
             <div className="App">
             <a className="skip-link" href="#app-main">Skip to main content</a>
             <OfflineIndicator />
@@ -200,6 +203,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute minRole="coach">
                     <RouteLoader><TeamAnalytics /></RouteLoader>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/ux-observability"
+                element={
+                  <ProtectedRoute minRole="admin">
+                    <RouteLoader><UxObservabilityDashboard /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
