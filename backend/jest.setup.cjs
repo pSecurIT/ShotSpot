@@ -47,11 +47,8 @@ afterEach(async () => {
   if (expect.getState().assertionCalls === 0) {
     console.warn(`⚠️  Warning: Test "${currentTestName}" in ${currentSuiteName} made no assertions`);
   }
-  
-  // Give database operations time to complete and connections to close
-  // Increased from 10ms to 100ms for proper async operation cleanup
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
+
+  // Keep per-test teardown lightweight; avoid artificial delays.
   // Clear any pending timers from rate limiting or other middleware
   jest.clearAllTimers();
 });
