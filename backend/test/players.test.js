@@ -343,8 +343,11 @@ describe('👤 Player Routes', () => {
 
     it('❌ should return 404 for non-existent player', async () => {
       try {
+        const { rows } = await db.query('SELECT COALESCE(MAX(id), 0) + 1000 AS id FROM players');
+        const missingId = rows[0].id;
+
         const response = await request(app)
-          .put('/api/players/999')
+          .put(`/api/players/${missingId}`)
           .set('Authorization', `Bearer ${authToken}`)
           .set('Content-Type', 'application/json')
           .send({
@@ -400,8 +403,11 @@ describe('👤 Player Routes', () => {
 
     it('❌ should return 404 for non-existent player', async () => {
       try {
+        const { rows } = await db.query('SELECT COALESCE(MAX(id), 0) + 1000 AS id FROM players');
+        const missingId = rows[0].id;
+
         const response = await request(app)
-          .delete('/api/players/999')
+          .delete(`/api/players/${missingId}`)
           .set('Authorization', `Bearer ${authToken}`)
           .set('Content-Type', 'application/json')
           .expect('Content-Type', /json/)
