@@ -2,6 +2,19 @@ import axios from 'axios';
 import type { AxiosRequestConfig } from 'axios';
 import { queueAction } from './offlineSync';
 import { ensureMatchEventClientUuid } from './matchEventIdentity';
+import { getUxRouteContext, trackApiLatency } from './uxObservability';
+
+type RequestUxMetadata = {
+  startedAt: number;
+  routePath: string;
+  flowName: string | null;
+  method: string;
+  endpoint: string;
+};
+
+type UxAxiosConfig = AxiosRequestConfig & {
+  _ux?: RequestUxMetadata;
+};
 
 const api = axios.create({
   baseURL: (import.meta.env.VITE_API_URL as string) || '/api',
@@ -129,6 +142,16 @@ export const getCsrfToken = async (): Promise<string | null> => {
 // Add auth token and CSRF token to requests
 api.interceptors.request.use(
   async (config) => {
+    const uxConfig = config as UxAxiosConfig;
+    const context = getUxRouteContext();
+    uxConfig._ux = {
+      startedAt: performance.now(),
+      routePath: context.routePath,
+      flowName: context.flowName,
+      method: (config.method || 'GET').toUpperCase(),
+      endpoint: config.url || '',
+    };
+
     config.data = ensureMatchEventClientUuid(config.method, config.url, config.data);
 
     // Add Bearer token
@@ -159,9 +182,35 @@ api.interceptors.request.use(
 
 // Handle auth errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const config = response.config as UxAxiosConfig;
+    if (config._ux) {
+      trackApiLatency({
+        endpoint: config._ux.endpoint,
+        method: config._ux.method,
+        status: response.status,
+        valueMs: performance.now() - config._ux.startedAt,
+        routePath: config._ux.routePath,
+        flowName: config._ux.flowName,
+      });
+    }
+
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
+
+    const uxConfig = originalRequest as UxAxiosConfig;
+    if (uxConfig?._ux) {
+      trackApiLatency({
+        endpoint: uxConfig._ux.endpoint,
+        method: uxConfig._ux.method,
+        status: error.response?.status,
+        valueMs: performance.now() - uxConfig._ux.startedAt,
+        routePath: uxConfig._ux.routePath,
+        flowName: uxConfig._ux.flowName,
+      });
+    }
     
     // Check if request failed due to network/backend issues
     const isNetworkError = !error.response; // No response means network failure

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../utils/api';
 import DashboardWidget from './DashboardWidget';
@@ -8,6 +8,7 @@ import PageLayout from './ui/PageLayout';
 import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useAuth } from '../contexts/AuthContext';
+import { completeFlowTiming } from '../utils/uxObservability';
 import '../styles/Dashboard.css';
 
 interface GameListItem {
@@ -57,6 +58,7 @@ const Dashboard: React.FC = () => {
   const { socket, connected } = useWebSocket();
   const { user } = useAuth();
   const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
+  const loginFlowCompletedRef = useRef(false);
 
   const [recentGames, setRecentGames] = useState<GameListItem[]>([]);
   const [upcomingGames, setUpcomingGames] = useState<GameListItem[]>([]);
@@ -237,6 +239,17 @@ const Dashboard: React.FC = () => {
 
     void fetchRecentAchievements();
   }, [showSecondaryPanels, fetchRecentAchievements]);
+
+  useEffect(() => {
+    if (loading.summary || loginFlowCompletedRef.current) {
+      return;
+    }
+
+    completeFlowTiming('login_to_dashboard', '/dashboard', {
+      readySource: 'dashboard_summary',
+    });
+    loginFlowCompletedRef.current = true;
+  }, [loading.summary]);
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;

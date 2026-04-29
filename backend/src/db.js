@@ -28,9 +28,10 @@ function getPool() {
 
     pool = new Pool({
       ...connectionConfig,
+      min: Number(process.env.DB_MIN_CONNECTIONS) || 5,
       max: Number(process.env.DB_MAX_CONNECTIONS) || Number(process.env.DB_MAX_CLIENTS) || 20,
-      idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
-      connectionTimeoutMillis: 2000,
+      idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 120000,
+      connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 5000,
     });
   }
   return pool;
@@ -76,13 +77,14 @@ export async function dbHealthCheck() {
   try {
     // Safe: hardcoded query with no user input
     await client.query('SELECT 1');
-    client.release();
     return true;
   } catch (err) {
     // Use sanitized error to avoid exposing sensitive connection details
     const sanitizedError = sanitizeDbError(err);
     logError('Database health check failed:', sanitizedError);
     throw new Error(`Database connection failed: ${sanitizedError.message}`, { cause: err });
+  } finally {
+    client.release();
   }
 }
 
