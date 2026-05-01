@@ -335,7 +335,11 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
 
 // Delete a player
 router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
-  const { id } = req.params;
+  const playerId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    return res.status(400).json({ error: 'Invalid player id' });
+  }
+
   try {
     // Begin transaction
     await db.query('BEGIN');
@@ -347,7 +351,7 @@ router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
       JOIN shots s ON g.id = s.game_id
       WHERE s.player_id = $1
       LIMIT 1
-    `, [id]);
+    `, [playerId]);
 
     if (gameCheck.rows.length > 0) {
       await db.query('ROLLBACK');
@@ -357,7 +361,17 @@ router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
       });
     }
 
-    const result = await db.query('DELETE FROM players WHERE id = $1 RETURNING *', [id]);
+    await db.query('DELETE FROM substitutions WHERE player_in_id = $1 OR player_out_id = $1', [playerId]);
+    await db.query('DELETE FROM game_rosters WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM free_shots WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM shots WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM game_events WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM player_achievements WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM player_leaderboard WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM player_predictions WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM twizzit_player_mappings WHERE local_player_id = $1', [playerId]);
+
+    const result = await db.query('DELETE FROM players WHERE id = $1 RETURNING *', [playerId]);
     if (result.rows.length === 0) {
       await db.query('ROLLBACK');
       return res.status(404).json({ error: 'Player not found' });
