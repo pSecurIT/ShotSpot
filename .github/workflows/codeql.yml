@@ -32,7 +32,7 @@ jobs:
             build-mode: none
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
     # For pull_request_target, scan the PR’s head commit instead of the base branch
         ref: ${{ github.event.pull_request.head.sha }}
@@ -51,7 +51,7 @@ jobs:
         config-file: ./.github/codeql/codeql-config.yml
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: '22.x'
         cache: 'npm'

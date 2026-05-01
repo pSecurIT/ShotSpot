@@ -250,16 +250,11 @@ Secret Scanning and Push Protection are enabled on this repository. GitHub autom
 - `.github/secret_scanning.yml` — defines path exclusions (test fixtures, `.env.example` files) and lists the custom patterns that should be registered via the GitHub UI
 - `.gitleaks.toml` — project-specific patterns used by the CI Gitleaks job and for local scanning
 
-**Custom patterns (must be registered in GitHub UI):**
+**Custom patterns — availability note:**
 
-| Name | Purpose | Regex |
-|------|---------|-------|
-| ShotSpot Twizzit Encryption Key | AES-256-CBC key used for Twizzit API secret storage | `TWIZZIT_ENCRYPTION_KEY\s*[=:]\s*["']?([0-9a-fA-F]{64})["']?` |
-| ShotSpot JWT Secret | Bearer token signing key | `JWT_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?` |
-| ShotSpot Session Secret | Express-session HMAC key | `SESSION_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?` |
-| ShotSpot CSRF Secret | CSRF token HMAC key | `CSRF_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?` |
+Registering custom patterns via the GitHub UI (Settings → Security → Secret scanning → Custom patterns) requires **GitHub Secret Protection**, which is only available on GitHub Team or Enterprise plans for organization-owned repositories. It is **not available for personal repositories**.
 
-Register each pattern at **Settings → Security → Secret scanning → Custom patterns → New pattern**.
+For this project, custom patterns are enforced via the **Gitleaks CI job** instead (see `.gitleaks.toml` and the `scan-secrets` job in `.github/workflows/security-scan.yml`). This covers the same patterns on every PR and push without requiring a paid plan.
 
 **Local scanning (optional pre-commit check):**
 ```bash
