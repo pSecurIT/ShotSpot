@@ -122,3 +122,49 @@ jobs:
           scanners: 'vuln,secret'
           ignore-unfixed: true
           exit-code: '1'
+
+  scan-secrets:
+    name: Scan for Secrets (Gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history so gitleaks can scan all commits on the branch/PR
+          fetch-depth: 0
+
+      - name: Run Gitleaks (SARIF output)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >-
+            detect
+            --config .gitleaks.toml
+            --redact
+            --report-format sarif
+            --report-path gitleaks-results.sarif
+            --exit-code 0
+
+      - name: Upload Gitleaks results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: ${{ hashFiles('gitleaks-results.sarif') != '' }}
+        with:
+          sarif_file: gitleaks-results.sarif
+          category: gitleaks-secret-scan
+
+      - name: Fail on detected secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >-
+            detect
+            --config .gitleaks.toml
+            --redact
+            --exit-code 1
