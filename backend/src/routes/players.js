@@ -196,14 +196,14 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
     }
 
     if (req.user.role === 'coach') {
-      const allowed = await hasTrainerAccess(req.user.userId, { clubId: club_id, teamId: team_id || null });
+      const allowed = await hasTrainerAccess(req.user.userId, { clubId: club_id, teamId: team_id ?? null });
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this club/team' });
       }
     }
 
     // If team_id provided, verify it exists and belongs to the club
-    if (team_id) {
+    if (team_id != null) {
       const teamExists = await db.query('SELECT id FROM teams WHERE id = $1 AND club_id = $2', [team_id, club_id]);
       if (teamExists.rows.length === 0) {
         return res.status(400).json({ error: 'Team does not exist or does not belong to this club' });
@@ -224,7 +224,7 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
 
     const result = await db.query(
       'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender, is_twizzit_registered) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [club_id, team_id || null, first_name, last_name, jersey_number, gender || null, false]
+      [club_id, team_id ?? null, first_name, last_name, jersey_number, gender || null, false]
     );
     
     const player = result.rows[0];
@@ -335,7 +335,11 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
 
 // Delete a player
 router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
-  const { id } = req.params;
+  const playerId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    return res.status(400).json({ error: 'Invalid player id' });
+  }
+
   try {
     // Begin transaction
     await db.query('BEGIN');
@@ -347,7 +351,7 @@ router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
       JOIN shots s ON g.id = s.game_id
       WHERE s.player_id = $1
       LIMIT 1
-    `, [id]);
+    `, [playerId]);
 
     if (gameCheck.rows.length > 0) {
       await db.query('ROLLBACK');
@@ -357,7 +361,17 @@ router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
       });
     }
 
-    const result = await db.query('DELETE FROM players WHERE id = $1 RETURNING *', [id]);
+    await db.query('DELETE FROM substitutions WHERE player_in_id = $1 OR player_out_id = $1', [playerId]);
+    await db.query('DELETE FROM game_rosters WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM free_shots WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM shots WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM game_events WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM player_achievements WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM player_leaderboard WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM player_predictions WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM twizzit_player_mappings WHERE local_player_id = $1', [playerId]);
+
+    const result = await db.query('DELETE FROM players WHERE id = $1 RETURNING *', [playerId]);
     if (result.rows.length === 0) {
       await db.query('ROLLBACK');
       return res.status(404).json({ error: 'Player not found' });
