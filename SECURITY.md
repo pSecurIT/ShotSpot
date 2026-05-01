@@ -240,6 +240,94 @@ Session security:
 - [ ] Incident response plan
 - [ ] Backup verification
 
+## Secret Scanning & Push Protection
+
+### GitHub Secret Scanning
+
+Secret Scanning and Push Protection are enabled on this repository. GitHub automatically detects and blocks commits containing known credential patterns (JWT tokens, API keys, private keys, etc.) before they reach the remote.
+
+**Repository configuration files:**
+- `.github/secret_scanning.yml` — defines path exclusions (test fixtures, `.env.example` files) and lists the custom patterns that should be registered via the GitHub UI
+- `.gitleaks.toml` — project-specific patterns used by the CI Gitleaks job and for local scanning
+
+**Custom patterns (must be registered in GitHub UI):**
+
+| Name | Purpose | Regex |
+|------|---------|-------|
+| ShotSpot Twizzit Encryption Key | AES-256-CBC key used for Twizzit API secret storage | `TWIZZIT_ENCRYPTION_KEY\s*[=:]\s*["']?([0-9a-fA-F]{64})["']?` |
+| ShotSpot JWT Secret | Bearer token signing key | `JWT_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?` |
+| ShotSpot Session Secret | Express-session HMAC key | `SESSION_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?` |
+| ShotSpot CSRF Secret | CSRF token HMAC key | `CSRF_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?` |
+
+Register each pattern at **Settings → Security → Secret scanning → Custom patterns → New pattern**.
+
+**Local scanning (optional pre-commit check):**
+```bash
+# Install gitleaks
+npm install -g gitleaks   # or: brew install gitleaks
+
+# Scan working tree
+gitleaks detect --config .gitleaks.toml --source . --redact
+
+# Scan commit history
+gitleaks detect --config .gitleaks.toml --source . --redact --log-opts "HEAD~10..HEAD"
+```
+
+### Secret Rotation Process
+
+Follow this process whenever a secret is compromised, rotated on schedule, or an employee with secret access departs.
+
+#### 1. JWT_SECRET / SESSION_SECRET / CSRF_SECRET
+
+```bash
+# Generate a new secret (minimum 32 bytes)
+openssl rand -base64 48
+```
+
+1. Generate a new value and update the environment variable in the deployment environment (`.env` in production, Docker secret, or CI/CD secret store).
+2. Restart the backend process — all active JWT tokens become invalid immediately.
+3. Users will be forced to log in again (tokens signed with the old secret are rejected).
+4. Remove the old secret from all secret stores and CI/CD variables.
+
+#### 2. TWIZZIT_ENCRYPTION_KEY
+
+> **Warning:** Rotating this key requires re-encrypting all stored Twizzit API credentials. Failure to do so will break the Twizzit integration.
+
+```bash
+# Generate a new 32-byte (64 hex character) key
+openssl rand -hex 32
+```
+
+1. Back up the current value.
+2. Run the re-encryption migration (to be implemented when Twizzit credential storage is added to the database).
+3. Update the environment variable.
+4. Restart the backend and verify that Twizzit sync still works.
+5. Securely delete the old key backup.
+
+#### 3. DB_PASSWORD / POSTGRES_PASSWORD
+
+1. Connect to the PostgreSQL instance as superuser.
+2. Change the password: `ALTER USER shotspot_user PASSWORD 'new_secure_password';`
+3. Update `DB_PASSWORD` in the environment and restart the backend.
+4. Verify database connectivity.
+
+#### 4. GitHub Actions / CI Secrets
+
+1. Navigate to **Settings → Secrets and variables → Actions**.
+2. Update the affected secret in place.
+3. Re-run any failed workflows to confirm the new value works.
+
+#### Secret Rotation Checklist
+
+- [ ] New secret generated with sufficient entropy (≥ 32 bytes / 256 bits)
+- [ ] Old secret invalidated at the source (revoked / password changed)
+- [ ] All deployment environments updated (prod, staging, CI)
+- [ ] Backend restarted and health-checked
+- [ ] Old secret removed from all secret stores
+- [ ] Incident documented with rotation timestamp
+
+---
+
 ## Incident Response
 
 ### Steps
