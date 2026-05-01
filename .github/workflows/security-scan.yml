@@ -138,6 +138,12 @@ jobs:
           # Full history so gitleaks can scan all commits on the branch/PR
           fetch-depth: 0
 
+      - name: Fix git safe.directory for container scans
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory /github/workspace
+
       - name: Run Gitleaks (SARIF output)
         uses: docker://ghcr.io/gitleaks/gitleaks:v8.24.2
         with:
