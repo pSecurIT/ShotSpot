@@ -1,0 +1,87 @@
+# Gitleaks configuration for ShotSpot
+# https://github.com/gitleaks/gitleaks
+#
+# Extends the default ruleset with project-specific patterns.
+# Used in CI (security-scan.yml) and can be run locally:
+#   npx gitleaks detect --config .gitleaks.toml --source .
+
+title = "ShotSpot Secret Scanning"
+
+[extend]
+# Inherit all default gitleaks rules (JWT, AWS keys, private keys, etc.)
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Project-specific custom rules
+# ---------------------------------------------------------------------------
+
+[[rules]]
+id          = "shotspot-twizzit-encryption-key"
+description = "ShotSpot Twizzit AES-256-CBC encryption key (64-char hex)"
+regex       = '''(?i)TWIZZIT_ENCRYPTION_KEY\s*[=:]\s*["']?([0-9a-fA-F]{64})["']?'''
+tags        = ["shotspot", "twizzit", "encryption", "aes"]
+[[rules.Entropies]]
+  Min   = 3.5
+  Max   = 8.0
+  Group = 1
+
+[[rules]]
+id          = "shotspot-jwt-secret"
+description = "ShotSpot JWT secret with assignment"
+regex       = '''(?i)JWT_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?'''
+tags        = ["shotspot", "jwt", "auth"]
+[[rules.Entropies]]
+  Min   = 3.5
+  Max   = 8.0
+  Group = 1
+
+[[rules]]
+id          = "shotspot-session-secret"
+description = "ShotSpot session secret with assignment"
+regex       = '''(?i)SESSION_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?'''
+tags        = ["shotspot", "session", "auth"]
+[[rules.Entropies]]
+  Min   = 3.5
+  Max   = 8.0
+  Group = 1
+
+[[rules]]
+id          = "shotspot-csrf-secret"
+description = "ShotSpot CSRF secret with assignment"
+regex       = '''(?i)CSRF_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?'''
+tags        = ["shotspot", "csrf", "auth"]
+[[rules.Entropies]]
+  Min   = 3.5
+  Max   = 8.0
+  Group = 1
+
+[[rules]]
+id          = "shotspot-db-password"
+description = "ShotSpot database password assignment"
+regex       = '''(?i)DB_PASSWORD\s*[=:]\s*["']?([^\s"']{8,})["']?'''
+tags        = ["shotspot", "database", "credentials"]
+[[rules.Entropies]]
+  Min   = 3.0
+  Max   = 8.0
+  Group = 1
+
+# ---------------------------------------------------------------------------
+# Path allowlist — exclude template / fixture files from all rules
+# ---------------------------------------------------------------------------
+
+[allowlist]
+description = "Exclude example env files, test fixtures, and docs"
+paths = [
+  ".env.example",
+  ".env.docker.example",
+  ".env.*.example",
+  # Test fixtures may contain intentionally fake credentials
+  "backend/test/",
+  "frontend/cypress/",
+  # Build output
+  "backend/coverage/",
+  "frontend/coverage/",
+  "frontend/dist/",
+  "frontend/android/",
+  "frontend/ios/",
+]

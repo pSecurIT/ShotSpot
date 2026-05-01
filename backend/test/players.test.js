@@ -88,6 +88,12 @@ describe('👤 Player Routes', () => {
     console.log('✅ Player Routes tests completed');
     try {
       // Clean up test data in correct order
+      await db.query('DELETE FROM substitutions');
+      await db.query('DELETE FROM game_rosters');
+      await db.query('DELETE FROM ball_possessions');
+      await db.query('DELETE FROM shots');
+      await db.query('DELETE FROM game_events');
+      await db.query('DELETE FROM games');
       await db.query('DELETE FROM players WHERE club_id = $1', [testClubId]);
       await db.query('DELETE FROM trainer_assignments WHERE user_id = $1', [testCoachId]);
       await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);

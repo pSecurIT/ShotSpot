@@ -51,10 +51,10 @@ jobs:
         node-version: [22.x]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -108,10 +108,10 @@ jobs:
         node-version: [22.x]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -152,10 +152,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Use Node.js 22.x
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: 22.x
 
@@ -217,10 +217,10 @@ jobs:
   #         --health-retries 5
   #
   #   steps:
-  #   - uses: actions/checkout@v4
+  #   - uses: actions/checkout@v5
   #
   #   - name: Use Node.js 20.x
-  #     uses: actions/setup-node@v4
+  #     uses: actions/setup-node@v5
   #     with:
   #       node-version: 20.x
   #       cache: 'npm'

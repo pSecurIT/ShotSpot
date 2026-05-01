@@ -26,7 +26,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build image for scanning
         shell: bash
@@ -91,7 +91,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run Trivy filesystem scanner (SARIF)
         uses: aquasecurity/trivy-action@v0.36.0
@@ -122,3 +122,33 @@ jobs:
           scanners: 'vuln,secret'
           ignore-unfixed: true
           exit-code: '1'
+
+  scan-secrets:
+    name: Scan for Secrets (Gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          # Full history so gitleaks can scan all commits on the branch/PR
+          fetch-depth: 0
+
+      - name: Run Gitleaks (SARIF output)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+      - name: Upload Gitleaks results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: ${{ hashFiles('results.sarif') != '' }}
+        with:
+          sarif_file: results.sarif
+          category: gitleaks-secret-scan
