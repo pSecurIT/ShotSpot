@@ -139,17 +139,16 @@ jobs:
           fetch-depth: 0
 
       - name: Run Gitleaks (SARIF output)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: docker://ghcr.io/gitleaks/gitleaks:v8.24.2
         with:
           args: >-
             detect
-            --config .gitleaks.toml
+            --source /github/workspace
+            --config /github/workspace/.gitleaks.toml
             --redact
             --report-format sarif
-            --report-path gitleaks-results.sarif
-            --exit-code 0
+            --report-path /github/workspace/gitleaks-results.sarif
+            --exit-code 1
 
       - name: Upload Gitleaks results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
@@ -157,14 +156,3 @@ jobs:
         with:
           sarif_file: gitleaks-results.sarif
           category: gitleaks-secret-scan
-
-      - name: Fail on detected secrets
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: >-
-            detect
-            --config .gitleaks.toml
-            --redact
-            --exit-code 1
