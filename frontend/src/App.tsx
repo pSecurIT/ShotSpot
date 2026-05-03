@@ -7,15 +7,15 @@ import Login from './components/Login';
 import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
-import Dashboard from './components/Dashboard';
-import GameManagement from './components/GameManagement';
-import LiveMatch from './components/LiveMatch';
 import OfflineIndicator from './components/OfflineIndicator';
 import NotFound from './components/NotFound';
 import RoutePending from './components/ui/RoutePending';
 import UxObservabilityBootstrap from './components/UxObservabilityBootstrap';
-import logo from './img/ShotSpot_logo.png';
+import logo from './img/shotspot-mark.svg';
 
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const GameManagement = React.lazy(() => import('./components/GameManagement'));
+const LiveMatch = React.lazy(() => import('./components/LiveMatch'));
 const ShotAnalytics = React.lazy(() => import('./components/ShotAnalytics'));
 const TeamManagement = React.lazy(() => import('./components/TeamManagement'));
 const ClubManagement = React.lazy(() => import('./components/ClubManagement'));
@@ -57,7 +57,7 @@ const App: React.FC = () => {
             <header className="App-header">
               <div className="header-content">
                 <div className="header-branding">
-                  <img src={logo} alt="ShotSpot Logo" className="header-logo" />
+                  <img src={logo} alt="ShotSpot Logo" className="header-logo" loading="lazy" decoding="async" />
                   <h1>ShotSpot - Korfball Statistics</h1>
                 </div>
                 <Navigation />

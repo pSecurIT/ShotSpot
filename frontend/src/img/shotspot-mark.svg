@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 92" role="img" aria-labelledby="shotspotTitle shotspotDesc">
+  <title id="shotspotTitle">ShotSpot</title>
+  <desc id="shotspotDesc">ShotSpot wordmark</desc>
+  <defs>
+    <linearGradient id="shotspotGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f766e" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+  <circle cx="48" cy="46" r="36" fill="url(#shotspotGradient)" />
+  <circle cx="48" cy="46" r="22" fill="#ffffff" opacity="0.9" />
+  <circle cx="48" cy="46" r="10" fill="#0f172a" />
+  <text x="96" y="58" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="44" font-weight="700" fill="#0f172a">ShotSpot</text>
+</svg>

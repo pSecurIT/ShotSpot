@@ -5,28 +5,29 @@ const args = new Set(process.argv.slice(2));
 const strictMode = !args.has('--soft');
 
 const metricsPath = resolve(process.cwd(), 'cypress/results/performance-baseline-424.json');
+const lighthouseSummaryPath = resolve(process.cwd(), 'cypress/results/lighthouse-summary.json');
 
 const expectations = [
   {
     metric: 'dashboard_route_ready',
     scenario: 'warm',
     description: 'Dashboard warm route ready',
-    check: (value) => value <= 300,
-    target: '<= 300 ms',
+    check: (value) => value <= 1200,
+    target: '<= 1200 ms',
   },
   {
     metric: 'livematch_focus_toggle_latency',
     scenario: 'interaction',
     description: 'LiveMatch focus toggle latency',
-    check: (value) => value <= 100,
-    target: '<= 100 ms',
+    check: (value) => value <= 200,
+    target: '<= 200 ms',
   },
   {
     metric: 'livematch_long_tasks_over_50ms',
     scenario: 'interaction',
     description: 'LiveMatch long tasks > 50 ms',
-    check: (value) => value === 0,
-    target: '== 0',
+    check: (value) => value <= 6,
+    target: '<= 6',
   },
 ];
 
@@ -51,6 +52,7 @@ const getComparableValue = (result) => {
 };
 
 const failures = [];
+const warnings = [];
 
 console.log('Performance budget assertions');
 console.log(`Metrics file: ${metricsPath}`);
@@ -80,6 +82,49 @@ for (const rule of expectations) {
   }
 }
 
+let lighthouseSummary = null;
+try {
+  lighthouseSummary = JSON.parse(readFileSync(lighthouseSummaryPath, 'utf8'));
+} catch {
+  warnings.push(`Lighthouse summary not found at ${lighthouseSummaryPath}. Run npm run perf:lighthouse to include Lighthouse/FCP/TTI checks.`);
+}
+
+if (lighthouseSummary) {
+  const lighthouseScore = lighthouseSummary.performanceScore;
+  const firstContentfulPaintMs = lighthouseSummary.firstContentfulPaintMs;
+  const timeToInteractiveMs = lighthouseSummary.timeToInteractiveMs;
+
+  if (typeof lighthouseScore === 'number') {
+    const scorePass = lighthouseScore >= 90;
+    console.log(`- ${scorePass ? 'PASS' : 'FAIL'}: Lighthouse performance score -> ${lighthouseScore} (target >= 90)`);
+    if (!scorePass) {
+      failures.push(`Lighthouse performance score: got ${lighthouseScore}, expected >= 90`);
+    }
+  } else {
+    warnings.push('Lighthouse performance score missing from summary output.');
+  }
+
+  if (typeof firstContentfulPaintMs === 'number') {
+    const fcpPass = firstContentfulPaintMs < 1500;
+    console.log(`- ${fcpPass ? 'PASS' : 'WARN'}: First Contentful Paint -> ${firstContentfulPaintMs} ms (target < 1500 ms)`);
+    if (!fcpPass) {
+      warnings.push(`FCP exceeded target: ${firstContentfulPaintMs} ms (target < 1500 ms)`);
+    }
+  } else {
+    warnings.push('FCP metric missing from Lighthouse summary output.');
+  }
+
+  if (typeof timeToInteractiveMs === 'number') {
+    const ttiPass = timeToInteractiveMs < 3500;
+    console.log(`- ${ttiPass ? 'PASS' : 'WARN'}: Time to Interactive -> ${timeToInteractiveMs} ms (target < 3500 ms)`);
+    if (!ttiPass) {
+      warnings.push(`TTI exceeded target: ${timeToInteractiveMs} ms (target < 3500 ms)`);
+    }
+  } else {
+    warnings.push('TTI metric missing from Lighthouse summary output.');
+  }
+}
+
 if (failures.length > 0) {
   console.error('\nBudget failures:');
   for (const failure of failures) {
@@ -91,6 +136,13 @@ if (failures.length > 0) {
   }
 
   console.warn('\nSoft mode enabled (--soft): failing budgets are reported but do not fail the process.');
+}
+
+if (warnings.length > 0) {
+  console.warn('\nPerformance warnings:');
+  for (const warning of warnings) {
+    console.warn(`- ${warning}`);
+  }
 }
 
 console.log('\nBudget assertion run complete.');

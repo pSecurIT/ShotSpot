@@ -86,7 +86,7 @@ sequenceDiagram
 
 ## 6. Visual References
 
-![ShotSpot icon](../frontend/src/img/ShotSpot_icon.png)
+![ShotSpot icon](../frontend/public/favicon.svg)
 ![Korfball court context](../frontend/src/img/Korfbalveld-breed.PNG)
 
 ## 7. Related Guides
