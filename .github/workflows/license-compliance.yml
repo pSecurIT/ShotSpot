@@ -44,6 +44,7 @@ jobs:
             --start "${{ matrix.project }}" \
             --production \
             --summary \
+            --excludePrivatePackages \
             --onlyAllow "$ALLOWED_LICENSES"
 
   docker-base-image-licenses:

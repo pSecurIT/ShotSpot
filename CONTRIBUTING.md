@@ -64,6 +64,7 @@ npx --yes license-checker-rseidelsohn \
    --start backend \
    --production \
    --summary \
+   --excludePrivatePackages \
    --onlyAllow "$(jq -r '.allowedLicenses | join(";")' .licenserc.json)"
 
 # Frontend dependencies
@@ -72,6 +73,7 @@ npx --yes license-checker-rseidelsohn \
    --start frontend \
    --production \
    --summary \
+   --excludePrivatePackages \
    --onlyAllow "$(jq -r '.allowedLicenses | join(";")' .licenserc.json)"
 ```
 
