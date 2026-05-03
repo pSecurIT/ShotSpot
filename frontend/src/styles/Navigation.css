@@ -305,7 +305,7 @@
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
-  color: rgba(255, 255, 255, 0.66);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .navigation-v2__user-info {

@@ -167,6 +167,22 @@ describe('Navigation Component', () => {
       expect(window.localStorage.getItem('shotspot:onboarding:v1:3:coach')).toBe('skipped');
     });
 
+    it('moves focus into onboarding dialog and closes on Escape', async () => {
+      window.localStorage.removeItem('shotspot:onboarding:v1:3:coach');
+      const user = userEvent.setup();
+      renderNavigation(coachUser);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Skip for now' })).toHaveFocus();
+      });
+
+      await user.keyboard('{Escape}');
+
+      await waitFor(() => {
+        expect(screen.queryByText('Welcome to ShotSpot')).not.toBeInTheDocument();
+      });
+    });
+
     it('opens targeted help content from the Help menu', async () => {
       const user = userEvent.setup();
       renderNavigation(regularUser);
@@ -176,6 +192,21 @@ describe('Navigation Component', () => {
 
       expect(screen.getByText('Games Tips')).toBeInTheDocument();
       expect(screen.getByText('Game flow tips')).toBeInTheDocument();
+    });
+
+    it('closes help dialog on Escape key', async () => {
+      const user = userEvent.setup();
+      renderNavigation(regularUser);
+
+      await user.click(screen.getByRole('button', { name: 'Help' }));
+      await user.click(screen.getByRole('menuitem', { name: /Overview/i }));
+
+      expect(screen.getByText('Quick Help Overview')).toBeInTheDocument();
+      await user.keyboard('{Escape}');
+
+      await waitFor(() => {
+        expect(screen.queryByText('Quick Help Overview')).not.toBeInTheDocument();
+      });
     });
 
     it('supports opening dropdown menus with keyboard and focuses the first item', async () => {

@@ -66,9 +66,13 @@ describe('MobileMenu', () => {
   it('expands grouped navigation sections', () => {
     renderMobileMenu();
 
-    fireEvent.click(screen.getByRole('button', { name: /Matches/i }));
+    const matchesToggle = screen.getByRole('button', { name: /Matches/i });
+    expect(matchesToggle).toHaveAttribute('aria-controls', 'mobile-section-matches');
+
+    fireEvent.click(matchesToggle);
 
     expect(screen.getByText('All Games')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Mobile site navigation' })).toBeInTheDocument();
   });
 
   it('calls onClose when the overlay is clicked', () => {

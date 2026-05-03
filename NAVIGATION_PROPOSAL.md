@@ -1,4 +1,5 @@
 # Navigation Bar Enhancement Proposal
+
 **Date:** January 10, 2026  
 **Status:** Archived (Implemented)
 
@@ -19,6 +20,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 ## Feature Gap Analysis
 
 ### ✅ Currently Implemented (Frontend + Backend)
+
 1. **Games** - Game management and creation
 2. **Teams** - Team CRUD operations
 3. **Players** - Player management
@@ -32,6 +34,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 ### ❌ Missing Frontend Implementation
 
 #### 🏢 **Clubs Management** (Backend: `/api/clubs`)
+
 - **Routes Available:**
   - GET `/api/clubs` - List all clubs
   - POST `/api/clubs` - Create club
@@ -44,6 +47,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 - **Impact:** Users cannot organize teams under clubs or view club hierarchies
 
 #### 🏆 **Competitions** (Backend: `/api/competitions`)
+
 - **Routes Available:**
   - GET `/api/competitions` - List competitions (filter by type, season, status)
   - POST `/api/competitions` - Create competition (tournament/league)
@@ -57,6 +61,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 - **Impact:** Cannot manage tournaments, leagues, brackets, or standings
 
 #### 📊 **Advanced Analytics** (Backend: `/api/advanced-analytics`)
+
 - **Routes Available:**
   - GET `/api/advanced-analytics/predictions/form-trends/:playerId` - Player form trends
   - GET `/api/advanced-analytics/predictions/fatigue/:playerId` - Fatigue analysis
@@ -71,6 +76,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 - **Impact:** Advanced predictions, fatigue tracking, video analysis features unavailable
 
 #### 📅 **Scheduled Reports** (Backend: `/api/scheduled-reports`)
+
 - **Routes Available:**
   - GET `/api/scheduled-reports` - List scheduled reports
   - POST `/api/scheduled-reports` - Create scheduled report
@@ -83,6 +89,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 - **Impact:** Cannot automate report generation (weekly, monthly, after-match)
 
 #### 📋 **Report Templates** (Backend: `/api/report-templates`)
+
 - **Routes Available:**
   - GET `/api/report-templates` - List templates
   - POST `/api/report-templates` - Create custom template
@@ -92,6 +99,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 - **Impact:** Cannot create/manage custom report templates with configurable sections
 
 #### 📈 **Team Analytics** (Backend: `/api/team-analytics`)
+
 - **Routes Available:**
   - GET `/api/team-analytics/:teamId/season-overview` - Season statistics
   - GET `/api/team-analytics/:teamId/momentum` - Team momentum analysis
@@ -100,6 +108,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 - **Impact:** Team-level analytics dashboard missing
 
 #### 🎯 **Series/Divisions** (Backend: `/api/series`)
+
 - **Routes Available:**
   - GET `/api/series` - List Belgian divisions (Eerste Klasse, etc.)
   - GET `/api/series/:id` - Division details with competitions
@@ -112,6 +121,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 ### ⚠️ Underutilized Features
 
 #### Achievements System
+
 - **Current Status:** Implemented in ShotAnalytics component but hidden in tab
 - **Backend Routes:**
   - `/api/achievements/list` - All achievement types
@@ -121,6 +131,7 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 - **Improvement Needed:** Dedicated achievements page with gamification focus
 
 #### Export Settings
+
 - **Current Status:** Accessible only through ExportCenter
 - **Backend Routes:**
   - GET/PUT `/api/export-settings` - Configure export defaults
@@ -134,14 +145,17 @@ After analyzing the backend routes (32 API endpoints) and frontend components, s
 ### 🎨 New Navigation Bar Design
 
 #### **Primary Navigation (All Users)**
-```
+
+``` text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ 🏠 Dashboard │ 🎮 Matches │ 📊 Analytics │ 🗂️ Data │ ⚙️ Settings │ 👤 User  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 #### **1. 🏠 Dashboard** (New)
+
 Landing page with quick actions and overview
+
 - Recent matches (last 5)
 - Upcoming games
 - Quick stats summary
@@ -149,7 +163,8 @@ Landing page with quick actions and overview
 - Notifications panel
 
 #### **2. 🎮 Matches**
-```
+
+``` txt
 Matches
 ├── 📋 All Games (current GameManagement)
 ├── ⚡ Live Match (current LiveMatch)
@@ -157,7 +172,8 @@ Matches
 ```
 
 #### **3. 📊 Analytics**
-```
+
+``` text
 Analytics
 ├── 🎯 Match Analytics (current ShotAnalytics)
 ├── 🏆 Achievements (enhanced from tab)
@@ -173,7 +189,8 @@ Analytics
 ```
 
 #### **4. 🗂️ Data**
-```
+
+``` text
 Data Management
 ├── 👥 Players (current)
 ├── 🏃 Teams (current)
@@ -187,7 +204,8 @@ Data Management
 ```
 
 #### **5. ⚙️ Settings** (New)
-```
+
+```text
 Settings & Configuration
 ├── 📤 Export Center (current)
 ├── 📋 Report Templates (NEW)
@@ -198,7 +216,8 @@ Settings & Configuration
 ```
 
 #### **6. 👤 User Menu** (Dropdown)
-```
+
+```text
 Welcome, [username] (role)
 ├── 🔐 Change Password
 ├── 👤 My Profile (NEW)
@@ -213,26 +232,31 @@ Welcome, [username] (role)
 ### Responsive Design Strategy
 
 #### **Desktop View** (>1024px)
-```
+
+```text
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Logo    Dashboard  Matches  Analytics  Data  Settings    [User ▼]  │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 #### **Tablet View** (768px - 1024px)
-```
+
+```text
 ┌──────────────────────────────────────────┐
 │  Logo    [☰ Menu]           [User ▼]    │
 └──────────────────────────────────────────┘
 ```
+
 Hamburger menu with collapsible sections
 
 #### **Mobile View** (<768px)
-```
+
+```text
 ┌──────────────────────────────┐
 │  Logo         [☰]    [👤]   │
 └──────────────────────────────┘
 ```
+
 Full-screen slide-out menu
 
 ### Role-Based Visibility
@@ -261,6 +285,7 @@ Full-screen slide-out menu
 ## Implementation Priority
 
 ### Phase 1: Core Infrastructure (Week 1-2)
+
 1. **New Navigation Component**
    - Responsive navigation bar with dropdown menus
    - Role-based visibility logic
@@ -273,6 +298,7 @@ Full-screen slide-out menu
    - Statistics overview
 
 ### Phase 2: Critical Missing Features (Week 3-4)
+
 3. **Clubs Management Component**
    - CRUD operations for clubs
    - Club hierarchy view
@@ -285,6 +311,7 @@ Full-screen slide-out menu
    - Standings table
 
 ### Phase 3: Advanced Features (Week 5-6)
+
 5. **Advanced Analytics Component**
    - Form trends visualization
    - Fatigue tracking dashboard
@@ -297,6 +324,7 @@ Full-screen slide-out menu
    - Email delivery configuration
 
 ### Phase 4: Enhancement & Polish (Week 7-8)
+
 7. **Report Templates Manager**
    - Template builder UI
    - Drag-drop section ordering
@@ -655,24 +683,28 @@ export interface MomentumData {
 ## Benefits Summary
 
 ### For Users
+
 - ✅ Clear, organized navigation structure
 - ✅ Mobile-responsive design
 - ✅ Intuitive feature discovery
 - ✅ Role-appropriate access
 
 ### For Coaches
+
 - ✅ Access to advanced analytics
 - ✅ Competition/tournament management
 - ✅ Automated report scheduling
 - ✅ Team performance dashboards
 
 ### For Admins
+
 - ✅ Full system configuration
 - ✅ Club hierarchy management
 - ✅ Division/series setup
 - ✅ Comprehensive user management
 
 ### For Development
+
 - ✅ Utilizes existing backend infrastructure
 - ✅ Modular component architecture
 - ✅ Type-safe TypeScript implementation
@@ -683,16 +715,19 @@ export interface MomentumData {
 ## Migration Strategy
 
 ### Backward Compatibility
+
 - Keep existing routes functional during transition
 - Add deprecation warnings to old navigation
 - Provide user migration guide
 
 ### Data Migration
+
 - No database changes required
 - All backend APIs already exist
 - Frontend state management only
 
 ### Testing Strategy
+
 - Unit tests for new components
 - Integration tests for navigation flows
 - E2E tests for critical paths
@@ -703,17 +738,20 @@ export interface MomentumData {
 ## Success Metrics
 
 ### Adoption Metrics
+
 - Navigation usage patterns
 - Feature discovery rate
 - User feedback scores
 
 ### Technical Metrics
+
 - Page load times
 - Component render performance
 - API response times
 - Mobile performance scores
 
 ### Business Metrics
+
 - Feature utilization increase
 - User engagement time
 - Task completion rates
@@ -736,18 +774,21 @@ export interface MomentumData {
 ### Current vs. Proposed Navigation Comparison
 
 #### Current Navigation (7 items)
-```
+
+```text
 Games | Teams | Players | Templates | Exports | Twizzit | Users
 ```
 
 #### Proposed Navigation (6 top-level + dropdowns)
-```
+
+```text
 Dashboard | Matches | Analytics | Data | Settings | [User ▼]
     ↓         ↓         ↓          ↓        ↓
   5 items   3 items   4 items   5 items  6 items
 ```
 
 **Total Features Accessible:**
+
 - Current: 7 main features
 - Proposed: 23+ features organized hierarchically
 

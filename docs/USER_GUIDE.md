@@ -72,4 +72,17 @@ Suggested capture list for release notes and onboarding GIFs:
 
 - [NAVIGATION_GUIDE.md](NAVIGATION_GUIDE.md)
 - [COMPETITION_MANAGEMENT.md](COMPETITION_MANAGEMENT.md)
+- [ACCESSIBILITY_AUDIT.md](ACCESSIBILITY_AUDIT.md)
 - [../QUICKSTART.md](../QUICKSTART.md)
+
+## 7. Accessibility Quick Tips
+
+ShotSpot includes accessibility support for keyboard and assistive-technology workflows.
+
+- Use the "Skip to main content" link at the top of the page to bypass repeated navigation.
+- Open top navigation dropdowns with Enter or Space, then move through items with Arrow keys.
+- Close dropdowns, dialogs, and the mobile menu with Escape.
+- In mobile menu and dialogs, focus stays within the open panel until you close it.
+- Form errors are announced in alert regions where available, and most status updates use polite live regions.
+
+If you are validating with assistive technology, use the checklist in [ACCESSIBILITY_AUDIT.md](ACCESSIBILITY_AUDIT.md).

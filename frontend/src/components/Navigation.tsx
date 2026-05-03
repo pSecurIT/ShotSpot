@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { BREAKPOINTS, NavigationItem } from '../config/navigation';
 import { useNavigation } from '../hooks/useNavigation';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 import NavigationDropdown from './NavigationDropdown';
 import MobileMenu from './MobileMenu';
 import ChangePasswordDialog from './ChangePasswordDialog';
@@ -18,6 +19,8 @@ const Navigation: React.FC = () => {
   const [helpTopic, setHelpTopic] = useState<'overview' | 'games' | 'players'>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const onboardingSkipButtonRef = useRef<HTMLButtonElement>(null);
+  const helpCloseButtonRef = useRef<HTMLButtonElement>(null);
   const { visibleNavigation } = useNavigation(user);
   const isCoachOrPlayer = user?.role === 'coach' || user?.role === 'user';
   const onboardingStorageKey = user ? `shotspot:onboarding:v1:${user.id}:${user.role}` : null;
@@ -176,6 +179,26 @@ const Navigation: React.FC = () => {
     players: 'Players Tips'
   };
 
+  const {
+    dialogRef: onboardingDialogRef,
+    titleId: onboardingTitleId,
+    onDialogKeyDown: onOnboardingDialogKeyDown,
+  } = useAccessibleDialog({
+    isOpen: isCoachOrPlayer && showOnboardingDialog,
+    onClose: () => closeOnboardingWithStatus('skipped'),
+    initialFocusRef: onboardingSkipButtonRef,
+  });
+
+  const {
+    dialogRef: helpDialogRef,
+    titleId: helpTitleId,
+    onDialogKeyDown: onHelpDialogKeyDown,
+  } = useAccessibleDialog({
+    isOpen: isCoachOrPlayer && showHelpDialog,
+    onClose: () => setShowHelpDialog(false),
+    initialFocusRef: helpCloseButtonRef,
+  });
+
   return (
     <>
     <nav className="navigation-v2" aria-label="Main navigation">
@@ -328,13 +351,23 @@ const Navigation: React.FC = () => {
 
     {portalTarget && isCoachOrPlayer && showOnboardingDialog && createPortal(
       <div className="modal-overlay" role="presentation" onClick={() => closeOnboardingWithStatus('skipped')}>
-        <div className="modal-content onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" onClick={(event) => event.stopPropagation()}>
-          <h3 id="onboarding-title">Welcome to ShotSpot</h3>
+        <div
+          ref={onboardingDialogRef}
+          className="modal-content onboarding-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={onboardingTitleId}
+          aria-describedby="onboarding-description"
+          onKeyDown={onOnboardingDialogKeyDown}
+          onClick={(event) => event.stopPropagation()}
+          tabIndex={-1}
+        >
+          <h3 id={onboardingTitleId}>Welcome to ShotSpot</h3>
           <p>
             Use this quick checklist to get productive fast. It is designed for coaches and players who need
             to move from login to useful actions in under a minute.
           </p>
-          <p>
+          <p id="onboarding-description">
             You can skip now and open it later from <strong>Help</strong> without losing progress.
           </p>
           <ol className="onboarding-dialog__checklist">
@@ -356,7 +389,12 @@ const Navigation: React.FC = () => {
             </li>
           </ol>
           <div className="onboarding-dialog__actions">
-            <button type="button" className="secondary-button" onClick={() => closeOnboardingWithStatus('skipped')}>
+            <button
+              ref={onboardingSkipButtonRef}
+              type="button"
+              className="secondary-button"
+              onClick={() => closeOnboardingWithStatus('skipped')}
+            >
               Skip for now
             </button>
             <button type="button" className="primary-button" onClick={() => closeOnboardingWithStatus('done')}>
@@ -370,11 +408,21 @@ const Navigation: React.FC = () => {
 
     {portalTarget && isCoachOrPlayer && showHelpDialog && createPortal(
       <div className="modal-overlay" role="presentation" onClick={() => setShowHelpDialog(false)}>
-        <div className="modal-content onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" onClick={(event) => event.stopPropagation()}>
-          <h3 id="help-title">{helpDialogTitleMap[helpTopic]}</h3>
+        <div
+          ref={helpDialogRef}
+          className="modal-content onboarding-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={helpTitleId}
+          aria-describedby="help-description"
+          onKeyDown={onHelpDialogKeyDown}
+          onClick={(event) => event.stopPropagation()}
+          tabIndex={-1}
+        >
+          <h3 id={helpTitleId}>{helpDialogTitleMap[helpTopic]}</h3>
           {helpTopic === 'overview' && (
             <>
-              <p>
+              <p id="help-description">
                 Targeted shortcuts to keep you moving fast during match preparation and roster updates.
               </p>
               <p>
@@ -442,7 +490,12 @@ const Navigation: React.FC = () => {
             </>
           )}
           <div className="onboarding-dialog__actions">
-            <button type="button" className="primary-button" onClick={() => setShowHelpDialog(false)}>
+            <button
+              ref={helpCloseButtonRef}
+              type="button"
+              className="primary-button"
+              onClick={() => setShowHelpDialog(false)}
+            >
               Close
             </button>
           </div>
