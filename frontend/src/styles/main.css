@@ -3,6 +3,14 @@
 @import './Navigation.css';
 @import './MobileMenu.css';
 
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --keyboard-inset: 0px;
+}
+
 /* Reset and Base Styles */
 * {
   margin: 0;
@@ -20,6 +28,8 @@ body {
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
 }
 
 html {
@@ -170,13 +180,18 @@ textarea:focus-visible,
   display: flex;
   flex-direction: column;
   width: 100%;
+  padding-bottom: max(var(--safe-area-bottom), var(--keyboard-inset));
 }
 
 .App-header {
   background:
     radial-gradient(circle at top left, rgba(255, 107, 26, 0.22), transparent 22%),
     var(--surface-hero);
-  padding: clamp(0.9rem, 2vw, var(--spacing-lg)) clamp(0.9rem, 3vw, var(--spacing-xl)) clamp(0.75rem, 1.5vw, var(--spacing-md));
+  padding:
+    calc(clamp(0.9rem, 2vw, var(--spacing-lg)) + var(--safe-area-top))
+    calc(clamp(0.9rem, 3vw, var(--spacing-xl)) + var(--safe-area-right))
+    clamp(0.75rem, 1.5vw, var(--spacing-md))
+    calc(clamp(0.9rem, 3vw, var(--spacing-xl)) + var(--safe-area-left));
   color: var(--text-light);
   box-shadow: var(--shadow-lg);
 }
@@ -217,10 +232,18 @@ textarea:focus-visible,
 
 .App-main {
   flex: 1;
-  padding: clamp(0.9rem, 3vw, var(--spacing-xl));
+  padding:
+    clamp(0.9rem, 3vw, var(--spacing-xl))
+    calc(clamp(0.9rem, 3vw, var(--spacing-xl)) + var(--safe-area-right))
+    max(clamp(0.9rem, 3vw, var(--spacing-xl)), var(--safe-area-bottom), var(--keyboard-inset))
+    calc(clamp(0.9rem, 3vw, var(--spacing-xl)) + var(--safe-area-left));
   max-width: 1280px;
   margin: 0 auto;
   width: 100%;
+}
+
+body.keyboard-open .App-main {
+  scroll-padding-bottom: calc(var(--keyboard-inset) + 1rem);
 }
 
 /* Shared page context layout */

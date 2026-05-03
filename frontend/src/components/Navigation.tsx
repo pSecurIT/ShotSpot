@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { BREAKPOINTS, NavigationItem } from '../config/navigation';
 import { useNavigation } from '../hooks/useNavigation';
 import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
+import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import NavigationDropdown from './NavigationDropdown';
 import MobileMenu from './MobileMenu';
 import ChangePasswordDialog from './ChangePasswordDialog';
@@ -52,6 +53,12 @@ const Navigation: React.FC = () => {
   }, [isCoachOrPlayer, onboardingStorageKey]);
 
   const isCollapsed = viewportWidth < BREAKPOINTS.tablet; // mobile + tablet
+  const openSwipe = useSwipeGesture({
+    enabled: isCollapsed && !isMobileMenuOpen,
+    minDistance: 58,
+    maxCrossAxisDistance: 96,
+    onSwipeRight: () => setIsMobileMenuOpen(true),
+  });
 
   const handleLogout = useCallback(() => {
     logout();
@@ -310,6 +317,16 @@ const Navigation: React.FC = () => {
           )}
 
           {/* Mobile Menu */}
+          {isCollapsed && !isMobileMenuOpen && (
+            <div
+              className="navigation-v2__swipe-edge"
+              aria-hidden="true"
+              onTouchStart={openSwipe.onTouchStart}
+              onTouchEnd={openSwipe.onTouchEnd}
+              onTouchCancel={openSwipe.onTouchCancel}
+            />
+          )}
+
           <MobileMenu
             menuId={mobileMenuId}
             isOpen={isMobileMenuOpen}

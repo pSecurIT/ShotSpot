@@ -1,10 +1,21 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite';
+import { createLogger, defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { configDefaults } from 'vitest/config';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 const analyzeBundle = process.env.ANALYZE === 'true';
+const isCypressRuntime = process.env.CYPRESS === '1';
+const viteLogger = createLogger();
+const originalError = viteLogger.error;
+
+viteLogger.error = (msg, options) => {
+  if (typeof msg === 'string' && msg.includes('[vite] http proxy error:')) {
+    return;
+  }
+
+  originalError(msg, options);
+};
 
 const shouldServeSpaEntry = (requestUrl: string | undefined, acceptHeader: string | undefined): boolean => {
   if (!requestUrl || !acceptHeader?.includes('text/html')) {
@@ -53,6 +64,7 @@ const spaFallbackPlugin = {
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  customLogger: viteLogger,
   plugins: [
     react(),
     spaFallbackPlugin,
@@ -171,13 +183,27 @@ export default defineConfig({
   server: {
     port: 3000,
     open: process.env.CYPRESS !== '1',
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        secure: false,
-      }
-    },
+    proxy: isCypressRuntime
+      ? undefined
+      : {
+          '/api': {
+            target: 'http://localhost:3001',
+            changeOrigin: true,
+            secure: false,
+            configure: (proxy) => {
+              proxy.removeAllListeners('error');
+              proxy.on('error', (error) => {
+                // Cypress and local frontend-only runs intentionally hit a missing backend.
+                // Suppress noisy ECONNREFUSED logs while leaving unexpected proxy errors visible.
+                if ((error as NodeJS.ErrnoException).code === 'ECONNREFUSED') {
+                  return;
+                }
+
+                console.error('[vite] proxy error:', error);
+              });
+            },
+          }
+        },
     host: true, // Listen on all addresses
     ...(process.env.NODE_ENV === 'production' ? {
       host: 'localhost',

@@ -43,6 +43,26 @@ npm run mobile:ios
    ```
 4. **Test on device/emulator** via native IDE
 
+## Automated Mobile Validation
+
+Use these commands to validate mobile navigation behavior before syncing native projects:
+
+```bash
+# Unit-level mobile menu behavior (gesture + keyboard focus)
+npm run test:run -- src/test/MobileMenu.test.tsx
+
+# Navigation E2E coverage (iOS-like, Android-like, offline, and screen-size matrix)
+npx start-server-and-test dev http://localhost:3000 "cypress run --spec cypress/e2e/navigation.cy.ts --browser electron"
+```
+
+The navigation E2E spec now verifies:
+- Edge swipe-to-open and panel swipe-to-close menu gestures
+- iOS-like mobile viewport behavior
+- Android-sized viewport behavior
+- Safe-area metadata support (`viewport-fit=cover`)
+- Offline navigation resilience when dashboard APIs fail
+- Screen-size matrix across small phone, large phone, tablet, and desktop widths
+
 ## Key Files
 
 - **`capacitor.config.ts`** - Capacitor configuration (app ID, name, plugins)
