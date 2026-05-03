@@ -47,6 +47,36 @@ npm --prefix backend run test
 
 If your change is limited to documentation or repository metadata, state that clearly in the pull request and run the subset of checks that still applies.
 
+## License Compliance Policy
+
+ShotSpot enforces dependency and container base image license checks in CI.
+
+- Policy configuration lives in `.licenserc.json`.
+- CI fails if denied licenses are detected, including GPL/AGPL family licenses.
+- License checks run for backend dependencies, frontend dependencies, and Docker base images.
+
+Run license checks locally before opening a pull request:
+
+```bash
+# Backend dependencies
+npm --prefix backend ci --ignore-scripts
+npx --yes license-checker-rseidelsohn \
+   --start backend \
+   --production \
+   --summary \
+   --excludePrivatePackages \
+   --onlyAllow "$(jq -r '.allowedLicenses | join(";")' .licenserc.json)"
+
+# Frontend dependencies
+npm --prefix frontend ci --ignore-scripts
+npx --yes license-checker-rseidelsohn \
+   --start frontend \
+   --production \
+   --summary \
+   --excludePrivatePackages \
+   --onlyAllow "$(jq -r '.allowedLicenses | join(";")' .licenserc.json)"
+```
+
 ## Frontend Expectations
 
 - Use TypeScript and keep component APIs explicit.

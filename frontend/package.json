@@ -2,6 +2,7 @@
   "name": "shotspot-frontend",
   "version": "0.1.0",
   "private": true,
+  "license": "BUSL-1.1",
   "description": "React and Capacitor frontend for ShotSpot live korfball tracking and reporting.",
   "type": "module",
   "engines": {

@@ -23,7 +23,7 @@ function getPool() {
     const connectionConfig = process.env.DATABASE_URL
       ? { connectionString: process.env.DATABASE_URL }
       : {
-        user: process.env.DB_USER,
+        user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD,
         host: process.env.DB_HOST,
         port: Number(process.env.DB_PORT) || 5432,
