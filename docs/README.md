@@ -2,6 +2,8 @@
 
 This directory collects feature-specific, domain-specific, and maintenance documentation that supports the main project guides in the repository root.
 
+For a complete cross-repository index, start at [../DOCUMENTATION.md](../DOCUMENTATION.md).
+
 ## What Lives Here
 
 - Product domain references that are too detailed for the root README
@@ -11,13 +13,15 @@ This directory collects feature-specific, domain-specific, and maintenance docum
 
 ## Quick Links
 
+- [USER_GUIDE.md](USER_GUIDE.md): end-user workflows for the updated navigation
+- [NAVIGATION_GUIDE.md](NAVIGATION_GUIDE.md): navigation architecture and route grouping
 - [DOMAIN.md](DOMAIN.md): domain concepts and terminology
 - [MIGRATIONS.md](MIGRATIONS.md): migration structure and operational rules
+- [COMPETITION_MANAGEMENT.md](COMPETITION_MANAGEMENT.md): competition flow and API surface
 - [NAVIGATION_ROLE_MATRIX.md](NAVIGATION_ROLE_MATRIX.md): navigation and permissions mapping
 - [UX_METRICS_PLAYBOOK.md](UX_METRICS_PLAYBOOK.md): tracked UX metrics, thresholds, and dashboard usage
 - [TWIZZIT_INTEGRATION.md](TWIZZIT_INTEGRATION.md): Twizzit setup, sync flows, and security notes
 - [TWIZZIT_FRONTEND.md](TWIZZIT_FRONTEND.md): frontend considerations for Twizzit-connected flows
-- [REPOSITORY_PROFILE_CHECKLIST.md](REPOSITORY_PROFILE_CHECKLIST.md): manual GitHub settings to update outside the codebase
 
 ## Twizzit References
 
@@ -27,6 +31,7 @@ This directory collects feature-specific, domain-specific, and maintenance docum
 ## Related Root-Level Docs
 
 - [../README.md](../README.md)
+- [../DOCUMENTATION.md](../DOCUMENTATION.md)
 - [../QUICKSTART.md](../QUICKSTART.md)
 - [../INSTALLATION.md](../INSTALLATION.md)
 - [../BUILD.md](../BUILD.md)
@@ -46,5 +51,3 @@ When you add or revise documentation:
 ## Support Path
 
 If you spot outdated documentation, open an issue or submit a pull request with the affected files listed explicitly.
-
-For repository profile updates that cannot be set in code, use [REPOSITORY_PROFILE_CHECKLIST.md](REPOSITORY_PROFILE_CHECKLIST.md).

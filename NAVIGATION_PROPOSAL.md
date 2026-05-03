@@ -1,6 +1,14 @@
 # Navigation Bar Enhancement Proposal
 **Date:** January 10, 2026  
-**Status:** Proposal
+**Status:** Archived (Implemented)
+
+> This proposal is preserved for historical context.
+>
+> Current implementation documentation:
+> - [docs/NAVIGATION_GUIDE.md](docs/NAVIGATION_GUIDE.md)
+> - [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+> - [docs/COMPETITION_MANAGEMENT.md](docs/COMPETITION_MANAGEMENT.md)
+> - [docs/NAVIGATION_ROLE_MATRIX.md](docs/NAVIGATION_ROLE_MATRIX.md)
 
 ## Executive Summary
 
