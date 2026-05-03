@@ -15,7 +15,7 @@ Roles:
 | Matches | ✅ | ✅ | ✅ |
 | Analytics | ✅ | ✅ | ✅ |
 | Data | ✅ | ✅ | ✅ |
-| Settings | ❌ | ✅ | ✅ |
+| Settings | ✅ | ✅ | ✅ |
 
 ## Section Details
 
@@ -27,21 +27,22 @@ Roles:
 ### Analytics
 - Match Analytics: user/coach/admin
 - Achievements: user/coach/admin
-- Advanced Analytics: coach/admin (currently disabled)
-- Team Analytics: coach/admin (currently disabled)
+- Advanced Analytics: coach/admin
+- Team Analytics: coach/admin
+- UX Observability: admin only
 
 ### Data
 - Players: user/coach/admin
 - Teams: user/coach/admin
-- Clubs: coach/admin (currently disabled)
-- Competitions: coach/admin (currently disabled)
-- Series/Divisions: coach/admin (currently disabled)
+- Clubs: coach/admin
+- Competitions: coach/admin
+- Series/Divisions: coach/admin
 
 ### Settings
 - Export Center: coach/admin
-- Report Templates: coach/admin (currently disabled)
-- Scheduled Reports: coach/admin (currently disabled)
-- Export Settings: coach/admin (currently disabled)
+- Report Templates: coach/admin
+- Scheduled Reports: coach/admin
+- Settings page: user/coach/admin
 - Twizzit Integration: coach/admin
 - User Management: admin only
 

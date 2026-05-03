@@ -24,6 +24,8 @@ It combines a React and Capacitor frontend, an Express and PostgreSQL backend, l
     - [Court and tracking context](#court-and-tracking-context)
     - [Repository social preview asset](#repository-social-preview-asset)
   - [Core Capabilities](#core-capabilities)
+  - [Navigation And Competition Enhancements](#navigation-and-competition-enhancements)
+  - [Screenshots And GIFs](#screenshots-and-gifs)
   - [Architecture](#architecture)
   - [Quick Start](#quick-start)
     - [Prerequisites](#prerequisites)
@@ -73,6 +75,28 @@ Use the existing ShotSpot logo and icon assets in `frontend/src/img/` when confi
 - Offline queueing and sync behavior for unstable network conditions
 - Mobile packaging and release workflows for Android and iOS
 - Twizzit integration support for federation-connected workflows
+
+## Navigation And Competition Enhancements
+
+- Role-aware navigation grouped into Matches, Analytics, Data, and Settings
+- New competition workflows for leagues and tournaments
+- Added club and series management pages to support season setup
+- Added report templates and scheduled reports in the settings flow
+- Added advanced analytics and team analytics entry points in the main navigation
+
+See the implementation guides:
+
+- [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+- [docs/NAVIGATION_GUIDE.md](docs/NAVIGATION_GUIDE.md)
+- [docs/COMPETITION_MANAGEMENT.md](docs/COMPETITION_MANAGEMENT.md)
+
+## Screenshots And GIFs
+
+The following assets are included in this repository and referenced by the new guides.
+
+![ShotSpot logo](frontend/src/img/ShotSpot_logo.png)
+![ShotSpot icon](frontend/src/img/ShotSpot_icon.png)
+![Korfball court context](frontend/src/img/Korfbalveld-breed.PNG)
 
 ## Architecture
 
@@ -156,11 +180,14 @@ npm --prefix frontend run build
 
 Start here based on what you are trying to do:
 
+- Full index and categorized navigation: [DOCUMENTATION.md](DOCUMENTATION.md)
+
 - Product and setup: [QUICKSTART.md](QUICKSTART.md), [INSTALLATION.md](INSTALLATION.md), [BUILD.md](BUILD.md)
 - Deployment and operations: [DEPLOYMENT.md](DEPLOYMENT.md), [DOCKER.md](DOCKER.md), [SECURITY.md](SECURITY.md), [SECRETS.md](SECRETS.md)
 - Offline and mobile: [OFFLINE.md](OFFLINE.md), [MOBILE.md](MOBILE.md), [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md), [MOBILE_RELEASE.md](MOBILE_RELEASE.md)
 - Reporting and analytics: [REPORTS_API.md](REPORTS_API.md), [VISUALIZATION.md](VISUALIZATION.md)
 - Twizzit and domain docs: [docs/README.md](docs/README.md), [docs/TWIZZIT_INTEGRATION.md](docs/TWIZZIT_INTEGRATION.md), [docs/DOMAIN.md](docs/DOMAIN.md), [docs/MIGRATIONS.md](docs/MIGRATIONS.md)
+- Navigation and competition docs: [docs/USER_GUIDE.md](docs/USER_GUIDE.md), [docs/NAVIGATION_GUIDE.md](docs/NAVIGATION_GUIDE.md), [docs/COMPETITION_MANAGEMENT.md](docs/COMPETITION_MANAGEMENT.md)
 
 ## Repository Layout
 
