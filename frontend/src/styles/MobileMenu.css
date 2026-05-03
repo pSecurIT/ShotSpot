@@ -81,7 +81,7 @@
   font-weight: 700;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.68);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .mobile-menu-header__title {
@@ -92,7 +92,7 @@
 
 .mobile-menu-header__subtitle {
   margin: 0;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.92);
   font-size: var(--text-sm);
   line-height: 1.45;
 }
