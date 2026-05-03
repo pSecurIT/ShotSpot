@@ -67,6 +67,25 @@ describe('👤 Player Routes', () => {
 
   beforeEach(async () => {
     try {
+      // Recreate shared auth fixtures each test because other parallel suites may wipe them.
+      await db.query(
+        `INSERT INTO users (id, username, email, password_hash, role)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (id) DO UPDATE SET username = $2, email = $3, role = $5`,
+        [1, 'testuser', 'testuser@test.com', 'hash', 'coach']
+      );
+
+      await db.query(
+        `DELETE FROM trainer_assignments
+         WHERE user_id = $1 AND club_id = $2 AND team_id = $3`,
+        [testCoachId, testClubId, testTeamId]
+      );
+      await db.query(
+        `INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active, active_from)
+         VALUES ($1, $2, $3, true, CURRENT_DATE)`,
+        [testCoachId, testClubId, testTeamId]
+      );
+
       // Clear only players table before each test
       await db.query('DELETE FROM players WHERE club_id = $1', [testClubId]);
     } catch (error) {
@@ -78,11 +97,9 @@ describe('👤 Player Routes', () => {
   afterAll(async () => {
     console.log('✅ Player Routes tests completed');
     try {
-      // Clean only data owned by this suite to avoid parallel-test interference
+      // Keep teardown narrow to avoid cross-suite FK/check-constraint churn.
       await db.query('DELETE FROM players WHERE club_id = $1', [testClubId]);
       await db.query('DELETE FROM trainer_assignments WHERE user_id = $1 AND club_id = $2', [testCoachId, testClubId]);
-      await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
-      await db.query('DELETE FROM clubs WHERE id = $1', [testClubId]);
     } catch (error) {
       console.error('⚠️ Player Routes cleanup failed:', error.message);
     }
