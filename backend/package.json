@@ -1,6 +1,8 @@
 {
   "name": "shotspot-backend",
   "version": "1.0.0",
+  "private": true,
+  "license": "BUSL-1.1",
   "description": "Express and PostgreSQL backend for ShotSpot live match capture, reporting, and integrations.",
   "main": "src/index.js",
   "scripts": {

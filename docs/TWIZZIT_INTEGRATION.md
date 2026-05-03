@@ -570,7 +570,7 @@ A: No, syncs are permanent. Backup database before large syncs.
 
 ## License
 
-This integration is part of ShotSpot and follows the same license terms.
+This integration is part of ShotSpot and follows Business Source License 1.1 (BUSL-1.1).
 
 ---
 
