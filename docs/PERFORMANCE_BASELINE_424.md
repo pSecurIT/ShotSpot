@@ -91,6 +91,14 @@ Automated performance checks now include a budget assertion step:
 - Combined CI command: `npm run perf:ci`
 - Optional non-blocking check for local diagnostics: `npm run perf:assert:soft`
 
+Issue #245 additions:
+
+- Bundle analysis report: `npm --prefix frontend run build:analyze` (outputs `frontend/dist/stats.html`)
+- Lighthouse/FCP/TTI capture: `npm --prefix frontend run perf:lighthouse`
+- Hybrid policy in `perf:assert`:
+   - Blocking: Lighthouse score must be >= 90
+   - Non-blocking warnings: FCP < 1.5s and TTI < 3.5s targets are reported in output
+
 Budget checks now evaluate `median` when available, and fall back to legacy `value` only for older result files.
 
 Current status from the latest median-based run:
@@ -98,6 +106,37 @@ Current status from the latest median-based run:
 - Pass: Dashboard warm route ready (median 220 ms <= 300 ms, p90 234 ms)
 - Pass: LiveMatch focus toggle latency (median 63.5 ms <= 100 ms, p90 112.7 ms)
 - Fail: LiveMatch long tasks > 50 ms (median 54 > 0, p90 56)
+
+## Issue #245 Verification Snapshot (2026-05-03)
+
+Performance optimization implementation added:
+
+- Expanded route-level lazy loading in `frontend/src/App.tsx` (Dashboard, Games, LiveMatch)
+- Granular route/vendor chunking and analyzer support in `frontend/vite.config.ts`
+- Virtual scrolling on large lists:
+   - `frontend/src/components/AchievementGallery.tsx`
+   - `frontend/src/components/Leaderboard.tsx`
+   - `frontend/src/components/LeagueStandings.tsx`
+- Memoization improvements in high-frequency list/filter code:
+   - `frontend/src/components/PlayerManagement.tsx`
+   - `frontend/src/components/LeagueStandings.tsx`
+   - `frontend/src/components/StandingsRow.tsx`
+- Image lazy-loading on court-heavy views:
+   - `frontend/src/components/CourtVisualization.tsx`
+   - `frontend/src/components/InteractiveShotChart.tsx`
+   - `frontend/src/components/ShotAnalytics.tsx`
+- Navigation/runtime cache updates in `frontend/public/service-worker.js`
+
+Lighthouse desktop-profile checkpoint from `frontend/cypress/results/lighthouse-summary.json`:
+
+- Score: 100 (pass)
+- FCP: 117 ms (pass vs < 1500 ms)
+- TTI: 117 ms (pass vs < 3500 ms)
+
+Notes:
+
+- Cypress baseline route/long-task budgets can still fail independently of Lighthouse because they measure separate runtime interaction paths.
+- Keep both checks: Lighthouse for initial-load quality, Cypress baseline for interaction regressions.
 
 ## Temporary Rollback A/B (2026-04-12)
 To validate net impact, performance app changes were temporarily rolled back, measured, and then restored.

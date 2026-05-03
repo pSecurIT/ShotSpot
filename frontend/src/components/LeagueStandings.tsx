@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { competitionsApi } from '../services/competitionsApi';
 import type { LeagueStanding } from '../types/competitions';
@@ -34,6 +34,11 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
   const [editingValue, setEditingValue] = useState<string>('');
   const [gameIdInput, setGameIdInput] = useState<string>('');
   const [updateLoading, setUpdateLoading] = useState(false);
+  const [standingsScrollTop, setStandingsScrollTop] = useState(0);
+
+  const VIRTUALIZATION_THRESHOLD = 50;
+  const ROW_HEIGHT = 56;
+  const VISIBLE_ROWS = 12;
 
   const loadStandings = useCallback(async () => {
     try {
@@ -61,32 +66,49 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
     }));
   };
 
-  const sortedStandings = [...standings].sort((a, b) => {
-    let aVal: unknown;
-    let bVal: unknown;
+  const sortedStandings = useMemo(() => {
+    return [...standings].sort((a, b) => {
+      let aVal: unknown;
+      let bVal: unknown;
 
-    if (sortConfig.key === 'position') {
-      aVal = standings.indexOf(a) + 1;
-      bVal = standings.indexOf(b) + 1;
-    } else {
-      aVal = a[sortConfig.key];
-      bVal = b[sortConfig.key];
-    }
+      if (sortConfig.key === 'position') {
+        aVal = standings.indexOf(a) + 1;
+        bVal = standings.indexOf(b) + 1;
+      } else {
+        aVal = a[sortConfig.key];
+        bVal = b[sortConfig.key];
+      }
 
-    // Handle null/undefined values
-    if (aVal == null && bVal == null) return 0;
-    if (aVal == null) return sortConfig.direction === 'asc' ? 1 : -1;
-    if (bVal == null) return sortConfig.direction === 'asc' ? -1 : 1;
+      // Handle null/undefined values
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return sortConfig.direction === 'asc' ? 1 : -1;
+      if (bVal == null) return sortConfig.direction === 'asc' ? -1 : 1;
 
-    // Compare values
-    if (typeof aVal === 'number' && typeof bVal === 'number') {
-      return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
-    } else if (typeof aVal === 'string' && typeof bVal === 'string') {
-      return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-    }
+      // Compare values
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      } else if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
 
-    return 0;
-  });
+      return 0;
+    });
+  }, [sortConfig, standings]);
+
+  const useVirtualization = sortedStandings.length >= VIRTUALIZATION_THRESHOLD;
+  const virtualStartIndex = useVirtualization
+    ? Math.max(0, Math.floor(standingsScrollTop / ROW_HEIGHT) - 2)
+    : 0;
+  const virtualEndIndex = useVirtualization
+    ? Math.min(sortedStandings.length, virtualStartIndex + VISIBLE_ROWS + 4)
+    : sortedStandings.length;
+  const visibleStandings = useVirtualization
+    ? sortedStandings.slice(virtualStartIndex, virtualEndIndex)
+    : sortedStandings;
+  const topSpacerHeight = useVirtualization ? virtualStartIndex * ROW_HEIGHT : 0;
+  const bottomSpacerHeight = useVirtualization
+    ? Math.max(0, (sortedStandings.length - virtualEndIndex) * ROW_HEIGHT)
+    : 0;
 
   const handlePointsEdit = (teamId: number, currentPoints: number) => {
     setEditingPointId(teamId);
@@ -247,7 +269,17 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       )}
 
       {!loading && !error && standings.length > 0 && (
-        <div className="league-standings__container">
+        <div
+          className="league-standings__container"
+          onScroll={
+            useVirtualization
+              ? (event) => {
+                  const target = event.currentTarget;
+                  setStandingsScrollTop(target.scrollTop);
+                }
+              : undefined
+          }
+        >
           <table className="league-standings__table" aria-label="League standings table">
             <thead>
               <tr>
@@ -392,7 +424,14 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
               </tr>
             </thead>
             <tbody>
-              {sortedStandings.map((standing, index) => (
+              {topSpacerHeight > 0 && (
+                <tr aria-hidden="true" className="league-standings__spacer-row">
+                  <td colSpan={10} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }}></td>
+                </tr>
+              )}
+              {visibleStandings.map((standing, visibleIndex) => {
+                const index = useVirtualization ? virtualStartIndex + visibleIndex : visibleIndex;
+                return (
                 <StandingsRow
                   key={standing.id}
                   standing={standing}
@@ -406,7 +445,13 @@ const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                   onCancelPoints={handlePointsCancel}
                   onEditingValueChange={setEditingValue}
                 />
-              ))}
+                );
+              })}
+              {bottomSpacerHeight > 0 && (
+                <tr aria-hidden="true" className="league-standings__spacer-row">
+                  <td colSpan={10} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }}></td>
+                </tr>
+              )}
             </tbody>
           </table>
 

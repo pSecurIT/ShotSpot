@@ -728,6 +728,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           src={courtImageUrl} 
           alt="Korfball Court" 
           className="court-image"
+          loading="lazy"
+          decoding="async"
           draggable={false}
         />
         {renderKorfMarkers()}

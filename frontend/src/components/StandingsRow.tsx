@@ -97,4 +97,4 @@ const StandingsRow: React.FC<StandingsRowProps> = ({
   );
 };
 
-export default StandingsRow;
+export default React.memo(StandingsRow);

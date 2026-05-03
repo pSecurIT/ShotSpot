@@ -185,6 +185,14 @@
   gap: 1rem;
 }
 
+.achievements-page__gallery--virtualized {
+  display: block;
+}
+
+.achievements-page__gallery-row {
+  padding: 0.25rem;
+}
+
 .achievements-page__subsection {
   display: flex;
   flex-direction: column;

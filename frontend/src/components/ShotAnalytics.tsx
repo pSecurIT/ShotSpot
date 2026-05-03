@@ -846,6 +846,8 @@ const ShotAnalytics: React.FC = () => {
             src={courtImageUrl} 
             alt="Korfball Court" 
             className="court-image"
+            loading="lazy"
+            decoding="async"
           />
           <div className="heatmap-overlay">
             {heatmapData.data.map((bucket, index) => {
@@ -1531,7 +1533,7 @@ const ShotAnalytics: React.FC = () => {
                 </span>
               </p>
               <div className="zones-court">
-                <img src={courtImageUrl} alt="Court" className="zones-court-image" />
+                <img src={courtImageUrl} alt="Court" className="zones-court-image" loading="lazy" decoding="async" />
                 <div className="zones-overlay">
                   {zoneAnalysis.zones.map((zone, index) => (
                     <div
