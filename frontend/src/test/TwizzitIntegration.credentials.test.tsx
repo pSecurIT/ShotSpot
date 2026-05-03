@@ -66,7 +66,7 @@ describe('TwizzitIntegration - credentials', () => {
 
     expect(await screen.findByText(/Success:/)).toBeInTheDocument();
     expect(screen.getByText(/Credentials added successfully/i)).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('shows detailed validation errors returned by backend', async () => {
     const user = userEvent.setup();

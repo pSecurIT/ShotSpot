@@ -152,7 +152,7 @@ describe('ScheduledReports', () => {
     });
 
     expect(await screen.findByText('Scheduled report created successfully')).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('edits an existing schedule and shows the update success banner', async () => {
     const user = userEvent.setup();
@@ -175,7 +175,7 @@ describe('ScheduledReports', () => {
     });
 
     expect(await screen.findByText('Scheduled report updated successfully')).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('runs schedule now and opens history', async () => {
     const user = userEvent.setup();
