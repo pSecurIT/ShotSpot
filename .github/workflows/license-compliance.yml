@@ -80,14 +80,15 @@ jobs:
             echo "Scanning Docker base image: $IMAGE"
             docker run --rm \
               -v "$PWD:/work" \
-              aquasec/trivy:0.63.0 \
+              aquasec/trivy:0.70.0 \
               image \
               --scanners license \
+              --pkg-types library \
               --format json \
               --output "/work/${REPORT_PATH}" \
               "$IMAGE"
 
-            MATCHES="$(jq -r '.. | strings' "$REPORT_PATH" | grep -Eio "$DENIED_REGEX" | sort -u || true)"
+            MATCHES="$(jq -r '.Results[]?.Licenses[]?.Name // empty' "$REPORT_PATH" | grep -Eio "$DENIED_REGEX" | sort -u || true)"
             if [ -n "$MATCHES" ]; then
               echo "Denied license(s) found in base image $IMAGE:"
               echo "$MATCHES"
