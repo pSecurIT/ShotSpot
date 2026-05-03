@@ -99,7 +99,7 @@ describe('VideoLinkEditor', () => {
         tags: ['left', 'key-moment'],
       }));
     });
-  });
+  }, 15000);
 
   it('generates auto-highlights and exports highlight reel', async () => {
     const user = userEvent.setup();

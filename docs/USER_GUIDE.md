@@ -51,8 +51,8 @@ After login, ShotSpot groups features by intent:
 
 The repository includes base visuals used by the navigation documentation:
 
-![ShotSpot logo](../frontend/src/img/ShotSpot_logo.png)
-![ShotSpot icon](../frontend/src/img/ShotSpot_icon.png)
+![ShotSpot logo](../frontend/src/img/shotspot-mark.svg)
+![ShotSpot icon](../frontend/public/favicon.svg)
 ![Korfball court context](../frontend/src/img/Korfbalveld-breed.PNG)
 
 Suggested capture list for release notes and onboarding GIFs:

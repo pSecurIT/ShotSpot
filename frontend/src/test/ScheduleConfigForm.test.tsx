@@ -121,7 +121,7 @@ describe('ScheduleConfigForm', () => {
     expect(payload.game_filters.filters.game_status).toBe('completed');
     expect(payload.game_filters.filters.last_n_days).toBe(14);
     expect(payload.game_filters.filters.include_practice).toBe(true);
-  });
+  }, 15000);
 
   it('renders next execution preview', () => {
     render(

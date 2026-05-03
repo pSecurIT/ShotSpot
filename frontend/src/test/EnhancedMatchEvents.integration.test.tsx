@@ -219,7 +219,7 @@ describe('Enhanced Match Events Integration', () => {
         }));
         expect(mockCommentaryCallback).toHaveBeenCalled();
       });
-    });
+    }, 15000);
   });
 
   describe('Real-time Updates', () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useAuth } from '../contexts/AuthContext';
@@ -223,13 +223,17 @@ const PlayerManagement: React.FC = () => {
     sortOrder
   ]);
 
-  const teamsForSelectedClub = newPlayer.club_id
-    ? teams.filter(t => t.club_id === Number(newPlayer.club_id))
-    : [];
+  const teamsForSelectedClub = useMemo(() => {
+    return newPlayer.club_id
+      ? teams.filter((team) => team.club_id === Number(newPlayer.club_id))
+      : [];
+  }, [newPlayer.club_id, teams]);
 
-  const teamsForFilters = isAdmin && selectedClubFilter
-    ? teams.filter(t => t.club_id === Number(selectedClubFilter))
-    : teams;
+  const teamsForFilters = useMemo(() => {
+    return isAdmin && selectedClubFilter
+      ? teams.filter((team) => team.club_id === Number(selectedClubFilter))
+      : teams;
+  }, [isAdmin, selectedClubFilter, teams]);
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -484,7 +488,8 @@ const PlayerManagement: React.FC = () => {
   };
 
   // Filter and sort players
-  const filteredPlayers = players
+  const filteredPlayers = useMemo(() => {
+    return players
     .filter(p => {
       // Club filter (admins only)
       if (isAdmin) {
@@ -531,6 +536,17 @@ const PlayerManagement: React.FC = () => {
       
       return sortOrder === 'asc' ? comparison : -comparison;
     });
+  }, [
+    isAdmin,
+    players,
+    searchQuery,
+    selectedClubFilter,
+    selectedGenderFilter,
+    selectedTeamFilter,
+    showInactive,
+    sortBy,
+    sortOrder
+  ]);
 
   const defaultClubFilter = isAdmin && clubs.length > 0 ? String(clubs[0].id) : '';
   const hasActiveRefinements = Boolean(
@@ -543,14 +559,25 @@ const PlayerManagement: React.FC = () => {
     || (isAdmin && selectedClubFilter !== defaultClubFilter)
   );
 
-  const activeFilterChips = [
+  const activeFilterChips = useMemo(() => [
     searchQuery.trim() ? `Search: "${searchQuery.trim()}"` : null,
     isAdmin && selectedClubFilter ? `Club: ${clubs.find((club) => String(club.id) === selectedClubFilter)?.name || 'Selected club'}` : null,
     selectedTeamFilter ? `Team: ${teams.find((team) => String(team.id) === selectedTeamFilter)?.name || 'Selected team'}` : null,
     selectedGenderFilter ? `Gender: ${selectedGenderFilter}` : null,
     !showInactive ? 'Active players only' : null,
     `Sort: ${sortBy} (${sortOrder === 'asc' ? 'ascending' : 'descending'})`
-  ].filter((chip): chip is string => Boolean(chip));
+  ].filter((chip): chip is string => Boolean(chip)), [
+    clubs,
+    isAdmin,
+    searchQuery,
+    selectedClubFilter,
+    selectedGenderFilter,
+    selectedTeamFilter,
+    showInactive,
+    sortBy,
+    sortOrder,
+    teams
+  ]);
 
   return (
     <PageLayout
