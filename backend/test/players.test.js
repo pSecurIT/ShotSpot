@@ -21,19 +21,6 @@ describe('👤 Player Routes', () => {
     console.log('🔧 Setting up Player Routes tests...');
 
     try {
-      // Clear all tables first to ensure clean state
-      await db.query('DELETE FROM substitutions');
-      await db.query('DELETE FROM game_rosters');
-      await db.query('DELETE FROM ball_possessions');
-      await db.query('DELETE FROM shots');
-      await db.query('DELETE FROM game_events');
-      await db.query('DELETE FROM games');
-      await db.query('DELETE FROM players');
-      await db.query('DELETE FROM teams');
-      await db.query('DELETE FROM trainer_assignments');
-      await db.query('DELETE FROM clubs');
-      await db.query('DELETE FROM users WHERE username = $1', ['testuser']);
-
       // Create test coach user (matches token userId: 1)
       const userRes = await db.query(
         `INSERT INTO users (id, username, email, password_hash, role) 
@@ -64,6 +51,10 @@ describe('👤 Player Routes', () => {
 
       // Create trainer assignment for the coach to access this club/team
       await db.query(
+        'DELETE FROM trainer_assignments WHERE user_id = $1 AND club_id = $2 AND team_id = $3',
+        [testCoachId, testClubId, testTeamId]
+      );
+      await db.query(
         `INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active, active_from)
          VALUES ($1, $2, $3, true, CURRENT_DATE)`,
         [testCoachId, testClubId, testTeamId]
@@ -76,6 +67,25 @@ describe('👤 Player Routes', () => {
 
   beforeEach(async () => {
     try {
+      // Recreate shared auth fixtures each test because other parallel suites may wipe them.
+      await db.query(
+        `INSERT INTO users (id, username, email, password_hash, role)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (id) DO UPDATE SET username = $2, email = $3, role = $5`,
+        [1, 'testuser', 'testuser@test.com', 'hash', 'coach']
+      );
+
+      await db.query(
+        `DELETE FROM trainer_assignments
+         WHERE user_id = $1 AND club_id = $2 AND team_id = $3`,
+        [testCoachId, testClubId, testTeamId]
+      );
+      await db.query(
+        `INSERT INTO trainer_assignments (user_id, club_id, team_id, is_active, active_from)
+         VALUES ($1, $2, $3, true, CURRENT_DATE)`,
+        [testCoachId, testClubId, testTeamId]
+      );
+
       // Clear only players table before each test
       await db.query('DELETE FROM players WHERE club_id = $1', [testClubId]);
     } catch (error) {
@@ -87,18 +97,9 @@ describe('👤 Player Routes', () => {
   afterAll(async () => {
     console.log('✅ Player Routes tests completed');
     try {
-      // Clean up test data in correct order
-      await db.query('DELETE FROM substitutions');
-      await db.query('DELETE FROM game_rosters');
-      await db.query('DELETE FROM ball_possessions');
-      await db.query('DELETE FROM shots');
-      await db.query('DELETE FROM game_events');
-      await db.query('DELETE FROM games');
+      // Keep teardown narrow to avoid cross-suite FK/check-constraint churn.
       await db.query('DELETE FROM players WHERE club_id = $1', [testClubId]);
-      await db.query('DELETE FROM trainer_assignments WHERE user_id = $1', [testCoachId]);
-      await db.query('DELETE FROM teams WHERE id = $1', [testTeamId]);
-      await db.query('DELETE FROM clubs WHERE id = $1', [testClubId]);
-      await db.query('DELETE FROM users WHERE id = $1', [testCoachId]);
+      await db.query('DELETE FROM trainer_assignments WHERE user_id = $1 AND club_id = $2', [testCoachId, testClubId]);
     } catch (error) {
       console.error('⚠️ Player Routes cleanup failed:', error.message);
     }
@@ -108,7 +109,7 @@ describe('👤 Player Routes', () => {
     it('✅ should return an empty array when no players exist', async () => {
       try {
         const response = await request(app)
-          .get('/api/players')
+          .get(`/api/players?club_id=${testClubId}`)
           .set('Authorization', `Bearer ${authToken}`)
           .set('Content-Type', 'application/json')
           .expect('Content-Type', /json/)
@@ -134,7 +135,7 @@ describe('👤 Player Routes', () => {
         );
 
         const response = await request(app)
-          .get('/api/players')
+          .get(`/api/players?club_id=${testClubId}`)
           .set('Authorization', `Bearer ${authToken}`)
           .expect('Content-Type', /json/)
           .expect(200);
@@ -392,11 +393,16 @@ describe('👤 Player Routes', () => {
         const playerId = createRes.body.id;
 
         // Delete the player
-        await request(app)
+        const deleteResponse = await request(app)
           .delete(`/api/players/${playerId}`)
           .set('Authorization', `Bearer ${authToken}`)
-          .set('Content-Type', 'application/json')
-          .expect(204);
+          .set('Content-Type', 'application/json');
+
+        if (deleteResponse.status !== 204) {
+          throw new Error(
+            `Expected 204, got ${deleteResponse.status}. Body: ${JSON.stringify(deleteResponse.body)}`
+          );
+        }
 
         // Verify player was deleted
         const dbResponse = await db.query('SELECT * FROM players WHERE id = $1', [playerId]);

@@ -1,0 +1,105 @@
+name: License Compliance
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  dependency-licenses:
+    name: Dependency License Check
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        project:
+          - backend
+          - frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+
+      - name: Install dependencies (no scripts)
+        working-directory: ${{ matrix.project }}
+        run: npm ci --ignore-scripts
+
+      - name: Validate dependency licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          ALLOWED_LICENSES="$(jq -r '.allowedLicenses | join(";")' .licenserc.json)"
+          echo "Checking ${{ matrix.project }} dependencies against approved license policy..."
+
+          npx --yes license-checker-rseidelsohn \
+            --start "${{ matrix.project }}" \
+            --production \
+            --summary \
+            --excludePrivatePackages \
+            --onlyAllow "$ALLOWED_LICENSES"
+
+  docker-base-image-licenses:
+    name: Docker Base Image License Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Scan Docker base images with Trivy license scanner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DENIED_REGEX="$(jq -r '.deniedLicenses | join("|")' .licenserc.json)"
+          mkdir -p license-reports
+
+          mapfile -t BASE_IMAGES < <(
+            awk 'toupper($1) == "FROM" { print $2 }' Dockerfile backend/Dockerfile.dev frontend/Dockerfile.dev \
+              | sort -u
+          )
+
+          if [ "${#BASE_IMAGES[@]}" -eq 0 ]; then
+            echo "No Docker base images found to scan"
+            exit 0
+          fi
+
+          FAIL=0
+          for IMAGE in "${BASE_IMAGES[@]}"; do
+            SAFE_NAME="$(echo "$IMAGE" | tr '/:.' '___')"
+            REPORT_PATH="license-reports/${SAFE_NAME}.json"
+
+            echo "Scanning Docker base image: $IMAGE"
+            docker run --rm \
+              -v "$PWD:/work" \
+              aquasec/trivy:0.70.0 \
+              image \
+              --scanners license \
+              --pkg-types library \
+              --format json \
+              --output "/work/${REPORT_PATH}" \
+              "$IMAGE"
+
+            MATCHES="$(jq -r '.Results[]?.Licenses[]?.Name // empty' "$REPORT_PATH" | grep -Eio "$DENIED_REGEX" | sort -u || true)"
+            if [ -n "$MATCHES" ]; then
+              echo "Denied license(s) found in base image $IMAGE:"
+              echo "$MATCHES"
+              FAIL=1
+            fi
+          done
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "License compliance failed: denied licenses were found in one or more Docker base images"
+            exit 1
+          fi
+
+          echo "Docker base image license scan passed"

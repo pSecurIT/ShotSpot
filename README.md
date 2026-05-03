@@ -180,7 +180,7 @@ Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for set
 
 ## Licensing
 
-ShotSpot is distributed under a source-available license, not a permissive open-source license. See [LICENSE](LICENSE) for the current terms, commercial-use restrictions, and contribution terms.
+ShotSpot is distributed under Business Source License 1.1 (BUSL-1.1), not a permissive open-source license. See [LICENSE](LICENSE) for the current terms, commercial-use restrictions, and contribution terms.
 
 ## Contact
 
