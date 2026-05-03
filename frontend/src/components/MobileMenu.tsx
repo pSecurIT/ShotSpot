@@ -113,7 +113,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
       <div
         className={`mobile-menu-overlay ${isOpen ? 'open' : ''}`}
         onClick={onClose}
-        aria-hidden="true"
+        aria-hidden={!isOpen}
       />
 
       {/* Menu Panel */}
@@ -125,7 +125,9 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
         aria-modal={isOpen ? true : undefined}
         aria-hidden={!isOpen}
         aria-labelledby={titleId}
+        aria-label="Mobile navigation menu"
         onKeyDown={handlePanelKeyDown}
+        tabIndex={-1}
       >
         {/* Header */}
         <div className="mobile-menu-header">
@@ -147,7 +149,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
         </div>
 
         {/* Menu Items */}
-        <nav className="mobile-menu-nav">
+        <nav className="mobile-menu-nav" aria-label="Mobile site navigation">
           <div className="mobile-menu-nav__intro">
             <span className="mobile-menu-nav__intro-label">Quick access</span>
             <span className="mobile-menu-nav__intro-copy">Choose a section to jump straight back into match operations.</span>
@@ -159,6 +161,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
             const visibleChildren = hasChildren
               ? filterItemsByRole(item.children!)
               : [];
+            const sectionControlsId = `mobile-section-${item.label.toLowerCase().replace(/\s+/g, '-')}`;
 
             return (
               <div key={item.label} className="mobile-menu-section">
@@ -168,20 +171,21 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                       className={`mobile-menu-section__header ${isExpanded ? 'expanded' : ''}`}
                       onClick={() => toggleSection(item.label)}
                       aria-expanded={isExpanded}
+                      aria-controls={sectionControlsId}
                       type="button"
                     >
-                      <span className="mobile-menu-section__icon">{item.icon}</span>
+                      <span className="mobile-menu-section__icon" aria-hidden="true">{item.icon}</span>
                       <span className="mobile-menu-section__label">{item.label}</span>
                       {item.badge && (
                         <span className="mobile-menu-section__badge">{item.badge}</span>
                       )}
-                      <span className={`mobile-menu-section__arrow ${isExpanded ? 'open' : ''}`}>
+                      <span className={`mobile-menu-section__arrow ${isExpanded ? 'open' : ''}`} aria-hidden="true">
                         ▼
                       </span>
                     </button>
 
                     {isExpanded && visibleChildren.length > 0 && (
-                      <div className="mobile-menu-section__children">
+                      <div className="mobile-menu-section__children" id={sectionControlsId}>
                         {visibleChildren.map((child) => (
                           <div key={child.label} className="mobile-menu-section__child">
                             {child.divider ? (
@@ -214,7 +218,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
           {userMenuItems.length > 0 && (
             <div className="mobile-menu-section mobile-menu-section--user">
               <div className="mobile-menu-section__header mobile-menu-section__header--static">
-                <span className="mobile-menu-section__icon">👤</span>
+                <span className="mobile-menu-section__icon" aria-hidden="true">👤</span>
                 <span className="mobile-menu-section__label">User</span>
               </div>
               <div className="mobile-menu-section__children">
