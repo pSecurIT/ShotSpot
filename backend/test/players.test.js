@@ -1,7 +1,7 @@
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import app from '../src/app.js';
 import db from '../src/db.js';
-import { generateTestToken } from './helpers/testHelpers.js';
 
 // Helper function to generate truly unique names
 const generateUniqueClubName = (prefix = 'Club') => {
@@ -16,23 +16,41 @@ describe('👤 Player Routes', () => {
   let testTeamId;
   let authToken;
   let testCoachId;
+  const uniqueSuffix = `${Date.now()}_${process.pid}_${Math.random().toString(36).slice(2, 8)}`;
+  const coachUsername = `players_coach_${uniqueSuffix}`;
+  const coachEmail = `${coachUsername}@test.local`;
+
+  const generateCoachToken = (userId) => {
+    const payload = {
+      userId,
+      username: coachUsername,
+      id: userId,
+      role: 'coach',
+      permissions: ['write']
+    };
+
+    return jwt.sign(
+      payload,
+      process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing',
+      { expiresIn: '1h' }
+    );
+  };
 
   beforeAll(async () => {
     console.log('🔧 Setting up Player Routes tests...');
 
     try {
-      // Create test coach user (matches token userId: 1)
+      // Create test coach user with isolated identity for this suite.
       const userRes = await db.query(
-        `INSERT INTO users (id, username, email, password_hash, role) 
-         VALUES ($1, $2, $3, $4, $5) 
-         ON CONFLICT (id) DO UPDATE SET username = $2, email = $3, role = $5
+        `INSERT INTO users (username, email, password_hash, role)
+         VALUES ($1, $2, $3, $4)
          RETURNING id`,
-        [1, 'testuser', 'testuser@test.com', 'hash', 'coach']
+        [coachUsername, coachEmail, 'hash', 'coach']
       );
       testCoachId = userRes.rows[0].id;
 
-      // Generate test auth token with coach role (userId: 1)
-      authToken = generateTestToken('coach');
+      // Generate test auth token bound to this suite's coach user.
+      authToken = generateCoachToken(testCoachId);
 
       // Create a test club to use for player tests
       const uniqueClubName = generateUniqueClubName('TestClubPlayers');
@@ -72,7 +90,7 @@ describe('👤 Player Routes', () => {
         `INSERT INTO users (id, username, email, password_hash, role)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (id) DO UPDATE SET username = $2, email = $3, role = $5`,
-        [1, 'testuser', 'testuser@test.com', 'hash', 'coach']
+        [testCoachId, coachUsername, coachEmail, 'hash', 'coach']
       );
 
       await db.query(
