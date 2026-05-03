@@ -15,6 +15,7 @@ For a complete cross-repository index, start at [../DOCUMENTATION.md](../DOCUMEN
 
 - [USER_GUIDE.md](USER_GUIDE.md): end-user workflows for the updated navigation
 - [NAVIGATION_GUIDE.md](NAVIGATION_GUIDE.md): navigation architecture and route grouping
+- [ACCESSIBILITY_AUDIT.md](ACCESSIBILITY_AUDIT.md): WCAG 2.1 AA accessibility improvements and verification checklist
 - [DOMAIN.md](DOMAIN.md): domain concepts and terminology
 - [MIGRATIONS.md](MIGRATIONS.md): migration structure and operational rules
 - [COMPETITION_MANAGEMENT.md](COMPETITION_MANAGEMENT.md): competition flow and API surface

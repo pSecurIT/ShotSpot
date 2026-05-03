@@ -38,11 +38,18 @@ const NavigationItem: React.FC<NavigationItemProps> = ({
           }
           onClick?.();
         }}
+        onKeyDown={(e) => {
+          if (e.key === ' ' && !isDisabled) {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).click();
+          }
+        }}
         aria-current={isActive ? 'page' : undefined}
+        aria-disabled={isDisabled ? 'true' : undefined}
         role={role}
         tabIndex={isDisabled ? -1 : tabIndex}
       >
-        <span className="nav-item__icon">{item.icon}</span>
+        <span className="nav-item__icon" aria-hidden="true">{item.icon}</span>
         <span className="nav-item__label">{item.label}</span>
         {item.badge && <span className="nav-item__badge">{item.badge}</span>}
       </NavLink>
@@ -59,10 +66,11 @@ const NavigationItem: React.FC<NavigationItemProps> = ({
       }}
       type="button"
       disabled={isDisabled}
+      aria-disabled={isDisabled ? 'true' : undefined}
       role={role}
       tabIndex={tabIndex}
     >
-      <span className="nav-item__icon">{item.icon}</span>
+      <span className="nav-item__icon" aria-hidden="true">{item.icon}</span>
       <span className="nav-item__label">{item.label}</span>
       {item.badge && <span className="nav-item__badge">{item.badge}</span>}
     </button>

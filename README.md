@@ -187,7 +187,7 @@ Start here based on what you are trying to do:
 - Offline and mobile: [OFFLINE.md](OFFLINE.md), [MOBILE.md](MOBILE.md), [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md), [MOBILE_RELEASE.md](MOBILE_RELEASE.md)
 - Reporting and analytics: [REPORTS_API.md](REPORTS_API.md), [VISUALIZATION.md](VISUALIZATION.md)
 - Twizzit and domain docs: [docs/README.md](docs/README.md), [docs/TWIZZIT_INTEGRATION.md](docs/TWIZZIT_INTEGRATION.md), [docs/DOMAIN.md](docs/DOMAIN.md), [docs/MIGRATIONS.md](docs/MIGRATIONS.md)
-- Navigation and competition docs: [docs/USER_GUIDE.md](docs/USER_GUIDE.md), [docs/NAVIGATION_GUIDE.md](docs/NAVIGATION_GUIDE.md), [docs/COMPETITION_MANAGEMENT.md](docs/COMPETITION_MANAGEMENT.md)
+- Navigation and competition docs: [docs/USER_GUIDE.md](docs/USER_GUIDE.md), [docs/NAVIGATION_GUIDE.md](docs/NAVIGATION_GUIDE.md), [docs/ACCESSIBILITY_AUDIT.md](docs/ACCESSIBILITY_AUDIT.md), [docs/COMPETITION_MANAGEMENT.md](docs/COMPETITION_MANAGEMENT.md)
 
 ## Repository Layout
 

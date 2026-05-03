@@ -119,3 +119,30 @@ graph LR
 
 ![ShotSpot logo](../frontend/src/img/ShotSpot_logo.png)
 ![Korfball court context](../frontend/src/img/Korfbalveld-breed.PNG)
+
+## 8. Accessibility (Issue #244)
+
+Navigation and menu interactions were audited and improved to align with WCAG 2.1 AA goals.
+
+- Keyboard support:
+  - Dropdown trigger supports Enter, Space, ArrowDown, ArrowUp, Escape
+  - Dropdown items support ArrowDown, ArrowUp, Home, End, Escape
+  - Mobile menu remains fully keyboard navigable with focus containment
+- Screen reader semantics:
+  - Menu trigger state is exposed through aria-expanded and aria-controls
+  - Dropdown menus and mobile navigation are labeled for assistive technology
+  - Decorative icons are hidden from assistive tech with aria-hidden
+- Dialog focus management:
+  - Onboarding and Help dialogs use the shared accessible dialog pattern
+  - Initial focus, Escape handling, and focus restoration are standardized
+- Contrast:
+  - Low-contrast helper copy in navigation and mobile header text was strengthened
+- Skip navigation:
+  - App shell includes "Skip to main content" in `frontend/src/App.tsx`
+
+Primary references:
+
+- [ACCESSIBILITY_AUDIT.md](ACCESSIBILITY_AUDIT.md)
+- [../frontend/src/components/Navigation.tsx](../frontend/src/components/Navigation.tsx)
+- [../frontend/src/components/NavigationDropdown.tsx](../frontend/src/components/NavigationDropdown.tsx)
+- [../frontend/src/components/MobileMenu.tsx](../frontend/src/components/MobileMenu.tsx)

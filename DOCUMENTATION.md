@@ -13,6 +13,7 @@ Use this page as the single entry point for all project documentation.
 - User workflows: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 - Navigation architecture and role behavior: [docs/NAVIGATION_GUIDE.md](docs/NAVIGATION_GUIDE.md)
 - Navigation role matrix: [docs/NAVIGATION_ROLE_MATRIX.md](docs/NAVIGATION_ROLE_MATRIX.md)
+- Accessibility implementation and verification: [docs/ACCESSIBILITY_AUDIT.md](docs/ACCESSIBILITY_AUDIT.md)
 - Competition workflows and APIs: [docs/COMPETITION_MANAGEMENT.md](docs/COMPETITION_MANAGEMENT.md)
 - Reporting endpoints: [REPORTS_API.md](REPORTS_API.md)
 - Visualization behavior: [VISUALIZATION.md](VISUALIZATION.md)
