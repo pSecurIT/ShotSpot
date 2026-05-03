@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- New documentation set for navigation and feature adoption:
+	- `docs/USER_GUIDE.md`
+	- `docs/NAVIGATION_GUIDE.md`
+	- `docs/COMPETITION_MANAGEMENT.md`
+- Architecture diagrams for navigation rendering flow and competition lifecycle
+- API client documentation for navigation-linked feature modules (clubs, competitions, series, analytics, reports, settings)
+
+### Changed
+- Updated `README.md` with navigation/competition enhancements and visual references
+- Updated `frontend/README.md` with component-level navigation documentation and API method index
+- Updated `QUICKSTART.md` with navigation quick tour and direct links to new guides
+
 ## [1.0.0] - 2025-11-29
 
 ### ✨ Initial Release

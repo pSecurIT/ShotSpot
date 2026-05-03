@@ -1,5 +1,14 @@
 # Navigation Enhancement - GitHub Issues Breakdown
 
+> Archive note:
+>
+> This file represents the historical issue breakdown used during rollout.
+> Active documentation has moved to:
+> - [docs/NAVIGATION_GUIDE.md](docs/NAVIGATION_GUIDE.md)
+> - [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+> - [docs/COMPETITION_MANAGEMENT.md](docs/COMPETITION_MANAGEMENT.md)
+> - [docs/NAVIGATION_ROLE_MATRIX.md](docs/NAVIGATION_ROLE_MATRIX.md)
+
 **Parent Issue:** Navigation Bar Enhancement & Missing Features Implementation  
 **Implementation Reference:** See NAVIGATION_PROPOSAL.md for complete architecture overview
 

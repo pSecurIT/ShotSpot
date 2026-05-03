@@ -133,6 +133,23 @@ Stop servers: Press `Ctrl+C` in the terminal
 - **API**: http://localhost:3001/api
 - **From Phone/Tablet**: http://[your-laptop-ip]:3000
 
+### Navigation Quick Tour
+
+After login, use the grouped navigation:
+
+- **Matches**: all games, live tracking, templates
+- **Analytics**: match analytics, achievements, advanced analytics, team analytics
+- **Data**: players, teams, clubs, competitions, series/divisions
+- **Settings**: exports, report templates, scheduled reports, Twizzit, user management
+
+Role visibility is enforced:
+
+- `user`: operational tracking and personal analytics
+- `coach`: data and reporting management
+- `admin`: system-level controls (for example user management and UX observability)
+
+Detailed navigation guide: [docs/NAVIGATION_GUIDE.md](docs/NAVIGATION_GUIDE.md)
+
 Find your laptop IP:
 ```bash
 # Windows: ipconfig
@@ -196,10 +213,19 @@ npm run setup-db           # Reset/setup database
 
 ## 📖 Full Documentation
 
+- **Documentation Hub**: [DOCUMENTATION.md](DOCUMENTATION.md)
 - **Complete Guide**: [INSTALLATION.md](INSTALLATION.md)
 - **Mobile Apps**: [MOBILE.md](MOBILE.md) - Build native iOS & Android apps
 - **Deployment**: [DEPLOYMENT.md](DEPLOYMENT.md)
 - **Security**: [SECURITY.md](SECURITY.md)
+- **User Guide**: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+- **Navigation Guide**: [docs/NAVIGATION_GUIDE.md](docs/NAVIGATION_GUIDE.md)
+- **Competition Management**: [docs/COMPETITION_MANAGEMENT.md](docs/COMPETITION_MANAGEMENT.md)
+
+### Feature Visuals
+
+![ShotSpot logo](frontend/src/img/ShotSpot_logo.png)
+![Korfball court context](frontend/src/img/Korfbalveld-breed.PNG)
 
 ---
 
