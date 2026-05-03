@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { NavigationItem as NavigationItemType } from '../config/navigation';
 import NavigationItem from './NavigationItem';
+import { useSwipeGesture } from '../hooks/useSwipeGesture';
 
 interface MobileMenuProps {
   menuId?: string;
@@ -25,6 +26,12 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const roleLabel = userRole.charAt(0).toUpperCase() + userRole.slice(1);
+  const closeSwipe = useSwipeGesture({
+    enabled: isOpen,
+    minDistance: 64,
+    maxCrossAxisDistance: 88,
+    onSwipeLeft: onClose,
+  });
 
   // Lock body scroll when menu is open
   useEffect(() => {
@@ -82,13 +89,25 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
   };
 
   const handlePanelKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Tab') return;
-
     const focusableElements = panelRef.current?.querySelectorAll<HTMLElement>(
       'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
     );
 
     if (!focusableElements || focusableElements.length === 0) return;
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      const focusedElement = document.activeElement as HTMLElement | null;
+      const currentIndex = Array.from(focusableElements).findIndex((element) => element === focusedElement);
+      const offset = event.key === 'ArrowDown' ? 1 : -1;
+      const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+      const nextIndex = (safeIndex + offset + focusableElements.length) % focusableElements.length;
+
+      event.preventDefault();
+      focusableElements[nextIndex].focus();
+      return;
+    }
+
+    if (event.key !== 'Tab') return;
 
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
@@ -127,6 +146,9 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
         aria-labelledby={titleId}
         aria-label="Mobile navigation menu"
         onKeyDown={handlePanelKeyDown}
+        onTouchStart={closeSwipe.onTouchStart}
+        onTouchEnd={closeSwipe.onTouchEnd}
+        onTouchCancel={closeSwipe.onTouchCancel}
         tabIndex={-1}
       >
         {/* Header */}

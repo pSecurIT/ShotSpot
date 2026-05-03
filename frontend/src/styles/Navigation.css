@@ -25,6 +25,16 @@
   min-width: 0;
 }
 
+.navigation-v2__swipe-edge {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 100vh;
+  z-index: 995;
+  background: transparent;
+}
+
 /* Desktop Navigation */
 .navigation-v2__desktop {
   display: flex;
