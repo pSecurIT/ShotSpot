@@ -5,10 +5,11 @@ import app from '../src/app.js';
 import db from '../src/db.js';
 
 describe('🔐 Authentication API', () => {
+  const AUTH_PREFIX = `auth_${process.pid}_`;
   let testUsers = [];
   const validUserData = {
-    username: 'testuser',
-    email: 'test@example.com',
+    username: `${AUTH_PREFIX}user`,
+    email: `${AUTH_PREFIX}user@test.local`,
     password: 'TestPassword123!'
   };
 
@@ -19,10 +20,10 @@ describe('🔐 Authentication API', () => {
   beforeEach(async () => {
     // Clean up users table before each test to ensure isolation
     // Clean up in correct order due to foreign key constraints
-    await db.query('DELETE FROM trainer_assignments WHERE user_id IN (SELECT id FROM users WHERE username LIKE $1)', ['test%']);
-    await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE $1)', ['test%']);
-    await db.query('DELETE FROM clubs WHERE name LIKE $1', ['test%']);
-    await db.query('DELETE FROM users WHERE username LIKE $1 OR email LIKE $2', ['test%', 'test%']);
+    await db.query('DELETE FROM trainer_assignments WHERE user_id IN (SELECT id FROM users WHERE username LIKE $1)', [`${AUTH_PREFIX}%`]);
+    await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE $1)', [`${AUTH_PREFIX}%`]);
+    await db.query('DELETE FROM clubs WHERE name LIKE $1', [`${AUTH_PREFIX}%`]);
+    await db.query('DELETE FROM users WHERE username LIKE $1 OR email LIKE $2', [`${AUTH_PREFIX}%`, `${AUTH_PREFIX}%`]);
     testUsers = [];
   });
 
@@ -31,8 +32,8 @@ describe('🔐 Authentication API', () => {
     if (testUsers.length > 0) {
       const userIds = testUsers.map(u => u.id);
       await db.query('DELETE FROM trainer_assignments WHERE user_id = ANY($1)', [userIds]);
-      await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE \'test%\')', []);
-      await db.query('DELETE FROM clubs WHERE name LIKE \'test%\'', []);
+      await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE $1)', [`${AUTH_PREFIX}%`]);
+      await db.query('DELETE FROM clubs WHERE name LIKE $1', [`${AUTH_PREFIX}%`]);
       await db.query('DELETE FROM users WHERE id = ANY($1)', [userIds]);
     }
   });
