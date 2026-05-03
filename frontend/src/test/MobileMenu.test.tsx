@@ -83,6 +83,21 @@ describe('MobileMenu', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('calls onClose when swiping left on the menu panel', () => {
+    const { onClose } = renderMobileMenu();
+    const panel = screen.getByRole('dialog', { name: 'Match menu' });
+
+    fireEvent.touchStart(panel, {
+      touches: [{ clientX: 280, clientY: 120 }],
+    });
+
+    fireEvent.touchEnd(panel, {
+      changedTouches: [{ clientX: 180, clientY: 126 }],
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('marks the dialog as hidden when closed', () => {
     renderMobileMenu(false);
 
@@ -110,5 +125,22 @@ describe('MobileMenu', () => {
 
     await user.tab({ shift: true });
     expect(screen.getByRole('button', { name: 'Close menu' })).toHaveFocus();
+  });
+
+  it('supports arrow key focus movement between menu actions', async () => {
+    renderMobileMenu();
+
+    const closeButton = screen.getByRole('button', { name: 'Close menu' });
+    const dashboardLink = screen.getByRole('link', { name: /Dashboard/i });
+
+    await waitFor(() => {
+      expect(closeButton).toHaveFocus();
+    });
+
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Match menu' }), { key: 'ArrowDown' });
+    expect(dashboardLink).toHaveFocus();
+
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Match menu' }), { key: 'ArrowUp' });
+    expect(closeButton).toHaveFocus();
   });
 });
