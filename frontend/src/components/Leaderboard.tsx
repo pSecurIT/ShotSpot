@@ -1,6 +1,75 @@
 import React from 'react';
+import { List, type RowComponentProps } from 'react-window';
 import type { LeaderboardPlayer } from '../types/achievements';
 import '../styles/Leaderboard.css';
+
+const VIRTUALIZATION_THRESHOLD = 100;
+const LEADERBOARD_ROW_HEIGHT = 62;
+
+type LeaderboardRowProps = {
+  players: LeaderboardPlayer[];
+  type: 'global' | 'team';
+};
+
+const getRankColor = (rank: number): string => {
+  switch (rank) {
+    case 1:
+      return '#FFD700';
+    case 2:
+      return '#C0C0C0';
+    case 3:
+      return '#CD7F32';
+    default:
+      return '#6C757D';
+  }
+};
+
+const getRankEmoji = (rank: number): string => {
+  switch (rank) {
+    case 1:
+      return '🥇';
+    case 2:
+      return '🥈';
+    case 3:
+      return '🥉';
+    default:
+      return '';
+  }
+};
+
+const LeaderboardVirtualRow = ({ index, style, players, type }: RowComponentProps<LeaderboardRowProps>): React.ReactElement => {
+  const player = players[index];
+
+  return (
+    <div
+      style={style}
+      className={`leaderboard__virtual-row ${player.rank <= 3 ? 'leaderboard__virtual-row--podium' : ''}`}
+      role="row"
+    >
+      <div className="leaderboard__virtual-cell leaderboard__virtual-cell--rank" role="cell">
+        <span style={{ color: getRankColor(player.rank), fontWeight: player.rank <= 3 ? 700 : 500 }}>
+          {getRankEmoji(player.rank) || `#${player.rank}`}
+        </span>
+      </div>
+      <div className="leaderboard__virtual-cell leaderboard__virtual-cell--player" role="cell">
+        {player.first_name} {player.last_name}
+        {player.jersey_number ? <span className="leaderboard__player-number">#{player.jersey_number}</span> : null}
+      </div>
+      {type === 'global' && (
+        <div className="leaderboard__virtual-cell leaderboard__virtual-cell--team" role="cell">{player.team_name || '-'}</div>
+      )}
+      <div className="leaderboard__virtual-cell leaderboard__virtual-cell--stat" role="cell">{player.total_shots}</div>
+      <div className="leaderboard__virtual-cell leaderboard__virtual-cell--stat" role="cell">{player.total_goals}</div>
+      <div className="leaderboard__virtual-cell leaderboard__virtual-cell--stat" role="cell">{player.fg_percentage.toFixed(1)}%</div>
+      <div className="leaderboard__virtual-cell leaderboard__virtual-cell--points" role="cell">{player.achievement_points}</div>
+      {type === 'team' && (
+        <div className="leaderboard__virtual-cell leaderboard__virtual-cell--stat" role="cell">
+          {player.achievements_earned ?? '-'}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface LeaderboardProps {
   players: LeaderboardPlayer[];
@@ -17,31 +86,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
   season,
   teamName
 }) => {
-  const getRankColor = (rank: number): string => {
-    switch (rank) {
-      case 1:
-        return '#FFD700'; // Gold
-      case 2:
-        return '#C0C0C0'; // Silver
-      case 3:
-        return '#CD7F32'; // Bronze
-      default:
-        return '#6C757D';
-    }
-  };
-
-  const getRankEmoji = (rank: number): string => {
-    switch (rank) {
-      case 1:
-        return '🥇';
-      case 2:
-        return '🥈';
-      case 3:
-        return '🥉';
-      default:
-        return '';
-    }
-  };
+  const useVirtualization = players.length >= VIRTUALIZATION_THRESHOLD;
 
   if (loading) {
     return (
@@ -87,7 +132,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
       </div>
 
       <div className="leaderboard__table-container">
-        <table className="leaderboard__table" aria-label={type === 'global' ? 'Global leaderboard' : `${teamName || 'Team'} leaderboard`}>
+        {!useVirtualization ? (
+          <table className="leaderboard__table" aria-label={type === 'global' ? 'Global leaderboard' : `${teamName || 'Team'} leaderboard`}>
           <thead>
             <tr>
               <th className="leaderboard__th leaderboard__th--rank">Rank</th>
@@ -160,7 +206,30 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        ) : (
+          <div className={`leaderboard__virtual ${type === 'team' ? 'leaderboard__virtual--team' : ''}`} role="table" aria-label={type === 'global' ? 'Global leaderboard' : `${teamName || 'Team'} leaderboard`}>
+            <div className="leaderboard__virtual-header" role="rowgroup">
+              <div className="leaderboard__virtual-row leaderboard__virtual-row--header" role="row">
+                <div className="leaderboard__virtual-cell leaderboard__virtual-cell--rank" role="columnheader">Rank</div>
+                <div className="leaderboard__virtual-cell leaderboard__virtual-cell--player" role="columnheader">Player</div>
+                {type === 'global' && <div className="leaderboard__virtual-cell leaderboard__virtual-cell--team" role="columnheader">Team</div>}
+                <div className="leaderboard__virtual-cell leaderboard__virtual-cell--stat" role="columnheader">Shots</div>
+                <div className="leaderboard__virtual-cell leaderboard__virtual-cell--stat" role="columnheader">Goals</div>
+                <div className="leaderboard__virtual-cell leaderboard__virtual-cell--stat" role="columnheader">FG%</div>
+                <div className="leaderboard__virtual-cell leaderboard__virtual-cell--points" role="columnheader">Points</div>
+                {type === 'team' && <div className="leaderboard__virtual-cell leaderboard__virtual-cell--stat" role="columnheader">🏆</div>}
+              </div>
+            </div>
+            <List
+              rowCount={players.length}
+              rowHeight={LEADERBOARD_ROW_HEIGHT}
+              rowComponent={LeaderboardVirtualRow}
+              rowProps={{ players, type }}
+              style={{ height: Math.min(620, players.length * LEADERBOARD_ROW_HEIGHT) }}
+            />
+          </div>
+        )}
       </div>
 
       <div className="leaderboard__footer">

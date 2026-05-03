@@ -5,27 +5,26 @@
 /* eslint-env serviceworker */
 /* global self, caches, fetch */
 
-const CACHE_NAME = 'shotspot-v1';
+const CACHE_NAME = 'shotspot-static-v1';
 const API_CACHE_NAME = 'shotspot-api-v1';
+const NAVIGATION_CACHE_NAME = 'shotspot-navigation-v1';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
   '/',
-  '/index.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
-  '/src/index.css',
-  '/src/img/ShotSpot_icon.png',
-  '/src/img/ShotSpot_logo.png',
-  '/src/img/Korfbalveld-breed.PNG'
+  '/index.html'
 ];
 
 // API endpoints that should be cached
-const CACHEABLE_API_ENDPOINTS = [
+const CACHEABLE_API_PREFIXES = [
   '/api/teams',
   '/api/players',
   '/api/games',
-  '/api/timer'
+  '/api/timer',
+  '/api/auth/me',
+  '/api/reports',
+  '/api/competitions',
+  '/api/series'
 ];
 
 // Install event - cache static assets
@@ -58,7 +57,7 @@ self.addEventListener('activate', (event) => {
         return Promise.all(
           cacheNames
             .filter((cacheName) => {
-              return cacheName !== CACHE_NAME && cacheName !== API_CACHE_NAME;
+              return cacheName !== CACHE_NAME && cacheName !== API_CACHE_NAME && cacheName !== NAVIGATION_CACHE_NAME;
             })
             .map((cacheName) => {
               console.log('[Service Worker] Deleting old cache:', cacheName);
@@ -94,6 +93,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (request.mode === 'navigate') {
+    event.respondWith(handleNavigationRequest(request));
+    return;
+  }
+
   // Handle static assets
   event.respondWith(handleStaticAsset(request));
 });
@@ -104,14 +108,36 @@ self.addEventListener('fetch', (event) => {
  */
 async function handleApiRequest(request) {
   const url = new URL(request.url);
+  const canCache = shouldCacheApiEndpoint(url.pathname);
+  const cache = await caches.open(API_CACHE_NAME);
+
+  if (canCache) {
+    const cachedResponse = await cache.match(request);
+    const networkPromise = fetch(request)
+      .then((networkResponse) => {
+        if (networkResponse.ok) {
+          cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+      })
+      .catch(() => null);
+
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    const networkResponse = await networkPromise;
+    if (networkResponse) {
+      return networkResponse;
+    }
+  }
   
   try {
     // Try network first
     const networkResponse = await fetch(request);
     
     // Cache successful responses for GET requests
-    if (networkResponse.ok && shouldCacheApiEndpoint(url.pathname)) {
-      const cache = await caches.open(API_CACHE_NAME);
+    if (networkResponse.ok && canCache) {
       cache.put(request, networkResponse.clone());
       return networkResponse;
     }
@@ -155,6 +181,36 @@ async function handleApiRequest(request) {
   }
 }
 
+async function handleNavigationRequest(request) {
+  const cache = await caches.open(NAVIGATION_CACHE_NAME);
+
+  try {
+    const networkResponse = await fetch(request);
+
+    if (networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+      cache.put('/index.html', networkResponse.clone());
+    }
+
+    return networkResponse;
+  } catch {
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    const shellResponse = await cache.match('/index.html');
+    if (shellResponse) {
+      return shellResponse;
+    }
+
+    return new Response('Offline - Navigation shell not available', {
+      status: 503,
+      statusText: 'Service Unavailable'
+    });
+  }
+}
+
 /**
  * Handle static assets with cache-first strategy
  * Falls back to network if not in cache
@@ -171,7 +227,7 @@ async function handleStaticAsset(request) {
     // If not in cache, fetch from network and cache
     const networkResponse = await fetch(request);
     
-    if (networkResponse.ok) {
+    if (networkResponse.ok && shouldCacheStaticRequest(new URL(request.url).pathname)) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone());
     }
@@ -192,7 +248,15 @@ async function handleStaticAsset(request) {
  * Check if an API endpoint should be cached
  */
 function shouldCacheApiEndpoint(pathname) {
-  return CACHEABLE_API_ENDPOINTS.some(endpoint => pathname.includes(endpoint));
+  return CACHEABLE_API_PREFIXES.some(endpoint => pathname.startsWith(endpoint));
+}
+
+function shouldCacheStaticRequest(pathname) {
+  if (pathname.startsWith('/assets/')) {
+    return true;
+  }
+
+  return /\.(css|js|png|jpg|jpeg|webp|gif|svg)$/i.test(pathname);
 }
 
 // Listen for messages from the client

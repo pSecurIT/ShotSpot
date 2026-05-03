@@ -138,6 +138,12 @@
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-md);
   overflow: hidden;
+  max-height: min(80vh, 760px);
+  overflow-y: auto;
+}
+
+.league-standings__spacer-row td {
+  background: transparent;
 }
 
 /* Table Styles */

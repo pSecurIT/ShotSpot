@@ -41,7 +41,7 @@ Defined in `frontend/src/config/navigation.ts`.
 ## 3. Role Matrix
 
 | Navigation Item | user | coach | admin |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Dashboard | Yes | Yes | Yes |
 | Matches -> All Games / Live Match | Yes | Yes | Yes |
 | Matches -> Match Templates | No | Yes | Yes |
@@ -117,7 +117,7 @@ graph LR
 
 ## 7. Visual References
 
-![ShotSpot logo](../frontend/src/img/ShotSpot_logo.png)
+![ShotSpot logo](../frontend/src/img/shotspot-mark.svg)
 ![Korfball court context](../frontend/src/img/Korfbalveld-breed.PNG)
 
 ## 8. Accessibility (Issue #244)
