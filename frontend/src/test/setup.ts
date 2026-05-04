@@ -25,18 +25,23 @@ const IGNORED_STDERR_WARNINGS = [
   'Not implemented: navigation to another Document',
 ];
 
+const sanitizeLogArg = (arg: unknown): unknown =>
+  typeof arg === 'string' ? arg.replace(/[\r\n]/g, ' ') : arg;
+
+const sanitizeLogArgs = (args: unknown[]): unknown[] => args.map(sanitizeLogArg);
+
 console.error = (...args: unknown[]) => {
   if (shouldIgnoreWarning(args)) {
     return;
   }
-  originalConsoleError(...args);
+  originalConsoleError(...sanitizeLogArgs(args));
 };
 
 console.warn = (...args: unknown[]) => {
   if (shouldIgnoreWarning(args)) {
     return;
   }
-  originalConsoleWarn(...args);
+  originalConsoleWarn(...sanitizeLogArgs(args));
 };
 
 process.stderr.write = ((chunk: string | Uint8Array, ...args: unknown[]) => {

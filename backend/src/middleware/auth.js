@@ -1,14 +1,20 @@
 import { logError, logInfo } from '../utils/logger.js';
 import { extractBearerToken, getJwtSecret, verifyAccessTokenClaims } from '../utils/authToken.js';
 
+const PASSWORD_CHANGE_ALLOWED_PATHS = new Set([
+  '/api/auth/change-password',
+  '/api/auth/logout',
+  '/api/health',
+  '/change-password',
+  '/logout',
+]);
+
 const auth = (req, res, next) => {
   try {
+    // verifyAccessTokenClaims throws JsonWebTokenError for null/invalid tokens;
+    // the catch block handles all failure modes uniformly so the security gate
+    // is always the cryptographic jwt.verify(), not a user-controlled boolean.
     const token = extractBearerToken(req.headers.authorization);
-    if (!token) {
-      logError('auth: Missing or malformed Bearer token');
-      return res.status(401).json({ error: 'Invalid token format' });
-    }
-
     const reqUser = verifyAccessTokenClaims(token, getJwtSecret());
     req.user = reqUser;
     logInfo('Auth: Verified token payload:', reqUser);
@@ -16,16 +22,7 @@ const auth = (req, res, next) => {
 
     // Check if password must be changed (allow only change-password and logout endpoints)
     if (req.user.passwordMustChange) {
-      const allowedPaths = [
-        '/api/auth/change-password',
-        '/api/auth/logout',
-        '/api/health',
-        '/change-password',
-        '/logout'
-      ];
-      const isAllowedPath = allowedPaths.some(path => req.path === path || req.path.startsWith(path));
-      
-      if (!isAllowedPath) {
+      if (!PASSWORD_CHANGE_ALLOWED_PATHS.has(req.path)) {
         return res.status(403).json({
           error: 'Password change required',
           message: 'You must change your password before accessing other resources',
@@ -40,7 +37,7 @@ const auth = (req, res, next) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired', expired: true });
     } else if (error.name === 'JsonWebTokenError') {
-      logError('JWT verification failed:', error.message);
+      logError('JWT verification failed:', error.message ?? 'invalid token');
       return res.status(401).json({ error: 'Invalid token' });
     } else {
       logError('Authentication error:', error);
