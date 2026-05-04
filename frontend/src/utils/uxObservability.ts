@@ -45,7 +45,7 @@ const ensureSessionId = (): string => {
     return existing;
   }
 
-  const generated = `ux_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const generated = `ux_${crypto.randomUUID()}`;
   window.sessionStorage.setItem(key, generated);
   return generated;
 };

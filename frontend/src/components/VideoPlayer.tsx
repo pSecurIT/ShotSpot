@@ -27,6 +27,13 @@ const clipLabel = (clip: VideoEvent | VideoHighlight): string => {
   return clip.description || clip.event_type;
 };
 
+const ALLOWED_VIDEO_URL_SCHEMES = /^https:\/\//i;
+
+const sanitizeVideoUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  return ALLOWED_VIDEO_URL_SCHEMES.test(url) ? url : null;
+};
+
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
   title = 'Video Preview',
   videoUrl,
@@ -35,15 +42,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onSelectClip,
 }) => {
   const selected = clips[selectedClipIndex] || null;
+  const safeVideoUrl = sanitizeVideoUrl(videoUrl);
 
   return (
     <section className="video-player" aria-label="Video preview section">
       <h3 className="video-player__title">{title}</h3>
-      {videoUrl ? (
+      {safeVideoUrl ? (
         <div className="video-player__frame-wrap" data-testid="video-frame-wrap">
           <iframe
             className="video-player__frame"
-            src={videoUrl}
+            src={safeVideoUrl}
             title="Linked video"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
