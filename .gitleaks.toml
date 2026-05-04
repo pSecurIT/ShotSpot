@@ -70,8 +70,9 @@ tags        = ["shotspot", "database", "credentials"]
 # ---------------------------------------------------------------------------
 
 [allowlist]
-description = "Exclude example env files, test fixtures, and docs"
+description = "Exclude example env files, test fixtures, docs, and CI-only placeholder values"
 paths = [
+  # Template / example env files
   ".env.example",
   ".env.docker.example",
   ".env.*.example",
@@ -84,4 +85,25 @@ paths = [
   "frontend/dist/",
   "frontend/android/",
   "frontend/ios/",
+  # Documentation — contains example/placeholder values for instructional purposes
+  "README.md",
+  "QUICKSTART.md",
+  "INSTALLATION.md",
+  "DEPLOYMENT.md",
+  "DOCKER.md",
+  "DOCKER_CHEATSHEET.md",
+  "BUILD.md",
+  "DEFAULT_ADMIN.md",
+  "REPORTS_API.md",
+  "release/README.md",
+  "docs/",
+]
+
+# Global regex allowlist — suppress known CI-only placeholder patterns that
+# appear in git history but carry no real secret value.
+regexes = [
+  # Standard GitHub Actions postgres service password (not a real credential)
+  '''DB_PASSWORD\s*[=:]\s*["']?postgres["']?''',
+  # Bearer tokens used in documentation curl examples
+  '''Authorization:\s+Bearer\s+[A-Za-z0-9_\-\.]{20,}''',
 ]

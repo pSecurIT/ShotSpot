@@ -81,6 +81,18 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
 
+      - name: Trivy image summary
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: local/shotspot:scan-${{ github.sha }}
+          format: 'github'
+          output: '${{ github.step_summary }}'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          scanners: 'vuln,secret'
+          ignore-unfixed: true
+          exit-code: '0'
+
   scan-filesystem:
     name: Scan Filesystem
     runs-on: ubuntu-latest
@@ -123,6 +135,19 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
 
+      - name: Trivy filesystem summary
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'github'
+          output: '${{ github.step_summary }}'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          scanners: 'vuln,secret'
+          ignore-unfixed: true
+          exit-code: '0'
+
   scan-secrets:
     name: Scan for Secrets (Gitleaks)
     runs-on: ubuntu-latest
@@ -139,7 +164,9 @@ jobs:
           fetch-depth: 0
 
       - name: Run Gitleaks (SARIF output)
+        id: gitleaks
         uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
@@ -152,3 +179,9 @@ jobs:
         with:
           sarif_file: results.sarif
           category: gitleaks-secret-scan
+
+      - name: Fail if secrets were detected
+        if: ${{ steps.gitleaks.outcome == 'failure' }}
+        run: |
+          echo "::error::Gitleaks detected secrets. See the Security tab for details."
+          exit 1

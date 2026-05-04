@@ -107,8 +107,9 @@ jobs:
 
       - name: Create .env.docker for CI
         run: |
-          # Generate a secure JWT secret (64 hex chars = 32 bytes)
+          # Generate ephemeral secrets for this CI run
           JWT_SECRET=$(openssl rand -hex 32)
+          DB_PASSWORD=$(openssl rand -hex 16)
           
           # Validate JWT_SECRET length (must be >= 32 chars)
           if [ ${#JWT_SECRET} -lt 32 ]; then
@@ -126,7 +127,7 @@ jobs:
             'DB_PORT=5432' \
             'DB_NAME=shotspot_test' \
             'DB_USER=shotspot_test' \
-            'DB_PASSWORD=test_password_123' \
+            "DB_PASSWORD=${DB_PASSWORD}" \
             "JWT_SECRET=${JWT_SECRET}" \
             'SESSION_SECURE=false' \
             'SESSION_SAME_SITE=lax' \
@@ -259,8 +260,9 @@ jobs:
 
       - name: Create .env.docker for CI
         run: |
-          # Generate a secure JWT secret (64 hex chars = 32 bytes)
+          # Generate ephemeral secrets for this CI run
           JWT_SECRET=$(openssl rand -hex 32)
+          DB_PASSWORD=$(openssl rand -hex 16)
           
           # Validate JWT_SECRET length (must be >= 32 chars)
           if [ ${#JWT_SECRET} -lt 32 ]; then
@@ -278,7 +280,7 @@ jobs:
             'DB_PORT=5432' \
             'DB_NAME=shotspot_test' \
             'DB_USER=shotspot_test' \
-            'DB_PASSWORD=test_password_123' \
+            "DB_PASSWORD=${DB_PASSWORD}" \
             "JWT_SECRET=${JWT_SECRET}" \
             'SESSION_SECURE=false' \
             'SESSION_SAME_SITE=lax' \
