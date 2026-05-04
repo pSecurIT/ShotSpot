@@ -27,11 +27,18 @@ const clipLabel = (clip: VideoEvent | VideoHighlight): string => {
   return clip.description || clip.event_type;
 };
 
-const ALLOWED_VIDEO_URL_SCHEMES = /^https:\/\//i;
-
 const sanitizeVideoUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
-  return ALLOWED_VIDEO_URL_SCHEMES.test(url) ? url : null;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 };
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
