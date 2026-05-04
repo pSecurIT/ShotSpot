@@ -104,6 +104,12 @@ paths = [
 regexes = [
   # Standard GitHub Actions postgres service password (not a real credential)
   '''DB_PASSWORD\s*[=:]\s*["']?postgres["']?''',
+  # Shell command substitution — the value is generated at runtime, not a literal secret
+  # e.g. DB_PASSWORD=$(openssl rand -hex 16) or CI_DB_PASSWORD=$(openssl rand ...)
+  '''(?i)[A-Z_]*DB_PASSWORD\s*=\s*\$\(''',
+  # Docker-compose / shell variable reference — the value is resolved from the environment
+  # e.g. DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+  '''(?i)DB_PASSWORD\s*[=:]\s*\$\{''',
   # Bearer tokens used in documentation curl examples
   '''Authorization:\s+Bearer\s+[A-Za-z0-9_\-\.]{20,}''',
 ]
