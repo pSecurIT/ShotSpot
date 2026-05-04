@@ -1,6 +1,7 @@
 version: '3.8'
 
-# This docker-compose file is for local testing of the Docker image
+# This docker-compose file is for local testing of the Docker image.
+# Copy .env.docker.example to .env.docker and set real values before running.
 # For production deployment, see DOCKER.md
 
 services:
@@ -8,7 +9,7 @@ services:
     image: postgres:14-alpine
     environment:
       POSTGRES_USER: shotspot_user
-      POSTGRES_PASSWORD: changeme_local_testing
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your environment or .env file}
       POSTGRES_DB: shotspot_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -33,11 +34,11 @@ services:
       DB_PORT: 5432
       DB_NAME: shotspot_db
       DB_USER: shotspot_user
-      DB_PASSWORD: changeme_local_testing
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your environment or .env file}
       DB_SSL: false
       DB_MAX_CONNECTIONS: 20
       DB_IDLE_TIMEOUT_MS: 30000
-      JWT_SECRET: changeme_local_testing_jwt_secret_minimum_32_chars
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your environment or .env file}
       JWT_EXPIRES_IN: 1h
       JWT_REFRESH_EXPIRES_IN: 7d
       SESSION_SECURE: false

@@ -1,0 +1,13 @@
+# .gitleaksignore — fingerprints of known-safe findings
+# https://github.com/gitleaks/gitleaks#gitleaksignore
+#
+# These are not real secrets. They are either:
+#   - Shell command substitutions that generate runtime values ($(openssl rand -hex 16))
+#   - Docker Compose / shell variable references that require the value from the environment (${VAR:?...})
+#
+# Commit 365ac47 — Issue #477: replaced hardcoded CI secrets with ephemeral generation
+365ac47230b9d8c1dd812ab0469aa969125209d5:release/docker-compose.yml:shotspot-db-password:37
+365ac47230b9d8c1dd812ab0469aa969125209d5:.github/workflows/release.yml:shotspot-db-password:267
+365ac47230b9d8c1dd812ab0469aa969125209d5:.github/workflows/docker.yml:shotspot-db-password:112
+365ac47230b9d8c1dd812ab0469aa969125209d5:docker-compose.dev.yml:shotspot-db-password:40
+365ac47230b9d8c1dd812ab0469aa969125209d5:.github/workflows/docker.yml:shotspot-db-password:265
