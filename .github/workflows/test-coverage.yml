@@ -91,9 +91,7 @@ jobs:
       DB_NAME_GAME_LOGIC: shotspot_test_db_game_logic
       DB_MAX_CONNECTIONS: 5
       DB_IDLE_TIMEOUT_MS: 1000
-      JWT_SECRET: test_jwt_secret_key_min_32_chars_long_for_testing
       JWT_EXPIRES_IN: 1h
-      SESSION_SECRET: test-session-secret
       PORT: 3999
       CORS_ORIGIN: http://localhost:3001
       RATE_LIMIT_WINDOW_MS: 900000
@@ -118,6 +116,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      - name: Generate ephemeral test secrets
+        run: |
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> $GITHUB_ENV
+          echo "SESSION_SECRET=$(openssl rand -hex 24)" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: actions/setup-node@v5

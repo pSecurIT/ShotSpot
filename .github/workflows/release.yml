@@ -264,6 +264,8 @@ jobs:
           echo " Images pre-pulled"
           
           # Create test environment
+          CI_DB_PASSWORD=$(openssl rand -hex 16)
+          CI_JWT_SECRET=$(openssl rand -hex 32)
           cat > .env << EOF
           PORT=3001
           NODE_ENV=production
@@ -271,11 +273,11 @@ jobs:
           DB_PORT=5432
           DB_NAME=shotspot_test
           DB_USER=shotspot_test
-          DB_PASSWORD=test_password_123
+          DB_PASSWORD=${CI_DB_PASSWORD}
           DB_SSL=false
           DB_MAX_CONNECTIONS=20
           DB_IDLE_TIMEOUT_MS=30000
-          JWT_SECRET=test_jwt_secret_for_ci_only_minimum_32_chars_required
+          JWT_SECRET=${CI_JWT_SECRET}
           JWT_EXPIRES_IN=1h
           JWT_REFRESH_EXPIRES_IN=7d
           SESSION_SECURE=false
