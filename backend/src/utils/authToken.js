@@ -20,6 +20,9 @@ export const extractBearerToken = (authorizationHeader) => {
 export const getJwtSecret = () => process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
 
 export const verifyAccessTokenClaims = (token, jwtSecret = getJwtSecret()) => {
+  if (!token || typeof token !== 'string') {
+    throw createJwtClaimError('Missing or malformed Bearer token');
+  }
   const decoded = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
   if (!decoded || typeof decoded !== 'object') {
     throw createJwtClaimError('Invalid token payload');

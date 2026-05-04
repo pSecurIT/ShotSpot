@@ -25,18 +25,35 @@ const IGNORED_STDERR_WARNINGS = [
   'Not implemented: navigation to another Document',
 ];
 
+const sanitizeLogArg = (arg: unknown): string => {
+  const value =
+    typeof arg === 'string'
+      ? arg
+      : (() => {
+          try {
+            return JSON.stringify(arg);
+          } catch {
+            return String(arg);
+          }
+        })();
+
+  return value.replace(/[\r\n]/g, ' ');
+};
+
+const sanitizeLogArgs = (args: unknown[]): string[] => args.map(sanitizeLogArg);
+
 console.error = (...args: unknown[]) => {
   if (shouldIgnoreWarning(args)) {
     return;
   }
-  originalConsoleError(...args);
+  originalConsoleError(...sanitizeLogArgs(args));
 };
 
 console.warn = (...args: unknown[]) => {
   if (shouldIgnoreWarning(args)) {
     return;
   }
-  originalConsoleWarn(...args);
+  originalConsoleWarn(...sanitizeLogArgs(args));
 };
 
 process.stderr.write = ((chunk: string | Uint8Array, ...args: unknown[]) => {
@@ -45,8 +62,10 @@ process.stderr.write = ((chunk: string | Uint8Array, ...args: unknown[]) => {
     return true;
   }
 
+  const sanitizedMessage = message.replace(/[\r\n]/g, ' ');
+
   return originalStderrWrite(
-    chunk,
+    sanitizedMessage,
     ...(args as Parameters<typeof process.stderr.write> extends [
       string | Uint8Array,
       ...infer Rest

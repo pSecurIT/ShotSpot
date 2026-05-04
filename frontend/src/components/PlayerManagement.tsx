@@ -162,7 +162,6 @@ const PlayerManagement: React.FC = () => {
       const prefs = JSON.parse(rawValue) as {
         selectedClubFilter?: string;
         selectedTeamFilter?: string;
-        selectedGenderFilter?: string;
         searchQuery?: string;
         showInactive?: boolean;
         sortBy?: 'name' | 'jersey' | 'team' | 'goals';
@@ -174,9 +173,6 @@ const PlayerManagement: React.FC = () => {
       }
       if (typeof prefs.selectedTeamFilter === 'string') {
         setSelectedTeamFilter(prefs.selectedTeamFilter);
-      }
-      if (typeof prefs.selectedGenderFilter === 'string') {
-        setSelectedGenderFilter(prefs.selectedGenderFilter);
       }
       if (typeof prefs.searchQuery === 'string') {
         setSearchQuery(prefs.searchQuery);
@@ -205,7 +201,6 @@ const PlayerManagement: React.FC = () => {
       JSON.stringify({
         selectedClubFilter,
         selectedTeamFilter,
-        selectedGenderFilter,
         searchQuery,
         showInactive,
         sortBy,
@@ -216,7 +211,6 @@ const PlayerManagement: React.FC = () => {
     PLAYER_LIST_PREFS_KEY,
     selectedClubFilter,
     selectedTeamFilter,
-    selectedGenderFilter,
     searchQuery,
     showInactive,
     sortBy,
