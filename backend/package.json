@@ -41,7 +41,7 @@
     "csv-stringify": "^6.6.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "express-rate-limit": "^8.4.0",
+    "express-rate-limit": "^8.5.1",
     "express-session": "^1.19.0",
     "express-slow-down": "^3.1.0",
     "express-validator": "^7.3.0",
@@ -55,7 +55,7 @@
   "devDependencies": {
     "@babel/core": "^7.28.6",
     "@babel/plugin-syntax-import-attributes": "^7.28.6",
-    "@babel/preset-env": "^7.28.6",
+    "@babel/preset-env": "^7.29.5",
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.5",
     "@types/jest": "^30.0.0",
