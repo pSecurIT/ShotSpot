@@ -21,7 +21,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.0",
     "patch-package": "^8.0.1",
-    "react": "^19.0.0",
+    "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.0",
     "react-window": "^2.2.7",
@@ -85,6 +85,7 @@
     "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "mobile:run:android": "npm run mobile:sync && npx cap run android",
     "mobile:run:ios": "npm run mobile:sync && npx cap run ios",
+    "snyk:scan": "snyk test --severity-threshold=high",
     "postinstall": "patch-package"
   },
   "eslintConfig": {

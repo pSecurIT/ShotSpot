@@ -13,6 +13,17 @@ import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 const exportsFilename = fileURLToPath(import.meta.url);
 const exportsDirname = path.dirname(exportsFilename);
+const exportsStorageDir = path.resolve(exportsDirname, '../../exports');
+
+const isSafeExportPath = (filePath) => {
+  if (typeof filePath !== 'string' || filePath.trim() === '') {
+    return false;
+  }
+
+  const relativeExportPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+  const normalizedPath = path.resolve(exportsStorageDir, relativeExportPath);
+  return normalizedPath.startsWith(exportsStorageDir + path.sep);
+};
 
 const router = express.Router();
 
@@ -1127,8 +1138,20 @@ router.get('/download/:id', [
       return res.status(404).json({ error: 'Export file not yet generated' });
     }
 
+    if (!isSafeExportPath(exportRecord.file_path)) {
+      return res.status(400).json({ error: 'Invalid export file path' });
+    }
+
     // Read and send file
-    const fullPath = path.join(exportsDirname, '../../', exportRecord.file_path);
+    const relativeExportPath = exportRecord.file_path.startsWith('/')
+      ? exportRecord.file_path.slice(1)
+      : exportRecord.file_path;
+    const fullPath = path.resolve(exportsStorageDir, relativeExportPath);
+
+    if (!fullPath.startsWith(exportsStorageDir + path.sep)) {
+      return res.status(400).json({ error: 'Invalid export file path' });
+    }
+
     const fileBuffer = await fs.readFile(fullPath);
 
     // Set appropriate headers
@@ -1202,6 +1225,10 @@ router.delete('/:id', [
 
     const filePath = fileResult.rows[0].file_path;
 
+    if (filePath && !isSafeExportPath(filePath)) {
+      return res.status(400).json({ error: 'Invalid export file path' });
+    }
+
     // Delete database record
     await db.query(
       'DELETE FROM report_exports WHERE id = $1 AND generated_by = $2',
@@ -1211,7 +1238,13 @@ router.delete('/:id', [
     // Delete actual file from storage if it exists
     if (filePath) {
       try {
-        const fullPath = path.join(exportsDirname, '../../', filePath);
+        const relativeExportPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+        const fullPath = path.resolve(exportsStorageDir, relativeExportPath);
+
+        if (!fullPath.startsWith(exportsStorageDir + path.sep)) {
+          throw new Error('Invalid export file path');
+        }
+
         await fs.unlink(fullPath);
         if (process.env.NODE_ENV !== 'test') {
           logInfo(`Deleted export file: ${filePath}`);
