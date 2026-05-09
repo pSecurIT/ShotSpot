@@ -8,6 +8,9 @@ on:
     branches: [ "main"]
   pull_request:
     branches: [ "main"]
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
 
 jobs:
   backend:
@@ -173,6 +176,19 @@ jobs:
       working-directory: frontend
       run: npm ci
 
+    - name: Set up Snyk CLI
+      uses: snyk/actions/setup@master
+
+    - name: Resolve Snyk reporting settings
+      shell: bash
+      run: |
+        echo "SNYK_REMOTE_REPO_URL=https://github.com/${GITHUB_REPOSITORY}.git" >> "$GITHUB_ENV"
+        if [ -n "${{ vars.SNYK_ORG }}" ]; then
+          echo "SNYK_ORG_FLAG=--org=${{ vars.SNYK_ORG }}" >> "$GITHUB_ENV"
+        else
+          echo "SNYK_ORG_FLAG=" >> "$GITHUB_ENV"
+        fi
+
     - name: Run npm audit (Backend)
       working-directory: backend
       run: |
@@ -196,22 +212,24 @@ jobs:
       run: npm audit --audit-level=critical
 
     - name: Run Snyk scan (Backend npm packages)
+      id: snyk_backend_test
       uses: snyk/actions/node@master
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       with:
         args: --severity-threshold=high --working-directory=backend
         command: test
-      continue-on-error: false
+      continue-on-error: true
 
     - name: Run Snyk scan (Frontend npm packages)
+      id: snyk_frontend_test
       uses: snyk/actions/node@master
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       with:
         args: --severity-threshold=high --working-directory=frontend
         command: test
-      continue-on-error: false
+      continue-on-error: true
 
     - name: Upload Snyk results to GitHub Code Scanning (Backend)
       uses: snyk/actions/node@master
@@ -244,6 +262,78 @@ jobs:
       with:
         sarif_file: snyk-frontend.sarif
         category: snyk-frontend
+
+    - name: Run Snyk Code scan
+      id: snyk_code_test
+      if: ${{ vars.SNYK_ENABLE_CODE_SCAN == 'true' }}
+      continue-on-error: true
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: |
+        snyk code test . \
+          --severity-threshold=high \
+          --sarif-file-output=snyk-code.sarif \
+          $SNYK_ORG_FLAG
+
+    - name: Upload Snyk Code SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v4
+      if: ${{ always() && hashFiles('snyk-code.sarif') != '' }}
+      with:
+        sarif_file: snyk-code.sarif
+        category: snyk-code
+
+    - name: Monitor backend dependencies in Snyk
+      if: ${{ github.event_name != 'pull_request' }}
+      working-directory: backend
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: |
+        snyk monitor \
+          --project-name=shotspot-backend \
+          --target-reference=${GITHUB_REF_NAME} \
+          --remote-repo-url=$SNYK_REMOTE_REPO_URL \
+          --project-environment=backend \
+          --project-lifecycle=production \
+          $SNYK_ORG_FLAG
+
+    - name: Monitor frontend dependencies in Snyk
+      if: ${{ github.event_name != 'pull_request' }}
+      working-directory: frontend
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: |
+        snyk monitor \
+          --project-name=shotspot-frontend \
+          --target-reference=${GITHUB_REF_NAME} \
+          --remote-repo-url=$SNYK_REMOTE_REPO_URL \
+          --project-environment=frontend \
+          --project-lifecycle=production \
+          $SNYK_ORG_FLAG
+
+    - name: Report Snyk Code findings to Snyk
+      if: ${{ vars.SNYK_ENABLE_CODE_SCAN == 'true' && github.event_name != 'pull_request' }}
+      continue-on-error: true
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: |
+        snyk code test . \
+          --severity-threshold=high \
+          --report \
+          --project-name=shotspot-code \
+          --target-name=${GITHUB_REPOSITORY} \
+          --target-reference=${GITHUB_REF_NAME} \
+          --remote-repo-url=$SNYK_REMOTE_REPO_URL \
+          $SNYK_ORG_FLAG
+
+    - name: Fail on blocking Snyk findings
+      if: ${{ steps.snyk_backend_test.outcome == 'failure' || steps.snyk_frontend_test.outcome == 'failure' || steps.snyk_code_test.outcome == 'failure' }}
+      run: |
+        echo "::error::Snyk detected blocking high or critical findings. See the uploaded SARIF results and Snyk dashboard for details."
+        exit 1
 
         
   # E2E tests disabled until Cypress is configured

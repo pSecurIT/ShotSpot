@@ -13,6 +13,9 @@ on:
   # Always run on PRs to ensure required checks are reported.
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '15 3 * * 1'
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -68,6 +71,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Set up Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Resolve Snyk reporting settings
+        shell: bash
+        run: |
+          echo "SNYK_REMOTE_REPO_URL=https://github.com/${GITHUB_REPOSITORY}.git" >> "$GITHUB_ENV"
+          if [ -n "${{ vars.SNYK_ORG }}" ]; then
+            echo "SNYK_ORG_FLAG=--org=${{ vars.SNYK_ORG }}" >> "$GITHUB_ENV"
+          else
+            echo "SNYK_ORG_FLAG=" >> "$GITHUB_ENV"
+          fi
+
       - name: Install docker-compose
         run: |
           sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -108,13 +124,14 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Run Snyk scan on Docker image
+        id: snyk_docker_test
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: ${{ steps.meta.outputs.tags }}
           args: --severity-threshold=high
-        continue-on-error: false
+        continue-on-error: true
 
       - name: Upload Snyk Docker SARIF to GitHub Code Scanning
         uses: snyk/actions/docker@master
@@ -131,6 +148,23 @@ jobs:
         with:
           sarif_file: snyk-docker.sarif
           category: snyk-docker
+
+      - name: Monitor Docker image in Snyk
+        id: snyk_docker_monitor
+        if: ${{ github.event_name != 'pull_request' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk container monitor "${{ steps.meta.outputs.tags }}" \
+            --file=Dockerfile \
+            --project-name=shotspot-container \
+            --target-reference=${GITHUB_REF_NAME} \
+            --project-environment=hosted \
+            --project-lifecycle=production \
+            --remote-repo-url=$SNYK_REMOTE_REPO_URL \
+            $SNYK_ORG_FLAG
 
       - name: Create .env.docker for CI
         run: |
@@ -244,6 +278,12 @@ jobs:
             fi
             rm -f .env.docker || true
           fi
+
+      - name: Fail on blocking Snyk findings
+        if: ${{ steps.snyk_docker_test.outcome == 'failure' || steps.snyk_docker_monitor.outcome == 'failure' }}
+        run: |
+          echo "::error::Snyk detected blocking Docker findings or failed to publish the monitoring snapshot."
+          exit 1
 
       - name: Push Docker image
         if: github.event_name != 'pull_request'

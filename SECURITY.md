@@ -330,44 +330,57 @@ openssl rand -hex 32
 ShotSpot employs a **multi-layered vulnerability scanning approach** to protect the entire attack surface of the monorepo:
 
 | Scanner | Coverage | Trigger | Threshold | Location |
-|---------|----------|---------|-----------|----------|
-| **Snyk** (npm) | Frontend + backend npm packages | PR/push/weekly | HIGH+CRITICAL | `.github/workflows/node.js.yml` |
-| **Snyk** (Docker) | Container images & dependencies | PR/push/weekly | HIGH+CRITICAL | `.github/workflows/docker.yml` |
+| ------- | -------- | ------- | --------- | -------- |
+| **Snyk** (npm) | Frontend + backend npm packages | PR/push/weekly/manual | HIGH+CRITICAL | `.github/workflows/node.js.yml` |
+| **Snyk Code** | Source code SAST for frontend + backend | PR/push/weekly/manual | HIGH | `.github/workflows/node.js.yml` |
+| **Snyk** (Docker) | Container images & dependencies | PR/push/weekly/manual | HIGH+CRITICAL | `.github/workflows/docker.yml` |
 | **Trivy** | Filesystem, OS packages, IaC, secrets | PR/push/weekly | CRITICAL (fails), MEDIUM (reports) | `.github/workflows/security-scan.yml` |
 | **CodeQL** | Static analysis (JavaScript/TypeScript) | Weekly + on-demand | All findings reported | `.github/workflows/codeql.yml` |
 | **npm audit** | npm packages (baseline/local) | Manual or pre-commit | CRITICAL (fail) | Per-directory or CI |
 
 ### Snyk Integration
 
-**Purpose:** Identify and remediate vulnerabilities in npm packages (backend Express, frontend React) and Docker container images with actionable remediation guidance.
+**Purpose:** Identify and remediate vulnerabilities in npm packages (backend Express, frontend React), source code security flaws, and Docker container images with actionable remediation guidance.
 
 **CI/CD Pipeline:**
 
-1. **Node.js Workflow** (`.github/workflows/node.js.yml`):
-   - Scans `backend/` and `frontend/` npm dependencies
-   - Runs after install; fails build on HIGH or CRITICAL severity
-   - Uploads findings to GitHub Code Scanning (SARIF format)
-   - Runs on: PR, push to main, weekly schedule
+**Node.js Workflow** (`.github/workflows/node.js.yml`)
 
-2. **Docker Workflow** (`.github/workflows/docker.yml`):
-   - Scans built Docker image after multi-stage build
-   - Includes base image + npm dependencies + application code
-   - Fails build on HIGH or CRITICAL severity
-   - Uploads findings to GitHub Code Scanning
-   - Runs on: PR, push to main (if Dockerfile/docker-compose.yml changes), weekly schedule
+- Scans `backend/` and `frontend/` npm dependencies
+- Optionally scans repository source code with **Snyk Code** when `SNYK_ENABLE_CODE_SCAN=true`
+- Runs after install; fails build on HIGH or CRITICAL severity
+- Uploads dependency and SAST findings to GitHub Code Scanning (SARIF format)
+- Publishes monitoring snapshots to Snyk for dependency projects on non-PR runs
+- Runs on PR, push to main, weekly schedule, and manual dispatch
+
+**Docker Workflow** (`.github/workflows/docker.yml`)
+
+- Scans the built Docker image after the multi-stage build
+- Includes base image plus npm dependencies and application code
+- Fails build on HIGH or CRITICAL severity
+- Uploads findings to GitHub Code Scanning
+- Publishes monitored container snapshots to Snyk on non-PR runs
+- Runs on PR, push to main (for Docker- or app-related changes), weekly schedule, and manual dispatch
 
 **Failure Behavior:**
 
-When Snyk detects HIGH or CRITICAL vulnerabilities:
+When Snyk detects blocking findings:
+
 - ❌ Build fails; PR cannot be merged
-- 📊 Findings reported in GitHub Code Scanning tab (visible as "Snyk" / "Snyk Docker" categories)
+- 📊 Findings reported in GitHub Code Scanning tab (visible as `snyk-backend`, `snyk-frontend`, `snyk-code`, and `snyk-docker` categories)
 - 🔗 Each finding links to Snyk.io for remediation guidance (e.g., patch versions, workarounds)
+
+**Monitoring & Reporting:**
+
+- `snyk monitor` is used for npm dependency projects and the Docker image on non-PR runs so new vulnerabilities continue to surface in the Snyk dashboard after merge.
+- `snyk code test --report` is used for Snyk Code because `monitor` is not supported for Snyk Code projects.
+- Workflows can be pinned to a specific Snyk organization by setting the repository variable `SNYK_ORG` to your Snyk org slug or org ID.
 
 **Remediation Workflow:**
 
 1. **Check Snyk Findings:** View GitHub Code Scanning → Snyk category or run locally (see below)
 2. **Review Guidance:** Click finding → Snyk link → see patch recommendations, CVE details, exploitability
-3. **Apply Fix:** 
+3. **Apply Fix:**
    - Upgrade vulnerable package: `npm update <package>`
    - Or use `npm audit fix` (use with caution; may introduce breaking changes)
 4. **Verify:** Commit and push; Snyk re-scans automatically
@@ -376,11 +389,13 @@ When Snyk detects HIGH or CRITICAL vulnerabilities:
 ### Local Vulnerability Scanning
 
 **Install Snyk CLI:**
+
 ```bash
 npm install -g snyk
 ```
 
 **Authenticate with Snyk (one-time):**
+
 ```bash
 snyk auth
 # Opens browser to https://app.snyk.io/auth/login
@@ -388,9 +403,13 @@ snyk auth
 ```
 
 **Scan Frontend & Backend Locally:**
+
 ```bash
 # Scan all packages (both frontend + backend)
 npm run snyk:scan
+
+# Scan source code security issues (SAST)
+npm run snyk:code
 
 # Or scan individually:
 cd backend && npm run snyk:scan
@@ -417,10 +436,24 @@ snyk test --help                          # Full option list
 ```
 
 **Docker Image Scanning (Local):**
+
 ```bash
 # Scan a locally built Docker image
 docker build -t shotspot:test .
 snyk container test shotspot:test --severity-threshold=high
+```
+
+**Code Vulnerability Scanning (Local):**
+
+```bash
+# Scan source code for SAST findings
+snyk code test . --severity-threshold=high
+
+# Save Snyk Code results to SARIF
+snyk code test . --severity-threshold=high --sarif-file-output=snyk-code.sarif
+
+# Report the current code snapshot to the Snyk UI
+snyk code test . --severity-threshold=high --report --project-name=shotspot-code
 ```
 
 ### Snyk Setup & Authentication
@@ -444,10 +477,15 @@ The CI/CD workflows use the `SNYK_TOKEN` GitHub secret for authentication. To se
    - New repository secret → Name: `SNYK_TOKEN`
    - Paste token value → Save
 
-4. **Verify Setup:**
+4. **Optional Repository Variables:**
+  - `SNYK_ORG` → pin workflow scans, reports, and monitor snapshots to a specific Snyk organization slug or org ID
+  - `SNYK_ENABLE_CODE_SCAN=true` → enable Snyk Code scanning and reporting in `node.js.yml`
+
+5. **Verify Setup:**
    - Push a commit or PR to trigger workflows
    - Check GitHub Actions → Node.js CI or Docker Build
-   - Confirm Snyk scans run without "Missing SNYK_TOKEN" errors
+  - Confirm Snyk scans run without "Missing SNYK_TOKEN" errors
+  - On non-PR runs, confirm new Snyk projects/snapshots appear in the configured org dashboard
 
 **Local Authentication (Optional for developers):**
 
@@ -462,7 +500,8 @@ snyk config unset api        # Revoke local authentication
 **When to use each:**
 
 - **npm audit** (lightweight baseline): Local pre-commit checks; fast but limited remediation guidance
-- **Snyk** (comprehensive npm + Docker): Full CI/CD pipeline; superior remediation, both package + container scanning; requires auth token
+- **Snyk Open Source + Container** (comprehensive npm + Docker): Full CI/CD pipeline; superior remediation, package + container scanning; supports monitoring snapshots
+- **Snyk Code** (SAST): Static analysis for application code; uses `snyk code test` and `--report` instead of `monitor`
 - **Trivy** (filesystem/IaC/OS): Complements Snyk with OS package scanning, secrets, IaC analysis; no auth required
 
 **Example Workflow:**
