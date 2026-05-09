@@ -108,13 +108,14 @@ const normalizeEvent = (rawEvent, index) => {
 router.post('/events', async (req, res) => {
   try {
     const body = req.body || {};
-    const rawEvents = Array.isArray(body.events) ? body.events : [body];
+    const incomingEvents = Array.isArray(body.events) ? body.events : [body];
+    const rawEvents = incomingEvents.slice(0, MAX_BATCH_SIZE);
 
     if (rawEvents.length === 0) {
       return res.status(400).json({ error: 'At least one event is required' });
     }
 
-    if (rawEvents.length > MAX_BATCH_SIZE) {
+    if (incomingEvents.length > MAX_BATCH_SIZE) {
       return res.status(400).json({ error: `Batch size exceeds ${MAX_BATCH_SIZE} events` });
     }
 
