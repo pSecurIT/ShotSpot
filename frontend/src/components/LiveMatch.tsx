@@ -804,10 +804,27 @@ const LiveMatch: React.FC = () => {
       });
 
       // After API calls complete, fetch updated data
+      // Fetch active possession with retry logic (initial possession should be auto-created by backend)
+      const fetchActivePossessionWithRetry = async () => {
+        return retryApiCall(
+          () => api.get(`/possessions/${gameId}/active`),
+          3,
+          100 // Start with 100ms, will backoff to 200ms, 400ms
+        ).then(response => {
+          setActivePossession(response.data);
+          return response.data;
+        }).catch((error) => {
+          // Log but don't fail match start if possession fetch fails
+          console.warn('Could not fetch initial active possession:', error);
+          return null;
+        });
+      };
+
       await Promise.all([
         fetchGame(),
         fetchTimerState(),
-        fetchPlayers() // Reload players with starting_position data
+        fetchPlayers(),
+        fetchActivePossessionWithRetry()
       ]);
 
       // NOW hide pre-match setup after everything is updated
@@ -878,25 +895,43 @@ const LiveMatch: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id, game?.home_team_id, game?.away_team_id]);
 
-  // Timer control handlers
+  // Timer control handlers with optimistic UI updates
   const handleStartTimer = async () => {
     try {
       setError(null);
       
       // Check if this is the first start
       const wasFirstStart = timerState?.timer_state === 'stopped' && timerState?.current_period === 1 && !activePossession;
-      await startTimer();
       
-      // If this is the first start, give home team possession (fire and forget)
-      if (wasFirstStart && game) {
-        handleCenterLineCross(game.home_team_id).catch(err => {
-          console.error('Error creating initial possession:', err);
-        });
-        setSuccess('Game started! Home team has possession.');
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        setSuccess('Timer started');
-        setTimeout(() => setSuccess(null), 2000);
+      // 🔥 OPTIMISTIC UPDATE: Update timer state immediately for instant feedback
+      const previousTimerState = timerState;
+      if (timerState) {
+        setTimerStateOptimistic({
+          ...timerState,
+          timer_state: 'running'
+        } as typeof timerState);
+      }
+      
+      try {
+        await startTimer();
+        
+        // If this is the first start, give home team possession (fire and forget)
+        if (wasFirstStart && game) {
+          handleCenterLineCross(game.home_team_id).catch(err => {
+            console.error('Error creating initial possession:', err);
+          });
+          setSuccess('Game started! Home team has possession.');
+          setTimeout(() => setSuccess(null), 3000);
+        } else {
+          setSuccess('Timer started');
+          setTimeout(() => setSuccess(null), 2000);
+        }
+      } catch (apiError) {
+        // Revert optimistic update on error
+        if (previousTimerState) {
+          setTimerStateOptimistic(previousTimerState);
+        }
+        throw apiError;
       }
       
     } catch (error) {
@@ -908,10 +943,29 @@ const LiveMatch: React.FC = () => {
   const handlePauseTimer = async () => {
     try {
       setError(null);
-      await pauseTimer();
       
-      setSuccess('Timer paused');
-      setTimeout(() => setSuccess(null), 2000);
+      // 🔥 OPTIMISTIC UPDATE: Pause timer immediately for instant feedback
+      const previousTimerState = timerState;
+      if (timerState) {
+        setTimerStateOptimistic({
+          ...timerState,
+          timer_state: 'paused'
+        } as typeof timerState);
+      }
+      
+      try {
+        await pauseTimer();
+        
+        setSuccess('Timer paused');
+        setTimeout(() => setSuccess(null), 2000);
+      } catch (apiError) {
+        // Revert optimistic update on error
+        if (previousTimerState) {
+          setTimerStateOptimistic(previousTimerState);
+        }
+        throw apiError;
+      }
+      
     } catch (error) {
       const err = error as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || 'Error pausing timer');
