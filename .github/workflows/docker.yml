@@ -77,7 +77,6 @@ jobs:
       - name: Resolve Snyk reporting settings
         shell: bash
         run: |
-          echo "SNYK_REMOTE_REPO_URL=https://github.com/${GITHUB_REPOSITORY}.git" >> "$GITHUB_ENV"
           if [ -n "${{ vars.SNYK_ORG }}" ]; then
             echo "SNYK_ORG_FLAG=--org=${{ vars.SNYK_ORG }}" >> "$GITHUB_ENV"
           else
@@ -163,7 +162,6 @@ jobs:
             --target-reference=${GITHUB_REF_NAME} \
             --project-environment=hosted \
             --project-lifecycle=production \
-            --remote-repo-url=$SNYK_REMOTE_REPO_URL \
             $SNYK_ORG_FLAG
 
       - name: Create .env.docker for CI
