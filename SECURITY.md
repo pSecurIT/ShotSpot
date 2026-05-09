@@ -323,6 +323,200 @@ openssl rand -hex 32
 
 ---
 
+## Vulnerability Scanning Pipeline
+
+### Overview
+
+ShotSpot employs a **multi-layered vulnerability scanning approach** to protect the entire attack surface of the monorepo:
+
+| Scanner | Coverage | Trigger | Threshold | Location |
+|---------|----------|---------|-----------|----------|
+| **Snyk** (npm) | Frontend + backend npm packages | PR/push/weekly | HIGH+CRITICAL | `.github/workflows/node.js.yml` |
+| **Snyk** (Docker) | Container images & dependencies | PR/push/weekly | HIGH+CRITICAL | `.github/workflows/docker.yml` |
+| **Trivy** | Filesystem, OS packages, IaC, secrets | PR/push/weekly | CRITICAL (fails), MEDIUM (reports) | `.github/workflows/security-scan.yml` |
+| **CodeQL** | Static analysis (JavaScript/TypeScript) | Weekly + on-demand | All findings reported | `.github/workflows/codeql.yml` |
+| **npm audit** | npm packages (baseline/local) | Manual or pre-commit | CRITICAL (fail) | Per-directory or CI |
+
+### Snyk Integration
+
+**Purpose:** Identify and remediate vulnerabilities in npm packages (backend Express, frontend React) and Docker container images with actionable remediation guidance.
+
+**CI/CD Pipeline:**
+
+1. **Node.js Workflow** (`.github/workflows/node.js.yml`):
+   - Scans `backend/` and `frontend/` npm dependencies
+   - Runs after install; fails build on HIGH or CRITICAL severity
+   - Uploads findings to GitHub Code Scanning (SARIF format)
+   - Runs on: PR, push to main, weekly schedule
+
+2. **Docker Workflow** (`.github/workflows/docker.yml`):
+   - Scans built Docker image after multi-stage build
+   - Includes base image + npm dependencies + application code
+   - Fails build on HIGH or CRITICAL severity
+   - Uploads findings to GitHub Code Scanning
+   - Runs on: PR, push to main (if Dockerfile/docker-compose.yml changes), weekly schedule
+
+**Failure Behavior:**
+
+When Snyk detects HIGH or CRITICAL vulnerabilities:
+- ❌ Build fails; PR cannot be merged
+- 📊 Findings reported in GitHub Code Scanning tab (visible as "Snyk" / "Snyk Docker" categories)
+- 🔗 Each finding links to Snyk.io for remediation guidance (e.g., patch versions, workarounds)
+
+**Remediation Workflow:**
+
+1. **Check Snyk Findings:** View GitHub Code Scanning → Snyk category or run locally (see below)
+2. **Review Guidance:** Click finding → Snyk link → see patch recommendations, CVE details, exploitability
+3. **Apply Fix:** 
+   - Upgrade vulnerable package: `npm update <package>`
+   - Or use `npm audit fix` (use with caution; may introduce breaking changes)
+4. **Verify:** Commit and push; Snyk re-scans automatically
+5. **Follow-up:** For complex vulnerabilities, consider upgrading Node.js or the base Docker image
+
+### Local Vulnerability Scanning
+
+**Install Snyk CLI:**
+```bash
+npm install -g snyk
+```
+
+**Authenticate with Snyk (one-time):**
+```bash
+snyk auth
+# Opens browser to https://app.snyk.io/auth/login
+# Creates ~/.snyk file with API token
+```
+
+**Scan Frontend & Backend Locally:**
+```bash
+# Scan all packages (both frontend + backend)
+npm run snyk:scan
+
+# Or scan individually:
+cd backend && npm run snyk:scan
+cd frontend && npm run snyk:scan
+
+# Scan and show detailed output
+snyk test --severity-threshold=high --verbose
+
+# Generate interactive report (opens in browser)
+snyk test --json > snyk-report.json
+```
+
+**Options:**
+
+```bash
+snyk test                                  # Basic scan; exits 1 if vulns found
+snyk test --severity-threshold=high       # Only HIGH and CRITICAL (default for ShotSpot)
+snyk test --severity-threshold=medium     # Include MEDIUM vulnerabilities
+snyk test --dry-run                       # Scan without failing build
+snyk test --file=package-lock.json        # Scan specific lock file
+snyk test --json                          # Output as JSON (for parsing)
+snyk test --sarif                         # Output as SARIF (for GitHub Code Scanning)
+snyk test --help                          # Full option list
+```
+
+**Docker Image Scanning (Local):**
+```bash
+# Scan a locally built Docker image
+docker build -t shotspot:test .
+snyk container test shotspot:test --severity-threshold=high
+```
+
+### Snyk Setup & Authentication
+
+**GitHub Actions Authentication:**
+
+The CI/CD workflows use the `SNYK_TOKEN` GitHub secret for authentication. To set this up:
+
+1. **Create Snyk Free Tier Account:**
+   - Go to https://snyk.io/free
+   - Sign up with email or GitHub account
+   - Create organization (or use existing pSecurIT org if available)
+
+2. **Generate API Token:**
+   - Log in to https://app.snyk.io
+   - Settings → API Token → Click to reveal
+   - Copy the token (40-character hex string)
+
+3. **Add GitHub Secret:**
+   - Repository settings → Secrets and variables → Actions
+   - New repository secret → Name: `SNYK_TOKEN`
+   - Paste token value → Save
+
+4. **Verify Setup:**
+   - Push a commit or PR to trigger workflows
+   - Check GitHub Actions → Node.js CI or Docker Build
+   - Confirm Snyk scans run without "Missing SNYK_TOKEN" errors
+
+**Local Authentication (Optional for developers):**
+
+```bash
+snyk auth                    # Opens browser; saves token to ~/.snyk
+snyk auth <token-string>     # Or pass token directly (avoid in scripts)
+snyk config unset api        # Revoke local authentication
+```
+
+### Snyk vs. npm audit vs. Trivy
+
+**When to use each:**
+
+- **npm audit** (lightweight baseline): Local pre-commit checks; fast but limited remediation guidance
+- **Snyk** (comprehensive npm + Docker): Full CI/CD pipeline; superior remediation, both package + container scanning; requires auth token
+- **Trivy** (filesystem/IaC/OS): Complements Snyk with OS package scanning, secrets, IaC analysis; no auth required
+
+**Example Workflow:**
+
+```
+Developer commits code
+  ↓
+Pre-commit (optional): npm audit quick check
+  ↓
+Push to PR
+  ↓
+GitHub Actions:
+  1. npm audit (quick baseline)
+  2. Snyk test (npm packages) → HIGH+CRITICAL fail
+  3. Snyk container (Docker image) → HIGH+CRITICAL fail
+  4. Trivy (filesystem + OS packages + secrets) → CRITICAL fail, MEDIUM report
+  5. CodeQL (static analysis)
+  ↓
+All pass? → Merge allowed
+Any fail? → Fix vulnerabilities, push again
+```
+
+### Interpreting Snyk Findings
+
+**Example Finding:**
+
+```
+⚠️ HIGH | Prototype Pollution
+   Package: lodash
+   Fixed in: >= 4.17.21
+   Introduced through: express-validator@7.3.0
+   Exploitability: Easily Exploitable
+   Maturity: Established
+```
+
+**How to respond:**
+
+1. **Click the finding** → Snyk.io link for full details
+2. **Check "Fixed in"** → Upgrade to or above that version
+3. **Review "Introduced through"** → May need to update a transitive dependency
+4. **Consider "Exploitability"** → High exploitability = higher priority
+5. **Update package:** `npm update <package>` and re-scan
+6. **If unpatched:** Use `npm audit --audit-level=critical` to determine if it's acceptable (temporary gap)
+
+### Further Resources
+
+- **Snyk Documentation:** https://docs.snyk.io/
+- **Snyk CLI Reference:** https://docs.snyk.io/snyk-cli
+- **Snyk GitHub Integration:** https://docs.snyk.io/integrations/ci-cd-integrations/github-actions-integration
+- **CVE Search:** https://cve.mitre.org/
+- **CVSS Scoring:** https://www.first.org/cvss/
+
+---
+
 ## Incident Response
 
 ### Steps

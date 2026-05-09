@@ -194,7 +194,48 @@ jobs:
       working-directory: frontend
       run: npm audit --audit-level=critical
 
-    # Security scanning can be added later with Snyk or other tools
+    - name: Run Snyk scan (Backend npm packages)
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high --working-directory=backend
+        command: test
+      continue-on-error: false
+
+    - name: Run Snyk scan (Frontend npm packages)
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high --working-directory=frontend
+        command: test
+      continue-on-error: false
+
+    - name: Upload Snyk results to GitHub Code Scanning (Backend)
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high --working-directory=backend --sarif-file-output=snyk-backend.sarif
+        command: test
+      continue-on-error: true
+
+    - name: Upload Snyk results to GitHub Code Scanning (Frontend)
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high --working-directory=frontend --sarif-file-output=snyk-frontend.sarif
+        command: test
+      continue-on-error: true
+
+    - name: Upload SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: snyk-*.sarif
+        category: snyk
 
   # E2E tests disabled until Cypress is configured
   # Uncomment when E2E tests are implemented
