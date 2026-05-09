@@ -1,6 +1,7 @@
 name: Node.js CI
 permissions:
   contents: read
+  security-events: write
 
 on:
   push:
@@ -230,12 +231,19 @@ jobs:
         command: test
       continue-on-error: true
 
-    - name: Upload SARIF to GitHub Code Scanning
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
+    - name: Upload Backend SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v4
+      if: ${{ always() && hashFiles('snyk-backend.sarif') != '' }}
       with:
-        sarif_file: snyk-*.sarif
-        category: snyk
+        sarif_file: snyk-backend.sarif
+        category: snyk-backend
+
+    - name: Upload Frontend SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v4
+      if: ${{ always() && hashFiles('snyk-frontend.sarif') != '' }}
+      with:
+        sarif_file: snyk-frontend.sarif
+        category: snyk-frontend
 
   # E2E tests disabled until Cypress is configured
   # Uncomment when E2E tests are implemented
