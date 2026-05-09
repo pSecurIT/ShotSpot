@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      security-events: write
       packages: write
 
     steps:
@@ -125,8 +126,8 @@ jobs:
         continue-on-error: true
 
       - name: Upload Docker SARIF to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: ${{ always() && hashFiles('snyk-docker.sarif') != '' }}
         with:
           sarif_file: snyk-docker.sarif
           category: snyk-docker
