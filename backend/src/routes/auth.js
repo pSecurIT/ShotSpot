@@ -5,6 +5,7 @@ import { body, validationResult } from 'express-validator';
 import Tokens from 'csrf';
 import db from '../db.js';
 import { auth } from '../middleware/auth.js';
+import { getJwtSecret } from '../utils/authToken.js';
 import { logError } from '../utils/logger.js';
 
 const router = express.Router();
@@ -190,7 +191,7 @@ router.post('/login', [
     );
 
     // Generate JWT
-    const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+    const jwtSecret = getJwtSecret();
     
     // Normalize expiresIn: allow numeric string (seconds) or timeframe string like '1h'
     const rawExpires = process.env.JWT_EXPIRES_IN;
@@ -251,7 +252,7 @@ router.post('/change-password', auth, [
 
     const { currentPassword, newPassword } = req.body;
 
-    const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+    const jwtSecret = getJwtSecret();
 
     // Get user from database
     const result = await db.query(

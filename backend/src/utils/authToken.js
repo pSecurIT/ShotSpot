@@ -17,7 +17,13 @@ export const extractBearerToken = (authorizationHeader) => {
   return match ? match[1] : null;
 };
 
-export const getJwtSecret = () => process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+export const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET must be set');
+  }
+  return secret;
+};
 
 export const verifyAccessTokenClaims = (token, jwtSecret = getJwtSecret()) => {
   if (!token || typeof token !== 'string') {
