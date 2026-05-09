@@ -245,6 +245,7 @@ jobs:
         sarif_file: snyk-frontend.sarif
         category: snyk-frontend
 
+        
   # E2E tests disabled until Cypress is configured
   # Uncomment when E2E tests are implemented
   # e2e:
