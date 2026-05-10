@@ -64,8 +64,31 @@ const PlayerManagement: React.FC = () => {
     team_id: '',
     gender: ''
   });
+  const [lastSelectedTeamByClub, setLastSelectedTeamByClub] = useState<Record<string, string>>({});
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set());
+
+  const resolveDefaultTeamId = useCallback((clubId: string): string => {
+    if (!clubId) {
+      return '';
+    }
+
+    const teamsForClub = teams.filter((team) => String(team.club_id) === clubId);
+    if (teamsForClub.length === 0) {
+      return '';
+    }
+
+    const rememberedTeamId = lastSelectedTeamByClub[clubId];
+    if (rememberedTeamId && teamsForClub.some((team) => String(team.id) === rememberedTeamId)) {
+      return rememberedTeamId;
+    }
+
+    if (teamsForClub.length === 1) {
+      return String(teamsForClub[0].id);
+    }
+
+    return '';
+  }, [lastSelectedTeamByClub, teams]);
 
   const resetPlayerRefinements = useCallback(() => {
     setSearchQuery('');
@@ -95,9 +118,11 @@ const PlayerManagement: React.FC = () => {
 
       setNewPlayer((prev) => {
         if (prev.club_id) return prev;
+        const initialClubId = clubList.length > 0 ? String(clubList[0].id) : '';
         return {
           ...prev,
-          club_id: clubList.length > 0 ? String(clubList[0].id) : ''
+          club_id: initialClubId,
+          team_id: resolveDefaultTeamId(initialClubId)
         };
       });
     } catch (error) {
@@ -106,7 +131,7 @@ const PlayerManagement: React.FC = () => {
       console.error('Error fetching clubs:', message);
       throw new Error(message);
     }
-  }, [isAdmin, selectedClubFilter]);
+  }, [isAdmin, resolveDefaultTeamId, selectedClubFilter]);
 
   const fetchTeams = useCallback(async () => {
     try {
@@ -223,6 +248,30 @@ const PlayerManagement: React.FC = () => {
       : [];
   }, [newPlayer.club_id, teams]);
 
+  useEffect(() => {
+    if (!newPlayer.club_id) {
+      return;
+    }
+
+    const selectedTeamIsValid = teams.some(
+      (team) => String(team.id) === newPlayer.team_id && String(team.club_id) === newPlayer.club_id
+    );
+
+    if (selectedTeamIsValid) {
+      return;
+    }
+
+    const defaultTeamId = resolveDefaultTeamId(newPlayer.club_id);
+    if (defaultTeamId === newPlayer.team_id) {
+      return;
+    }
+
+    setNewPlayer((prev) => ({
+      ...prev,
+      team_id: defaultTeamId
+    }));
+  }, [newPlayer.club_id, newPlayer.team_id, resolveDefaultTeamId, teams]);
+
   const teamsForFilters = useMemo(() => {
     return isAdmin && selectedClubFilter
       ? teams.filter((team) => team.club_id === Number(selectedClubFilter))
@@ -292,7 +341,7 @@ const PlayerManagement: React.FC = () => {
         first_name: '',
         last_name: '',
         jersey_number: '',
-        team_id: '',
+        team_id: newPlayer.team_id,
         gender: ''
       });
       setSuccess('Player added successfully!');
@@ -428,12 +477,28 @@ const PlayerManagement: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+
+    if (name === 'team_id') {
+      if (newPlayer.club_id) {
+        setLastSelectedTeamByClub((prev) => ({
+          ...prev,
+          [newPlayer.club_id]: value
+        }));
+      }
+      setNewPlayer((prev) => ({
+        ...prev,
+        team_id: value
+      }));
+      return;
+    }
+
     setNewPlayer(prev => {
       if (name === 'club_id') {
+        const defaultTeamId = resolveDefaultTeamId(value);
         return {
           ...prev,
           club_id: value,
-          team_id: ''
+          team_id: defaultTeamId
         };
       }
       return {
@@ -485,14 +550,17 @@ const PlayerManagement: React.FC = () => {
   const filteredPlayers = useMemo(() => {
     return players
     .filter(p => {
+      const playerClubId = p.club_id != null ? String(p.club_id) : '';
+      const playerTeamId = p.team_id != null ? String(p.team_id) : '';
+
       // Club filter (admins only)
       if (isAdmin) {
         if (!selectedClubFilter) return false;
-        if (p.club_id.toString() !== selectedClubFilter) return false;
+        if (playerClubId !== selectedClubFilter) return false;
       }
 
       // Team filter
-      if (selectedTeamFilter && p.team_id.toString() !== selectedTeamFilter) return false;
+      if (selectedTeamFilter && playerTeamId !== selectedTeamFilter) return false;
       
       // Active status filter
       if (!showInactive && !p.is_active) return false;
@@ -504,7 +572,7 @@ const PlayerManagement: React.FC = () => {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
-        const jerseyMatch = p.jersey_number.toString().includes(query);
+        const jerseyMatch = String(p.jersey_number ?? '').includes(query);
         if (!fullName.includes(query) && !jerseyMatch) return false;
       }
       
