@@ -268,7 +268,7 @@ describe('PlayerManagement', () => {
     expect(screen.getByText('First name must be at least 2 characters')).toHaveAttribute('id', 'add-first_name-error');
   });
 
-  it('clears form after successful player creation', async () => {
+  it('clears text fields but preserves selected club and team after successful player creation', async () => {
     // Reset and setup mock for this specific test to ensure success
     vi.clearAllMocks();
     apiGetMock.mockImplementation((url: string) => {
@@ -332,7 +332,7 @@ describe('PlayerManagement', () => {
       expect(updatedFirstNameInput).toHaveValue('');
       expect(updatedLastNameInput).toHaveValue('');
       expect(updatedJerseyInput).toHaveValue(null);
-      expect(updatedTeamSelect).toHaveValue('');
+      expect(updatedTeamSelect).toHaveValue('1');
       expect(updatedClubSelect).toHaveValue('1');
     });
   });

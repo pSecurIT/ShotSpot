@@ -1,4 +1,5 @@
 import express from 'express';
+import { randomUUID } from 'crypto';
 import { body, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
@@ -433,6 +434,31 @@ router.put('/:id', [
     `;
 
     const _result = await db.query(query, params);
+    const previousGame = gameCheck.rows[0];
+
+    // Auto-create initial possession when game transitions to in_progress
+    if (status === 'in_progress' && previousGame.status !== 'in_progress') {
+      // Check if an active possession already exists for this period
+      const existingPossession = await db.query(
+        `SELECT id FROM ball_possessions 
+         WHERE game_id = $1 AND period = $2 AND ended_at IS NULL
+         LIMIT 1`,
+        [id, 1]
+      );
+
+      if (existingPossession.rows.length === 0) {
+        // Create initial possession for home team at period 1
+        const possessionInsert = await db.query(
+          `INSERT INTO ball_possessions (game_id, club_id, period, started_at, event_status, client_uuid)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id`,
+          [id, previousGame.home_club_id, 1, new Date().toISOString(), 'confirmed', randomUUID()]
+        );
+        if (process.env.NODE_ENV !== 'test') {
+          logInfo(`Auto-created initial possession ${possessionInsert.rows[0].id} for game ${id}`);
+        }
+      }
+    }
 
     // Fetch updated game with team names
     const gameResult = await db.query(`
