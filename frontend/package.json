@@ -85,6 +85,8 @@
     "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "mobile:run:android": "npm run mobile:sync && npx cap run android",
     "mobile:run:ios": "npm run mobile:sync && npx cap run ios",
+    "mobile:run:android:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mobile-run-android.ps1",
+    "mobile:run:android:win:no-sync": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mobile-run-android.ps1 -NoSync",
     "snyk:scan": "snyk test --severity-threshold=high",
     "postinstall": "patch-package"
   },

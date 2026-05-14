@@ -141,9 +141,12 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // CORS configuration with enhanced security
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+const configuredOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
   .split(',')
   .map(origin => origin.trim());
+
+const mobileAppOrigins = ['http://localhost', 'https://localhost', 'capacitor://localhost'];
+const allowedOrigins = [...new Set([...configuredOrigins, ...mobileAppOrigins])];
 
 const corsOptions = {
   origin: (origin, callback) => {
