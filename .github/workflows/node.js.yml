@@ -156,6 +156,9 @@ jobs:
   security:
     name: Security Checks
     runs-on: ubuntu-latest
+    env:
+      # Temporary default: keep Snyk Code disabled to avoid free-plan quota exhaustion.
+      SNYK_ENABLE_CODE_SCAN: 'false'
     
     steps:
     - uses: actions/checkout@v5
@@ -211,43 +214,47 @@ jobs:
       working-directory: frontend
       run: npm audit --audit-level=critical
 
-    - name: Run Snyk scan (Backend npm packages)
-      id: snyk_backend_test
-      uses: snyk/actions/node@master
+    - name: Run Snyk scan (Backend npm packages + SARIF)
+      id: snyk_backend_scan
+      continue-on-error: true
+      shell: bash
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --severity-threshold=high --working-directory=backend
-        command: test
-      continue-on-error: true
+      working-directory: backend
+      run: |
+        set +e
+        snyk test --severity-threshold=high --sarif-file-output=../snyk-backend.sarif $SNYK_ORG_FLAG > ../snyk-backend.log 2>&1
+        exit_code=$?
+        echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+        exit 0
 
-    - name: Run Snyk scan (Frontend npm packages)
-      id: snyk_frontend_test
-      uses: snyk/actions/node@master
+    - name: Run Snyk scan (Frontend npm packages + SARIF)
+      id: snyk_frontend_scan
+      continue-on-error: true
+      shell: bash
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --severity-threshold=high --working-directory=frontend
-        command: test
-      continue-on-error: true
+      working-directory: frontend
+      run: |
+        set +e
+        snyk test --severity-threshold=high --sarif-file-output=../snyk-frontend.sarif $SNYK_ORG_FLAG > ../snyk-frontend.log 2>&1
+        exit_code=$?
+        echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+        exit 0
 
-    - name: Upload Snyk results to GitHub Code Scanning (Backend)
-      uses: snyk/actions/node@master
+    - name: Run Snyk scan (Android Gradle dependencies + SARIF)
+      id: snyk_android_scan
+      continue-on-error: true
+      shell: bash
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --severity-threshold=high --working-directory=backend --sarif-file-output=snyk-backend.sarif
-        command: test
-      continue-on-error: true
-
-    - name: Upload Snyk results to GitHub Code Scanning (Frontend)
-      uses: snyk/actions/node@master
-      env:
-        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --severity-threshold=high --working-directory=frontend --sarif-file-output=snyk-frontend.sarif
-        command: test
-      continue-on-error: true
+      working-directory: frontend/android
+      run: |
+        set +e
+        snyk test --all-sub-projects --severity-threshold=high --sarif-file-output=../../snyk-android-gradle.sarif $SNYK_ORG_FLAG > ../../snyk-android-gradle.log 2>&1
+        exit_code=$?
+        echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+        exit 0
 
     - name: Upload Backend SARIF to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@v4
@@ -263,9 +270,16 @@ jobs:
         sarif_file: snyk-frontend.sarif
         category: snyk-frontend
 
+    - name: Upload Android Gradle SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v4
+      if: ${{ always() && hashFiles('snyk-android-gradle.sarif') != '' }}
+      with:
+        sarif_file: snyk-android-gradle.sarif
+        category: snyk-android-gradle
+
     - name: Run Snyk Code scan
       id: snyk_code_test
-      if: ${{ vars.SNYK_ENABLE_CODE_SCAN == 'true' }}
+      if: ${{ env.SNYK_ENABLE_CODE_SCAN == 'true' }}
       continue-on-error: true
       shell: bash
       env:
@@ -314,7 +328,7 @@ jobs:
           $SNYK_ORG_FLAG
 
     - name: Report Snyk Code findings to Snyk
-      if: ${{ vars.SNYK_ENABLE_CODE_SCAN == 'true' && github.event_name != 'pull_request' }}
+      if: ${{ env.SNYK_ENABLE_CODE_SCAN == 'true' && github.event_name != 'pull_request' }}
       continue-on-error: true
       shell: bash
       env:
@@ -329,11 +343,61 @@ jobs:
           --remote-repo-url=$SNYK_REMOTE_REPO_URL \
           $SNYK_ORG_FLAG
 
-    - name: Fail on blocking Snyk findings
-      if: ${{ steps.snyk_backend_test.outcome == 'failure' || steps.snyk_frontend_test.outcome == 'failure' || steps.snyk_code_test.outcome == 'failure' }}
+    - name: Evaluate Snyk findings (quota-aware)
+      shell: bash
+      env:
+        BACKEND_EXIT: ${{ steps.snyk_backend_scan.outputs.exit_code }}
+        FRONTEND_EXIT: ${{ steps.snyk_frontend_scan.outputs.exit_code }}
+        ANDROID_EXIT: ${{ steps.snyk_android_scan.outputs.exit_code }}
+        CODE_OUTCOME: ${{ steps.snyk_code_test.outcome }}
       run: |
-        echo "::error::Snyk detected blocking high or critical findings. See the uploaded SARIF results and Snyk dashboard for details."
-        exit 1
+        set -euo pipefail
+
+        blocking=0
+
+        is_quota_error() {
+          local log_file="$1"
+          [ -f "$log_file" ] && grep -Eiq 'quota|limit reached|over.*plan|plan usage|monthly limit|rate limit' "$log_file"
+        }
+
+        evaluate_scan() {
+          local name="$1"
+          local exit_code="$2"
+          local log_file="$3"
+
+          if [ -z "$exit_code" ] || [ "$exit_code" = "0" ]; then
+            echo "${name}: no blocking findings"
+            return
+          fi
+
+          if [ "$exit_code" = "1" ]; then
+            echo "::error::${name}: high/critical findings detected by Snyk"
+            blocking=1
+            return
+          fi
+
+          if is_quota_error "$log_file"; then
+            echo "::warning::${name}: Snyk quota/plan limit reached; not blocking this run"
+            return
+          fi
+
+          echo "::error::${name}: Snyk execution failed (exit ${exit_code})"
+          blocking=1
+        }
+
+        evaluate_scan "Backend dependencies" "${BACKEND_EXIT:-}" "snyk-backend.log"
+        evaluate_scan "Frontend dependencies" "${FRONTEND_EXIT:-}" "snyk-frontend.log"
+        evaluate_scan "Android Gradle dependencies" "${ANDROID_EXIT:-}" "snyk-android-gradle.log"
+
+        if [ "${CODE_OUTCOME:-}" = "failure" ]; then
+          echo "::error::Snyk Code scan reported blocking findings"
+          blocking=1
+        fi
+
+        if [ "$blocking" -ne 0 ]; then
+          echo "::error::Blocking Snyk findings detected. Check SARIF and logs for details."
+          exit 1
+        fi
 
         
   # E2E tests disabled until Cypress is configured

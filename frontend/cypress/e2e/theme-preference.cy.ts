@@ -14,11 +14,12 @@ describe('Smoke: Theme preference', () => {
             role: 'user',
           })
         )
+        win.localStorage.setItem('shotspot:onboarding:v1:1:user', 'done')
         win.localStorage.removeItem('themePreference')
       },
     })
 
-    cy.contains('h2', 'My Profile').should('be.visible')
+    cy.get('.section-header__title').contains('My Profile').should('be.visible')
 
     cy.get('#themePreference').should('have.value', 'system')
 

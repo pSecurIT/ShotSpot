@@ -139,9 +139,12 @@ const PORT = process.env.PORT || 3002;
 // Create HTTP server and attach Socket.IO
 const httpServer = createServer(app);
 
-const socketAllowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+const configuredSocketOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
   .split(',')
   .map((origin) => origin.trim());
+
+const mobileSocketOrigins = ['http://localhost', 'https://localhost', 'capacitor://localhost'];
+const socketAllowedOrigins = [...new Set([...configuredSocketOrigins, ...mobileSocketOrigins])];
 
 const io = new Server(httpServer, {
   cors: {

@@ -122,17 +122,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Run Snyk scan on Docker image
+      - name: Run Snyk scan on Docker image + SARIF
         id: snyk_docker_test
-        uses: snyk/actions/docker@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          image: ${{ steps.meta.outputs.tags }}
-          args: --severity-threshold=high
-        continue-on-error: true
-
-      - name: Upload Snyk Docker SARIF to GitHub Code Scanning
         uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
