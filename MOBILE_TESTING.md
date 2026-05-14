@@ -67,6 +67,8 @@ npm run test:core-api
 ```bash
 cd frontend
 npm run mobile:run:android
+# Windows (auto-configures JAVA_HOME/ANDROID_HOME and waits for emulator)
+npm run mobile:run:android:win
 ```
 
 ### Testing Checklist
@@ -331,6 +333,7 @@ npm run cypress:run -- --spec "cypress/e2e/responsive-layout.cy.ts"
 | Issue | Solution |
 |-------|----------|
 | Android emulator won't start | Ensure virtualization enabled in BIOS, increase RAM allocation in AVD settings |
+| Android deploy loops with `adb device offline` or `jvm.cfg` errors | Run `npm run mobile:run:android:win` to auto-select a valid JDK/JBR, reset adb, and wait for emulator boot |
 | iOS simulator won't build | Run `sudo xcode-select --reset`, update Xcode |
 | Capacitor sync fails | Delete `ios/` and `android/` directories, run `npm run mobile:sync` |
 | Service worker not caching | Clear browser cache, check DevTools Application > Service Workers |

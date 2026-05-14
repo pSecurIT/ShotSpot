@@ -1,6 +1,7 @@
 import React, { createContext, useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { resolveSocketBaseUrl } from '../utils/networkConfig';
 
 interface WebSocketContextType {
   socket: Socket | null;
@@ -44,7 +45,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     }
 
     // Initialize WebSocket connection
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const backendUrl = resolveSocketBaseUrl(import.meta.env.VITE_API_URL as string | undefined);
     
     const newSocket = io(backendUrl, {
       auth: {
