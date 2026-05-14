@@ -24,7 +24,12 @@ const CACHEABLE_API_PREFIXES = [
   '/api/auth/me',
   '/api/reports',
   '/api/competitions',
-  '/api/series'
+  '/api/series',
+  '/api/clubs',
+  '/api/advanced-analytics',
+  '/api/team-analytics',
+  '/api/scheduled-reports',
+  '/api/report-templates'
 ];
 
 // Install event - cache static assets

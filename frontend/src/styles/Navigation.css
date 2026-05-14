@@ -493,7 +493,7 @@
    Responsive Breakpoints
    ======================================== */
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .navigation-v2__hamburger {
     display: none;
   }

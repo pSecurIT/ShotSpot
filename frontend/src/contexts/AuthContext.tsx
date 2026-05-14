@@ -40,6 +40,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       
       const { token, user } = response.data;
+      if (!token || !user) {
+        return {
+          success: false,
+          error: 'Invalid username or password'
+        };
+      }
+
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);

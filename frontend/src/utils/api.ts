@@ -3,6 +3,7 @@ import type { AxiosRequestConfig } from 'axios';
 import { queueAction } from './offlineSync';
 import { ensureMatchEventClientUuid } from './matchEventIdentity';
 import { getUxRouteContext, trackApiLatency } from './uxObservability';
+import { resolveApiBaseUrl } from './networkConfig';
 
 type RequestUxMetadata = {
   startedAt: number;
@@ -17,7 +18,7 @@ type UxAxiosConfig = AxiosRequestConfig & {
 };
 
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_URL as string) || '/api',
+  baseURL: resolveApiBaseUrl(import.meta.env.VITE_API_URL as string | undefined),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -219,8 +220,13 @@ api.interceptors.response.use(
     const isOffline = !navigator.onLine;
     
     // Queue write operations when offline or backend unavailable
+    const method = originalRequest.method?.toUpperCase() || '';
+    const requestUrl = String(originalRequest.url || '');
+    const isAuthEndpoint = /\/auth\/(login|register|csrf)/.test(requestUrl);
+
     const shouldQueue = (isOffline || isNetworkError || isServerError || isCorsError) &&
-                       ['POST', 'PUT', 'DELETE'].includes(originalRequest.method?.toUpperCase() || '');
+               ['POST', 'PUT', 'DELETE'].includes(method) &&
+               !isAuthEndpoint;
 
     if (shouldQueue) {
       const endpoint = originalRequest.url || '';
