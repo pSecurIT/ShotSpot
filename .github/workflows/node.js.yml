@@ -249,6 +249,25 @@ jobs:
         command: test
       continue-on-error: true
 
+    - name: Run Snyk scan (Android Gradle dependencies)
+      id: snyk_android_test
+      continue-on-error: true
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      working-directory: frontend/android
+      run: |
+        snyk test --all-sub-projects --severity-threshold=high $SNYK_ORG_FLAG
+
+    - name: Export Snyk SARIF (Android Gradle dependencies)
+      continue-on-error: true
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      working-directory: frontend/android
+      run: |
+        snyk test --all-sub-projects --severity-threshold=high --sarif-file-output=../../snyk-android-gradle.sarif $SNYK_ORG_FLAG
+
     - name: Upload Backend SARIF to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@v4
       if: ${{ always() && hashFiles('snyk-backend.sarif') != '' }}
@@ -262,6 +281,13 @@ jobs:
       with:
         sarif_file: snyk-frontend.sarif
         category: snyk-frontend
+
+    - name: Upload Android Gradle SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v4
+      if: ${{ always() && hashFiles('snyk-android-gradle.sarif') != '' }}
+      with:
+        sarif_file: snyk-android-gradle.sarif
+        category: snyk-android-gradle
 
     - name: Run Snyk Code scan
       id: snyk_code_test
@@ -330,7 +356,7 @@ jobs:
           $SNYK_ORG_FLAG
 
     - name: Fail on blocking Snyk findings
-      if: ${{ steps.snyk_backend_test.outcome == 'failure' || steps.snyk_frontend_test.outcome == 'failure' || steps.snyk_code_test.outcome == 'failure' }}
+      if: ${{ steps.snyk_backend_test.outcome == 'failure' || steps.snyk_frontend_test.outcome == 'failure' || steps.snyk_android_test.outcome == 'failure' || steps.snyk_code_test.outcome == 'failure' }}
       run: |
         echo "::error::Snyk detected blocking high or critical findings. See the uploaded SARIF results and Snyk dashboard for details."
         exit 1
