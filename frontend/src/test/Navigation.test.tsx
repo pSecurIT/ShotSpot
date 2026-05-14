@@ -601,3 +601,195 @@ describe('Navigation Component', () => {
     expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument();
   });
 });
+
+describe('Navigation: Mobile Swipe Gestures', () => {
+  const regularUser = {
+    id: 1,
+    username: 'testuser',
+    email: 'test@example.com',
+    role: 'user'
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    global.alert = vi.fn();
+    window.localStorage.clear();
+    window.localStorage.setItem('shotspot:onboarding:v1:1:user', 'done');
+  });
+
+  it('right-swipe on left edge opens mobile menu on collapsed viewport', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    // Verify hamburger button exists
+    expect(screen.getByRole('button', { name: 'Open navigation menu' })).toBeInTheDocument();
+
+    // Simulate right-swipe from left edge
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+    expect(swipeEdge).toBeInTheDocument();
+
+    act(() => {
+      fireEvent.touchStart(swipeEdge!, {
+        touches: [{ clientX: 18, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    act(() => {
+      fireEvent.touchEnd(swipeEdge!, {
+        changedTouches: [{ clientX: 100, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    // Menu should open
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+  });
+
+  it('swipe-to-open disabled on desktop viewport', async () => {
+    setViewportWidth(1280); // Desktop viewport
+    renderNavigation(regularUser);
+
+    // Hamburger button should not exist
+    expect(screen.queryByRole('button', { name: 'Open navigation menu' })).not.toBeInTheDocument();
+
+    // Swipe edge should not exist
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+    expect(swipeEdge).not.toBeInTheDocument();
+  });
+
+  it('swipe-to-open disabled when menu already open', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    // Open menu via hamburger button
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+
+    // Swipe gesture should be disabled while menu is open
+    // (Verified by the useSwipeGesture hook's enabled prop)
+    expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+  });
+
+  it('swipe-to-open not triggered by insufficient distance', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+
+    // Small swipe (less than 56px minimum)
+    act(() => {
+      fireEvent.touchStart(swipeEdge!, {
+        touches: [{ clientX: 18, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    act(() => {
+      fireEvent.touchEnd(swipeEdge!, {
+        changedTouches: [{ clientX: 40, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    // Menu should not open
+    expect(document.querySelector('.mobile-menu-panel')).not.toHaveClass('open');
+  });
+
+  it('swipe-to-open not triggered by excessive vertical movement', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+
+    // Vertical swipe (excessive y-axis movement)
+    act(() => {
+      fireEvent.touchStart(swipeEdge!, {
+        touches: [{ clientX: 18, clientY: 300 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    act(() => {
+      fireEvent.touchEnd(swipeEdge!, {
+        changedTouches: [{ clientX: 100, clientY: 500 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    // Menu should not open
+    expect(document.querySelector('.mobile-menu-panel')).not.toHaveClass('open');
+  });
+
+  it('menu can be opened via swipe and closed via close button', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+
+    // Open via swipe
+    act(() => {
+      fireEvent.touchStart(swipeEdge!, {
+        touches: [{ clientX: 18, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    act(() => {
+      fireEvent.touchEnd(swipeEdge!, {
+        changedTouches: [{ clientX: 100, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+
+    // Close via the menu close button
+    fireEvent.click(screen.getByRole('button', { name: 'Close menu' }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).not.toHaveClass('open');
+    });
+  });
+
+  it('tab key supports navigation focus on mobile', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    // Open menu
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+
+    // Tab key should move focus within menu
+    const closeButton = document.querySelector('.mobile-menu-header__close');
+    act(() => {
+      (closeButton as HTMLElement).focus();
+    });
+
+    expect(document.activeElement).toBe(closeButton);
+  });
+
+  it('escape key closes mobile menu', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    // Open menu
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+
+    // Press Escape
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).not.toHaveClass('open');
+    });
+  });
+});

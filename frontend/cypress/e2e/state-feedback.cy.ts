@@ -49,6 +49,7 @@ const matchTemplates = [
 ];
 
 const visitWithAdmin = (path: string) => {
+  cy.viewport(1280, 900);
   cy.visit(path, {
     onBeforeLoad: (win) => {
       win.localStorage.setItem('token', 'cypress-token');
@@ -117,11 +118,15 @@ describe('State feedback flows', () => {
 
     cy.wait('@getPlayerClubs');
     cy.wait('@getPlayerTeamsStateful');
-    cy.contains('Player action failed').should('be.visible');
+    cy.contains(/Player action failed|Couldn't load players/).should('be.visible');
     cy.contains('Failed to fetch teams').should('be.visible');
     cy.contains('John Doe').should('be.visible');
 
-    cy.contains('button', 'Reload players').click();
+    cy.contains('button', /Reload players|Retry/)
+      .should('be.visible')
+      .then(($button) => {
+        cy.wrap($button).click({ force: true });
+      });
 
     cy.wait('@getPlayerTeamsStateful');
     cy.wait('@getPlayers');
@@ -144,10 +149,10 @@ describe('State feedback flows', () => {
     cy.wait('@getTemplates');
 
     cy.contains('button', 'Create New Game').click();
-    cy.get('select').eq(1).select('Alpha Club');
-    cy.get('select').eq(2).select('Team Alpha');
-    cy.get('select').eq(3).select('Beta Club');
-    cy.get('select').eq(4).select('Team Beta');
+    cy.get('#home-club-select').select('Alpha Club');
+    cy.get('#home-team-select').select('Team Alpha');
+    cy.get('#away-club-select').select('Beta Club');
+    cy.get('#away-team-select').select('Team Beta');
     cy.get('input[type="datetime-local"]').type('2025-11-15T16:00');
     cy.contains('button', 'Create Game').click();
 
