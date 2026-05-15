@@ -146,6 +146,14 @@ jobs:
           sarif_file: snyk-docker.sarif
           category: snyk-docker
 
+      - name: Upload Docker SARIF with legacy category
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        if: ${{ always() && hashFiles('snyk-docker.sarif') != '' }}
+        with:
+          sarif_file: snyk-docker.sarif
+          # Compatibility upload to preserve code-scanning config continuity across workflow refactors.
+          category: '.github/workflows/docker.yml:scan-vulnerabilities'
+
       - name: Monitor Docker image in Snyk
         id: snyk_docker_monitor
         if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
