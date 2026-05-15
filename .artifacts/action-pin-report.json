@@ -1,26 +1,28 @@
 {
-  "generatedAtUtc": "2026-05-15T10:27:04Z",
+  "generatedAtUtc": "2026-05-15T17:37:24Z",
   "strictUpdates": false,
-  "workflowFilesScanned": 1,
-  "usesLinesScanned": 2,
-  "shaPinnedRefsChecked": 2,
+  "workflowFilesScanned": 14,
+  "usesLinesScanned": 89,
+  "shaPinnedRefsChecked": 89,
   "nonShaRefs": 0,
-  "outdatedShaRefs": 1,
+  "outdatedShaRefs": 0,
   "pass": true,
   "scannedFiles": [
+    ".github/workflows/codeql.yml",
+    ".github/workflows/dependency-remediation.yml",
+    ".github/workflows/docker.yml",
+    ".github/workflows/license-compliance.yml",
+    ".github/workflows/mobile-ci.yml",
+    ".github/workflows/mobile-preview.yml",
+    ".github/workflows/mobile-release.yml",
+    ".github/workflows/node.js.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/security-scan.yml",
+    ".github/workflows/sync-dependabot-android.yml",
+    ".github/workflows/test-coverage.yml",
+    ".github/workflows/validate-migrations.yml",
     ".github/workflows/verify-action-pins.yml"
   ],
   "findings": [
-    {
-      "type": "outdated_sha",
-      "file": ".github/workflows/verify-action-pins.yml",
-      "line": 38,
-      "action": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
-      "repo": "actions/checkout",
-      "pinnedRef": "de0fac2e4500dabe0009e67214ff5f5447ce83dd",
-      "latestTag": "v6.0.2",
-      "latestSha": "de0fac2e4500dabe0009e67214ff5f5447ce83dd",
-      "message": "Update available for actions/checkout: pinned 93cb6efe1820, latest tag v6.0.2 (de0fac2e4500)"
-    }
   ]
 }
