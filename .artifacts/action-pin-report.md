@@ -11,4 +11,4 @@
 
 | Type | Location | Action | Message |
 | --- | --- | --- | --- |
-| outdated_sha | .github/workflows/verify-action-pins.yml:38 | actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd | Update available for actions/checkout: pinned 93cb6efe1820, latest tag v6.0.2 (de0fac2e4500) |
+| outdated_sha | .github/workflows/verify-action-pins.yml:38 | actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd | Update available for actions/checkout: pinned 93cb6efe1820, latest tag v6.0.2 (de0fac2e4500) |
