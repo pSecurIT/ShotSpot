@@ -53,11 +53,6 @@ Use this page as the single entry point for all project documentation.
 - UX metrics playbook: [docs/UX_METRICS_PLAYBOOK.md](docs/UX_METRICS_PLAYBOOK.md)
 - Performance baseline: [docs/PERFORMANCE_BASELINE_424.md](docs/PERFORMANCE_BASELINE_424.md)
 
-## Historical And Archive Notes
-
-- Navigation proposal archive: [NAVIGATION_PROPOSAL.md](NAVIGATION_PROPOSAL.md)
-- Navigation issue breakdown archive: [NAVIGATION_IMPLEMENTATION_ISSUES.md](NAVIGATION_IMPLEMENTATION_ISSUES.md)
-
 ## How To Keep This Hub Current
 
 - Add new docs to the correct section when introducing new features.
