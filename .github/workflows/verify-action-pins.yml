@@ -1,0 +1,36 @@
+name: Verify Workflow Action Pins
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/verify-action-pins.sh'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/verify-action-pins.sh'
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-action-pins-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify uses pinning and updates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+
+      - name: Run workflow action pin verification
+        shell: bash
+        run: bash scripts/verify-action-pins.sh
