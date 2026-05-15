@@ -51,14 +51,14 @@ jobs:
           exit-code: '0'
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-container-scan'
 
       - name: Upload Trivy results with legacy release category
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
@@ -66,7 +66,7 @@ jobs:
           category: '.github/workflows/release.yml:scan-vulnerabilities'
 
       - name: Upload Trivy results with legacy docker category
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
@@ -120,7 +120,7 @@ jobs:
           exit-code: '0'
 
       - name: Upload Trivy filesystem results
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('trivy-fs-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-fs-results.sarif'
@@ -176,7 +176,7 @@ jobs:
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
 
       - name: Upload Gitleaks results to GitHub Security
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('results.sarif') != '' }}
         with:
           sarif_file: results.sarif
