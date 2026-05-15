@@ -13,6 +13,7 @@ describe('📊 Series Routes', () => {
   let adminToken;
   let testSeries1;
   let testSeries2;
+  let testSeries3;
   let testSeason;
   let testCompetition;
 
@@ -60,7 +61,7 @@ describe('📊 Series Routes', () => {
     try {
       await db.query('DELETE FROM competitions WHERE season_id = $1', [testSeason.id]);
       await db.query('DELETE FROM seasons WHERE id = $1', [testSeason.id]);
-      await db.query('DELETE FROM series WHERE id IN ($1, $2)', [testSeries1?.id, testSeries2?.id]);
+      await db.query('DELETE FROM series WHERE id IN ($1, $2, $3)', [testSeries1?.id, testSeries2?.id, testSeries3?.id]);
       await db.query('DELETE FROM users WHERE username IN (\'seriesadmin\', \'seriescoach\')');
     } catch (error) {
       global.testContext.logTestError(error, 'afterAll cleanup failed');
@@ -113,7 +114,7 @@ describe('📊 Series Routes', () => {
       }
     });
 
-    it('❌ should reject series creation without admin role', async () => {
+    it('✅ should allow series creation for coach role', async () => {
       try {
         const response = await request(app)
           .post('/api/series')
@@ -123,7 +124,10 @@ describe('📊 Series Routes', () => {
             level: 3
           });
 
-        expect(response.status).toBe(403);
+        expect(response.status).toBe(201);
+        expect(response.body.name).toBe('Derde Klasse');
+        expect(response.body.level).toBe(3);
+        testSeries3 = response.body;
       } catch (error) {
         global.testContext.logTestError(error, 'POST series role check failed');
         throw error;
@@ -276,16 +280,17 @@ describe('📊 Series Routes', () => {
       }
     });
 
-    it('❌ should reject update without admin role', async () => {
+    it('✅ should allow update with coach role', async () => {
       try {
         const response = await request(app)
           .put(`/api/series/${testSeries1.id}`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
-            name: 'Should Fail'
+            name: 'Coach Updated Series'
           });
 
-        expect(response.status).toBe(403);
+        expect(response.status).toBe(200);
+        expect(response.body.name).toBe('Coach Updated Series');
       } catch (error) {
         global.testContext.logTestError(error, 'PUT role check failed');
         throw error;
@@ -354,13 +359,21 @@ describe('📊 Series Routes', () => {
       }
     });
 
-    it('❌ should reject delete without admin role', async () => {
+    it('✅ should allow delete with coach role', async () => {
       try {
+        const coachDeleteTarget = await db.query(
+          `INSERT INTO series (name, level, region)
+           VALUES ($1, $2, $3)
+           RETURNING *`,
+          ['Coach Delete Division', 11, 'National']
+        );
+
         const response = await request(app)
-          .delete(`/api/series/${testSeries2.id}`)
+          .delete(`/api/series/${coachDeleteTarget.rows[0].id}`)
           .set('Authorization', `Bearer ${authToken}`);
 
-        expect(response.status).toBe(403);
+        expect(response.status).toBe(200);
+        expect(response.body.message).toContain('deleted successfully');
       } catch (error) {
         global.testContext.logTestError(error, 'DELETE role check failed');
         throw error;
