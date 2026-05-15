@@ -45,16 +45,16 @@ STRICT_UPDATES="$(normalize_bool "$STRICT_UPDATES")"
 mkdir -p "$(dirname "$REPORT_JSON_PATH")"
 mkdir -p "$(dirname "$REPORT_MD_PATH")"
 
-declare -A latest_tag_cache
-declare -A latest_sha_cache
-declare -A checked_refs
+declare -A latest_tag_cache=()
+declare -A latest_sha_cache=()
+declare -A checked_refs=()
 
 non_pinned=0
 outdated_pins=0
 checked_total=0
 uses_total=0
-declare -a workflow_files
-declare -a findings
+declare -a workflow_files=()
+declare -a findings=()
 
 get_repo_from_action() {
   local action_ref="$1"
