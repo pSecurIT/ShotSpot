@@ -10,6 +10,7 @@ const requiredEnvVars = {
     'DB_IDLE_TIMEOUT_MS',
     'JWT_SECRET',
     'JWT_EXPIRES_IN',
+    'SESSION_SECRET',
     'CORS_ORIGIN',
     'RATE_LIMIT_WINDOW_MS',
     'RATE_LIMIT_MAX'

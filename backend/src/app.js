@@ -5,10 +5,10 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
+import csrf from './middleware/csrf.js';
 import crypto from 'crypto';
 import path from 'node:path';
 import fs from 'fs';
-import csrf from './middleware/csrf.js';
 import { errorNotificationService } from './utils/errorNotification.js';
 import { logError, logInfo, logWarn } from './utils/logger.js';
 import authRoutes from './routes/auth.js';
@@ -98,6 +98,20 @@ app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), (r
 
 // Rate limiting with enhanced security (disabled in test to prevent timer leaks)
 if (process.env.NODE_ENV !== 'test') {
+  const shouldSkipGeneralRateLimit = (req) => {
+    // Keep tests deterministic while enforcing limits elsewhere.
+    if (process.env.NODE_ENV === 'test') {
+      return true;
+    }
+
+    // Skip only for trusted IPs and health checks.
+    const trustedIPs = (process.env.TRUSTED_IPS || '').split(',');
+    const isHealthCheck = req.path === '/api/health';
+    const isTrustedIP = trustedIPs.includes(req.ip);
+
+    return isHealthCheck || isTrustedIP;
+  };
+
   const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
     max: parseInt(process.env.RATE_LIMIT_MAX) || 5000, // Increased for development with timer polling
@@ -111,20 +125,7 @@ if (process.env.NODE_ENV !== 'test') {
         retryAfter: Math.ceil(req.rateLimit.resetTime / 1000) - Date.now() / 1000
       });
     },
-    skip: (req) => {
-      // Skip rate limiting in development mode entirely to avoid issues during rapid dev cycles
-      const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production';
-      if (isDevelopment) {
-        return true; // Skip all rate limiting in development
-      }
-      
-      // In production, skip only for trusted IPs and health checks
-      const trustedIPs = (process.env.TRUSTED_IPS || '').split(',');
-      const isHealthCheck = req.path === '/api/health';
-      const isTrustedIP = trustedIPs.includes(req.ip);
-      
-      return isHealthCheck || isTrustedIP;
-    }
+    skip: shouldSkipGeneralRateLimit
   });
 
   // Speed limiter - gradually slow down responses based on number of requests
@@ -132,7 +133,8 @@ if (process.env.NODE_ENV !== 'test') {
     windowMs: 900000, // 15 minutes
     delayAfter: 50, // allow 50 requests per 15 minutes, then...
     delayMs: (hits) => hits * 100, // add 100ms of delay per hit
-    maxDelayMs: 3000 // maximum delay of 3 seconds
+    maxDelayMs: 3000, // maximum delay of 3 seconds
+    skip: shouldSkipGeneralRateLimit
   });
 
   // Apply rate limiting and speed limiting to all routes
@@ -150,7 +152,7 @@ const allowedOrigins = [...new Set([...configuredOrigins, ...mobileAppOrigins])]
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+    // Requests without origin are handled by the production API guard below.
     if (!origin) {
       return callback(null, true);
     }
@@ -183,6 +185,22 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
+app.use((req, res, next) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isApiRequest = req.path.startsWith('/api/');
+  const isHealthCheck = req.path === '/api/health';
+  const hasOrigin = Boolean(req.headers.origin);
+
+  // Reject API calls without Origin in production, except health checks.
+  if (isProduction && isApiRequest && !isHealthCheck && !hasOrigin) {
+    return res.status(403).json({
+      error: 'Origin header required in production'
+    });
+  }
+
+  return next();
+});
+
 try {
   app.use(cors(corsOptions));
 } catch (corsError) {
@@ -207,9 +225,9 @@ app.use((req, res, next) => {
 app.use(cookieParser());
 
 // Ensure session secret is available
-const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET;
+const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret) {
-  throw new Error('SESSION_SECRET or JWT_SECRET must be set in environment variables');
+  throw new Error('SESSION_SECRET must be set in environment variables');
 }
 
 // Session configuration with security settings from environment
@@ -262,7 +280,7 @@ app.use(express.json({
   strict: true // Reject payloads that are not arrays or objects
 }));
 
-// CSRF protection
+// CSRF protection (session-backed synchronizer token pattern)
 app.use(csrf);
 
 // Security headers middleware
