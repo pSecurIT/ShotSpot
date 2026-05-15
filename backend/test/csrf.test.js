@@ -195,15 +195,19 @@ describe('🛡️ CSRF Middleware Security', () => {
       expect(res.status).not.toHaveBeenCalled();
     });
 
-    it('❌ should still check other auth endpoints', () => {
+    it('❌ should enforce CSRF on login endpoint', () => {
       req.method = 'POST';
       req.path = '/api/auth/login';
       req.session = null;
       
       csrf(req, res, next);
       
-      expect(next).toHaveBeenCalledWith();
-      expect(res.status).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid CSRF token',
+        details: 'Session not initialized. Please refresh and try again.'
+      });
     });
   });
 

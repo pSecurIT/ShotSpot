@@ -1,8 +1,9 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
 import Tokens from 'csrf';
+import { body, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth } from '../middleware/auth.js';
 import { getJwtSecret } from '../utils/authToken.js';
@@ -11,23 +12,32 @@ import { logError } from '../utils/logger.js';
 const router = express.Router();
 const tokens = new Tokens();
 
+const authLimiter = rateLimit({
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS, 10) || 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  skip: () => process.env.NODE_ENV === 'test' && process.env.ENABLE_AUTH_RATE_LIMIT_IN_TEST !== 'true',
+  message: {
+    error: 'Too many authentication attempts, please try again later.'
+  }
+});
+
 // CSRF token endpoint
 router.get('/csrf', (req, res) => {
-  if (!req.session.csrfSecret) {
-    req.session.csrfSecret = tokens.secretSync();
-  }
-  const token = tokens.create(req.session.csrfSecret);
-  
-  // Explicitly save the session to ensure it's persisted
-  req.session.save((err) => {
-    if (err) {
-      if (process.env.NODE_ENV !== 'test') {
-        logError('Error saving session for CSRF:', err);
-      }
-      return res.status(500).json({ error: 'Failed to create CSRF token' });
+  try {
+    if (!req.session.csrfSecret) {
+      req.session.csrfSecret = tokens.secretSync();
     }
-    res.json({ csrfToken: token });
-  });
+    const token = tokens.create(req.session.csrfSecret);
+    return res.json({ csrfToken: token });
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      logError('Error creating CSRF token:', err);
+    }
+    return res.status(500).json({ error: 'Failed to create CSRF token' });
+  }
 });
 
 // Validation middleware
@@ -124,7 +134,7 @@ router.post('/register', validateRegistration, async (req, res) => {
 });
 
 // Login user
-router.post('/login', [
+router.post('/login', authLimiter, [
   body('username').trim().notEmpty(),
   body('password').notEmpty()
 ], async (req, res) => {
@@ -235,8 +245,7 @@ router.post('/login', [
 });
 
 // Change password endpoint (works even if password_must_change is true)
-// Note: In production, also apply CSRF protection middleware to this endpoint
-router.post('/change-password', auth, [
+router.post('/change-password', auth, authLimiter, [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   body('newPassword')
     .isLength({ min: 8 })
