@@ -33,10 +33,10 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '22'
           cache: 'npm'
@@ -61,7 +61,7 @@ jobs:
         run: npm run coverage
 
       - name: Upload frontend coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
         with:
           directory: ./frontend/coverage
           flags: frontend
@@ -115,7 +115,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 
       - name: Generate ephemeral test secrets
         run: |
@@ -123,7 +123,7 @@ jobs:
           echo "SESSION_SECRET=$(openssl rand -hex 24)" >> $GITHUB_ENV
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '22'
           cache: 'npm'
@@ -155,8 +155,11 @@ jobs:
         run: npm run test:parallel:coverage
 
       - name: Upload backend coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
         with:
           directory: ./backend/coverage/parallel
           flags: backend
           name: backend-coverage
+
+
+
