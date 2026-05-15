@@ -98,10 +98,10 @@ router.get('/:id', [
 
 /**
  * Create a new series (division)
- * Requires admin role
+ * Requires coach or admin role
  */
 router.post('/', [
-  requireRole(['admin']),
+  requireRole(['admin', 'coach']),
   body('name')
     .trim()
     .notEmpty().withMessage('Series name is required')
@@ -146,10 +146,10 @@ router.post('/', [
 
 /**
  * Update a series
- * Requires admin role
+ * Requires coach or admin role
  */
 router.put('/:id', [
-  requireRole(['admin']),
+  requireRole(['admin', 'coach']),
   param('id').isInt({ min: 1 }).withMessage('Series ID must be a positive integer'),
   body('name')
     .optional()
@@ -237,11 +237,11 @@ router.put('/:id', [
 
 /**
  * Delete a series
- * Requires admin role
+ * Requires coach or admin role
  * Cannot delete if competitions exist in this series
  */
 router.delete('/:id', [
-  requireRole(['admin']),
+  requireRole(['admin', 'coach']),
   param('id').isInt({ min: 1 }).withMessage('Series ID must be a positive integer')
 ], async (req, res) => {
   const errors = validationResult(req);

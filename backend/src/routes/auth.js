@@ -27,10 +27,14 @@ const authLimiter = rateLimit({
 // CSRF token endpoint
 router.get('/csrf', (req, res) => {
   try {
-    if (!req.session.csrfSecret) {
-      req.session.csrfSecret = tokens.secretSync();
-    }
-    const token = tokens.create(req.session.csrfSecret);
+    const token = (typeof req.csrfToken === 'function')
+      ? req.csrfToken()
+      : (() => {
+        if (!req.session.csrfSecret) {
+          req.session.csrfSecret = tokens.secretSync();
+        }
+        return tokens.create(req.session.csrfSecret);
+      })();
     return res.json({ csrfToken: token });
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
