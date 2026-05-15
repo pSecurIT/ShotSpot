@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import csrf from './middleware/csrf.js';
+import csurf from '@dr.pogodin/csurf';
 import crypto from 'crypto';
 import path from 'node:path';
 import fs from 'fs';
@@ -47,6 +47,11 @@ import seasonsRoutes from './routes/seasons.js';
 
 
 const app = express();
+
+const csrfProtection = csurf({
+  ignoreMethods: ['GET', 'HEAD', 'OPTIONS'],
+  value: (req) => req.headers['x-csrf-token'] || req.body?._csrf || req.query?._csrf
+});
 
 function resolveSafeLogPath() {
   const logsDir = path.resolve(process.cwd(), 'logs');
@@ -294,7 +299,12 @@ app.use(express.json({
 }));
 
 // CSRF protection (session-backed synchronizer token pattern)
-app.use(csrf);
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'test' && process.env.ENABLE_CSRF_IN_TEST !== 'true') {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+});
 
 // Security headers middleware
 app.use((req, res, next) => {
@@ -390,6 +400,16 @@ app.use((err, req, res, _next) => {
       // Production logging to file
       const { logsDir, logPath } = resolveSafeLogPath();
       const logLevel = process.env.LOG_LEVEL || 'error';
+      const logStatus = Number.isInteger(err.status) ? err.status : 500;
+      const persistentLogEntry = {
+        id: errorId,
+        timestamp: new Date().toISOString(),
+        level: logLevel,
+        status: logStatus,
+        errorName: typeof err.name === 'string' ? err.name : 'Error',
+        // Avoid persisting request/network-derived payloads to file.
+        message: logStatus >= 500 ? 'Internal server error' : 'Request failed'
+      };
       
       // Ensure log directory exists
       fs.mkdirSync(logsDir, { recursive: true });
@@ -397,7 +417,7 @@ app.use((err, req, res, _next) => {
       // Write to log file
       fs.appendFileSync(
         logPath,
-        JSON.stringify({ ...errorContext, level: logLevel }) + '\n',
+        JSON.stringify(persistentLogEntry) + '\n',
         { encoding: 'utf8' }
       );
       
