@@ -469,6 +469,110 @@ describe('🔐 Authentication API', () => {
       expect(decoded).toHaveProperty('role', 'admin');
       expect(response.body.user).toHaveProperty('role', 'admin');
     });
+
+    it('✅ should allow login with valid CSRF token and retained session in non-test mode', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      const originalEnableCsrfInTest = process.env.ENABLE_CSRF_IN_TEST;
+      process.env.NODE_ENV = 'development';
+      process.env.ENABLE_CSRF_IN_TEST = 'true';
+
+      try {
+        const agent = request.agent(app);
+
+        // Step 1: fetch CSRF token and retain session cookie in agent.
+        const csrfResponse = await agent
+          .get('/api/auth/csrf')
+          .expect(200);
+
+        expect(csrfResponse.body).toHaveProperty('csrfToken');
+        const csrfToken = csrfResponse.body.csrfToken;
+        expect(typeof csrfToken).toBe('string');
+
+        // Step 2: perform login with the same agent and CSRF header.
+        const loginResponse = await agent
+          .post('/api/auth/login')
+          .set('X-CSRF-Token', csrfToken)
+          .send({
+            username: validUserData.username,
+            password: validUserData.password
+          })
+          .expect(200);
+
+        expect(loginResponse.body).toHaveProperty('token');
+        expect(loginResponse.body).toHaveProperty('user');
+        expect(loginResponse.body.user).toHaveProperty('username', validUserData.username);
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+        process.env.ENABLE_CSRF_IN_TEST = originalEnableCsrfInTest;
+      }
+    });
+
+    it('✅ should rate-limit repeated failed login attempts', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      const originalEnableInTest = process.env.ENABLE_AUTH_RATE_LIMIT_IN_TEST;
+      const originalMaxAttempts = process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS;
+
+      process.env.NODE_ENV = 'test';
+      process.env.ENABLE_AUTH_RATE_LIMIT_IN_TEST = 'true';
+      process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS = '10';
+
+      try {
+        for (let i = 0; i < 10; i += 1) {
+          await request(app)
+            .post('/api/auth/login')
+            .send({
+              username: 'nonexistent-user-rate-limit',
+              password: 'WrongPassword123!'
+            })
+            .expect(401);
+        }
+
+        const limitedResponse = await request(app)
+          .post('/api/auth/login')
+          .send({
+            username: 'nonexistent-user-rate-limit',
+            password: 'WrongPassword123!'
+          })
+          .expect(429);
+
+        expect(limitedResponse.body).toHaveProperty('error');
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+        process.env.ENABLE_AUTH_RATE_LIMIT_IN_TEST = originalEnableInTest;
+        process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS = originalMaxAttempts;
+      }
+    });
+
+    it('✅ should reject API requests without Origin in production', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      try {
+        const response = await request(app)
+          .get('/api/auth/csrf')
+          .expect(403);
+
+        expect(response.body).toEqual({ error: 'Origin header required in production' });
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    });
+
+    it('✅ should allow API requests with valid Origin in production', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      try {
+        const response = await request(app)
+          .get('/api/auth/csrf')
+          .set('Origin', 'http://localhost:3000')
+          .expect(200);
+
+        expect(response.body).toHaveProperty('csrfToken');
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    });
   });
 
   describe('🔒 Security Tests', () => {
