@@ -80,9 +80,12 @@ jobs:
 
       - name: Resolve Snyk reporting settings
         shell: bash
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
         run: |
-          if [ -n "${{ vars.SNYK_ORG }}" ]; then
-            echo "SNYK_ORG_FLAG=--org=${{ vars.SNYK_ORG }}" >> "$GITHUB_ENV"
+          snyk_org="$(node -e "const v = JSON.parse(process.env.VARS_JSON || '{}'); process.stdout.write(v.SNYK_ORG || '')")"
+          if [ -n "$snyk_org" ]; then
+            echo "SNYK_ORG_FLAG=--org=$snyk_org" >> "$GITHUB_ENV"
           else
             echo "SNYK_ORG_FLAG=" >> "$GITHUB_ENV"
           fi
@@ -141,7 +144,7 @@ jobs:
         if: ${{ always() && hashFiles('snyk-docker.sarif') != '' }}
         with:
           sarif_file: snyk-docker.sarif
-          category: snyk-docker
+          category: docker/snyk-image
 
       - name: Monitor Docker image in Snyk
         id: snyk_docker_monitor
