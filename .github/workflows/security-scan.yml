@@ -30,7 +30,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Build image for scanning
         shell: bash
@@ -51,14 +51,14 @@ jobs:
           exit-code: '0'
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-container-scan'
 
       - name: Upload Trivy results with legacy release category
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
@@ -66,7 +66,7 @@ jobs:
           category: '.github/workflows/release.yml:scan-vulnerabilities'
 
       - name: Upload Trivy results with legacy docker category
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
@@ -105,7 +105,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Run Trivy filesystem scanner (SARIF)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
@@ -120,7 +120,7 @@ jobs:
           exit-code: '0'
 
       - name: Upload Trivy filesystem results
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('trivy-fs-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-fs-results.sarif'
@@ -160,7 +160,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           # Full history so gitleaks can scan all commits on the branch/PR
           fetch-depth: 0
@@ -176,7 +176,7 @@ jobs:
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
 
       - name: Upload Gitleaks results to GitHub Security
-        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
         if: ${{ hashFiles('results.sarif') != '' }}
         with:
           sarif_file: results.sarif
