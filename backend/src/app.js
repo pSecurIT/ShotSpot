@@ -48,6 +48,19 @@ import seasonsRoutes from './routes/seasons.js';
 
 const app = express();
 
+function resolveSafeLogPath() {
+  const logsDir = path.resolve(process.cwd(), 'logs');
+  const configuredPath = process.env.LOG_FILE_PATH;
+  const rawName = configuredPath ? path.basename(configuredPath) : 'app.log';
+  const sanitizedName = (rawName || 'app.log').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const fileName = sanitizedName.endsWith('.log') ? sanitizedName : `${sanitizedName}.log`;
+
+  return {
+    logsDir,
+    logPath: path.join(logsDir, fileName)
+  };
+}
+
 // Security middleware with enhanced configuration
 app.use(helmet({
   contentSecurityPolicy: {
@@ -375,17 +388,17 @@ app.use((err, req, res, _next) => {
   if (process.env.ENABLE_ERROR_LOGGING === 'true') {
     if (process.env.NODE_ENV === 'production') {
       // Production logging to file
-      const logPath = process.env.LOG_FILE_PATH || 'logs/app.log';
+      const { logsDir, logPath } = resolveSafeLogPath();
       const logLevel = process.env.LOG_LEVEL || 'error';
       
       // Ensure log directory exists
-      const logDir = path.dirname(logPath);
-      fs.mkdirSync(logDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
       
       // Write to log file
       fs.appendFileSync(
         logPath,
-        JSON.stringify({ ...errorContext, level: logLevel }) + '\n'
+        JSON.stringify({ ...errorContext, level: logLevel }) + '\n',
+        { encoding: 'utf8' }
       );
       
       // Send notification for critical errors if webhook is configured
