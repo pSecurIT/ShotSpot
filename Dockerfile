@@ -23,8 +23,7 @@ ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
 # Security: Use npm ci for reproducible builds and verify checksums
 # Install as root for speed (no chown needed on node_modules)
 # Note: Keep optional deps for build tools like Rollup that need platform-specific binaries
-# Include optional dependencies explicitly to avoid missing peer dependency errors
-RUN npm ci --include=optional --ignore-scripts && \
+RUN npm ci --ignore-scripts && \
     npm cache clean --force
 
 # Copy frontend source (already owned by root, no chown needed yet)
@@ -53,8 +52,7 @@ ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
 # Security: Use npm ci with --ignore-scripts to prevent malicious postinstall scripts
 # Install as root for speed (no chown needed on node_modules)
 # Note: Keep optional deps - backend may need platform-specific modules
-# Include optional dependencies explicitly to avoid missing peer dependency errors
-RUN npm ci --include=optional --ignore-scripts && \
+RUN npm ci --ignore-scripts && \
     npm cache clean --force
 
 # Copy backend source (already owned by root)
@@ -99,8 +97,8 @@ WORKDIR /app/backend
 ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
     NPM_CONFIG_FETCH_RETRIES=10
 
-# Multi-arch: Use --no-optional to avoid problematic native dependencies
-RUN npm ci --only=production --ignore-scripts --no-optional && \
+# Multi-arch: Exclude optional and dev dependencies in runtime image
+RUN npm ci --omit=optional --omit=dev --ignore-scripts && \
     npm cache clean --force && \
     # Runtime container does not need npm or npx after dependencies are installed.
     rm -rf /usr/local/lib/node_modules/npm && \
