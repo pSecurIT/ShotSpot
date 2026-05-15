@@ -1,10 +1,27 @@
 const MAX_DEPTH = 4;
 
-const normalizeLogString = (value) => String(value)
-  // Neutralize line-breaking/control characters used for log forging.
-  .replace(/[\u0000\t\n\v\f\r\u2028\u2029]+/g, ' ')
-  .replace(/\s{2,}/g, ' ')
-  .trim();
+const shouldNormalizeLogChar = (charCode) => (
+  charCode === 0
+  || charCode === 9
+  || charCode === 10
+  || charCode === 11
+  || charCode === 12
+  || charCode === 13
+  || charCode === 0x2028
+  || charCode === 0x2029
+);
+
+const normalizeLogString = (value) => {
+  const source = String(value);
+  let normalized = '';
+
+  for (let index = 0; index < source.length; index += 1) {
+    const charCode = source.charCodeAt(index);
+    normalized += shouldNormalizeLogChar(charCode) ? ' ' : source[index];
+  }
+
+  return normalized.replace(/\s{2,}/g, ' ').trim();
+};
 
 const sanitizeForLog = (value, depth = 0) => {
   if (value === null || value === undefined) {
