@@ -11,6 +11,10 @@ on:
     - cron: '0 2 * * 1'
   workflow_dispatch: # Allow manual trigger
 
+concurrency:
+  group: security-scan-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -26,7 +30,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 
       - name: Build image for scanning
         shell: bash
@@ -36,7 +40,7 @@ jobs:
           docker build -t local/shotspot:scan-${{ github.sha }} .
 
       - name: Run Trivy vulnerability scanner (SARIF)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: local/shotspot:scan-${{ github.sha }}
           format: 'sarif'
@@ -47,32 +51,30 @@ jobs:
           exit-code: '0'
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
-          # Keep category compatible with historical baseline config from docker.yml
-          # so PR code scanning can compare against main without "configuration not found".
-          category: '.github/workflows/docker.yml:scan-vulnerabilities'
-
-      - name: Upload Trivy results with legacy container category
-        uses: github/codeql-action/upload-sarif@v4
-        if: ${{ hashFiles('trivy-results.sarif') != '' }}
-        with:
-          sarif_file: 'trivy-results.sarif'
-          # Backward-compatible category retained for old code-scanning baselines.
           category: 'trivy-container-scan'
 
       - name: Upload Trivy results with legacy release category
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
-          # Refresh the stale Trivy configuration that GitHub still tracks from release.yml.
+          # Compatibility upload to preserve code-scanning config continuity across workflow refactors.
           category: '.github/workflows/release.yml:scan-vulnerabilities'
 
+      - name: Upload Trivy results with legacy docker category
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
+        if: ${{ hashFiles('trivy-results.sarif') != '' }}
+        with:
+          sarif_file: 'trivy-results.sarif'
+          # Compatibility upload to preserve code-scanning config continuity across workflow refactors.
+          category: '.github/workflows/docker.yml:scan-vulnerabilities'
+
       - name: Fail on critical vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: local/shotspot:scan-${{ github.sha }}
           format: 'table'
@@ -83,11 +85,11 @@ jobs:
 
       - name: Trivy image summary
         if: always()
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: local/shotspot:scan-${{ github.sha }}
           format: 'github'
-          output: '${{ github.step_summary }}'
+          output: '$GITHUB_STEP_SUMMARY'
           severity: 'CRITICAL,HIGH,MEDIUM'
           scanners: 'vuln,secret'
           ignore-unfixed: true
@@ -103,10 +105,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 
       - name: Run Trivy filesystem scanner (SARIF)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -118,14 +120,14 @@ jobs:
           exit-code: '0'
 
       - name: Upload Trivy filesystem results
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
         if: ${{ hashFiles('trivy-fs-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-fs-results.sarif'
           category: 'trivy-filesystem-scan'
 
       - name: Fail on critical dependency vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -137,12 +139,12 @@ jobs:
 
       - name: Trivy filesystem summary
         if: always()
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'github'
-          output: '${{ github.step_summary }}'
+          output: '$GITHUB_STEP_SUMMARY'
           severity: 'CRITICAL,HIGH,MEDIUM'
           scanners: 'vuln,secret'
           ignore-unfixed: true
@@ -158,14 +160,14 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           # Full history so gitleaks can scan all commits on the branch/PR
           fetch-depth: 0
 
       - name: Run Gitleaks (SARIF output)
         id: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -174,7 +176,7 @@ jobs:
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
 
       - name: Upload Gitleaks results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
         if: ${{ hashFiles('results.sarif') != '' }}
         with:
           sarif_file: results.sarif
@@ -185,3 +187,5 @@ jobs:
         run: |
           echo "::error::Gitleaks detected secrets. See the Security tab for details."
           exit 1
+
+

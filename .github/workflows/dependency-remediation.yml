@@ -1,0 +1,82 @@
+name: Dependency Remediation
+
+on:
+  schedule:
+    - cron: '0 4 * * 5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependency-remediation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  remediate:
+    name: Generate Dependency Remediation PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.x
+
+      - name: Pin npm version
+        run: npm install -g npm@10.9.2
+
+      - name: Apply backend lockfile remediation
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          npx --yes npm-check-updates@latest --target patch --upgrade
+          npm install --ignore-scripts
+          npm install --package-lock-only --ignore-scripts
+          npm audit fix --package-lock-only --ignore-scripts || true
+
+      - name: Apply frontend lockfile remediation
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          npx --yes npm-check-updates@latest --target patch --upgrade
+          npm install --ignore-scripts
+          npm install --package-lock-only --ignore-scripts
+          npm audit fix --package-lock-only --ignore-scripts || true
+
+      - name: Create remediation pull request
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676
+        with:
+          commit-message: "chore(security): automated dependency remediation"
+          title: "chore(security): automated dependency remediation"
+          body: |
+            This PR was created automatically by CI to apply dependency remediation.
+
+            Scope:
+            - backend/package.json
+            - backend/package-lock.json
+            - frontend/package.json
+            - frontend/package-lock.json
+
+            Notes:
+            - Includes safe patch-level dependency updates.
+            - Includes npm audit fix lockfile remediation where applicable.
+            - Auto-merge is intentionally disabled.
+          labels: |
+            security
+            dependencies
+            automated
+          branch: chore/security-dependency-remediation
+          delete-branch: true
+          add-paths: |
+            backend/package.json
+            backend/package-lock.json
+            frontend/package.json
+            frontend/package-lock.json
+
+
+
