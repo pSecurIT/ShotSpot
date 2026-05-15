@@ -15,9 +15,9 @@
       "type": "outdated_sha",
       "file": ".github/workflows/verify-action-pins.yml",
       "line": 38,
-      "action": "actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd",
+      "action": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
       "repo": "actions/checkout",
-      "pinnedRef": "93cb6efe18208431cddfb8368fd83d5badbf9bfd",
+      "pinnedRef": "de0fac2e4500dabe0009e67214ff5f5447ce83dd",
       "latestTag": "v6.0.2",
       "latestSha": "de0fac2e4500dabe0009e67214ff5f5447ce83dd",
       "message": "Update available for actions/checkout: pinned 93cb6efe1820, latest tag v6.0.2 (de0fac2e4500)"
