@@ -1,11 +1,11 @@
 {
-  "generatedAtUtc": "2026-05-15T17:34:19Z",
+  "generatedAtUtc": "2026-05-15T17:37:24Z",
   "strictUpdates": false,
   "workflowFilesScanned": 14,
   "usesLinesScanned": 89,
   "shaPinnedRefsChecked": 89,
   "nonShaRefs": 0,
-  "outdatedShaRefs": 1,
+  "outdatedShaRefs": 0,
   "pass": true,
   "scannedFiles": [
     ".github/workflows/codeql.yml",
@@ -24,16 +24,5 @@
     ".github/workflows/verify-action-pins.yml"
   ],
   "findings": [
-    {
-      "type": "outdated_sha",
-      "file": ".github/workflows/docker.yml",
-      "line": 134,
-      "action": "snyk/actions/docker@9cf6ca713d71123d2d229cc3d7f145b96ea3c518",
-      "repo": "snyk/actions",
-      "pinnedRef": "9cf6ca713d71123d2d229cc3d7f145b96ea3c518",
-      "latestTag": "v1.0.0",
-      "latestSha": "9adf32b1121593767fc3c057af55b55db032dc04",
-      "message": "Update available for snyk/actions: pinned 9cf6ca713d71, latest tag v1.0.0 (9adf32b11215)"
-    }
   ]
 }
