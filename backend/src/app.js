@@ -299,12 +299,7 @@ app.use(express.json({
 }));
 
 // CSRF protection (session-backed synchronizer token pattern)
-app.use((req, res, next) => {
-  if (process.env.NODE_ENV === 'test' && process.env.ENABLE_CSRF_IN_TEST !== 'true') {
-    return next();
-  }
-  return csrfProtection(req, res, next);
-});
+app.use(csrfProtection);
 
 // Security headers middleware
 app.use((req, res, next) => {
