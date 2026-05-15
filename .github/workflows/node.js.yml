@@ -253,21 +253,21 @@ jobs:
       if: ${{ always() && hashFiles('snyk-backend.sarif') != '' }}
       with:
         sarif_file: snyk-backend.sarif
-        category: node/snyk-backend
+        category: snyk-backend
 
     - name: Upload Frontend SARIF to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
       if: ${{ always() && hashFiles('snyk-frontend.sarif') != '' }}
       with:
         sarif_file: snyk-frontend.sarif
-        category: node/snyk-frontend
+        category: snyk-frontend
 
     - name: Upload Android Gradle SARIF to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
       if: ${{ always() && hashFiles('snyk-android-gradle.sarif') != '' }}
       with:
         sarif_file: snyk-android-gradle.sarif
-        category: node/snyk-android-gradle
+        category: snyk-android-gradle
 
     - name: Run Snyk Code scan
       id: snyk_code_test
@@ -293,7 +293,7 @@ jobs:
       if: ${{ always() && hashFiles('snyk-code.sarif') != '' }}
       with:
         sarif_file: snyk-code.sarif
-        category: node/snyk-code
+        category: snyk-code
 
     - name: Monitor backend dependencies in Snyk
       if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
