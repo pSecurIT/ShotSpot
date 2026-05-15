@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import csurf from '@dr.pogodin/csurf';
+import csurf from 'csurf';
 import crypto from 'crypto';
 import path from 'node:path';
 import fs from 'fs';
@@ -47,11 +47,6 @@ import seasonsRoutes from './routes/seasons.js';
 
 
 const app = express();
-
-const csrfProtection = csurf({
-  ignoreMethods: ['GET', 'HEAD', 'OPTIONS'],
-  value: (req) => req.headers['x-csrf-token'] || req.body?._csrf || req.query?._csrf
-});
 
 function resolveSafeLogPath() {
   const logsDir = path.resolve(process.cwd(), 'logs');
@@ -299,7 +294,10 @@ app.use(express.json({
 }));
 
 // CSRF protection (session-backed synchronizer token pattern)
-app.use(csrfProtection);
+app.use(csurf({
+  ignoreMethods: ['GET', 'HEAD', 'OPTIONS'],
+  value: (req) => req.headers['x-csrf-token'] || req.body?._csrf || req.query?._csrf
+}));
 
 // Security headers middleware
 app.use((req, res, next) => {
