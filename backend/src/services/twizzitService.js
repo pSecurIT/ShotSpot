@@ -1,4 +1,5 @@
 import TwizzitApiClient from './twizzit-api-client.js';
+import db from '../db.js';
 
 import { logError } from '../utils/logger.js';
 
@@ -36,6 +37,58 @@ function getTwizzitClient() {
   return twizzitClient;
 }
 
+function normalizeGender(gender) {
+  if (!gender) return null;
+  const value = String(gender).trim().toLowerCase();
+  if (['male', 'm', 'man'].includes(value)) return 'male';
+  if (['female', 'f', 'woman'].includes(value)) return 'female';
+  return null;
+}
+
+function toDateOrNull(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+}
+
+function deriveSeasonDates(season) {
+  const directStart = toDateOrNull(season?.start_date);
+  const directEnd = toDateOrNull(season?.end_date);
+
+  if (directStart && directEnd) {
+    return { startDate: directStart, endDate: directEnd };
+  }
+
+  const name = String(season?.name || '');
+  const match = name.match(/(\d{4})\D+(\d{4})/);
+  if (match) {
+    const startYear = Number(match[1]);
+    const endYear = Number(match[2]);
+    if (Number.isFinite(startYear) && Number.isFinite(endYear) && endYear >= startYear) {
+      return {
+        startDate: `${startYear}-09-01`,
+        endDate: `${endYear}-06-30`
+      };
+    }
+  }
+
+  const currentYear = new Date().getFullYear();
+  return {
+    startDate: `${currentYear}-01-01`,
+    endDate: `${currentYear}-12-31`
+  };
+}
+
+// Test hook used by regression tests; not used in production runtime.
+export function __setTwizzitClientForTests(client) {
+  twizzitClient = client;
+}
+
+export function __resetTwizzitClientForTests() {
+  twizzitClient = null;
+}
+
 /**
  * Sync clubs from Twizzit API
  * @returns {Promise<Array>} List of synced clubs
@@ -43,16 +96,46 @@ function getTwizzitClient() {
 export async function syncClubs() {
   try {
     const { groups } = await getTwizzitClient().getGroups();
-    // Map Twizzit groups to clubs
-    const clubs = groups.map((group) => ({
-      id: group.id,
-      name: group.name,
-      description: group.description || '',
-    }));
+    const syncedClubs = [];
 
-    // TODO: Save clubs to the database
+    for (const group of groups || []) {
+      const twizzitId = String(group.id);
+      const clubName = String(group.name || '').trim() || `Twizzit Club ${twizzitId}`;
 
-    return clubs;
+      const clubResult = await db.query(
+        `INSERT INTO clubs (name)
+         VALUES ($1)
+         ON CONFLICT (name)
+         DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+         RETURNING id, name`,
+        [clubName]
+      );
+
+      const localClub = clubResult.rows[0];
+
+      // local_club_id is nullable in this table and currently linked to teams via FK.
+      // We still persist Twizzit IDs so sync is no longer a no-op.
+      await db.query(
+        `INSERT INTO twizzit_team_mappings (local_club_id, twizzit_team_id, twizzit_team_name, last_synced_at, sync_status, sync_error)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, 'synced', NULL)
+         ON CONFLICT (twizzit_team_id)
+         DO UPDATE
+         SET twizzit_team_name = EXCLUDED.twizzit_team_name,
+             last_synced_at = CURRENT_TIMESTAMP,
+             sync_status = 'synced',
+             sync_error = NULL`,
+        [null, twizzitId, clubName]
+      );
+
+      syncedClubs.push({
+        id: twizzitId,
+        name: clubName,
+        description: group.description || '',
+        localClubId: localClub.id,
+      });
+    }
+
+    return syncedClubs;
   } catch (error) {
     logError('Failed to sync clubs:', error);
     throw error;
@@ -67,18 +150,77 @@ export async function syncClubs() {
 export async function syncPlayers(clubId) {
   try {
     const { contacts } = await getTwizzitClient().getGroupContacts(clubId);
-    // Map Twizzit contacts to players
-    const players = contacts.map((contact) => ({
-      id: contact.id,
-      firstName: contact.first_name,
-      lastName: contact.last_name,
-      email: contact.email,
-      gender: contact.gender,
-    }));
+    const syncedPlayers = [];
 
-    // TODO: Save players to the database
+    const teamMappingResult = await db.query(
+      'SELECT id FROM twizzit_team_mappings WHERE twizzit_team_id = $1 LIMIT 1',
+      [String(clubId)]
+    );
+    const teamMappingId = teamMappingResult.rows[0]?.id || null;
 
-    return players;
+    for (const contact of contacts || []) {
+      const twizzitPlayerId = String(contact.id);
+      const firstName = String(contact.first_name || '').trim() || 'Unknown';
+      const lastName = String(contact.last_name || '').trim() || 'Player';
+      const gender = normalizeGender(contact.gender);
+
+      const existingPlayer = await db.query(
+        `SELECT id
+         FROM players
+         WHERE first_name = $1
+           AND last_name = $2
+           AND club_id IS NOT DISTINCT FROM $3
+         LIMIT 1`,
+        [firstName, lastName, null]
+      );
+
+      let localPlayerId;
+      if (existingPlayer.rows.length > 0) {
+        localPlayerId = existingPlayer.rows[0].id;
+        await db.query(
+          `UPDATE players
+           SET gender = $1,
+               is_twizzit_registered = true,
+               twizzit_verified_at = CURRENT_TIMESTAMP,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [gender, localPlayerId]
+        );
+      } else {
+        const insertedPlayer = await db.query(
+          `INSERT INTO players (club_id, first_name, last_name, gender, is_twizzit_registered, twizzit_verified_at)
+           VALUES ($1, $2, $3, $4, true, CURRENT_TIMESTAMP)
+           RETURNING id`,
+          [null, firstName, lastName, gender]
+        );
+        localPlayerId = insertedPlayer.rows[0].id;
+      }
+
+      await db.query(
+        `INSERT INTO twizzit_player_mappings (local_player_id, twizzit_player_id, twizzit_player_name, team_mapping_id, last_synced_at, sync_status, sync_error)
+         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, 'synced', NULL)
+         ON CONFLICT (twizzit_player_id)
+         DO UPDATE
+         SET local_player_id = EXCLUDED.local_player_id,
+             twizzit_player_name = EXCLUDED.twizzit_player_name,
+             team_mapping_id = EXCLUDED.team_mapping_id,
+             last_synced_at = CURRENT_TIMESTAMP,
+             sync_status = 'synced',
+             sync_error = NULL`,
+        [localPlayerId, twizzitPlayerId, `${firstName} ${lastName}`, teamMappingId]
+      );
+
+      syncedPlayers.push({
+        id: twizzitPlayerId,
+        firstName,
+        lastName,
+        email: contact.email || null,
+        gender,
+        localPlayerId,
+      });
+    }
+
+    return syncedPlayers;
   } catch (error) {
     // Avoid user-controlled format strings in logs
     logError('Failed to sync players for club %s:', clubId, error);
@@ -93,17 +235,46 @@ export async function syncPlayers(clubId) {
 export async function syncSeasons() {
   try {
     const { seasons } = await getTwizzitClient().getSeasons();
-    // Map Twizzit seasons to app seasons
-    const mappedSeasons = seasons.map((season) => ({
-      id: season.id,
-      name: season.name,
-      startDate: season.start_date,
-      endDate: season.end_date,
-    }));
+    const syncedSeasons = [];
 
-    // TODO: Save seasons to the database
+    for (const season of seasons || []) {
+      const twizzitId = String(season.id);
+      const seasonName = String(season.name || '').trim() || `Twizzit Season ${twizzitId}`;
+      const { startDate, endDate } = deriveSeasonDates(season);
 
-    return mappedSeasons;
+      const existing = await db.query('SELECT id FROM seasons WHERE name = $1 LIMIT 1', [seasonName]);
+      let localSeasonId;
+
+      if (existing.rows.length > 0) {
+        localSeasonId = existing.rows[0].id;
+        await db.query(
+          `UPDATE seasons
+           SET start_date = $1,
+               end_date = $2,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $3`,
+          [startDate, endDate, localSeasonId]
+        );
+      } else {
+        const inserted = await db.query(
+          `INSERT INTO seasons (name, start_date, end_date, season_type, is_active)
+           VALUES ($1, $2, $3, $4, false)
+           RETURNING id`,
+          [seasonName, startDate, endDate, 'mixed']
+        );
+        localSeasonId = inserted.rows[0].id;
+      }
+
+      syncedSeasons.push({
+        id: twizzitId,
+        name: seasonName,
+        startDate,
+        endDate,
+        localSeasonId,
+      });
+    }
+
+    return syncedSeasons;
   } catch (error) {
     logError('Failed to sync seasons:', error);
     throw error;
