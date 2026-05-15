@@ -41,6 +41,9 @@ describe('🔐 Environment Variable Validation', () => {
     requiredVars.forEach(varName => {
       delete process.env[varName];
     });
+
+    // Keep a secure default unless a test explicitly removes it.
+    process.env.SESSION_SECRET = 'a_very_long_and_secure_session_secret_key_123456789';
   });
 
   afterEach(() => {
@@ -199,6 +202,30 @@ describe('🔐 Environment Variable Validation', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith('Missing required environment variables:');
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('JWT_SECRET'));
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('JWT_EXPIRES_IN'));
+    });
+
+    it('❌ should fail when SESSION_SECRET is missing', () => {
+      // Set all required variables except SESSION_SECRET
+      process.env.PORT = '3001';
+      process.env.DB_USER = 'test_user';
+      process.env.DB_PASSWORD = 'secure_password_123456';
+      process.env.DB_HOST = 'localhost';
+      process.env.DB_PORT = '5432';
+      process.env.DB_NAME = 'test_db';
+      process.env.DB_MAX_CONNECTIONS = '10';
+      process.env.DB_IDLE_TIMEOUT_MS = '30000';
+      process.env.JWT_SECRET = 'a_very_long_and_secure_jwt_secret_key_123456789';
+      process.env.JWT_EXPIRES_IN = '1h';
+      process.env.CORS_ORIGIN = 'http://localhost:3000';
+      process.env.RATE_LIMIT_WINDOW_MS = '900000';
+      process.env.RATE_LIMIT_MAX = '100';
+      delete process.env.SESSION_SECRET;
+
+      validateEnvVars();
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Missing required environment variables:');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('SESSION_SECRET'));
     });
   });
 
