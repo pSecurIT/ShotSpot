@@ -55,7 +55,7 @@ jobs:
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
-          category: 'trivy-container-scan'
+          category: 'security-scan/trivy-container'
 
       - name: Fail on critical vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
@@ -108,7 +108,7 @@ jobs:
         if: ${{ hashFiles('trivy-fs-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-fs-results.sarif'
-          category: 'trivy-filesystem-scan'
+          category: 'security-scan/trivy-filesystem'
 
       - name: Fail on critical dependency vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
@@ -164,7 +164,7 @@ jobs:
         if: ${{ hashFiles('results.sarif') != '' }}
         with:
           sarif_file: results.sarif
-          category: gitleaks-secret-scan
+          category: security-scan/gitleaks-secret
 
       - name: Fail if secrets were detected
         if: ${{ steps.gitleaks.outcome == 'failure' }}

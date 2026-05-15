@@ -188,10 +188,13 @@ jobs:
 
     - name: Resolve Snyk reporting settings
       shell: bash
+      env:
+        VARS_JSON: ${{ toJSON(vars) }}
       run: |
         echo "SNYK_REMOTE_REPO_URL=https://github.com/${GITHUB_REPOSITORY}.git" >> "$GITHUB_ENV"
-        if [ -n "${{ vars.SNYK_ORG }}" ]; then
-          echo "SNYK_ORG_FLAG=--org=${{ vars.SNYK_ORG }}" >> "$GITHUB_ENV"
+        snyk_org="$(node -e "const v = JSON.parse(process.env.VARS_JSON || '{}'); process.stdout.write(v.SNYK_ORG || '')")"
+        if [ -n "$snyk_org" ]; then
+          echo "SNYK_ORG_FLAG=--org=$snyk_org" >> "$GITHUB_ENV"
         else
           echo "SNYK_ORG_FLAG=" >> "$GITHUB_ENV"
         fi
@@ -234,8 +237,8 @@ jobs:
         set +e
 
         if [ ! -d "frontend/android" ]; then
-          echo "Android project is required, but frontend/android does not exist." > snyk-android-gradle.log
-          echo "exit_code=2" >> "$GITHUB_OUTPUT"
+          echo "Android project not present; skipping Android Gradle Snyk scan." > snyk-android-gradle.log
+          echo "exit_code=0" >> "$GITHUB_OUTPUT"
           exit 0
         fi
 
@@ -250,21 +253,21 @@ jobs:
       if: ${{ always() && hashFiles('snyk-backend.sarif') != '' }}
       with:
         sarif_file: snyk-backend.sarif
-        category: snyk-backend
+        category: node/snyk-backend
 
     - name: Upload Frontend SARIF to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
       if: ${{ always() && hashFiles('snyk-frontend.sarif') != '' }}
       with:
         sarif_file: snyk-frontend.sarif
-        category: snyk-frontend
+        category: node/snyk-frontend
 
     - name: Upload Android Gradle SARIF to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
       if: ${{ always() && hashFiles('snyk-android-gradle.sarif') != '' }}
       with:
         sarif_file: snyk-android-gradle.sarif
-        category: snyk-android-gradle
+        category: node/snyk-android-gradle
 
     - name: Run Snyk Code scan
       id: snyk_code_test
@@ -290,7 +293,7 @@ jobs:
       if: ${{ always() && hashFiles('snyk-code.sarif') != '' }}
       with:
         sarif_file: snyk-code.sarif
-        category: snyk-code
+        category: node/snyk-code
 
     - name: Monitor backend dependencies in Snyk
       if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}

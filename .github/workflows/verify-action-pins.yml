@@ -6,11 +6,13 @@ on:
     paths:
       - '.github/workflows/**'
       - 'scripts/verify-action-pins.sh'
+      - 'scripts/verify-sarif-categories.sh'
   push:
     branches: [ main ]
     paths:
       - '.github/workflows/**'
       - 'scripts/verify-action-pins.sh'
+      - 'scripts/verify-sarif-categories.sh'
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
@@ -74,6 +76,14 @@ jobs:
           REPORT_MD_PATH: ${{ github.workspace }}/.artifacts/action-pin-report.md
         run: bash scripts/verify-action-pins.sh
 
+      - name: Run SARIF category verification
+        shell: bash
+        env:
+          TARGET_FILE_LIST_PATH: ${{ steps.scope.outputs.target_file_list_path }}
+          REPORT_JSON_PATH: ${{ github.workspace }}/.artifacts/sarif-category-report.json
+          REPORT_MD_PATH: ${{ github.workspace }}/.artifacts/sarif-category-report.md
+        run: bash scripts/verify-sarif-categories.sh
+
       - name: Add verification summary
         if: always()
         shell: bash
@@ -85,6 +95,14 @@ jobs:
             echo "No markdown report produced." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -f ".artifacts/sarif-category-report.md" ]; then
+            cat ".artifacts/sarif-category-report.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No SARIF category report produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Upload verification report artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -94,3 +112,5 @@ jobs:
           path: |
             .artifacts/action-pin-report.json
             .artifacts/action-pin-report.md
+            .artifacts/sarif-category-report.json
+            .artifacts/sarif-category-report.md
