@@ -76,7 +76,7 @@ jobs:
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
 
       - name: Set up Snyk CLI
-        uses: snyk/actions/setup@9cf6ca713d71123d2d229cc3d7f145b96ea3c518
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04
 
       - name: Resolve Snyk reporting settings
         shell: bash
