@@ -104,7 +104,7 @@ is_valid_category() {
   # - simple lowercase tokens (e.g. snyk-backend)
   # - scoped slash form (e.g. security-scan/trivy-container)
   # - CodeQL matrix style (e.g. /language:${{matrix.language}})
-  printf '%s\n' "$category" | grep -Eq '^/?[-A-Za-z0-9._${}: ]+(/[-A-Za-z0-9._${}: ]+)?$'
+  printf '%s\n' "$category" | grep -Eq '^/?[-A-Za-z0-9._${}: ]+(/[-A-Za-z0-9._${}: ]+)*$'
 }
 
 write_reports() {
