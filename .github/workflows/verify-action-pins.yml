@@ -14,6 +14,12 @@ on:
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
+    inputs:
+      strict_updates:
+        description: 'Fail the job when newer action tags are available'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -30,7 +36,61 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          fetch-depth: 0
+
+      - name: Resolve workflow scan scope
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGET_LIST="$RUNNER_TEMP/verify-action-pins/target-workflows.txt"
+          mkdir -p "$(dirname "$TARGET_LIST")"
+          : > "$TARGET_LIST"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+            git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- '.github/workflows/*.yml' > "$TARGET_LIST" || true
+
+            CHANGED_COUNT=$(grep -c . "$TARGET_LIST" || true)
+            echo "mode=changed" >> "$GITHUB_OUTPUT"
+            echo "target_file_list_path=$TARGET_LIST" >> "$GITHUB_OUTPUT"
+            echo "changed_count=$CHANGED_COUNT" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+            echo "target_file_list_path=" >> "$GITHUB_OUTPUT"
+            echo "changed_count=all" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run workflow action pin verification
         shell: bash
+        env:
+          TARGET_FILE_LIST_PATH: ${{ steps.scope.outputs.target_file_list_path }}
+          STRICT_UPDATES: ${{ github.event.inputs.strict_updates || 'false' }}
+          REPORT_JSON_PATH: ${{ github.workspace }}/.artifacts/action-pin-report.json
+          REPORT_MD_PATH: ${{ github.workspace }}/.artifacts/action-pin-report.md
         run: bash scripts/verify-action-pins.sh
+
+      - name: Add verification summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f ".artifacts/action-pin-report.md" ]; then
+            cat ".artifacts/action-pin-report.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No markdown report produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload verification report artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: verify-action-pins-report-${{ github.run_id }}
+          if-no-files-found: error
+          path: |
+            .artifacts/action-pin-report.json
+            .artifacts/action-pin-report.md
