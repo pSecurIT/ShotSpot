@@ -144,7 +144,7 @@ jobs:
         if: ${{ always() && hashFiles('snyk-docker.sarif') != '' }}
         with:
           sarif_file: snyk-docker.sarif
-          category: docker/snyk-image
+          category: snyk-docker
 
       - name: Monitor Docker image in Snyk
         id: snyk_docker_monitor

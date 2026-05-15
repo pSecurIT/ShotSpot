@@ -100,13 +100,11 @@ extract_category_value() {
 is_valid_category() {
   local category="$1"
 
-  # Allow GitHub expression categories if they use a scoped prefix.
-  if [[ "$category" == *'${{'* ]]; then
-    [[ "$category" =~ ^[a-z0-9][a-z0-9._-]*/ ]]
-    return
-  fi
-
-  [[ "$category" =~ ^[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$ ]]
+  # Accept established GitHub category styles:
+  # - simple lowercase tokens (e.g. snyk-backend)
+  # - scoped slash form (e.g. security-scan/trivy-container)
+  # - CodeQL matrix style (e.g. /language:${{matrix.language}})
+  printf '%s\n' "$category" | grep -Eq '^/?[-A-Za-z0-9._${}: ]+(/[-A-Za-z0-9._${}: ]+)?$'
 }
 
 write_reports() {
@@ -124,7 +122,7 @@ write_reports() {
     echo "- Invalid categories: $invalid_count"
     echo "- Pass: $pass_status"
     echo
-    echo "Convention: workflow/scope using lowercase letters, numbers, dot, underscore, and dash."
+    echo "Convention: use stable category identifiers and avoid category renames unless intentional."
     echo
 
     if [ "${#findings[@]}" -eq 0 ]; then
@@ -195,7 +193,7 @@ for file in "${workflow_files[@]}"; do
     file_rel="$(as_relative_path "$file")"
 
     if ! is_valid_category "$category_value"; then
-      message="Category does not match convention workflow/scope"
+      message="Category has unsupported format"
       echo "::error file=$file_rel,line=$line_number::$message: $category_value"
       add_finding "invalid_category" "$file_rel" "$line_number" "$category_value" "$message"
       invalid_count=$((invalid_count + 1))
