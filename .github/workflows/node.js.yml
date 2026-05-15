@@ -253,7 +253,7 @@ jobs:
       if: ${{ always() && hashFiles('snyk-backend.sarif') != '' }}
       with:
         sarif_file: snyk-backend.sarif
-        category: snyk-backend
+        category: 'Snyk/Open Source/shotspot/0'
 
     - name: Upload Frontend SARIF to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e
