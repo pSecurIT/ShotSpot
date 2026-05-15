@@ -64,7 +64,7 @@ jobs:
         echo "SESSION_SECRET=$(openssl rand -hex 24)" >> $GITHUB_ENV
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -121,7 +121,7 @@ jobs:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
     
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -168,7 +168,7 @@ jobs:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 
     - name: Use Node.js 22.x
-      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
       with:
         node-version: 22.x
 
@@ -408,7 +408,7 @@ jobs:
   #   - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
   #
   #   - name: Use Node.js 20.x
-  #     uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+  #     uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
   #     with:
   #       node-version: 20.x
   #       cache: 'npm'
