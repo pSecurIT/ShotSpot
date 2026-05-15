@@ -137,6 +137,10 @@ jobs:
             sleep 2
           done
 
+      - name: Setup test database
+        working-directory: backend
+        run: npm run setup-test-db
+
       - name: Run backend tests with coverage (single project)
         working-directory: backend
         run: npm run test:coverage
