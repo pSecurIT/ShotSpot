@@ -3,6 +3,7 @@ import {
   syncClubs,
   syncPlayers,
   syncSeasons,
+  verifyTwizzitConnection,
   __setTwizzitClientForTests,
   __resetTwizzitClientForTests
 } from '../src/services/twizzitService.js';
@@ -138,5 +139,123 @@ describe('🔄 Twizzit Service Persistence', () => {
     expect(seasonRow.rows).toHaveLength(1);
     expect(seasonRow.rows[0].start_date_iso).toBe('2025-09-01');
     expect(seasonRow.rows[0].end_date_iso).toBe('2026-06-30');
+  });
+
+  it('✅ syncClubs falls back to a generated club name when Twizzit name is blank', async () => {
+    const fallbackGroupId = `blank-group-${suffix}`;
+
+    __setTwizzitClientForTests({
+      async getGroups() {
+        return { groups: [{ id: fallbackGroupId, name: '   ', description: '' }] };
+      },
+      async getGroupContacts() {
+        return { contacts: [] };
+      },
+      async getSeasons() {
+        return { seasons: [] };
+      },
+      async verifyConnection() {
+        return true;
+      }
+    });
+
+    const synced = await syncClubs();
+
+    expect(synced[0].name).toBe(`Twizzit Club ${fallbackGroupId}`);
+
+    await db.query('DELETE FROM twizzit_team_mappings WHERE twizzit_team_id = $1', [fallbackGroupId]);
+    await db.query('DELETE FROM clubs WHERE name = $1', [`Twizzit Club ${fallbackGroupId}`]);
+  });
+
+  it('✅ syncPlayers updates an existing player and normalizes gender aliases', async () => {
+    await syncClubs();
+
+    const existingPlayer = await db.query(
+      `INSERT INTO players (club_id, first_name, last_name, gender, is_twizzit_registered)
+       VALUES ($1, $2, $3, $4, false)
+       RETURNING id`,
+      [null, playerFirstName, playerLastName, null]
+    );
+
+    __setTwizzitClientForTests({
+      async getGroups() {
+        return { groups: [{ id: mockGroupId, name: clubName, description: '' }] };
+      },
+      async getGroupContacts() {
+        return {
+          contacts: [{
+            id: `twizzit-player-${suffix}`,
+            first_name: playerFirstName,
+            last_name: playerLastName,
+            email: `${suffix}@example.com`,
+            gender: 'F'
+          }]
+        };
+      },
+      async getSeasons() {
+        return { seasons: [] };
+      },
+      async verifyConnection() {
+        return true;
+      }
+    });
+
+    const syncedPlayers = await syncPlayers(mockGroupId);
+    expect(syncedPlayers[0].gender).toBe('female');
+
+    const updatedPlayer = await db.query(
+      'SELECT id, gender, is_twizzit_registered FROM players WHERE id = $1',
+      [existingPlayer.rows[0].id]
+    );
+
+    expect(updatedPlayer.rows[0].gender).toBe('female');
+    expect(updatedPlayer.rows[0].is_twizzit_registered).toBe(true);
+  });
+
+  it('✅ syncSeasons derives dates from season name when API dates are missing', async () => {
+    const derivedSeasonName = `Competition 2030-2031 ${suffix}`;
+
+    __setTwizzitClientForTests({
+      async getGroups() {
+        return { groups: [] };
+      },
+      async getGroupContacts() {
+        return { contacts: [] };
+      },
+      async getSeasons() {
+        return {
+          seasons: [{ id: `derived-season-${suffix}`, name: derivedSeasonName, start_date: null, end_date: null }]
+        };
+      },
+      async verifyConnection() {
+        return true;
+      }
+    });
+
+    const syncedSeasons = await syncSeasons();
+
+    expect(syncedSeasons[0].startDate).toBe('2030-09-01');
+    expect(syncedSeasons[0].endDate).toBe('2031-06-30');
+
+    await db.query('DELETE FROM seasons WHERE name = $1', [derivedSeasonName]);
+  });
+
+  it('✅ verifyTwizzitConnection returns false when the client throws', async () => {
+    __setTwizzitClientForTests({
+      async getGroups() {
+        return { groups: [] };
+      },
+      async getGroupContacts() {
+        return { contacts: [] };
+      },
+      async getSeasons() {
+        return { seasons: [] };
+      },
+      async verifyConnection() {
+        throw new Error('connection failed');
+      }
+    });
+
+    await expect(verifyTwizzitConnection()).resolves.toBe(false);
   });
 });

@@ -1374,9 +1374,8 @@ const LiveMatch: React.FC = () => {
       setTimeout(() => setSuccess(null), 3000);
     }
     
-    // Refresh game data in parallel (non-blocking)
+    // Refresh possession-derived data without immediately overwriting optimistic score updates.
     Promise.all([
-      fetchGame(),
       fetchPossessionStats(),
       fetchActivePossession()
     ]).catch(error => {

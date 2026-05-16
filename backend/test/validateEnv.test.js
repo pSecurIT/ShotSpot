@@ -5,6 +5,8 @@
  */
 
 import validateEnvVars from '../src/utils/validateEnv.js';
+import jwt from 'jsonwebtoken';
+import { extractBearerToken, getJwtSecret, verifyAccessTokenClaims } from '../src/utils/authToken.js';
 
 describe('🔐 Environment Variable Validation', () => {
   let originalEnv;
@@ -488,6 +490,75 @@ describe('🔐 Environment Variable Validation', () => {
       expect(mockExit).not.toHaveBeenCalled();
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    it('❌ should reject invalid DEFAULT_ADMIN_USERNAME format', () => {
+      process.env.PORT = '3001';
+      process.env.DB_USER = 'test_user';
+      process.env.DB_PASSWORD = 'secure_password_123456';
+      process.env.DB_HOST = 'localhost';
+      process.env.DB_PORT = '5432';
+      process.env.DB_NAME = 'test_db';
+      process.env.DB_MAX_CONNECTIONS = '10';
+      process.env.DB_IDLE_TIMEOUT_MS = '30000';
+      process.env.JWT_SECRET = 'a_very_long_and_secure_jwt_secret_key_123456789';
+      process.env.JWT_EXPIRES_IN = '1h';
+      process.env.CORS_ORIGIN = 'http://localhost:3000';
+      process.env.RATE_LIMIT_WINDOW_MS = '900000';
+      process.env.RATE_LIMIT_MAX = '100';
+      process.env.DEFAULT_ADMIN_USERNAME = 'bad user name';
+
+      validateEnvVars();
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Insecure environment variable configurations:');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('DEFAULT_ADMIN_USERNAME (only alphanumeric, underscore, and hyphen allowed)'));
+    });
+
+    it('❌ should reject invalid DEFAULT_ADMIN_EMAIL format', () => {
+      process.env.PORT = '3001';
+      process.env.DB_USER = 'test_user';
+      process.env.DB_PASSWORD = 'secure_password_123456';
+      process.env.DB_HOST = 'localhost';
+      process.env.DB_PORT = '5432';
+      process.env.DB_NAME = 'test_db';
+      process.env.DB_MAX_CONNECTIONS = '10';
+      process.env.DB_IDLE_TIMEOUT_MS = '30000';
+      process.env.JWT_SECRET = 'a_very_long_and_secure_jwt_secret_key_123456789';
+      process.env.JWT_EXPIRES_IN = '1h';
+      process.env.CORS_ORIGIN = 'http://localhost:3000';
+      process.env.RATE_LIMIT_WINDOW_MS = '900000';
+      process.env.RATE_LIMIT_MAX = '100';
+      process.env.DEFAULT_ADMIN_EMAIL = 'not-an-email';
+
+      validateEnvVars();
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Insecure environment variable configurations:');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('DEFAULT_ADMIN_EMAIL (invalid email format)'));
+    });
+
+    it('❌ should reject weak DEFAULT_ADMIN_PASSWORD', () => {
+      process.env.PORT = '3001';
+      process.env.DB_USER = 'test_user';
+      process.env.DB_PASSWORD = 'secure_password_123456';
+      process.env.DB_HOST = 'localhost';
+      process.env.DB_PORT = '5432';
+      process.env.DB_NAME = 'test_db';
+      process.env.DB_MAX_CONNECTIONS = '10';
+      process.env.DB_IDLE_TIMEOUT_MS = '30000';
+      process.env.JWT_SECRET = 'a_very_long_and_secure_jwt_secret_key_123456789';
+      process.env.JWT_EXPIRES_IN = '1h';
+      process.env.CORS_ORIGIN = 'http://localhost:3000';
+      process.env.RATE_LIMIT_WINDOW_MS = '900000';
+      process.env.RATE_LIMIT_MAX = '100';
+      process.env.DEFAULT_ADMIN_PASSWORD = 'weakpass';
+
+      validateEnvVars();
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Insecure environment variable configurations:');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('DEFAULT_ADMIN_PASSWORD (must include uppercase, lowercase, number, and special character)'));
+    });
   });
 
   describe('🚨 Combined Error Scenarios', () => {
@@ -532,6 +603,69 @@ describe('🔐 Environment Variable Validation', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('DB_PORT (must be a number)'));
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('CORS_ORIGIN (must be a valid URL'));
     });
+  });
+});
+
+describe('🔑 Auth Token Utilities', () => {
+  const originalJwtSecret = process.env.JWT_SECRET;
+
+  afterEach(() => {
+    process.env.JWT_SECRET = originalJwtSecret;
+  });
+
+  it('extracts bearer token from a valid Authorization header', () => {
+    const token = 'abc.def.ghi';
+    expect(extractBearerToken(`Bearer ${token}`)).toBe(token);
+  });
+
+  it('returns null for malformed Authorization headers', () => {
+    expect(extractBearerToken('Token abc.def.ghi')).toBeNull();
+    expect(extractBearerToken('Bearer not-a-jwt')).toBeNull();
+    expect(extractBearerToken(undefined)).toBeNull();
+  });
+
+  it('returns JWT_SECRET when configured and throws when missing', () => {
+    process.env.JWT_SECRET = 'a_very_long_and_secure_jwt_secret_key_123456789';
+    expect(getJwtSecret()).toBe(process.env.JWT_SECRET);
+
+    delete process.env.JWT_SECRET;
+    expect(() => getJwtSecret()).toThrow('JWT_SECRET must be set');
+  });
+
+  it('verifies token claims and normalizes role/userId fields', () => {
+    const jwtSecret = 'a_very_long_and_secure_jwt_secret_key_123456789';
+    const signed = jwt.sign(
+      {
+        id: '42',
+        role: 'COACH',
+        passwordMustChange: true
+      },
+      jwtSecret,
+      { algorithm: 'HS256' }
+    );
+
+    const decoded = verifyAccessTokenClaims(signed, jwtSecret);
+    expect(decoded.userId).toBe(42);
+    expect(decoded.role).toBe('coach');
+    expect(decoded.passwordMustChange).toBe(true);
+  });
+
+  it('throws JsonWebTokenError for missing or malformed claims', () => {
+    const jwtSecret = 'a_very_long_and_secure_jwt_secret_key_123456789';
+    const badClaimsToken = jwt.sign({ userId: 0, role: 'coach' }, jwtSecret, { algorithm: 'HS256' });
+
+    expect(() => verifyAccessTokenClaims('', jwtSecret)).toThrow('Missing or malformed Bearer token');
+    expect(() => verifyAccessTokenClaims(badClaimsToken, jwtSecret)).toThrow('Invalid token claims');
+  });
+
+  it('propagates jwt.verify failures for invalid signatures', () => {
+    const validTokenWrongSecret = jwt.sign(
+      { userId: 77, role: 'admin' },
+      'different_secret_key_12345678901234567890',
+      { algorithm: 'HS256' }
+    );
+
+    expect(() => verifyAccessTokenClaims(validTokenWrongSecret, 'a_very_long_and_secure_jwt_secret_key_123456789')).toThrow();
   });
 });
 

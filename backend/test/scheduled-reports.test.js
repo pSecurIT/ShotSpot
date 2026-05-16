@@ -19,7 +19,7 @@ const generateOtherCoachToken = () => jwt.sign(
     role: 'coach',
     permissions: ['write'],
   },
-  process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing',
+  process.env.JWT_SECRET,
   { expiresIn: '1h' }
 );
 
@@ -302,6 +302,35 @@ describe('📅 Scheduled Reports Routes', () => {
 
       expect(response.body.error).toBe('Team not found');
     });
+
+    it('✅ should create after_match reports without next run date', async () => {
+      const response = await request(app)
+        .post('/api/scheduled-reports')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          name: 'After Match Follow-up',
+          template_id: templateId,
+          schedule_type: 'after_match'
+        })
+        .expect(201);
+
+      expect(response.body.schedule_type).toBe('after_match');
+      expect(response.body.next_run_at).toBeNull();
+    });
+
+    it('❌ should return 404 when template does not exist', async () => {
+      const response = await request(app)
+        .post('/api/scheduled-reports')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          name: 'Template Missing',
+          template_id: 999999,
+          schedule_type: 'weekly'
+        })
+        .expect(404);
+
+      expect(response.body.error).toBe('Template not found');
+    });
   });
 
   describe('📝 PUT /api/scheduled-reports/:id', () => {
@@ -374,6 +403,40 @@ describe('📅 Scheduled Reports Routes', () => {
 
       expect(response.body.error).toBe('No valid fields to update');
     });
+
+    it('❌ should return 404 for unknown template_id on update', async () => {
+      const response = await request(app)
+        .put(`/api/scheduled-reports/${reportId}`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({ template_id: 999999 })
+        .expect(404);
+
+      expect(response.body.error).toBe('Template not found');
+    });
+
+    it('❌ should reject update when template is not accessible to coach', async () => {
+      const privateTemplate = await db.query(`
+        INSERT INTO report_templates (name, description, type, sections, created_by, is_default, is_active)
+        VALUES ($1, $2, $3, $4, $5, false, true)
+        RETURNING id
+      `, [
+        'Private Other Coach Template',
+        'Used for access checks',
+        'custom',
+        JSON.stringify([{ id: 's', type: 'summary', title: 'Summary' }]),
+        2
+      ]);
+
+      const response = await request(app)
+        .put(`/api/scheduled-reports/${reportId}`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({ template_id: privateTemplate.rows[0].id })
+        .expect(403);
+
+      expect(response.body.error).toBe('You do not have access to this template');
+
+      await db.query('DELETE FROM report_templates WHERE id = $1', [privateTemplate.rows[0].id]);
+    });
   });
 
   describe('🗑️ DELETE /api/scheduled-reports/:id', () => {
@@ -417,6 +480,15 @@ describe('📅 Scheduled Reports Routes', () => {
         .expect(403);
 
       expect(response.body.error).toBe('You do not have permission to delete this scheduled report');
+    });
+
+    it('❌ should return 404 for missing scheduled report on delete', async () => {
+      const response = await request(app)
+        .delete('/api/scheduled-reports/999999')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .expect(404);
+
+      expect(response.body.error).toBe('Scheduled report not found');
     });
   });
 
@@ -585,6 +657,15 @@ describe('📅 Scheduled Reports Routes', () => {
         .expect(400);
 
       expect(response.body.error).toBe('Limit must be between 1 and 100');
+    });
+
+    it('❌ should return 404 when report history target does not exist', async () => {
+      const response = await request(app)
+        .get('/api/scheduled-reports/999999/history')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .expect(404);
+
+      expect(response.body.error).toBe('Scheduled report not found');
     });
   });
 });

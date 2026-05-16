@@ -14,7 +14,7 @@ import { logInfo, logWarn, logError } from '../utils/logger.js';
 function createTransporter() {
   // Production: Use SMTP configuration from environment
   if (process.env.NODE_ENV === 'production' || process.env.SMTP_HOST) {
-    return nodemailer.createTransporter({
+    return nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
