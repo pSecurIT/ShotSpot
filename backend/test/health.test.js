@@ -262,7 +262,7 @@ describe('🏥 Health Check', () => {
   afterAll(async () => {
     try {
       // Close the database pool (this is the last test file to run)
-      await db.closePool();
+      await dbModule.closePool();
       console.log('✅ Health Check tests completed');
     } catch (error) {
       console.error('❌ Health Check cleanup error:', error.message);
