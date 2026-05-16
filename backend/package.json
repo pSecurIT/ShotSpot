@@ -19,6 +19,8 @@
     "test": "cross-env NODE_ENV=test jest --config jest.config.js --no-cache --verbose --runInBand",
     "test:watch": "cross-env NODE_ENV=test jest --config jest.config.js --watch --no-cache --verbose",
     "test:coverage": "cross-env NODE_ENV=test jest --config jest.config.js --coverage --no-cache --verbose --runInBand",
+    "test:coverage:gate": "node scripts/check-coverage-thresholds.js --threshold=80",
+    "test:coverage:strict": "npm run test:coverage && npm run test:coverage:gate",
     "test:ci": "cross-env NODE_ENV=test jest --coverage --ci --watchAll=false --runInBand",
     "test:debug": "cross-env NODE_ENV=test jest --config jest.config.js --no-cache --verbose --detectOpenHandles --forceExit",
     "setup-parallel-dbs": "node scripts/setup-parallel-dbs.js",

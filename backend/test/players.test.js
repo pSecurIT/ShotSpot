@@ -31,7 +31,7 @@ describe('👤 Player Routes', () => {
 
     return jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing',
+      process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
   };
@@ -203,6 +203,55 @@ describe('👤 Player Routes', () => {
         throw error;
       }
     });
+
+    it('✅ should get a player by id with stats', async () => {
+      const insertResult = await db.query(
+        `INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id`,
+        [testClubId, testTeamId, 'Lookup', 'Player', 41]
+      );
+
+      const response = await request(app)
+        .get(`/api/players/${insertResult.rows[0].id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect('Content-Type', /json/)
+        .expect(200);
+
+      expect(response.body.first_name).toBe('Lookup');
+      expect(response.body.team_name).toBe('U17 Team');
+      expect(response.body.games_played).toBe('0');
+    });
+
+    it('❌ should return 404 for a missing player by id', async () => {
+      const { rows } = await db.query('SELECT COALESCE(MAX(id), 0) + 1000 AS id FROM players');
+
+      const response = await request(app)
+        .get(`/api/players/${rows[0].id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect('Content-Type', /json/)
+        .expect(404);
+
+      expect(response.body.error).toBe('Player not found');
+    });
+
+    it('✅ should get players by team id', async () => {
+      await db.query(
+        `INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [testClubId, testTeamId, 'Team', 'Member', 42]
+      );
+
+      const response = await request(app)
+        .get(`/api/players/team/${testTeamId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect('Content-Type', /json/)
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].team_id).toBe(testTeamId);
+      expect(response.body[0].club_name).toContain('TestClubPlayers');
+    });
   });
 
   describe('📝 POST /api/players', () => {
@@ -319,6 +368,62 @@ describe('👤 Player Routes', () => {
         throw error;
       }
     });
+
+    it('❌ should reject creating a player outside the coach trainer assignment', async () => {
+      const otherClubRes = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+        [generateUniqueClubName('UnassignedClubPlayers')]
+      );
+
+      try {
+        const response = await request(app)
+          .post('/api/players')
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send({
+            club_id: otherClubRes.rows[0].id,
+            first_name: 'Denied',
+            last_name: 'Player',
+            jersey_number: 32
+          })
+          .expect(403);
+
+        expect(response.body.error).toContain('Trainer assignment required');
+      } finally {
+        await db.query('DELETE FROM clubs WHERE id = $1', [otherClubRes.rows[0].id]);
+      }
+    });
+
+    it('❌ should reject creating a player with a team from another club', async () => {
+      const otherClubRes = await db.query(
+        'INSERT INTO clubs (name) VALUES ($1) RETURNING id',
+        [generateUniqueClubName('MismatchClubPlayers')]
+      );
+      const otherTeamRes = await db.query(
+        'INSERT INTO teams (club_id, name, age_group) VALUES ($1, $2, $3) RETURNING id',
+        [otherClubRes.rows[0].id, 'Mismatch Team', 'U19']
+      );
+
+      try {
+        const response = await request(app)
+          .post('/api/players')
+          .set('Authorization', `Bearer ${authToken}`)
+          .set('Content-Type', 'application/json')
+          .send({
+            club_id: testClubId,
+            team_id: otherTeamRes.rows[0].id,
+            first_name: 'Wrong',
+            last_name: 'Team',
+            jersey_number: 33
+          })
+          .expect(400);
+
+        expect(response.body.error).toBe('Team does not exist or does not belong to this club');
+      } finally {
+        await db.query('DELETE FROM teams WHERE id = $1', [otherTeamRes.rows[0].id]);
+        await db.query('DELETE FROM clubs WHERE id = $1', [otherClubRes.rows[0].id]);
+      }
+    });
   });
 
   describe('✏️ PUT /api/players/:id', () => {
@@ -390,6 +495,65 @@ describe('👤 Player Routes', () => {
         throw error;
       }
     });
+
+    it('❌ should reject duplicate jersey numbers within the same team on update', async () => {
+      await request(app)
+        .post('/api/players')
+        .send({
+          club_id: testClubId,
+          team_id: testTeamId,
+          first_name: 'First',
+          last_name: 'Teammate',
+          jersey_number: 34
+        })
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect(201);
+
+      const secondPlayer = await request(app)
+        .post('/api/players')
+        .send({
+          club_id: testClubId,
+          team_id: testTeamId,
+          first_name: 'Second',
+          last_name: 'Teammate',
+          jersey_number: 35
+        })
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect(201);
+
+      const response = await request(app)
+        .put(`/api/players/${secondPlayer.body.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          club_id: testClubId,
+          team_id: testTeamId,
+          first_name: 'Second',
+          last_name: 'Teammate',
+          jersey_number: 34
+        })
+        .expect(409);
+
+      expect(response.body.error).toContain('Jersey number already in use for this team');
+    });
+
+    it('❌ should reject invalid player id on update', async () => {
+      const response = await request(app)
+        .put('/api/players/0')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          club_id: testClubId,
+          first_name: 'Invalid',
+          last_name: 'Id',
+          jersey_number: 36
+        })
+        .expect(400);
+
+      expect(response.body.error).toBe('Invalid player id');
+    });
   });
 
   describe('🗑️ DELETE /api/players/:id', () => {
@@ -448,6 +612,17 @@ describe('👤 Player Routes', () => {
         global.testContext.logTestError(error, 'DELETE non-existent player 404 failed');
         throw error;
       }
+    });
+
+    it('❌ should reject invalid player id on delete', async () => {
+      const response = await request(app)
+        .delete('/api/players/0')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .expect('Content-Type', /json/)
+        .expect(400);
+
+      expect(response.body.error).toBe('Invalid player id');
     });
   });
 });

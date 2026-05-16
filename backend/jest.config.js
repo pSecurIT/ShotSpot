@@ -26,7 +26,7 @@ export default {
     '!src/config/*.js'
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'text-summary', 'html', 'clover'],
+  coverageReporters: ['text', 'text-summary', 'html', 'clover', 'json-summary'],
   
   transform: {
     '^.+\\.js$': [

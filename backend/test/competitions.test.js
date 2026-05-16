@@ -227,6 +227,68 @@ describe('🏆 Competitions API', () => {
         throw error;
       }
     });
+
+    it('❌ should return 404 when season does not exist', async () => {
+      const response = await request(app)
+        .post('/api/competitions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          name: 'Competition Missing Season',
+          competition_type: 'tournament',
+          start_date: '2024-06-01',
+          season_id: 999999
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Season not found');
+    });
+
+    it('❌ should return 404 when series does not exist', async () => {
+      const response = await request(app)
+        .post('/api/competitions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          name: 'Competition Missing Series',
+          competition_type: 'tournament',
+          start_date: '2024-06-01',
+          series_id: 999999
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Series not found');
+    });
+  });
+
+  describe('🔎 GET /api/competitions/:id', () => {
+    let detailCompetition;
+
+    beforeAll(async () => {
+      const result = await db.query(
+        `INSERT INTO competitions (name, competition_type, start_date, season_id)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        ['Detail Test Competition', 'tournament', '2024-08-01', season.id]
+      );
+      detailCompetition = result.rows[0];
+    });
+
+    it('✅ should fetch competition details by id', async () => {
+      const response = await request(app)
+        .get(`/api/competitions/${detailCompetition.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.id).toBe(detailCompetition.id);
+      expect(response.body.name).toBe('Detail Test Competition');
+    });
+
+    it('❌ should return 404 for missing competition', async () => {
+      const response = await request(app)
+        .get('/api/competitions/999999')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Competition not found');
+    });
   });
 
   describe('📊 GET /api/competitions', () => {
@@ -538,6 +600,7 @@ describe('🏆 Competitions API', () => {
 
   describe('📊 Competition Standings', () => {
     let standingsCompetition;
+    let emptyStandingsCompetition;
 
     beforeAll(async () => {
       const result = await db.query(
@@ -556,6 +619,13 @@ describe('🏆 Competitions API', () => {
         'INSERT INTO competition_teams (competition_id, team_id) VALUES ($1, $2)',
         [standingsCompetition.id, club2.team_id]
       );
+
+      const emptyResult = await db.query(
+        `INSERT INTO competitions (name, competition_type, start_date)
+         VALUES ($1, $2, $3) RETURNING *`,
+        ['Empty Standings Competition', 'league', '2024-02-01']
+      );
+      emptyStandingsCompetition = emptyResult.rows[0];
     });
 
     it('✅ should initialize standings', async () => {
@@ -574,6 +644,26 @@ describe('🏆 Competitions API', () => {
         global.testContext.logTestError(error, 'POST initialize standings failed');
         throw error;
       }
+    });
+
+    it('❌ should reject standings initialization when competition has no teams', async () => {
+      const response = await request(app)
+        .post(`/api/competitions/${emptyStandingsCompetition.id}/standings/initialize`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json');
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('No teams in competition');
+    });
+
+    it('❌ should return 404 when initializing standings for a missing competition', async () => {
+      const response = await request(app)
+        .post('/api/competitions/999999/standings/initialize')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json');
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Competition not found');
     });
 
     it('✅ should get standings', async () => {
@@ -617,6 +707,32 @@ describe('🏆 Competitions API', () => {
         global.testContext.logTestError(error, 'POST update standings failed');
         throw error;
       }
+    });
+
+    it('❌ should return 404 when updating standings for a missing game', async () => {
+      const response = await request(app)
+        .post(`/api/competitions/${standingsCompetition.id}/standings/update`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ game_id: 999999 });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Game not found');
+    });
+
+    it('❌ should reject standings updates for games that are not completed', async () => {
+      const gameResult = await db.query(
+        `INSERT INTO games (home_club_id, away_club_id, home_team_id, away_team_id, date, status, home_score, away_score)
+         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, 'scheduled', 0, 0) RETURNING *`,
+        [club1.id, club2.id, club1.team_id, club2.team_id]
+      );
+
+      const response = await request(app)
+        .post(`/api/competitions/${standingsCompetition.id}/standings/update`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ game_id: gameResult.rows[0].id });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Game must be completed to update standings');
     });
 
     it('✅ should award 1 point each on draw', async () => {
@@ -712,6 +828,36 @@ describe('🏆 Competitions API', () => {
         throw error;
       }
     });
+
+    it('❌ should return 400 when no fields are provided', async () => {
+      const response = await request(app)
+        .put(`/api/competitions/${updateCompetition.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('No valid fields to update');
+    });
+
+    it('❌ should return 404 for missing competition on update', async () => {
+      const response = await request(app)
+        .put('/api/competitions/999999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'completed' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Competition not found');
+    });
+
+    it('❌ should return 404 for unknown season on update', async () => {
+      const response = await request(app)
+        .put(`/api/competitions/${updateCompetition.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ season_id: 999999 });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Season not found');
+    });
   });
 
   describe('🗑️ DELETE /api/competitions/:id', () => {
@@ -759,6 +905,15 @@ describe('🏆 Competitions API', () => {
         global.testContext.logTestError(error, 'DELETE by coach rejection failed');
         throw error;
       }
+    });
+
+    it('❌ should return 404 for missing competition on delete', async () => {
+      const response = await request(app)
+        .delete('/api/competitions/999999')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Competition not found');
     });
   });
 });
