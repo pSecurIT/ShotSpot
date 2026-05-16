@@ -99,15 +99,21 @@ jobs:
         echo "Setting up parallel test databases..."
         node scripts/setup-parallel-dbs.js
         
-    - name: Run Backend Tests
+    - name: Run Backend Tests with Coverage
       working-directory: backend
       run: |
         echo "Waiting for Postgres to be fully ready..."
         sleep 10
-        # Run parallel tests with isolated databases for better performance
-        npm run test:parallel
+        # Run parallel tests with isolated databases and collect coverage
+        npm run test:parallel:coverage
 
-    # Coverage reporting can be added later with Codecov or similar services
+    - name: Upload backend coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: backend/coverage
+        flags: backend
+        fail_ci_if_error: true
 
   frontend:
     name: Frontend Tests
@@ -147,11 +153,17 @@ jobs:
       working-directory: frontend
       run: npm run lint
 
-    - name: Run Frontend Tests
+    - name: Run Frontend Tests with Coverage
       working-directory: frontend
-      run: npm run test:run
+      run: npm run coverage
 
-    # Coverage reporting can be added later with Codecov or similar services
+    - name: Upload frontend coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: frontend/coverage
+        flags: frontend
+        fail_ci_if_error: true
 
     - name: Build Frontend
       working-directory: frontend

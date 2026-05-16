@@ -116,6 +116,33 @@ describe('🧭 UX Observability API', () => {
     expect(response.body.inserted).toBe(1);
   });
 
+  it('✅ POST /api/ux-observability/events stores friction signals', async () => {
+    const response = await request(app)
+      .post('/api/ux-observability/events')
+      .set('Authorization', `Bearer ${coachToken}`)
+      .send({
+        events: [
+          {
+            routePath: '/live-match/12',
+            flowName: 'capture_event',
+            eventType: 'long_task',
+            metricName: 'main_thread_block_ms',
+            valueMs: 180
+          },
+          {
+            routePath: '/live-match/12',
+            flowName: 'capture_event',
+            eventType: 'slow_render',
+            metricName: 'render_ms',
+            valueMs: 95
+          }
+        ]
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.inserted).toBe(2);
+  });
+
   it('✅ GET /api/dashboard/ux/overview is available to admins', async () => {
     const response = await request(app)
       .get('/api/dashboard/ux/overview?days=30')
@@ -125,6 +152,19 @@ describe('🧭 UX Observability API', () => {
     expect(response.body).toHaveProperty('overview');
     expect(response.body.overview).toHaveProperty('total_events');
     expect(response.body.overview).toHaveProperty('feedback_count');
+  });
+
+  it('✅ GET /api/dashboard/ux/overview supports absolute time ranges', async () => {
+    const from = '2024-01-01T00:00:00.000Z';
+    const to = '2024-01-02T00:00:00.000Z';
+
+    const response = await request(app)
+      .get(`/api/dashboard/ux/overview?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.from).toBe(from);
+    expect(response.body.to).toBe(to);
   });
 
   it('❌ GET /api/dashboard/ux/overview denies non-admin users', async () => {
@@ -145,6 +185,27 @@ describe('🧭 UX Observability API', () => {
     expect(response.body.flows.some((row) => row.flow_name === 'open_games_list')).toBe(true);
   });
 
+  it('✅ GET /api/dashboard/ux/api-latency returns latency rows for admins', async () => {
+    const response = await request(app)
+      .get('/api/dashboard/ux/api-latency?hours=24')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body.latency)).toBe(true);
+    expect(response.body.latency.some((row) => row.endpoint === '/games')).toBe(true);
+  });
+
+  it('✅ GET /api/dashboard/ux/friction returns friction indicators for admins', async () => {
+    const response = await request(app)
+      .get('/api/dashboard/ux/friction?days=30')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body.indicators)).toBe(true);
+    expect(response.body.indicators.some((row) => row.event_type === 'long_task')).toBe(true);
+    expect(response.body.indicators.some((row) => row.event_type === 'slow_render')).toBe(true);
+  });
+
   it('✅ GET /api/dashboard/ux/feedback returns recent feedback rows for admins', async () => {
     const response = await request(app)
       .get('/api/dashboard/ux/feedback?days=30')
@@ -153,6 +214,15 @@ describe('🧭 UX Observability API', () => {
     expect(response.status).toBe(200);
     expect(Array.isArray(response.body.feedback)).toBe(true);
     expect(response.body.feedback.some((row) => row.flow_name === 'open_match_analytics')).toBe(true);
+  });
+
+  it('✅ GET /api/dashboard/ux/feedback falls back to the default window for invalid days', async () => {
+    const response = await request(app)
+      .get('/api/dashboard/ux/feedback?days=0')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.window_days).toBe(7);
   });
 
   it('❌ GET /api/ux-observability/events requires authentication', async () => {

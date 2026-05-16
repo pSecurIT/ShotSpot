@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import LiveMatch from '../components/LiveMatch';
 import api from '../utils/api';
+import type { ReactNode } from 'react';
 
 // Mock the API module
 vi.mock('../utils/api');
@@ -48,15 +49,60 @@ vi.mock('../hooks/useTimer', () => ({
 
 // Mock child components
 vi.mock('../components/CourtVisualization', () => ({
-  default: () => <div data-testid="court-visualization">Court Visualization</div>
+  default: ({ onShotRecorded, onPauseTimer, onResumeTimer }: {
+    onShotRecorded?: (payload: { result: 'goal' | 'miss' | 'blocked'; teamId: number; opposingTeamId: number }) => void;
+    onPauseTimer?: () => void;
+    onResumeTimer?: () => void;
+  }) => (
+    <div data-testid="court-visualization">
+      Court Visualization
+      <button
+        type="button"
+        data-testid="record-goal"
+        onClick={() => onShotRecorded?.({ result: 'goal', teamId: 1, opposingTeamId: 2 })}
+      >
+        Record Goal
+      </button>
+      <button
+        type="button"
+        data-testid="record-miss"
+        onClick={() => onShotRecorded?.({ result: 'miss', teamId: 2, opposingTeamId: 1 })}
+      >
+        Record Miss
+      </button>
+      <button type="button" data-testid="court-pause" onClick={() => onPauseTimer?.()}>
+        Pause From Court
+      </button>
+      <button type="button" data-testid="court-resume" onClick={() => onResumeTimer?.()}>
+        Resume From Court
+      </button>
+    </div>
+  )
 }));
 
 vi.mock('../components/SubstitutionPanel', () => ({
-  default: () => <div data-testid="substitution-panel">Substitution Panel</div>
+  default: ({ onSubstitutionRecorded }: {
+    onSubstitutionRecorded?: () => void;
+  }) => (
+    <div data-testid="substitution-panel">
+      Substitution Panel
+      <button type="button" data-testid="record-substitution" onClick={() => onSubstitutionRecorded?.()}>
+        Record Substitution
+      </button>
+    </div>
+  )
 }));
 
 vi.mock('../components/MatchTimeline', () => ({
-  default: () => <div data-testid="match-timeline">Match Timeline</div>
+  default: ({ onRefresh, children }: { onRefresh?: () => void; children?: ReactNode }) => (
+    <div data-testid="match-timeline">
+      Match Timeline
+      <button type="button" data-testid="timeline-refresh" onClick={() => onRefresh?.()}>
+        Refresh Timeline
+      </button>
+      {children}
+    </div>
+  )
 }));
 
 vi.mock('../components/FaultTracker', () => ({
@@ -79,12 +125,22 @@ const mockApi = api as jest.Mocked<typeof api>;
 
 const mockGame = {
   id: 1,
-  home_team: 'Home Team',
-  away_team: 'Away Team',
+  home_club_id: 10,
+  away_club_id: 20,
+  home_team_id: 1,
+  away_team_id: 2,
+  home_team_name: 'Home Team',
+  away_team_name: 'Away Team',
   home_score: 0,
   away_score: 0,
   status: 'in_progress',
-  current_period: 1
+  current_period: 1,
+  timer_state: 'stopped',
+  home_attacking_side: 'left',
+  number_of_periods: 4,
+  period_duration: { minutes: 10, seconds: 0 },
+  time_remaining: { minutes: 10, seconds: 0 },
+  date: '2026-05-15T10:00:00Z'
 };
 
 const LiveMatchWrapper = () => (
@@ -94,6 +150,12 @@ const LiveMatchWrapper = () => (
 );
 
 describe('LiveMatch', () => {
+  const pendingEvents = {
+    comprehensive: [] as Array<{ id: number }>,
+    shots: [] as Array<{ id: number }>,
+    substitutions: [] as Array<{ id: number }>
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -106,22 +168,64 @@ describe('LiveMatch', () => {
       time_remaining: { minutes: 10, seconds: 0 },
       period_duration: { minutes: 10, seconds: 0 }
     };
+
+    pendingEvents.comprehensive = [];
+    pendingEvents.shots = [];
+    pendingEvents.substitutions = [];
     
     mockApi.get.mockImplementation((url: string) => {
       if (url === '/games/1') {
         return Promise.resolve({ data: mockGame });
       }
-      if (url === '/events/comprehensive/1?event_status=unconfirmed') {
+      if (url === '/game-rosters/1') {
+        return Promise.resolve({
+          data: [
+            {
+              player_id: 201,
+              club_id: mockGame.home_club_id,
+              first_name: 'Home',
+              last_name: 'Player',
+              jersey_number: 7,
+              gender: 'male',
+              is_starting: true,
+              starting_position: 'offense'
+            },
+            {
+              player_id: 301,
+              club_id: mockGame.away_club_id,
+              first_name: 'Away',
+              last_name: 'Player',
+              jersey_number: 8,
+              gender: 'female',
+              is_starting: true,
+              starting_position: 'defense'
+            }
+          ]
+        });
+      }
+      if (url === '/possessions/1/active') {
+        return Promise.reject({ response: { status: 404 } });
+      }
+      if (url === '/possessions/1/stats') {
         return Promise.resolve({ data: [] });
+      }
+      if (url === '/users/me/assignable-teams') {
+        return Promise.resolve({ data: [] });
+      }
+      if (url === '/events/comprehensive/1?event_status=unconfirmed') {
+        return Promise.resolve({ data: pendingEvents.comprehensive });
       }
       if (url === '/shots/1?event_status=unconfirmed') {
-        return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: pendingEvents.shots });
       }
       if (url === '/substitutions/1?event_status=unconfirmed') {
-        return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: pendingEvents.substitutions });
       }
       return Promise.resolve({ data: [] });
     });
+
+    mockApi.post.mockResolvedValue({ data: { success: true } });
+    mockApi.patch.mockResolvedValue({ data: { success: true } });
   });
 
   // Basic rendering tests
@@ -176,26 +280,33 @@ describe('LiveMatch', () => {
   });
 
   it('shows the pending review count on the timeline tab', async () => {
-    mockApi.get.mockImplementation((url: string) => {
-      if (url === '/games/1') {
-        return Promise.resolve({ data: mockGame });
-      }
-      if (url === '/events/comprehensive/1?event_status=unconfirmed') {
-        return Promise.resolve({ data: [{ id: 1 }, { id: 2 }] });
-      }
-      if (url === '/shots/1?event_status=unconfirmed') {
-        return Promise.resolve({ data: [{ id: 3 }] });
-      }
-      if (url === '/substitutions/1?event_status=unconfirmed') {
-        return Promise.resolve({ data: [{ id: 4 }] });
-      }
-      return Promise.resolve({ data: [] });
-    });
+    pendingEvents.comprehensive = [{ id: 1 }, { id: 2 }];
+    pendingEvents.shots = [{ id: 3 }];
+    pendingEvents.substitutions = [{ id: 4 }];
 
     render(<LiveMatchWrapper />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Timeline \(4\)/i })).toBeInTheDocument();
+    });
+  });
+
+  it('updates pending review count when timeline refresh is triggered (offline queue signal)', async () => {
+    const user = userEvent.setup();
+    render(<LiveMatchWrapper />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('timeline-refresh')).toBeInTheDocument();
+    });
+
+    pendingEvents.comprehensive = [{ id: 11 }];
+    pendingEvents.shots = [{ id: 12 }, { id: 13 }];
+    pendingEvents.substitutions = [];
+
+    await user.click(screen.getByTestId('timeline-refresh'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Timeline \(3\)/i })).toBeInTheDocument();
     });
   });
 
@@ -271,15 +382,31 @@ describe('LiveMatch', () => {
     });
 
     it('handles timer pause', async () => {
+      const user = userEvent.setup();
+      mockTimerState = {
+        current_period: 1,
+        timer_state: 'running',
+        time_remaining: { minutes: 9, seconds: 30 },
+        period_duration: { minutes: 10, seconds: 0 }
+      };
+
       render(<LiveMatchWrapper />);
       
       await waitFor(() => {
-        expect(screen.getByText('▶️ Start Match')).toBeInTheDocument();
+        expect(screen.getByText('⏸️ Pause')).toBeInTheDocument();
       });
 
-      // For this test, we'll just check if the pause functionality would be available
-      // The actual pause button appears when timer is running, which requires more complex state setup
-      expect(screen.queryByText('⏸️ Pause')).not.toBeInTheDocument();
+      await user.click(screen.getByText('⏸️ Pause'));
+
+      await waitFor(() => {
+        expect(mockPauseTimer).toHaveBeenCalledTimes(1);
+        expect(mockSetTimerStateOptimistic).toHaveBeenCalledWith({
+          current_period: 1,
+          timer_state: 'paused',
+          time_remaining: { minutes: 9, seconds: 30 },
+          period_duration: { minutes: 10, seconds: 0 }
+        });
+      });
     });
 
     it('advances to the next period optimistically before the timer API finishes', async () => {
@@ -801,6 +928,45 @@ describe('LiveMatch', () => {
 
       // Should handle 404 gracefully without showing error
       expect(screen.queryByText(/error/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Critical Live Flows', () => {
+    it('records a goal and updates the scoreboard immediately', async () => {
+      const user = userEvent.setup();
+
+      render(<LiveMatchWrapper />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('record-goal')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId('record-goal'));
+
+      await waitFor(() => {
+        expect(document.querySelector('.team-section.home-team .score')).toHaveTextContent('1');
+        expect(screen.getByText('⚽ GOAL! Possession switched to opposing team.')).toBeInTheDocument();
+      });
+    });
+
+    it('refreshes live data when a substitution is captured', async () => {
+      const user = userEvent.setup();
+
+      render(<LiveMatchWrapper />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('record-substitution')).toBeInTheDocument();
+      });
+
+      const gamesCallsBefore = mockApi.get.mock.calls.filter(([url]) => url === '/games/1').length;
+
+      await user.click(screen.getByTestId('record-substitution'));
+
+      await waitFor(() => {
+        const gamesCallsAfter = mockApi.get.mock.calls.filter(([url]) => url === '/games/1').length;
+        expect(gamesCallsAfter).toBeGreaterThan(gamesCallsBefore);
+        expect(mockApi.get).toHaveBeenCalledWith('/game-rosters/1');
+      });
     });
   });
 

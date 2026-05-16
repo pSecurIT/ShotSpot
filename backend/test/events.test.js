@@ -34,7 +34,7 @@ describe('🎯 Events API', () => {
       regularUser = userResult.rows[0];
 
       // Create JWT tokens directly (no dependency on login endpoint)
-      const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+      const jwtSecret = process.env.JWT_SECRET;
       adminToken = jwt.sign({ userId: adminUser.id, role: adminUser.role }, jwtSecret, { expiresIn: '1h' });
       coachToken = jwt.sign({ userId: coachUser.id, role: coachUser.role }, jwtSecret, { expiresIn: '1h' });
       userToken = jwt.sign({ userId: regularUser.id, role: regularUser.role }, jwtSecret, { expiresIn: '1h' });
@@ -865,6 +865,23 @@ describe('🎯 Events API', () => {
       expect(response.body.result).toBe('miss');
     });
 
+    it('should create a free shot with a fallback player when player_id is omitted', async () => {
+      const response = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          club_id: club1.id,
+          period: 1,
+          free_shot_type: 'free_shot',
+          result: 'goal'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.first_name).toBe('Unknown');
+      expect(response.body.last_name).toBe('Scorer');
+    });
+
     it('should create an unconfirmed free shot idempotently and confirm it later', async () => {
       const payload = {
         game_id: game.id,
@@ -932,6 +949,109 @@ describe('🎯 Events API', () => {
       expect(response.body.length).toBe(1);
       expect(response.body[0]).toHaveProperty('club_name');
       expect(response.body[0]).toHaveProperty('first_name');
+    });
+
+    it('should update a free shot', async () => {
+      const createResponse = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player1.id,
+          club_id: club1.id,
+          period: 1,
+          free_shot_type: 'free_shot',
+          result: 'miss'
+        });
+
+      const response = await request(app)
+        .put(`/api/free-shots/${createResponse.body.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          result: 'goal',
+          reason: 'Updated reason',
+          distance: 7.2
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.result).toBe('goal');
+      expect(response.body.reason).toBe('Updated reason');
+      expect(response.body.distance).toBe(7.2);
+    });
+
+    it('should reject invalid free shot updates', async () => {
+      const createResponse = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player1.id,
+          club_id: club1.id,
+          period: 1,
+          free_shot_type: 'free_shot',
+          result: 'goal'
+        });
+
+      const response = await request(app)
+        .put(`/api/free-shots/${createResponse.body.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ game_id: game.id, result: 'invalid_result' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Result must be one of: goal, miss, blocked');
+    });
+
+    it('should return 404 when updating a missing free shot', async () => {
+      const response = await request(app)
+        .put('/api/free-shots/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ game_id: game.id, result: 'goal' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Free shot not found');
+    });
+
+    it('should return 404 when confirming a missing free shot', async () => {
+      const response = await request(app)
+        .post('/api/free-shots/999999/confirm')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ game_id: game.id });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Free shot not found');
+    });
+
+    it('should delete a free shot', async () => {
+      const createResponse = await request(app)
+        .post('/api/free-shots')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          player_id: player1.id,
+          club_id: club1.id,
+          period: 1,
+          free_shot_type: 'free_shot',
+          result: 'goal'
+        });
+
+      const response = await request(app)
+        .delete(`/api/free-shots/${createResponse.body.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ game_id: game.id });
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('Free shot deleted successfully');
+    });
+
+    it('should return 404 when deleting a missing free shot', async () => {
+      const response = await request(app)
+        .delete('/api/free-shots/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ game_id: game.id });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Free shot not found');
     });
 
     it('should reject invalid free shot type', async () => {
@@ -1209,6 +1329,44 @@ describe('🎯 Events API', () => {
       expect(response.body[0]).toHaveProperty('title');
     });
 
+    it('should filter commentary by type, period, and status', async () => {
+      await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          commentary_type: 'note',
+          title: 'Confirmed note',
+          content: 'Confirmed content'
+        });
+
+      await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 2,
+          commentary_type: 'technical',
+          title: 'Pending technical note',
+          content: 'Pending content',
+          client_uuid: '20000000-0000-4000-8000-000000000003',
+          event_status: 'unconfirmed'
+        });
+
+      const response = await request(app)
+        .get(`/api/match-commentary/${game.id}?commentary_type=technical&period=2&event_status=unconfirmed`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0]).toMatchObject({
+        commentary_type: 'technical',
+        period: 2,
+        event_status: 'unconfirmed'
+      });
+    });
+
     it('should update commentary', async () => {
       // Create commentary
       const createResponse = await request(app)
@@ -1237,6 +1395,138 @@ describe('🎯 Events API', () => {
       expect(updateResponse.status).toBe(200);
       expect(updateResponse.body.title).toBe('Updated Title');
       expect(updateResponse.body.content).toBe('Updated content with more details');
+    });
+
+    it('should reject updating commentary owned by another coach', async () => {
+      const createResponse = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          commentary_type: 'note',
+          title: 'Admin note',
+          content: 'Only admin can edit this'
+        });
+
+      const response = await request(app)
+        .put(`/api/match-commentary/${createResponse.body.id}`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({ title: 'Coach edit attempt' });
+
+      expect(response.status).toBe(403);
+      expect(response.body.error).toContain('only edit your own commentary');
+    });
+
+    it('should return 400 when updating commentary without any fields', async () => {
+      const createResponse = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          commentary_type: 'note',
+          title: 'No-op update',
+          content: 'No fields test'
+        });
+
+      const response = await request(app)
+        .put(`/api/match-commentary/${createResponse.body.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('No fields to update');
+    });
+
+    it('should return 404 when updating missing commentary', async () => {
+      const response = await request(app)
+        .put('/api/match-commentary/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ title: 'Missing commentary' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Match commentary not found');
+    });
+
+    it('should reject confirming commentary owned by another coach', async () => {
+      const createResponse = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 2,
+          commentary_type: 'technical',
+          title: 'Admin pending note',
+          content: 'Pending confirmation',
+          client_uuid: '20000000-0000-4000-8000-000000000004',
+          event_status: 'unconfirmed'
+        });
+
+      const response = await request(app)
+        .post(`/api/match-commentary/${createResponse.body.id}/confirm`)
+        .set('Authorization', `Bearer ${coachToken}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body.error).toContain('only confirm your own commentary');
+    });
+
+    it('should return 404 when confirming missing commentary', async () => {
+      const response = await request(app)
+        .post('/api/match-commentary/999999/confirm')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Match commentary not found');
+    });
+
+    it('should delete commentary as admin', async () => {
+      const createResponse = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          commentary_type: 'note',
+          title: 'Delete me',
+          content: 'This commentary will be deleted'
+        });
+
+      const response = await request(app)
+        .delete(`/api/match-commentary/${createResponse.body.id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('Match commentary deleted successfully');
+    });
+
+    it('should reject deleting commentary owned by another coach', async () => {
+      const createResponse = await request(app)
+        .post('/api/match-commentary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          game_id: game.id,
+          period: 1,
+          commentary_type: 'note',
+          title: 'Protected note',
+          content: 'Coach should not delete this'
+        });
+
+      const response = await request(app)
+        .delete(`/api/match-commentary/${createResponse.body.id}`)
+        .set('Authorization', `Bearer ${coachToken}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body.error).toContain('only delete your own commentary');
+    });
+
+    it('should return 404 when deleting missing commentary', async () => {
+      const response = await request(app)
+        .delete('/api/match-commentary/999999')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Match commentary not found');
     });
 
     it('should reject invalid commentary type', async () => {

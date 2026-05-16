@@ -33,7 +33,7 @@ describe('⏱️ Timer API', () => {
       regularUser = userResult.rows[0];
 
       // Create JWT tokens directly (no dependency on login endpoint)
-      const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+      const jwtSecret = process.env.JWT_SECRET;
       adminToken = jwt.sign({ userId: adminUser.id, role: adminUser.role }, jwtSecret, { expiresIn: '1h' });
       coachToken = jwt.sign({ userId: coachUser.id, role: coachUser.role }, jwtSecret, { expiresIn: '1h' });
       userToken = jwt.sign({ userId: regularUser.id, role: regularUser.role }, jwtSecret, { expiresIn: '1h' });
@@ -415,6 +415,16 @@ describe('⏱️ Timer API', () => {
         throw error;
       }
     });
+
+    it('❌ should return 404 when stopping a missing game', async () => {
+      const response = await request(app)
+        .post('/api/timer/999999/stop')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Game not found');
+    });
   });
 
   describe('⏭️ POST /api/timer/:gameId/next-period', () => {
@@ -500,6 +510,16 @@ describe('⏱️ Timer API', () => {
         throw error;
       }
     });
+
+    it('❌ should return 404 for next-period on missing game', async () => {
+      const response = await request(app)
+        .post('/api/timer/999999/next-period')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Game not found');
+    });
   });
 
   describe('✏️ PUT /api/timer/:gameId/period', () => {
@@ -553,6 +573,16 @@ describe('⏱️ Timer API', () => {
         throw error;
       }
     });
+
+    it('❌ should return 404 when manually setting period on missing game', async () => {
+      const response = await request(app)
+        .put('/api/timer/999999/period')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ period: 2 });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Game not found');
+    });
   });
 
   describe('⏰ PUT /api/timer/:gameId/duration', () => {
@@ -604,6 +634,87 @@ describe('⏱️ Timer API', () => {
         global.testContext.logTestError(error, 'Regular user duration test failed');
         throw error;
       }
+    });
+
+    it('❌ should return 404 when updating duration for missing game', async () => {
+      const response = await request(app)
+        .put('/api/timer/999999/duration')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ minutes: 15 });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Game not found');
+    });
+  });
+
+  describe('🔄 POST /api/timer/:gameId/reset-match', () => {
+    beforeEach(async () => {
+      await db.query(
+        `UPDATE games
+         SET home_score = 5,
+             away_score = 4,
+             current_period = 3,
+             timer_state = 'paused',
+             timer_started_at = CURRENT_TIMESTAMP,
+             timer_paused_at = CURRENT_TIMESTAMP,
+             time_remaining = '00:05:00'::interval
+         WHERE id = $1`,
+        [game.id]
+      );
+
+      await db.query(
+        `INSERT INTO game_events (game_id, event_type, club_id, period)
+         VALUES ($1, 'timeout', $2, 2)`,
+        [game.id, club1.id]
+      );
+
+      await db.query(
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period)
+         SELECT $1, p.id, $2, 10, 10, 'goal', 2
+         FROM players p
+         WHERE 1 = 0`,
+        [game.id, club1.id]
+      );
+    });
+
+    it('✅ should reset match data and timer state', async () => {
+      const response = await request(app)
+        .post(`/api/timer/${game.id}/reset-match`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('Match reset successfully');
+
+      const gameResult = await db.query(
+        'SELECT home_score, away_score, current_period, timer_state, time_remaining FROM games WHERE id = $1',
+        [game.id]
+      );
+
+      expect(gameResult.rows[0].home_score).toBe(0);
+      expect(gameResult.rows[0].away_score).toBe(0);
+      expect(gameResult.rows[0].current_period).toBe(1);
+      expect(gameResult.rows[0].timer_state).toBe('stopped');
+      expect(gameResult.rows[0].time_remaining).toBeNull();
+    });
+
+    it('❌ should reject reset-match by regular user', async () => {
+      const response = await request(app)
+        .post(`/api/timer/${game.id}/reset-match`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({});
+
+      expect(response.status).toBe(403);
+    });
+
+    it('❌ should return 404 when resetting a missing game', async () => {
+      const response = await request(app)
+        .post('/api/timer/999999/reset-match')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Game not found');
     });
   });
 

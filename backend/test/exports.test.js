@@ -525,6 +525,184 @@ describe('📤 Exports API', () => {
       expect(response.body.error).toContain('Player ID must be');
     });
   });
+
+  describe('🧰 Template Management + Queue/Download', () => {
+    let createdTemplateId;
+
+    afterEach(async () => {
+      if (createdTemplateId) {
+        await db.query('DELETE FROM report_templates WHERE id = $1', [createdTemplateId]);
+        createdTemplateId = null;
+      }
+    });
+
+    it('✅ should create, update, and delete a custom template', async () => {
+      const createResponse = await request(app)
+        .post('/api/exports/templates')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          name: 'Coach Template',
+          description: 'Template lifecycle test',
+          format: 'csv',
+          options: { sections: ['shots'] }
+        })
+        .expect(201);
+
+      createdTemplateId = createResponse.body.id;
+      expect(createResponse.body.name).toBe('Coach Template');
+
+      const updateResponse = await request(app)
+        .put(`/api/exports/templates/${createdTemplateId}`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({ description: 'Updated template description' })
+        .expect(200);
+
+      expect(updateResponse.body.description).toBe('Updated template description');
+
+      await request(app)
+        .delete(`/api/exports/templates/${createdTemplateId}`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .expect(200);
+
+      createdTemplateId = null;
+    });
+
+    it('❌ should reject template update with no fields', async () => {
+      const createResponse = await request(app)
+        .post('/api/exports/templates')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          name: 'No-Update Template',
+          format: 'json',
+          options: {}
+        })
+        .expect(201);
+
+      createdTemplateId = createResponse.body.id;
+
+      const response = await request(app)
+        .put(`/api/exports/templates/${createdTemplateId}`)
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({})
+        .expect(400);
+
+      expect(response.body.error).toBe('No fields to update');
+    });
+
+    it('✅ should return queue status payload', async () => {
+      const response = await request(app)
+        .get('/api/exports/queue-status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('queueLength');
+      expect(response.body).toHaveProperty('isProcessing');
+      expect(typeof response.body.queueLength).toBe('number');
+      expect(typeof response.body.isProcessing).toBe('boolean');
+    });
+
+    it('✅ should return recent exports for current user', async () => {
+      const templateResult = await db.query(`
+        INSERT INTO report_templates (name, description, type, sections, created_by, is_default, is_active)
+        VALUES ($1, $2, $3, $4, $5, false, true)
+        RETURNING id
+      `, [
+        'Recent Exports Template',
+        'Template for recent exports route',
+        'csv',
+        JSON.stringify({}),
+        adminUser.id
+      ]);
+
+      const exportResult = await db.query(`
+        INSERT INTO report_exports (template_id, generated_by, report_name, report_type, format, file_path, file_size_bytes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id
+      `, [
+        templateResult.rows[0].id,
+        adminUser.id,
+        'Recent Export Sample',
+        'game',
+        'csv',
+        '/exports/recent-sample.csv',
+        2048
+      ]);
+
+      const response = await request(app)
+        .get('/api/exports/recent')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.some((entry) => entry.name === 'Recent Export Sample')).toBe(true);
+
+      await db.query('DELETE FROM report_exports WHERE id = $1', [exportResult.rows[0].id]);
+      await db.query('DELETE FROM report_templates WHERE id = $1', [templateResult.rows[0].id]);
+    });
+
+    it('❌ should reject from-template when team does not exist', async () => {
+      const templateResponse = await request(app)
+        .post('/api/exports/templates')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          name: 'From Template Source',
+          format: 'csv',
+          options: { sections: ['shots'] }
+        })
+        .expect(201);
+
+      createdTemplateId = templateResponse.body.id;
+
+      const response = await request(app)
+        .post('/api/exports/from-template')
+        .set('Authorization', `Bearer ${coachToken}`)
+        .send({
+          templateId: createdTemplateId,
+          dataType: 'team',
+          teamId: 999999
+        })
+        .expect(404);
+
+      expect(response.body.error).toBe('Team not found');
+    });
+
+    it('❌ should reject download for unsafe export paths', async () => {
+      const templateResult = await db.query(`
+        INSERT INTO report_templates (name, description, type, sections, created_by, is_default, is_active)
+        VALUES ($1, $2, $3, $4, $5, false, true)
+        RETURNING id
+      `, [
+        'Unsafe Download Template',
+        'Template for download path checks',
+        'csv',
+        JSON.stringify({}),
+        adminUser.id
+      ]);
+
+      const exportResult = await db.query(`
+        INSERT INTO report_exports (template_id, generated_by, report_name, report_type, format, file_path)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+      `, [
+        templateResult.rows[0].id,
+        adminUser.id,
+        'Unsafe Export',
+        'game',
+        'csv',
+        '/../../etc/passwd'
+      ]);
+
+      const response = await request(app)
+        .get(`/api/exports/download/${exportResult.rows[0].id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(400);
+
+      expect(response.body.error).toBe('Invalid export file path');
+
+      await db.query('DELETE FROM report_exports WHERE id = $1', [exportResult.rows[0].id]);
+      await db.query('DELETE FROM report_templates WHERE id = $1', [templateResult.rows[0].id]);
+    });
+  });
 });
 
 
