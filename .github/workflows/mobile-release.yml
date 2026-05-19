@@ -263,7 +263,7 @@ jobs:
       - name: Add iOS platform
         working-directory: frontend
         run: |
-          if [ ! -d ios ]; then
+          if [ ! -d ios/App ]; then
             npx cap add ios
           fi
 
@@ -272,8 +272,18 @@ jobs:
         run: npx cap sync ios
 
       - name: Install iOS dependencies
-        working-directory: frontend/ios/App
-        run: pod install
+        working-directory: frontend
+        run: |
+          if [ -f ios/App/Podfile ]; then
+            cd ios/App
+          elif [ -f ios/Podfile ]; then
+            cd ios
+          else
+            echo "❌ No Podfile found after iOS sync"
+            find ios -maxdepth 3 -name Podfile || true
+            exit 1
+          fi
+          pod install
 
       - name: Bump version
         working-directory: frontend/ios/App
