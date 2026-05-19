@@ -39,6 +39,7 @@ services:
       DB_MAX_CONNECTIONS: 20
       DB_IDLE_TIMEOUT_MS: 30000
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your environment or .env file}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in your environment or .env file}
       JWT_EXPIRES_IN: 1h
       JWT_REFRESH_EXPIRES_IN: 7d
       SESSION_SECURE: false
