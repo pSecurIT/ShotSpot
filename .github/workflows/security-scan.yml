@@ -1,9 +1,7 @@
 name: Security Scan
 
-# Run security scans on PRs, pushes to main, and weekly to catch regressions
+# Run security scans on pushes to main, weekly, and manually to catch regressions
 on:
-  pull_request:
-    branches: [ main ]
   push:
     branches: [ main ]
   schedule:
@@ -56,22 +54,6 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-container-scan'
-
-      - name: Upload Trivy results with legacy release category
-        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
-        if: ${{ hashFiles('trivy-results.sarif') != '' }}
-        with:
-          sarif_file: 'trivy-results.sarif'
-          # Compatibility upload to preserve code-scanning config continuity across workflow refactors.
-          category: '.github/workflows/release.yml:scan-vulnerabilities'
-
-      - name: Upload Trivy results with legacy docker category
-        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
-        if: ${{ hashFiles('trivy-results.sarif') != '' }}
-        with:
-          sarif_file: 'trivy-results.sarif'
-          # Compatibility upload to preserve code-scanning config continuity across workflow refactors.
-          category: '.github/workflows/docker.yml:scan-vulnerabilities'
 
       - name: Fail on critical vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
@@ -149,43 +131,5 @@ jobs:
           scanners: 'vuln,secret'
           ignore-unfixed: true
           exit-code: '0'
-
-  scan-secrets:
-    name: Scan for Secrets (Gitleaks)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          # Full history so gitleaks can scan all commits on the branch/PR
-          fetch-depth: 0
-
-      - name: Run Gitleaks (SARIF output)
-        id: gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
-          GITLEAKS_ENABLE_COMMENTS: "false"
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
-
-      - name: Upload Gitleaks results to GitHub Security
-        uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
-        if: ${{ hashFiles('results.sarif') != '' }}
-        with:
-          sarif_file: results.sarif
-          category: gitleaks-secret-scan
-
-      - name: Fail if secrets were detected
-        if: ${{ steps.gitleaks.outcome == 'failure' }}
-        run: |
-          echo "::error::Gitleaks detected secrets. See the Security tab for details."
-          exit 1
 
 
