@@ -11,3 +11,36 @@
 365ac47230b9d8c1dd812ab0469aa969125209d5:.github/workflows/docker.yml:shotspot-db-password:112
 365ac47230b9d8c1dd812ab0469aa969125209d5:docker-compose.dev.yml:shotspot-db-password:40
 365ac47230b9d8c1dd812ab0469aa969125209d5:.github/workflows/docker.yml:shotspot-db-password:265
+
+# Dynamic JWT/SESSION secret generation via openssl in CI workflows (not real secrets)
+# These use $(openssl rand -hex N) to generate ephemeral values at CI runtime
+1bb88ed1:.github/workflows/node.js.yml:shotspot-jwt-secret:63
+1bb88ed1:.github/workflows/node.js.yml:shotspot-session-secret:64
+1bb88ed1:.github/workflows/test-coverage.yml:shotspot-jwt-secret:107
+1bb88ed1:.github/workflows/test-coverage.yml:shotspot-session-secret:108
+1bb88ed1:.github/workflows/docker.yml:shotspot-jwt-secret:168
+1bb88ed1:.github/workflows/docker.yml:shotspot-db-password:169
+1bb88ed1:.github/workflows/docker.yml:shotspot-jwt-secret:327
+1bb88ed1:.github/workflows/docker.yml:shotspot-db-password:328
+1bb88ed1:.github/workflows/release.yml:shotspot-jwt-secret:268
+1bb88ed1:.github/workflows/release.yml:shotspot-session-secret:269
+
+# Environment variable placeholders in docker-compose files (${VAR:?error message})
+# These require values from the environment/user and are not hardcoded secrets
+1bb88ed1:docker-compose.dev.yml:shotspot-db-password:11
+1bb88ed1:docker-compose.dev.yml:shotspot-db-password:40
+1bb88ed1:docker-compose.dev.yml:shotspot-jwt-secret:43
+1bb88ed1:docker-compose.yml:shotspot-db-password:30
+1bb88ed1:docker-compose.yml:shotspot-db-password:94
+1bb88ed1:docker-compose.yml:shotspot-jwt-secret:100
+1bb88ed1:docker-compose.yml:shotspot-session-secret:103
+1bb88ed1:docker-compose.yml:shotspot-csrf-secret:104
+1bb88ed1:release/docker-compose.yml:shotspot-db-password:12
+1bb88ed1:release/docker-compose.yml:shotspot-db-password:37
+1bb88ed1:release/docker-compose.yml:shotspot-jwt-secret:41
+1bb88ed1:release/docker-compose.yml:shotspot-session-secret:42
+
+# Test job hardcoded credentials (test database, not production)
+# These are intentional default test credentials for CI isolation
+1bb88ed1:.github/workflows/test-coverage.yml:shotspot-db-password:73
+1bb88ed1:.github/workflows/node.js.yml:shotspot-db-password:35
