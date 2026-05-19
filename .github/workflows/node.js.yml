@@ -241,6 +241,7 @@ jobs:
 
     - name: Run Snyk scan (Android Gradle dependencies + SARIF)
       id: snyk_android_scan
+      if: ${{ github.event_name != 'pull_request' }}
       continue-on-error: true
       shell: bash
       env:
@@ -391,6 +392,27 @@ jobs:
         if [ "$blocking" -ne 0 ]; then
           echo "::error::Blocking Snyk findings detected. Check SARIF and logs for details."
           exit 1
+        fi
+
+    - name: Publish security summary
+      if: always()
+      shell: bash
+      env:
+        BACKEND_EXIT: ${{ steps.snyk_backend_scan.outputs.exit_code }}
+        FRONTEND_EXIT: ${{ steps.snyk_frontend_scan.outputs.exit_code }}
+        ANDROID_EXIT: ${{ steps.snyk_android_scan.outputs.exit_code }}
+      run: |
+        set -euo pipefail
+
+        echo "## Security Checks Summary" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Backend Snyk exit code: ${BACKEND_EXIT:-0}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Frontend Snyk exit code: ${FRONTEND_EXIT:-0}" >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          echo "- Android Gradle scan: skipped on pull requests to keep the PR critical path lean" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "- Android Gradle Snyk exit code: ${ANDROID_EXIT:-0}" >> "$GITHUB_STEP_SUMMARY"
         fi
 
         
