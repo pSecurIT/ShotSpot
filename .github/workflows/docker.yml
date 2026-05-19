@@ -50,17 +50,24 @@ jobs:
             base_sha="${{ github.event.pull_request.base.sha }}"
             head_sha="${{ github.event.pull_request.head.sha }}"
 
-            if git diff --name-only "$base_sha" "$head_sha" -- \
-              'Dockerfile' \
-              'docker-compose.yml' \
-              'backend/**' \
-              'frontend/**' \
-              '.github/workflows/docker.yml' | grep -q .; then
+            changed_files="$(
+              git diff --name-only "$base_sha" "$head_sha" -- \
+                'Dockerfile' \
+                'docker-compose.yml' \
+                'backend/**' \
+                'frontend/**' \
+                '.github/workflows/docker.yml' 2>/dev/null
+            )" || changed_files=""
+
+            if [ -n "$changed_files" ]; then
               should_run=true
               echo "Docker-relevant changes detected for this pull request." >> "$GITHUB_STEP_SUMMARY"
-            else
+            elif git diff --quiet "$base_sha" "$head_sha" -- >/dev/null 2>&1; then
               should_run=false
               echo "No Docker-relevant changes detected for this pull request; heavy Docker validation will be skipped." >> "$GITHUB_STEP_SUMMARY"
+            else
+              should_run=true
+              echo "Unable to compute the pull request diff with local SHAs; Docker validation will run by default." >> "$GITHUB_STEP_SUMMARY"
             fi
           else
             echo "Non-pull_request event; Docker validation will run." >> "$GITHUB_STEP_SUMMARY"
