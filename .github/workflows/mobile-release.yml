@@ -196,15 +196,40 @@ jobs:
       - name: Detect signing secrets
         id: detect_signing
         run: |
-          # If both P12 and provisioning profile secrets exist, enable signing path
-          if [ -n "$IOS_CERTIFICATE_BASE64" ] && [ -n "$IOS_PROVISIONING_PROFILE_BASE64" ]; then
+          required=(
+            IOS_CERTIFICATE_BASE64
+            IOS_CERTIFICATE_PASSWORD
+            IOS_PROVISIONING_PROFILE_BASE64
+            IOS_TEAM_ID
+            IOS_PROVISIONING_PROFILE_NAME
+          )
+
+          missing=()
+          present=0
+
+          for var_name in "${required[@]}"; do
+            if [ -n "${!var_name}" ]; then
+              present=$((present + 1))
+            else
+              missing+=("$var_name")
+            fi
+          done
+
+          # Fully configured: use signed archive flow.
+          if [ ${#missing[@]} -eq 0 ]; then
             echo "signing_required=true" >> $GITHUB_ENV
             echo "signing_required=true" >> $GITHUB_OUTPUT
             echo "✅ Signing secrets detected - will perform signed archive"
-          else
+          # Not configured at all: use simulator fallback flow.
+          elif [ $present -eq 0 ]; then
             echo "signing_required=false" >> $GITHUB_ENV
             echo "signing_required=false" >> $GITHUB_OUTPUT
             echo "⚠️  Signing secrets not configured - will perform simulator build"
+          # Partially configured: fail fast with actionable diagnostics.
+          else
+            echo "::error::Partial iOS signing configuration detected. Missing required secret(s): ${missing[*]}"
+            echo "Provide all required secrets for signed builds, or remove all iOS signing secrets to use simulator fallback."
+            exit 1
           fi
 
       - name: Setup Node.js
