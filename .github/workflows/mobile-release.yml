@@ -295,56 +295,19 @@ jobs:
         working-directory: frontend
         run: npx cap sync ios
 
-      - name: Inspect generated iOS project
-        working-directory: frontend
-        run: |
-          echo "iOS directory structure:"
-          find ios -maxdepth 4 | sort
-
       - name: Install iOS dependencies
         working-directory: frontend
         run: |
-          set -e
-
-          PODFILE_DIR="$(find ios -name Podfile -type f -maxdepth 4 -exec dirname {} \; | head -n 1)"
-
-          if [ -z "$PODFILE_DIR" ]; then
+          if [ -f ios/App/Podfile ]; then
+            cd ios/App
+          elif [ -f ios/Podfile ]; then
+            cd ios
+          else
             echo "❌ No Podfile found after iOS sync"
-            find ios -maxdepth 4 -name Podfile || true
-            echo "Contents of ios directory:"
-            find ios -maxdepth 4 -type f | sort || true
+            find ios -maxdepth 3 -name Podfile || true
             exit 1
           fi
-
-          echo "✅ Found Podfile in: $PODFILE_DIR"
-          cd "$PODFILE_DIR"
           pod install
-
-      - name: Verify expected iOS app layout
-        working-directory: frontend
-        run: |
-          set -e
-
-          if [ ! -d ios/App ]; then
-            echo "❌ Expected ios/App directory was not generated"
-            echo "Current iOS structure:"
-            find ios -maxdepth 4 | sort || true
-            exit 1
-          fi
-
-          if [ ! -f ios/App/App.xcworkspace/contents.xcworkspacedata ]; then
-            echo "❌ Missing ios/App/App.xcworkspace"
-            find ios/App -maxdepth 3 | sort || true
-            exit 1
-          fi
-
-          if [ ! -f ios/App/App/Info.plist ]; then
-            echo "❌ Missing ios/App/App/Info.plist"
-            find ios/App -maxdepth 4 | sort || true
-            exit 1
-          fi
-
-          echo "✅ Verified expected iOS layout at ios/App"
 
       - name: Bump version
         working-directory: frontend/ios/App

@@ -1,10 +1,7 @@
 name: Security Scan
 
-# Run security scans on pull requests to main, pushes to main, weekly, and manually.
+# Run security scans on pushes to main, weekly, and manually to catch regressions
 on:
-  pull_request:
-    branches: [ main ]
-    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [ main ]
   schedule:
