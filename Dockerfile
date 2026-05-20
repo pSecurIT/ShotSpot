@@ -63,13 +63,8 @@ FROM node:lts-alpine
 
 ARG NPM_VERSION
 
-# Security: Update packages, npm, and install only necessary tools
-RUN apk update && \
-    apk upgrade --no-cache && \
-    apk add --no-cache \
-    dumb-init \
-    tini && \
-    rm -rf /var/cache/apk/* && \
+# Security: Install only runtime init process and pin npm
+RUN apk add --no-cache tini && \
     npm install -g npm@${NPM_VERSION}
 
 # Security: Create non-root user (no chown on /app yet - faster)
