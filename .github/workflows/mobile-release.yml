@@ -284,11 +284,17 @@ jobs:
           VITE_API_URL: ${{ env.VITE_API_URL_PRODUCTION }}
         run: npm run build
 
-      - name: Add iOS platform
+      - name: Ensure iOS platform exists
         working-directory: frontend
         run: |
-          if [ ! -d ios/App ]; then
+          set -e
+
+          if [ ! -f ios/App/Podfile ] || [ ! -f ios/App/App.xcodeproj/project.pbxproj ]; then
+            echo "iOS platform is missing or incomplete; recreating it"
+            rm -rf ios
             npx cap add ios
+          else
+            echo "iOS platform already present"
           fi
 
       - name: Sync Capacitor
@@ -302,23 +308,8 @@ jobs:
           find ios -maxdepth 4 | sort
 
       - name: Install iOS dependencies
-        working-directory: frontend
-        run: |
-          set -e
-
-          PODFILE_DIR="$(find ios -name Podfile -type f -maxdepth 4 -exec dirname {} \; | head -n 1)"
-
-          if [ -z "$PODFILE_DIR" ]; then
-            echo "❌ No Podfile found after iOS sync"
-            find ios -maxdepth 4 -name Podfile || true
-            echo "Contents of ios directory:"
-            find ios -maxdepth 4 -type f | sort || true
-            exit 1
-          fi
-
-          echo "✅ Found Podfile in: $PODFILE_DIR"
-          cd "$PODFILE_DIR"
-          pod install
+        working-directory: frontend/ios/App
+        run: pod install
 
       - name: Verify expected iOS app layout
         working-directory: frontend
