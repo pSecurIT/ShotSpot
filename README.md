@@ -11,7 +11,7 @@ ShotSpot is a korfball match intelligence platform for coaches, analysts, and te
 It combines a React and Capacitor frontend, an Express and PostgreSQL backend, live reporting APIs, export tooling, and mobile packaging so the same product can support match-day tracking, coaching review, and broader club workflows.
 
 <p align="center">
-  <img src="frontend/src/img/ShotSpot_logo.png" alt="ShotSpot logo" width="220" />
+  <img src="frontend/src/img/shotspot-mark.svg" alt="ShotSpot logo" width="220" />
 </p>
 
 ## Table of Contents
@@ -94,7 +94,7 @@ See the implementation guides:
 
 The following assets are included in this repository and referenced by the new guides.
 
-![ShotSpot logo](frontend/src/img/ShotSpot_logo.png)
+![ShotSpot logo](frontend/src/img/shotspot-mark.svg)
 ![ShotSpot icon](frontend/src/img/ShotSpot_icon.png)
 ![Korfball court context](frontend/src/img/Korfbalveld-breed.PNG)
 

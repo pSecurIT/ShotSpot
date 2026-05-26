@@ -224,7 +224,7 @@ npm run setup-db           # Reset/setup database
 
 ### Feature Visuals
 
-![ShotSpot logo](frontend/src/img/ShotSpot_logo.png)
+![ShotSpot logo](frontend/src/img/shotspot-mark.svg)
 ![Korfball court context](frontend/src/img/Korfbalveld-breed.PNG)
 
 ---
