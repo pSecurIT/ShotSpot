@@ -1,7 +1,8 @@
 {
   "name": "shotspot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ShotSpot - Korfball match statistics platform for live event capture, reporting, and analysis.",
+  "type": "module",
   "scripts": {
     "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
     "start:backend": "cd backend && npm start",

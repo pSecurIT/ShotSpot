@@ -1,5 +1,8 @@
 name: "ShotSpot CodeQL Config"
 
+packs:
+  - .github/codeql/extensions
+
 queries:
   - uses: security-extended
 

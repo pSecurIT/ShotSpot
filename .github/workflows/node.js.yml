@@ -267,6 +267,8 @@ jobs:
       with:
         sarif_file: snyk-backend.sarif
         category: 'Snyk/Open Source/shotspot/0'
+        ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
     - name: Upload Frontend SARIF to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
@@ -274,6 +276,8 @@ jobs:
       with:
         sarif_file: snyk-frontend.sarif
         category: snyk-frontend
+        ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
     - name: Upload Android Gradle SARIF to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
@@ -281,6 +285,8 @@ jobs:
       with:
         sarif_file: snyk-android-gradle.sarif
         category: snyk-android-gradle
+        ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
     - name: Run Snyk Code scan
       id: snyk_code_test
@@ -307,6 +313,8 @@ jobs:
       with:
         sarif_file: snyk-code.sarif
         category: snyk-code
+        ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
     - name: Monitor backend dependencies in Snyk
       if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}

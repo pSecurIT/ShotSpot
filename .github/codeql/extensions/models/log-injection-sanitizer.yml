@@ -1,0 +1,12 @@
+extensions:
+  # Marks sanitizeForLog and sanitizeArgs as taint-neutralizing (sanitizer) functions.
+  # This prevents CodeQL js/log-injection (CWE-117) false positives since both
+  # functions strip all newline and control characters from their inputs.
+  - addsTo:
+      pack: codeql/javascript-all
+      extensible: neutralModel
+    data:
+      # sanitizeForLog(value, depth?) → strips control/newline chars recursively
+      - ["", "Member[sanitizeForLog]", "sanitizer"]
+      # sanitizeArgs(args) → maps sanitizeForLog over all log arguments
+      - ["", "Member[sanitizeArgs]", "sanitizer"]
