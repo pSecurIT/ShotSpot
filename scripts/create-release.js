@@ -66,6 +66,15 @@ function updateVersion(newVersion) {
   console.log(`✅ Updated version to ${newVersion} in all package.json files`);
 }
 
+function syncBackendLockfile() {
+  // Keep backend/package-lock.json aligned with backend/package.json version.
+  // This mirrors the Docker CI lockfile validation step.
+  exec('npm install --package-lock-only --include=optional --ignore-scripts', {
+    cwd: join(rootDir, 'backend'),
+  });
+  console.log('✅ Synced backend/package-lock.json');
+}
+
 function incrementVersion(version, type) {
   const parts = version.split('.').map(Number);
   switch (type) {
@@ -347,11 +356,14 @@ async function main() {
   // Update versions
   updateVersion(newVersion);
 
+  // Ensure backend lockfile stays in sync with backend package version.
+  syncBackendLockfile();
+
   // Update changelog
   updateChangelogFile(changelog);
 
   // Commit changes
-  exec('git add package.json frontend/package.json backend/package.json CHANGELOG.md');
+  exec('git add package.json frontend/package.json backend/package.json backend/package-lock.json CHANGELOG.md');
   const stagedChanges = exec('git diff --cached --name-only', { silent: true });
   if (stagedChanges) {
     exec(`git commit -m "chore: release version ${newVersion}"`);
