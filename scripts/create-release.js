@@ -25,12 +25,14 @@ function question(query) {
 
 function exec(command, options = {}) {
   try {
-    return execSync(command, { 
+    const result = execSync(command, { 
       encoding: 'utf-8', 
       stdio: options.silent ? 'pipe' : 'inherit',
       cwd: options.cwd || rootDir,
       ...options 
-    }).trim();
+    });
+
+    return typeof result === 'string' ? result.trim() : '';
   } catch (error) {
     if (options.ignoreError) return '';
     throw error;
