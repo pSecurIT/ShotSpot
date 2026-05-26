@@ -28,6 +28,7 @@ function exec(command, options = {}) {
     return execSync(command, { 
       encoding: 'utf-8', 
       stdio: options.silent ? 'pipe' : 'inherit',
+      cwd: options.cwd || rootDir,
       ...options 
     }).trim();
   } catch (error) {
