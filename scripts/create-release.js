@@ -112,6 +112,13 @@ function getLatestTag(excludedTag = '') {
   }) || '';
 }
 
+function getCurrentBranch() {
+  return exec('git branch --show-current', {
+    silent: true,
+    ignoreError: true,
+  }) || 'main';
+}
+
 function categorizeCommits(commits) {
   const categories = {
     features: [],
@@ -218,7 +225,20 @@ async function main() {
 
   // Get current version
   const currentVersion = getCurrentVersion();
+  const currentBranch = getCurrentBranch();
   console.log(`Current version: ${currentVersion}\n`);
+
+  if (currentBranch !== 'main') {
+    const continueOnBranch = await question(
+      `⚠️  You are on branch ${currentBranch}. Continue release on this branch? (y/N): `
+    );
+
+    if (continueOnBranch.toLowerCase() !== 'y') {
+      console.log('❌ Aborted');
+      rl.close();
+      process.exit(0);
+    }
+  }
 
   // Ask for release type
   console.log('Select release type:');
@@ -350,14 +370,14 @@ async function main() {
 
   console.log('\n🎉 Release prepared successfully!\n');
   console.log('Next steps:');
-  console.log(`1. Push changes: git push origin main`);
+  console.log(`1. Push changes: git push origin ${currentBranch}`);
   console.log(`2. Push tag: git push origin ${releaseTag}`);
   console.log('3. Create GitHub release from the tag');
   console.log('4. GitHub Actions will automatically build mobile packages\n');
 
   const pushNow = await question('Push to remote now? (y/N): ');
   if (pushNow.toLowerCase() === 'y') {
-    exec('git push origin main');
+    exec(`git push origin ${currentBranch}`);
     exec(`git push origin ${releaseTag}`);
     console.log('✅ Pushed to remote');
     console.log('\n🚀 GitHub Actions will now build the mobile packages!');
