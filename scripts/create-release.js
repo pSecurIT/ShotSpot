@@ -90,6 +90,28 @@ function getGitLog(fromTag) {
     .filter(line => line.trim());
 }
 
+function tagExists(tagName) {
+  return Boolean(exec(`git rev-parse -q --verify "refs/tags/${tagName}"`, {
+    silent: true,
+    ignoreError: true,
+  }));
+}
+
+function remoteTagExists(tagName) {
+  return Boolean(exec(`git ls-remote --tags origin "refs/tags/${tagName}"`, {
+    silent: true,
+    ignoreError: true,
+  }));
+}
+
+function getLatestTag(excludedTag = '') {
+  const excludeArg = excludedTag ? ` --exclude=${excludedTag}` : '';
+  return exec(`git describe --tags --abbrev=0${excludeArg}`, {
+    silent: true,
+    ignoreError: true,
+  }) || '';
+}
+
 function categorizeCommits(commits) {
   const categories = {
     features: [],
@@ -234,8 +256,56 @@ async function main() {
 
   console.log(`\nNew version will be: ${newVersion}`);
 
+  let allowVersionOverride = false;
+  const releaseTag = `v${newVersion}`;
+  const localTagExists = tagExists(releaseTag);
+  const pushedTagExists = remoteTagExists(releaseTag);
+
+  if (newVersion === currentVersion) {
+    const continueOverride = await question(
+      `⚠️  Version ${newVersion} is already current. Continue with override mode? (y/N): `
+    );
+
+    if (continueOverride.toLowerCase() !== 'y') {
+      console.log('❌ Aborted');
+      rl.close();
+      process.exit(0);
+    }
+
+    allowVersionOverride = true;
+  }
+
+  if (pushedTagExists) {
+    console.log(`❌ Tag ${releaseTag} already exists.`);
+    console.log('   The tag already exists on origin, so this release version cannot be overridden.');
+    rl.close();
+    process.exit(1);
+  }
+
+  let replaceLocalTag = false;
+  if (localTagExists) {
+    if (!allowVersionOverride) {
+      console.log(`❌ Tag ${releaseTag} already exists locally.`);
+      console.log('   Choose a different release version or rerun in override mode.');
+      rl.close();
+      process.exit(1);
+    }
+
+    const recreateTag = await question(
+      `⚠️  Local tag ${releaseTag} exists but is not on origin. Recreate it? (y/N): `
+    );
+
+    if (recreateTag.toLowerCase() !== 'y') {
+      console.log('❌ Aborted');
+      rl.close();
+      process.exit(0);
+    }
+
+    replaceLocalTag = true;
+  }
+
   // Get latest tag
-  const latestTag = exec('git describe --tags --abbrev=0', { silent: true, ignoreError: true }) || '';
+  const latestTag = getLatestTag(replaceLocalTag ? releaseTag : '');
   
   // Get commits since last tag
   const commits = getGitLog(latestTag);
@@ -262,24 +332,33 @@ async function main() {
 
   // Commit changes
   exec('git add package.json frontend/package.json backend/package.json CHANGELOG.md');
-  exec(`git commit -m "chore: release version ${newVersion}"`);
-  console.log('✅ Committed version updates');
+  const stagedChanges = exec('git diff --cached --name-only', { silent: true });
+  if (stagedChanges) {
+    exec(`git commit -m "chore: release version ${newVersion}"`);
+    console.log('✅ Committed version updates');
+  } else {
+    console.log('ℹ️  No staged file changes detected, skipping release commit');
+  }
 
   // Create tag
-  exec(`git tag -a v${newVersion} -m "Release version ${newVersion}"`);
-  console.log(`✅ Created tag v${newVersion}`);
+  if (replaceLocalTag) {
+    exec(`git tag -d ${releaseTag}`);
+    console.log(`✅ Removed existing local tag ${releaseTag}`);
+  }
+  exec(`git tag -a ${releaseTag} -m "Release version ${newVersion}"`);
+  console.log(`✅ Created tag ${releaseTag}`);
 
   console.log('\n🎉 Release prepared successfully!\n');
   console.log('Next steps:');
   console.log(`1. Push changes: git push origin main`);
-  console.log(`2. Push tag: git push origin v${newVersion}`);
+  console.log(`2. Push tag: git push origin ${releaseTag}`);
   console.log('3. Create GitHub release from the tag');
   console.log('4. GitHub Actions will automatically build mobile packages\n');
 
   const pushNow = await question('Push to remote now? (y/N): ');
   if (pushNow.toLowerCase() === 'y') {
     exec('git push origin main');
-    exec(`git push origin v${newVersion}`);
+    exec(`git push origin ${releaseTag}`);
     console.log('✅ Pushed to remote');
     console.log('\n🚀 GitHub Actions will now build the mobile packages!');
     console.log('Check: https://github.com/pSecurIT/Korfball-game-statistics/actions');
