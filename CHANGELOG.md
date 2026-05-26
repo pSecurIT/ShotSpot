@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.0.1] - 2026-05-26
+
+### 🐛 Bug Fixes
+
+- fix: improve exec function to handle command output and return trimmed result
+- fix: update exec function to set current working directory based on options
+- fix: correct member references in log-injection-sanitizer.yml
+- fix: add module type declaration in package.json
+- fix: correct extension point name in log-injection-sanitizer.yml
+- fix: update logo references from PNG to SVG format in documentation
+- fix: ensure iOS platform exists and streamline dependency installation in mobile release workflow (#540)
+- fix: enhance iOS project inspection and dependency installation in mo… (#537)
+
+
 ## [1.0.1] - 2026-05-26
 
 
