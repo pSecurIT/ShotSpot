@@ -58,7 +58,7 @@
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.6",
+    "@babel/core": "^7.29.7",
     "@babel/plugin-syntax-import-attributes": "^7.28.6",
     "@babel/preset-env": "^7.29.7",
     "@eslint/js": "^10.0.1",
