@@ -75,6 +75,15 @@ function syncBackendLockfile() {
   console.log('✅ Synced backend/package-lock.json');
 }
 
+function syncFrontendLockfile() {
+  // Keep frontend/package-lock.json aligned with frontend/package.json version.
+  // This mirrors the Docker CI lockfile validation step.
+  exec('npm install --package-lock-only --include=optional --ignore-scripts', {
+    cwd: join(rootDir, 'frontend'),
+  });
+  console.log('✅ Synced frontend/package-lock.json');
+}
+
 function incrementVersion(version, type) {
   const parts = version.split('.').map(Number);
   switch (type) {
@@ -359,11 +368,14 @@ async function main() {
   // Ensure backend lockfile stays in sync with backend package version.
   syncBackendLockfile();
 
+  // Ensure frontend lockfile stays in sync with frontend package version.
+  syncFrontendLockfile();
+
   // Update changelog
   updateChangelogFile(changelog);
 
   // Commit changes
-  exec('git add package.json frontend/package.json backend/package.json backend/package-lock.json CHANGELOG.md');
+  exec('git add package.json frontend/package.json backend/package.json frontend/package-lock.json backend/package-lock.json CHANGELOG.md');
   const stagedChanges = exec('git diff --cached --name-only', { silent: true });
   if (stagedChanges) {
     exec(`git commit -m "chore: release version ${newVersion}"`);
