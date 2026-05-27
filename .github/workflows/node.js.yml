@@ -262,7 +262,7 @@ jobs:
         exit 0
 
     - name: Upload Backend SARIF to GitHub Code Scanning
-      uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
       if: ${{ always() && hashFiles('snyk-backend.sarif') != '' }}
       with:
         sarif_file: snyk-backend.sarif
@@ -271,7 +271,7 @@ jobs:
         sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
     - name: Upload Frontend SARIF to GitHub Code Scanning
-      uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
       if: ${{ always() && hashFiles('snyk-frontend.sarif') != '' }}
       with:
         sarif_file: snyk-frontend.sarif
@@ -280,7 +280,7 @@ jobs:
         sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
     - name: Upload Android Gradle SARIF to GitHub Code Scanning
-      uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
       if: ${{ always() && hashFiles('snyk-android-gradle.sarif') != '' }}
       with:
         sarif_file: snyk-android-gradle.sarif
@@ -308,7 +308,7 @@ jobs:
           $SNYK_ORG_FLAG
 
     - name: Upload Snyk Code SARIF to GitHub Code Scanning
-      uses: github/codeql-action/upload-sarif@9e0d7b8d25671d64c341c19c0152d693099fb5ba
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
       if: ${{ always() && hashFiles('snyk-code.sarif') != '' }}
       with:
         sarif_file: snyk-code.sarif
