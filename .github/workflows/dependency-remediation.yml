@@ -51,7 +51,9 @@ jobs:
       - name: Create remediation pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
         with:
-          token: ${{ github.token }}
+          # Use a repository secret token when available so the created PR can trigger
+          # downstream workflows instead of being suppressed as a GITHUB_TOKEN event.
+          token: ${{ secrets.DEPENDENCY_REMEDIATION_TOKEN != '' && secrets.DEPENDENCY_REMEDIATION_TOKEN || github.token }}
           commit-message: "chore(security): automated dependency remediation"
           title: "chore(security): automated dependency remediation"
           body: |
