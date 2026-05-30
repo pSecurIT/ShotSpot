@@ -69,9 +69,9 @@ describe('MatchTemplates', () => {
     localStorage.setItem('token', 'test-token');
   });
 
-  it('should render loading state initially', () => {
+  it('should render loading state initially', async () => {
     renderWithProviders(<MatchTemplates />);
-    expect(screen.getByRole('status')).toHaveTextContent('Loading templates...');
+    expect(await screen.findByText(/loading templates/i)).toBeInTheDocument();
   });
 
   it('should render templates after loading', async () => {
