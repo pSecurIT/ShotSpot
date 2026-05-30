@@ -51,4 +51,4 @@ export interface NotificationPreferences {
   frequency: 'realtime' | 'hourly' | 'daily';
 }
 
-export type SettingsTab = 'export' | 'preferences' | 'notifications' | 'account' | 'system';
+export type SettingsTab = 'export' | 'preferences' | 'notifications' | 'account' | 'system' | 'security';
