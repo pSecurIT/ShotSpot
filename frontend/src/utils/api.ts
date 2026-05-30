@@ -4,6 +4,7 @@ import { queueAction } from './offlineSync';
 import { ensureMatchEventClientUuid } from './matchEventIdentity';
 import { getUxRouteContext, trackApiLatency } from './uxObservability';
 import { resolveApiBaseUrl } from './networkConfig';
+import { clearStoredAuthSession, getStoredAuthToken } from './authSessionStorage';
 
 type RequestUxMetadata = {
   startedAt: number;
@@ -156,7 +157,7 @@ api.interceptors.request.use(
     config.data = ensureMatchEventClientUuid(config.method, config.url, config.data);
 
     // Add Bearer token
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = getStoredAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -284,12 +285,11 @@ api.interceptors.response.use(
       // Don't redirect if this is a login/register attempt (let the component handle the error)
       const isAuthEndpoint = originalRequest.url?.includes('/auth/login') || 
                             originalRequest.url?.includes('/auth/register');
-      const hasAuthToken = typeof window !== 'undefined' && Boolean(localStorage.getItem('token'));
+      const hasAuthToken = Boolean(getStoredAuthToken());
       
       if (!isAuthEndpoint && hasAuthToken && typeof window !== 'undefined') {
         // Token expired or invalid - redirect to login
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        clearStoredAuthSession();
         window.location.href = '/login';
       }
     }

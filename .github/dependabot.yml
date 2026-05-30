@@ -5,43 +5,8 @@
 
 version: 2
 updates:
-  # Backend npm dependencies
-  - package-ecosystem: "npm"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "01:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: "chore(backend)"
-      include: "scope"
-
-  # Frontend npm dependencies
-  - package-ecosystem: "npm"
-    directory: "/frontend"
-    schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "01:30"
-      timezone: "UTC"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "eslint"
-        update-types:
-          - "version-update:semver-major"
-      - dependency-name: "@eslint/js"
-        update-types:
-          - "version-update:semver-major"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: "chore(frontend)"
-      include: "scope"
-
+  # Note: npm dependency remediation for /backend and /frontend is handled by
+  # .github/workflows/dependency-remediation.yml to avoid duplicate PRs.
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"

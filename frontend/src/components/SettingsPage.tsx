@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ExportSettings from './ExportSettings';
@@ -7,6 +7,7 @@ import NotificationPreferences from './NotificationPreferences';
 import PageLayout from './ui/PageLayout';
 import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import type { SettingsTab } from '../types/settings';
+import { isBiometricAvailable } from '../utils/biometricService';
 import '../styles/Settings.css';
 
 interface Tab {
@@ -20,6 +21,7 @@ const ALL_TABS: Tab[] = [
   { id: 'preferences', label: 'User Preferences' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'account', label: 'Account Settings' },
+  { id: 'security', label: 'Security' },
   { id: 'system', label: 'System Configuration', minRole: 'admin' },
 ];
 
@@ -68,6 +70,7 @@ const SettingsPage: React.FC = () => {
         {activeTab === 'preferences' && <UserPreferences />}
         {activeTab === 'notifications' && <NotificationPreferences />}
         {activeTab === 'account' && <AccountSettingsTab />}
+        {activeTab === 'security' && <BiometricSettingsTab />}
         {activeTab === 'system' && user.role === 'admin' && <SystemConfigTab />}
       </div>
     </div>
@@ -100,6 +103,88 @@ const AccountSettingsTab: React.FC = () => {
         To update your email or password, visit your{' '}
         <Link to="/profile">User Profile</Link>.
       </p>
+    </div>
+  );
+};
+
+const BiometricSettingsTab: React.FC = () => {
+  const { biometricEnrolled, enrollBiometricAfterLogin, disableBiometric, user } = useAuth();
+  const [deviceSupported, setDeviceSupported] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    isBiometricAvailable().then(r => setDeviceSupported(r.available));
+  }, []);
+
+  if (!user) return null;
+
+  const handleDisable = async () => {
+    setLoading(true);
+    setStatusMsg(null);
+    await disableBiometric();
+    setLoading(false);
+    setStatusMsg('Biometric login has been disabled. You can re-enable it after your next password login.');
+  };
+
+  const handleEnable = async () => {
+    setLoading(true);
+    setStatusMsg(null);
+    const result = await enrollBiometricAfterLogin();
+    setLoading(false);
+    setStatusMsg(result.success
+      ? 'Biometric login enabled. Use Face ID or Touch ID on your next sign-in.'
+      : (result.error ?? 'Could not enable biometric login. Please try again.'));
+  };
+
+  return (
+    <div className="settings-section">
+      <h3>Biometric login</h3>
+      <p className="settings-info">
+        Use Face ID or Touch ID to sign in quickly without entering your password.
+        Your session token is stored securely in the device keychain and is only
+        accessible via biometric confirmation.
+      </p>
+
+      {statusMsg && (
+        <div className="alert alert-info" role="status">{statusMsg}</div>
+      )}
+
+      {!deviceSupported && (
+        <p className="settings-info settings-info--muted">
+          Biometric authentication is not available on this device or in the web browser.
+          Run the app as a native iOS or Android build to use this feature.
+        </p>
+      )}
+
+      {deviceSupported && (
+        <>
+          <div className="settings-field">
+            <label>Status</label>
+            <span className="settings-value">
+              {biometricEnrolled ? '✅ Enabled' : '⬜ Disabled'}
+            </span>
+          </div>
+          <hr className="settings-divider" />
+          {biometricEnrolled ? (
+            <button
+              className="secondary-button"
+              onClick={handleDisable}
+              disabled={loading}
+            >
+              {loading ? 'Disabling…' : 'Disable biometric login'}
+            </button>
+          ) : (
+            <button
+              className="primary-button"
+              onClick={handleEnable}
+              disabled={loading}
+            >
+              {loading ? 'Enabling…' : 'Enable biometric login'}
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 };

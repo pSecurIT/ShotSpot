@@ -1,3 +1,5 @@
+import { getStoredAuthToken } from './authSessionStorage';
+
 export type UxEventType = 'flow_timing' | 'api_latency' | 'long_task' | 'slow_render' | 'feedback';
 
 export interface UxMetricEvent {
@@ -103,7 +105,7 @@ export const flushQueuedEvents = async (): Promise<void> => {
     return;
   }
 
-  const token = window.localStorage.getItem('token');
+  const token = getStoredAuthToken();
   if (!token) {
     return;
   }
