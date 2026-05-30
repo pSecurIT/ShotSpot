@@ -5,6 +5,7 @@ import {
   clearStoredAuthSession,
   clearStoredAuthToken,
   clearStoredAuthUser,
+  getStoredAuthSession,
   getStoredAuthToken,
   getStoredAuthUser,
   setStoredAuthToken,
@@ -45,6 +46,25 @@ describe('authSessionStorage', () => {
 
     clearStoredAuthUser();
     expect(getStoredAuthUser()).toBeNull();
+  });
+
+  it('returns web session snapshot from localStorage', async () => {
+    setStoredAuthToken('session-token');
+    setStoredAuthUser('{"id":8,"username":"coach"}');
+
+    await expect(getStoredAuthSession()).resolves.toEqual({
+      token: 'session-token',
+      userJson: '{"id":8,"username":"coach"}',
+    });
+  });
+
+  it('returns null session snapshot when no localStorage data exists', async () => {
+    clearStoredAuthSession();
+
+    await expect(getStoredAuthSession()).resolves.toEqual({
+      token: null,
+      userJson: null,
+    });
   });
 });
 
