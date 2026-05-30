@@ -479,8 +479,13 @@ Frontend: 1.0.0
     └── CFBundleVersion: 1
 ```
 
-## Future Enhancements
-
+    - @aparajita/capacitor-biometric-auth
+    - capacitor-secure-storage-plugin
+    - Touch ID / Face ID / Android fingerprint
+    - Quick-login prompt on launch
+    - Post-login enrollment prompt and Settings → Security opt-out
+    - Token hydration on app startup for relaunch restore
+    - Password fallback when biometric auth is unavailable or cancelled
 ### Planned Features
 ```
 1. Push Notifications
@@ -500,8 +505,19 @@ Frontend: 1.0.0
    - @capacitor/share
    - Share match reports
 
-5. Background Sync
-   - @capacitor/background-sync
+
+## Biometric Data Flow
+
+1. User signs in with password.
+2. App offers optional biometric enrollment.
+3. The session token and user JSON are written to secure storage on native devices.
+4. On app relaunch, the auth context hydrates the session from secure storage before the app leaves its loading state.
+5. Biometric quick login unlocks the stored session, then the existing auth flow and offline queue continue unchanged.
+
+## Validation Notes
+
+- Unit coverage includes the biometric service wrapper, auth storage, and login enrollment/quick-login paths.
+- Manual device validation still needs iOS Face ID / Touch ID and Android fingerprint testing on physical hardware or emulators with biometric enrollment enabled.
    - Sync while app is backgrounded
 
 6. Geolocation

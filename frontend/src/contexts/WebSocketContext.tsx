@@ -2,6 +2,7 @@ import React, { createContext, useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { resolveSocketBaseUrl } from '../utils/networkConfig';
+import { getStoredAuthToken } from '../utils/authSessionStorage';
 
 interface WebSocketContextType {
   socket: Socket | null;
@@ -34,8 +35,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       return;
     }
 
-    // Get auth token from localStorage
-    const token = localStorage.getItem('token');
+    // Get auth token from storage
+    const token = getStoredAuthToken();
 
     if (!user || !token) {
       if (!token) {

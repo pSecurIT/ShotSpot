@@ -29,7 +29,10 @@ const config: CapacitorConfig = {
     Keyboard: {
       resize: 'body',
       resizeOnFullScreen: true
-    }
+    },
+    // @aparajita/capacitor-biometric-auth – no extra config required;
+    // iOS Face ID usage string is added to Info.plist (see scripts/setup-biometric-platforms.js)
+    // Android permissions are added to AndroidManifest.xml (same script)
   }
 };
 
