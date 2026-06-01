@@ -100,8 +100,14 @@ jobs:
 
       - name: Generate ephemeral test secrets
         run: |
-          echo "JWT_SECRET=$(openssl rand -hex 32)" >> $GITHUB_ENV
-          echo "SESSION_SECRET=$(openssl rand -hex 24)" >> $GITHUB_ENV
+          {
+            echo "JWT_SECRET<<EOF"
+            openssl rand -hex 32
+            echo "EOF"
+            echo "SESSION_SECRET<<EOF"
+            openssl rand -hex 24
+            echo "EOF"
+          } >> "$GITHUB_ENV"
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e

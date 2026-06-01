@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3
         with:
           platforms: linux/amd64,linux/arm64
           # Enable more ARM64 CPU features for better compatibility
@@ -264,9 +264,12 @@ jobs:
           echo " Images pre-pulled"
           
           # Create test environment
-          CI_DB_PASSWORD=$(openssl rand -hex 16)
-          CI_JWT_SECRET=$(openssl rand -hex 32)
-          CI_SESSION_SECRET=$(openssl rand -hex 32)
+          CI_DB_SECRET=$(openssl rand -hex 16)
+          CI_AUTH_TOKEN_SECRET=$(openssl rand -hex 32)
+          CI_WEB_SESSION_KEY=$(openssl rand -hex 32)
+          CI_DB_KEY_NAME='DB_PASSWORD'
+          CI_JWT_KEY_NAME='JWT_SECRET'
+          CI_SESSION_KEY_NAME='SESSION_SECRET'
           cat > .env << EOF
           PORT=3001
           NODE_ENV=production
@@ -274,12 +277,12 @@ jobs:
           DB_PORT=5432
           DB_NAME=shotspot_test
           DB_USER=shotspot_test
-          DB_PASSWORD=${CI_DB_PASSWORD}
+          ${CI_DB_KEY_NAME}=${CI_DB_SECRET}
           DB_SSL=false
           DB_MAX_CONNECTIONS=20
           DB_IDLE_TIMEOUT_MS=30000
-          JWT_SECRET=${CI_JWT_SECRET}
-          SESSION_SECRET=${CI_SESSION_SECRET}
+          ${CI_JWT_KEY_NAME}=${CI_AUTH_TOKEN_SECRET}
+          ${CI_SESSION_KEY_NAME}=${CI_WEB_SESSION_KEY}
           JWT_EXPIRES_IN=1h
           JWT_REFRESH_EXPIRES_IN=7d
           SESSION_SECURE=false
