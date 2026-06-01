@@ -7,31 +7,33 @@
 import validateEnvVars from '../src/utils/validateEnv.js';
 import jwt from 'jsonwebtoken';
 import { extractBearerToken, getJwtSecret, verifyAccessTokenClaims } from '../src/utils/authToken.js';
+import { logInfo, logError } from '../src/utils/logger.js';
+
+jest.mock('../src/utils/logger.js', () => ({
+  __esModule: true,
+  logInfo: jest.fn(),
+  logWarn: jest.fn(),
+  logError: jest.fn()
+}));
 
 describe('🔐 Environment Variable Validation', () => {
   let originalEnv;
-  let originalConsoleLog;
-  let originalConsoleError;
   let originalProcessExit;
   let mockExit;
   let consoleLogSpy;
   let consoleErrorSpy;
 
   beforeEach(() => {
-    // Backup original environment and console methods
+    // Backup original environment and process exit
     originalEnv = { ...process.env };
-    originalConsoleLog = console.log;
-    originalConsoleError = console.error;
     originalProcessExit = process.exit;
 
-    // Create spies
-    consoleLogSpy = jest.fn();
-    consoleErrorSpy = jest.fn();
+    // Reuse existing expectation names, but bind them to logger mocks.
+    consoleLogSpy = logInfo;
+    consoleErrorSpy = logError;
     mockExit = jest.fn();
 
-    // Mock console and process.exit
-    console.log = consoleLogSpy;
-    console.error = consoleErrorSpy;
+    // Mock process.exit
     process.exit = mockExit;
 
     // Clear environment variables
@@ -49,10 +51,8 @@ describe('🔐 Environment Variable Validation', () => {
   });
 
   afterEach(() => {
-    // Restore original environment and console methods
+    // Restore original environment and process exit
     process.env = originalEnv;
-    console.log = originalConsoleLog;
-    console.error = originalConsoleError;
     process.exit = originalProcessExit;
   });
 
