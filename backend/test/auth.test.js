@@ -470,10 +470,9 @@ describe('🔐 Authentication API', () => {
       expect(response.body.user).toHaveProperty('role', 'admin');
     });
 
-    it('✅ should allow login with valid CSRF token and retained session in non-test mode', async () => {
-      const originalNodeEnv = process.env.NODE_ENV;
+    it('✅ should allow login with valid CSRF token when CSRF is enabled in test mode', async () => {
       const originalEnableCsrfInTest = process.env.ENABLE_CSRF_IN_TEST;
-      process.env.NODE_ENV = 'development';
+      process.env.NODE_ENV = 'test';
       process.env.ENABLE_CSRF_IN_TEST = 'true';
 
       try {
@@ -487,11 +486,15 @@ describe('🔐 Authentication API', () => {
         expect(csrfResponse.body).toHaveProperty('csrfToken');
         const csrfToken = csrfResponse.body.csrfToken;
         expect(typeof csrfToken).toBe('string');
+        const sessionCookies = csrfResponse.headers['set-cookie'];
+        expect(Array.isArray(sessionCookies)).toBe(true);
+        expect(sessionCookies.length).toBeGreaterThan(0);
 
         // Step 2: perform login with the same agent and CSRF header.
         const loginResponse = await agent
           .post('/api/auth/login')
-          .set('X-CSRF-Token', csrfToken)
+          .set('Cookie', sessionCookies.join('; '))
+          .set('x-csrf-token', csrfToken)
           .send({
             username: validUserData.username,
             password: validUserData.password
@@ -502,7 +505,6 @@ describe('🔐 Authentication API', () => {
         expect(loginResponse.body).toHaveProperty('user');
         expect(loginResponse.body.user).toHaveProperty('username', validUserData.username);
       } finally {
-        process.env.NODE_ENV = originalNodeEnv;
         process.env.ENABLE_CSRF_IN_TEST = originalEnableCsrfInTest;
       }
     });
