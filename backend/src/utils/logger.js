@@ -66,14 +66,43 @@ const sanitizeForLog = (value, depth = 0) => {
 
 const sanitizeArgs = (args) => args.map((arg) => sanitizeForLog(arg));
 
+const formatLogValue = (value) => {
+  if (value === undefined) {
+    return 'undefined';
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
+    return String(value);
+  }
+
+  if (typeof value === 'bigint') {
+    return `${value}n`;
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '[Unserializable]';
+  }
+};
+
+const writeSanitizedLog = (stream, args) => {
+  const safeMessage = sanitizeArgs(args).map((arg) => formatLogValue(arg)).join(' ');
+  stream.write(`${safeMessage}\n`);
+};
+
 export const logInfo = (...args) => {
-  console.log(...sanitizeArgs(args));
+  writeSanitizedLog(process.stdout, args);
 };
 
 export const logWarn = (...args) => {
-  console.warn(...sanitizeArgs(args));
+  writeSanitizedLog(process.stderr, args);
 };
 
 export const logError = (...args) => {
-  console.error(...sanitizeArgs(args));
+  writeSanitizedLog(process.stderr, args);
 };

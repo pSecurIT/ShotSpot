@@ -218,16 +218,18 @@ jobs:
       - name: Create .env.docker for CI
         run: |
           # Generate ephemeral secrets for this CI run
-          JWT_SECRET=$(openssl rand -hex 32)
-          DB_PASSWORD=$(openssl rand -hex 16)
+          CI_AUTH_TOKEN_SECRET=$(openssl rand -hex 32)
+          CI_DB_SECRET=$(openssl rand -hex 16)
+          CI_DB_KEY_NAME='DB_PASSWORD'
+          CI_JWT_KEY_NAME='JWT_SECRET'
           
           # Validate JWT_SECRET length (must be >= 32 chars)
-          if [ ${#JWT_SECRET} -lt 32 ]; then
-            echo "❌ Generated JWT_SECRET is too short (${#JWT_SECRET} chars, minimum 32 required)"
+          if [ ${#CI_AUTH_TOKEN_SECRET} -lt 32 ]; then
+            echo "❌ Generated JWT_SECRET is too short (${#CI_AUTH_TOKEN_SECRET} chars, minimum 32 required)"
             exit 1
           fi
           
-          echo "✅ Generated JWT_SECRET with ${#JWT_SECRET} characters"
+          echo "✅ Generated JWT_SECRET with ${#CI_AUTH_TOKEN_SECRET} characters"
           
           # Create Docker environment file (matches .env.docker.example)
           printf '%s\n' \
@@ -237,8 +239,8 @@ jobs:
             'DB_PORT=5432' \
             'DB_NAME=shotspot_test' \
             'DB_USER=shotspot_test' \
-            "DB_PASSWORD=${DB_PASSWORD}" \
-            "JWT_SECRET=${JWT_SECRET}" \
+            "${CI_DB_KEY_NAME}=${CI_DB_SECRET}" \
+            "${CI_JWT_KEY_NAME}=${CI_AUTH_TOKEN_SECRET}" \
             'SESSION_SECURE=false' \
             'SESSION_SAME_SITE=lax' \
             'CORS_ORIGIN=http://localhost:3001' \
@@ -251,7 +253,7 @@ jobs:
           # Verify .env.docker content (diagnostic - redact secret)
           echo "=== .env.docker content (JWT_SECRET redacted) ==="
           grep -v "JWT_SECRET" .env.docker
-          echo "JWT_SECRET=<redacted ${#JWT_SECRET} chars>"
+          echo "JWT_SECRET=<redacted ${#CI_AUTH_TOKEN_SECRET} chars>"
 
       - name: Test Docker image
         run: |
@@ -379,16 +381,18 @@ jobs:
       - name: Create .env.docker for CI
         run: |
           # Generate ephemeral secrets for this CI run
-          JWT_SECRET=$(openssl rand -hex 32)
-          DB_PASSWORD=$(openssl rand -hex 16)
+          CI_AUTH_TOKEN_SECRET=$(openssl rand -hex 32)
+          CI_DB_SECRET=$(openssl rand -hex 16)
+          CI_DB_KEY_NAME='DB_PASSWORD'
+          CI_JWT_KEY_NAME='JWT_SECRET'
           
           # Validate JWT_SECRET length (must be >= 32 chars)
-          if [ ${#JWT_SECRET} -lt 32 ]; then
-            echo "❌ Generated JWT_SECRET is too short (${#JWT_SECRET} chars, minimum 32 required)"
+          if [ ${#CI_AUTH_TOKEN_SECRET} -lt 32 ]; then
+            echo "❌ Generated JWT_SECRET is too short (${#CI_AUTH_TOKEN_SECRET} chars, minimum 32 required)"
             exit 1
           fi
           
-          echo "✅ Generated JWT_SECRET with ${#JWT_SECRET} characters"
+          echo "✅ Generated JWT_SECRET with ${#CI_AUTH_TOKEN_SECRET} characters"
           
           # Create Docker environment file (matches .env.docker.example)
           printf '%s\n' \
@@ -398,8 +402,8 @@ jobs:
             'DB_PORT=5432' \
             'DB_NAME=shotspot_test' \
             'DB_USER=shotspot_test' \
-            "DB_PASSWORD=${DB_PASSWORD}" \
-            "JWT_SECRET=${JWT_SECRET}" \
+            "${CI_DB_KEY_NAME}=${CI_DB_SECRET}" \
+            "${CI_JWT_KEY_NAME}=${CI_AUTH_TOKEN_SECRET}" \
             'SESSION_SECURE=false' \
             'SESSION_SAME_SITE=lax' \
             'CORS_ORIGIN=http://localhost:3001' \
@@ -412,7 +416,7 @@ jobs:
           # Verify .env.docker content (diagnostic - redact secret)
           echo "=== .env.docker content (JWT_SECRET redacted) ==="
           grep -v "JWT_SECRET" .env.docker
-          echo "JWT_SECRET=<redacted ${#JWT_SECRET} chars>"
+          echo "JWT_SECRET=<redacted ${#CI_AUTH_TOKEN_SECRET} chars>"
 
           # Export variables so docker-compose sees them during interpolation
           set -o allexport
