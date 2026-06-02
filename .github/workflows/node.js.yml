@@ -56,7 +56,7 @@ jobs:
         node-version: [22.x]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
     - name: Generate ephemeral test secrets
       run: |
@@ -130,7 +130,7 @@ jobs:
         node-version: [22.x]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
     
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
@@ -183,7 +183,7 @@ jobs:
       SNYK_ENABLE_CODE_SCAN: 'true'
     
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
     - name: Use Node.js 22.x
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
@@ -453,7 +453,7 @@ jobs:
   #         --health-retries 5
   #
   #   steps:
-  #   - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+  #   - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
   #
   #   - name: Use Node.js 20.x
   #     uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
