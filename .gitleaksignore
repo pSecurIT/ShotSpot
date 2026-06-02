@@ -78,3 +78,18 @@ ac5d33976a5ff38c4fe2800c4981ee3668c2f580:.github/workflows/test-coverage.yml:sho
 ac5d33976a5ff38c4fe2800c4981ee3668c2f580:.github/workflows/coverage-badge.yml:shotspot-jwt-secret:89
 bc58e3e323e4c50b4fc0ca0e46716e454566f836:.github/workflows/node.js.yml:shotspot-jwt-secret:68
 6c8c3a3e19ef3b45b6f40c488dadbd341690a7d4:.github/workflows/node.js.yml:shotspot-jwt-secret:60
+
+# Orphaned/unreachable test fixtures (from historical development commits)
+# These are mock/placeholder tokens in test files and documentation examples
+# All values are either encrypted_password_here placeholders, mock JWT tokens (eyJ...), or test fixture IDs
+8a360648a423712265a0c4a337c944470ce7d210:backend/test/twizzit-routes.test.js:generic-api-key:159
+d914a626975b69642a760868b752182cfff15eff:backend/scripts/simple-auth-test.js:generic-api-key:20
+d914a626975b69642a760868b752182cfff15eff:backend/test/twizzit-api-client.test.js:generic-api-key:82
+d914a626975b69642a760868b752182cfff15eff:backend/test/twizzit-routes.test.js:generic-api-key:103
+68b5e0369b9fd38e9e303dd48ef80c17b4de2aa0:REPORTS_API.md:curl-auth-header:64
+68b5e0369b9fd38e9e303dd48ef80c17b4de2aa0:REPORTS_API.md:curl-auth-header:121
+68b5e0369b9fd38e9e303dd48ef80c17b4de2aa0:REPORTS_API.md:curl-auth-header:192
+ad24040fe28f7784e74e9030a04839c681424235:DEFAULT_ADMIN.md:generic-api-key:112
+ad24040fe28f7784e74e9030a04839c681424235:DEFAULT_ADMIN.md:generic-api-key:153
+6313ee9103acd03307c6aa31d49366688ce3343d:backend/test/csrf.test.js:generic-api-key:269
+6313ee9103acd03307c6aa31d49366688ce3343d:backend/test/csrf.test.js:generic-api-key:293
