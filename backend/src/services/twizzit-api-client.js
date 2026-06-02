@@ -5,6 +5,8 @@
 
 import axios from 'axios';
 
+import { logInfo, logWarn, logError } from '../utils/logger.js';
+
 class TwizzitApiClient {
   static _tokenCache = new Map();
   static _authInFlight = new Map();
@@ -84,13 +86,13 @@ class TwizzitApiClient {
           config.headers.Authorization = `Bearer ${this.accessToken}`;
           
           if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-            console.log('[Twizzit Auth] Token attached:', {
+            logInfo('[Twizzit Auth] Token attached:', {
               hasToken: !!this.accessToken,
               expiresIn: this.tokenExpiry ? Math.round((this.tokenExpiry - Date.now()) / 1000 / 60) + ' minutes' : 'unknown'
             });
           }
         } else if (process.env.NODE_ENV !== 'test') {
-          console.warn('[Twizzit Auth] WARNING: No access token available for request!');
+          logWarn('[Twizzit Auth] WARNING: No access token available for request!');
         }
 
         // Debug log the actual request URL with params
@@ -103,7 +105,7 @@ class TwizzitApiClient {
             const queryString = config.paramsSerializer.serialize(params);
             fullUrl += `?${queryString}`;
           }
-          console.log('[Twizzit API Request]', {
+          logInfo('[Twizzit API Request]', {
             method: config.method?.toUpperCase(),
             fullUrl,
             params,
@@ -123,7 +125,7 @@ class TwizzitApiClient {
       (response) => response,
       async (error) => {
         if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-          console.error('[Twizzit API Error]', {
+          logError('[Twizzit API Error]', {
             url: error.config?.url,
             method: error.config?.method,
             status: error.response?.status,
@@ -152,7 +154,7 @@ class TwizzitApiClient {
         // Handle 401 errors (token expired)
         if (error.response?.status === 401 && !originalRequest._retry) {
           if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-            console.log('[Twizzit Auth] Got 401, clearing token and retrying...');
+            logInfo('[Twizzit Auth] Got 401, clearing token and retrying...');
           }
           
           originalRequest._retry = true;
@@ -183,7 +185,7 @@ class TwizzitApiClient {
   async authenticate() {
     try {
       if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-        console.log('[Twizzit Auth] Starting authentication...', {
+        logInfo('[Twizzit Auth] Starting authentication...', {
           hasEndpoint: !!this.apiEndpoint,
           hasUsername: !!this.username,
           hasPassword: !!this.password
@@ -202,7 +204,7 @@ class TwizzitApiClient {
       });
 
       if (!response.data?.token) {
-        console.error('[Twizzit Auth] Authentication response missing token:', response.data);
+        logError('[Twizzit Auth] Authentication response missing token:', response.data);
         throw new Error('Authentication response missing token');
       }
 
@@ -213,7 +215,7 @@ class TwizzitApiClient {
       this.tokenExpiry = Date.now() + (expiresIn * 1000) - 300000; // Refresh 5 min before expiry
 
       if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-        console.log('[Twizzit Auth] Authentication successful!', {
+        logInfo('[Twizzit Auth] Authentication successful!', {
           hasToken: !!this.accessToken,
           expiresIn: expiresIn + ' seconds'
         });
@@ -245,7 +247,7 @@ class TwizzitApiClient {
     const bufferTime = 5 * 60 * 1000; // 5 minutes buffer
 
     if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-      console.log('[Twizzit Auth] Ensuring authentication...', {
+      logInfo('[Twizzit Auth] Ensuring authentication...', {
         hasToken: !!this.accessToken,
         hasExpiry: !!this.tokenExpiry,
         isExpired: this.tokenExpiry ? (this.tokenExpiry - now) <= bufferTime : 'N/A'
@@ -257,7 +259,7 @@ class TwizzitApiClient {
       const timeRemaining = this.tokenExpiry - now;
       if (timeRemaining > bufferTime) {
         if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-          console.log('[Twizzit Auth] Using existing valid token');
+          logInfo('[Twizzit Auth] Using existing valid token');
         }
         return; // Token is still valid
       }
@@ -271,7 +273,7 @@ class TwizzitApiClient {
 
       if (cached?.token && cached?.tokenExpiry && cached.tokenExpiry - now > bufferTime) {
         if (process.env.TWIZZIT_DEBUG === '1') {
-          console.log('[Twizzit Auth] Using cached token from other instance');
+          logInfo('[Twizzit Auth] Using cached token from other instance');
         }
         this.accessToken = cached.token;
         this.tokenExpiry = cached.tokenExpiry;
@@ -281,7 +283,7 @@ class TwizzitApiClient {
       const inFlight = TwizzitApiClient._authInFlight.get(cacheKey);
       if (inFlight) {
         if (process.env.TWIZZIT_DEBUG === '1') {
-          console.log('[Twizzit Auth] Waiting for in-flight authentication...');
+          logInfo('[Twizzit Auth] Waiting for in-flight authentication...');
         }
         const result = await inFlight;
         this.accessToken = result.token;
@@ -290,7 +292,7 @@ class TwizzitApiClient {
       }
 
       if (process.env.TWIZZIT_DEBUG === '1') {
-        console.log('[Twizzit Auth] Need to authenticate (no valid token found)');
+        logInfo('[Twizzit Auth] Need to authenticate (no valid token found)');
       }
 
       const authPromise = (async () => {
@@ -325,7 +327,7 @@ class TwizzitApiClient {
       return true;
     } catch (error) {
       if (process.env.NODE_ENV !== 'test') {
-        console.error(
+        logError(
           'Connection verification error:',
           error?.response?.status ?? error?.status,
           error?.response?.data ?? error?.details ?? error?.message
@@ -414,7 +416,7 @@ class TwizzitApiClient {
       const message = details?.message || details?.error || error?.message || 'Connection verification failed';
 
       if (process.env.NODE_ENV !== 'test') {
-        console.error('Connection verification error:', status, details || message);
+        logError('Connection verification error:', status, details || message);
       }
 
       return { success: false, status, message, details };
@@ -580,7 +582,7 @@ class TwizzitApiClient {
       }
 
       if (debug) {
-        console.log(`[Twizzit] ${path} failed without organization filter`, {
+        logInfo(`[Twizzit] ${path} failed without organization filter`, {
           status: error?.response?.status,
           error: error?.response?.data?.error || error?.response?.data?.message
         });
@@ -595,7 +597,7 @@ class TwizzitApiClient {
       try {
         const orgId = await this.getDefaultOrganizationId();
         const paramsWithOrg = TwizzitApiClient._applyOrganizationIdToParams(normalizedParams, orgId);
-        if (debug) console.log(`[Twizzit] ${path} retrying with default organization`, { orgId, params: paramsWithOrg });
+        if (debug) logInfo(`[Twizzit] ${path} retrying with default organization`, { orgId, params: paramsWithOrg });
         return await this.client.get(path, { params: paramsWithOrg });
       } catch (errorWithDefaultOrg) {
         if (TwizzitApiClient._isRateLimited(errorWithDefaultOrg)) {
@@ -603,7 +605,7 @@ class TwizzitApiClient {
         }
 
         if (debug) {
-          console.log(`[Twizzit] ${path} failed with default organization`, {
+          logInfo(`[Twizzit] ${path} failed with default organization`, {
             status: errorWithDefaultOrg?.response?.status,
             error: errorWithDefaultOrg?.response?.data?.error || errorWithDefaultOrg?.response?.data?.message
           });
@@ -619,14 +621,14 @@ class TwizzitApiClient {
         }
 
         const orgIds = await this._getOrganizationIdsOrdered();
-        if (debug) console.log(`[Twizzit] ${path} probing organizations`, { count: orgIds.length });
+        if (debug) logInfo(`[Twizzit] ${path} probing organizations`, { count: orgIds.length });
         let lastError = errorWithDefaultOrg;
 
         for (const orgId of orgIds) {
           try {
             const response = await this.client.get(path, { params: TwizzitApiClient._applyOrganizationIdToParams(normalizedParams, orgId) });
             this.organizationId = orgId;
-            if (debug) console.log(`[Twizzit] ${path} succeeded with organization`, { 'organization-ids[]': orgId });
+            if (debug) logInfo(`[Twizzit] ${path} succeeded with organization`, { 'organization-ids[]': orgId });
             return response;
           } catch (e) {
             lastError = e;
@@ -641,7 +643,7 @@ class TwizzitApiClient {
         // 4) As a last resort, if we only failed due to "no access for specified organizations",
         // retry without org filter again (some accounts only allow implicit org scope).
         if (TwizzitApiClient._isNoAccessForSpecifiedOrganizations(lastError)) {
-          if (debug) console.log(`[Twizzit] ${path} retrying again without organization filter after org probe`);
+          if (debug) logInfo(`[Twizzit] ${path} retrying again without organization filter after org probe`);
           return this.client.get(path, { params: normalizedParams });
         }
 
@@ -728,14 +730,14 @@ class TwizzitApiClient {
       }
 
       if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-        console.log('[Twizzit] Fetching groups with params:', params);
+        logInfo('[Twizzit] Fetching groups with params:', params);
       }
 
       // Use _requestGetWithOrgDiscovery which handles org ID discovery and fallbacks
       const response = await this._requestGetWithOrgDiscovery('/v2/api/groups', params);
 
       if (process.env.NODE_ENV !== 'test' && process.env.TWIZZIT_DEBUG === '1') {
-        console.log('[Twizzit] Successfully fetched groups:', {
+        logInfo('[Twizzit] Successfully fetched groups:', {
           count: Array.isArray(response.data) ? response.data.length : 0
         });
       }
@@ -942,7 +944,7 @@ class TwizzitApiClient {
           payload = Array.isArray(response.data) ? response.data : [];
 
           if (debugEnabled && process.env.NODE_ENV !== 'test') {
-            console.log('[twizzit] getGroupContacts via /group-contacts', {
+            logInfo('[twizzit] getGroupContacts via /group-contacts', {
               groupId: groupIdValue,
               seasonId,
               params: attemptParams,
@@ -1000,7 +1002,7 @@ class TwizzitApiClient {
           payload = payload.filter((row) => extractSeasonId(row) === seasonId);
 
           if (debugEnabled && process.env.NODE_ENV !== 'test') {
-            console.log('[twizzit] getGroupContacts season filter (membership rows)', {
+            logInfo('[twizzit] getGroupContacts season filter (membership rows)', {
               groupId: groupIdValue,
               seasonId,
               before: beforeCount,

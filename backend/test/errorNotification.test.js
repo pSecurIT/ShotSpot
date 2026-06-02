@@ -5,6 +5,14 @@
  */
 
 import { errorNotificationService } from '../src/utils/errorNotification.js';
+import { logError, logInfo } from '../src/utils/logger.js';
+
+jest.mock('../src/utils/logger.js', () => ({
+  __esModule: true,
+  logError: jest.fn(),
+  logInfo: jest.fn(),
+  logWarn: jest.fn()
+}));
 
 // Mock global fetch for HTTP requests
 global.fetch = jest.fn();
@@ -14,22 +22,10 @@ global.AbortSignal = {
 
 describe('🚨 Error Notification Service', () => {
   let originalEnv;
-  let originalConsoleLog;
-  let originalConsoleError;
-  let consoleLogSpy;
-  let consoleErrorSpy;
 
   beforeEach(() => {
-    // Backup original environment and console methods
+    // Backup original environment
     originalEnv = { ...process.env };
-    originalConsoleLog = console.log;
-    originalConsoleError = console.error;
-
-    // Create spies
-    consoleLogSpy = jest.fn();
-    consoleErrorSpy = jest.fn();
-    console.log = consoleLogSpy;
-    console.error = consoleErrorSpy;
 
     // Clear all maps for fresh state
     errorNotificationService.errorCounts.clear();
@@ -49,10 +45,8 @@ describe('🚨 Error Notification Service', () => {
   });
 
   afterEach(() => {
-    // Restore original environment and console methods
+    // Restore original environment
     process.env = originalEnv;
-    console.log = originalConsoleLog;
-    console.error = originalConsoleError;
   });
 
   describe('✅ Service Configuration and Setup', () => {
@@ -350,7 +344,7 @@ describe('🚨 Error Notification Service', () => {
         const message = errorNotificationService.formatErrorMessage(mockError, 'critical');
         await errorNotificationService.sendWebhook(message, mockError);
         
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Webhook notification failed:', 'Internal Server Error');
+        expect(logError).toHaveBeenCalledWith('Webhook notification failed:', 'Internal Server Error');
       });
 
       it('❌ should handle network errors for webhook', async () => {
@@ -361,7 +355,7 @@ describe('🚨 Error Notification Service', () => {
         const message = errorNotificationService.formatErrorMessage(mockError, 'critical');
         await errorNotificationService.sendWebhook(message, mockError);
         
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to send webhook notification:', 'Network error');
+        expect(logError).toHaveBeenCalledWith('Failed to send webhook notification:', 'Network error');
       });
     });
 
@@ -423,7 +417,7 @@ describe('🚨 Error Notification Service', () => {
         const message = errorNotificationService.formatErrorMessage(mockError, 'high');
         await errorNotificationService.sendSlack(message, mockError, 'high');
         
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to send Slack notification:', 'Slack error');
+        expect(logError).toHaveBeenCalledWith('Failed to send Slack notification:', 'Slack error');
       });
     });
 
@@ -491,7 +485,7 @@ describe('🚨 Error Notification Service', () => {
         const message = errorNotificationService.formatErrorMessage(mockError, 'critical');
         await errorNotificationService.sendTeams(message, mockError, 'critical');
         
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to send Teams notification:', 'Teams error');
+        expect(logError).toHaveBeenCalledWith('Failed to send Teams notification:', 'Teams error');
       });
     });
 
@@ -504,7 +498,7 @@ describe('🚨 Error Notification Service', () => {
         const message = errorNotificationService.formatErrorMessage(mockError, 'critical');
         await errorNotificationService.sendEmail(message, mockError);
         
-        expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect(logInfo).toHaveBeenCalledWith(
           expect.stringContaining('📧 Email notification (not sent - email service not configured):'),
           expect.stringContaining('[CRITICAL] ShotSpot Error - TestError')
         );
@@ -519,7 +513,7 @@ describe('🚨 Error Notification Service', () => {
         await errorNotificationService.sendEmail(message, mockError);
         
         // Should not throw error and should use default sender
-        expect(consoleLogSpy).toHaveBeenCalled();
+        expect(logInfo).toHaveBeenCalled();
       });
     });
   });
@@ -626,7 +620,7 @@ describe('🚨 Error Notification Service', () => {
       await expect(errorNotificationService.notifyTeam(mixedResultsError)).resolves.not.toThrow();
       
       expect(fetch).toHaveBeenCalledTimes(2);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to send Slack notification:', 'Slack failed');
+      expect(logError).toHaveBeenCalledWith('Failed to send Slack notification:', 'Slack failed');
     });
   });
 
@@ -664,7 +658,7 @@ describe('🚨 Error Notification Service', () => {
       
       await errorNotificationService.sendWebhook(message, {});
       
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to send webhook notification:', 'AbortError: The operation was aborted');
+      expect(logError).toHaveBeenCalledWith('Failed to send webhook notification:', 'AbortError: The operation was aborted');
     });
   });
 });

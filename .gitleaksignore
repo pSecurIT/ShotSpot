@@ -45,6 +45,40 @@
 1bb88ed1:.github/workflows/test-coverage.yml:shotspot-db-password:73
 1bb88ed1:.github/workflows/node.js.yml:shotspot-db-password:35
 
+# Historical CI/runtime placeholders and test-only values from full-history scans
+# - Runtime-generated secrets (e.g. $(openssl rand -hex ...))
+# - Compose placeholders/reference syntax (${VAR:?...})
+# - Legacy CI defaults used only in test/release automation
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:.github/workflows/release.yml:shotspot-db-password:267
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:release/docker-compose.yml:shotspot-db-password:37
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:.github/workflows/docker.yml:shotspot-db-password:112
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:docker-compose.dev.yml:shotspot-db-password:40
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:.github/workflows/docker.yml:shotspot-db-password:265
+410f19882807e01cbd9074aedf74b1ff9c1eabe8:.github/workflows/test-coverage.yml:shotspot-jwt-secret:94
+6309707335cfa99e00c4f4c5ddd0a7a119ab1193:.github/workflows/release.yml:shotspot-db-password:277
+6309707335cfa99e00c4f4c5ddd0a7a119ab1193:.github/workflows/release.yml:shotspot-jwt-secret:281
+1005be5804cf8c7ba99dcd676ad15c3ecfa816ba:release/docker-compose.yml:shotspot-jwt-secret:39
+e6321ebc42f74ba50a3cca620b20fae5f82d73d4:.github/workflows/release.yml:shotspot-jwt-secret:265
+3c27fa521f7daeecd98a5f482eaf96d1d89ed616:.github/workflows/docker.yml:shotspot-db-password:88
+b4bf5a057554ec1860a7220340f8678d89ad35c6:.github/workflows/docker.yml:shotspot-db-password:88
+3c27fa521f7daeecd98a5f482eaf96d1d89ed616:.github/workflows/docker.yml:shotspot-db-password:222
+b4bf5a057554ec1860a7220340f8678d89ad35c6:.github/workflows/docker.yml:shotspot-db-password:222
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.dev.yml:shotspot-jwt-secret:42
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.dev.yml:shotspot-db-password:11
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.dev.yml:shotspot-db-password:41
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:.github/workflows/release.yml:shotspot-db-password:169
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:release/docker-compose.yml:shotspot-db-password:35
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:release/docker-compose.yml:shotspot-jwt-secret:36
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.yml:shotspot-db-password:27
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.yml:shotspot-db-password:87
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:.github/workflows/docker.yml:shotspot-db-password:82
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:.github/workflows/docker.yml:shotspot-db-password:166
+ac5d33976a5ff38c4fe2800c4981ee3668c2f580:.github/workflows/node.js.yml:shotspot-jwt-secret:33
+ac5d33976a5ff38c4fe2800c4981ee3668c2f580:.github/workflows/test-coverage.yml:shotspot-jwt-secret:83
+ac5d33976a5ff38c4fe2800c4981ee3668c2f580:.github/workflows/coverage-badge.yml:shotspot-jwt-secret:89
+bc58e3e323e4c50b4fc0ca0e46716e454566f836:.github/workflows/node.js.yml:shotspot-jwt-secret:68
+6c8c3a3e19ef3b45b6f40c488dadbd341690a7d4:.github/workflows/node.js.yml:shotspot-jwt-secret:60
+
 # Orphaned/unreachable test fixtures (from historical development commits)
 # These are mock/placeholder tokens in test files and documentation examples
 # All values are either encrypted_password_here placeholders, mock JWT tokens (eyJ...), or test fixture IDs

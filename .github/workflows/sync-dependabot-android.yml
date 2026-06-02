@@ -1,0 +1,111 @@
+name: Sync Dependabot Android Config
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/dependabot.yml'
+      - '.github/workflows/sync-dependabot-android.yml'
+      - 'frontend/android/**'
+  schedule:
+    - cron: '0 5 * * 5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-dependabot-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync-config:
+    name: Ensure Android Dependabot block matches repo state
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Sync Android Dependabot block
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FILE=".github/dependabot.yml"
+          START_MARKER="# BEGIN_ANDROID_GRADLE_DEPENDABOT"
+          END_MARKER="# END_ANDROID_GRADLE_DEPENDABOT"
+
+          if [ ! -f "$FILE" ]; then
+            echo "Missing $FILE"
+            exit 1
+          fi
+
+          block_present=0
+          if grep -q "$START_MARKER" "$FILE"; then
+            block_present=1
+          fi
+
+          if [ -d "frontend/android" ]; then
+            if [ "$block_present" -eq 0 ]; then
+              printf '%s\n' \
+                '' \
+                '  # BEGIN_ANDROID_GRADLE_DEPENDABOT' \
+                '  # Android Gradle dependencies' \
+                '  - package-ecosystem: "gradle"' \
+                '    directory: "/frontend/android"' \
+                '    schedule:' \
+                '      interval: "weekly"' \
+                '      day: "thursday"' \
+                '      time: "01:00"' \
+                '      timezone: "UTC"' \
+                '    open-pull-requests-limit: 10' \
+                '    labels:' \
+                '      - "dependencies"' \
+                '      - "android"' \
+                '    commit-message:' \
+                '      prefix: "chore(android)"' \
+                '      include: "scope"' \
+                '  # END_ANDROID_GRADLE_DEPENDABOT' >> "$FILE"
+            fi
+          else
+            if [ "$block_present" -eq 1 ]; then
+              awk -v start="$START_MARKER" -v end="$END_MARKER" '
+                $0 == start {skip=1; next}
+                $0 == end {skip=0; next}
+                !skip {print}
+              ' "$FILE" > "$FILE.tmp"
+              mv "$FILE.tmp" "$FILE"
+            fi
+          fi
+
+          if git diff --quiet -- "$FILE"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create pull request for config sync
+        if: ${{ steps.sync.outputs.changed == 'true' }}
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
+        with:
+          commit-message: "chore(ci): sync Android Dependabot guard"
+          title: "chore(ci): sync Android Dependabot guard"
+          body: |
+            This PR keeps `.github/dependabot.yml` aligned with repository structure.
+
+            Rule enforced:
+            - Keep Android Gradle Dependabot entry only when `frontend/android` exists on default branch.
+          labels: |
+            dependencies
+            automated
+            ci
+          branch: chore/sync-dependabot-android-guard
+          delete-branch: true
+          add-paths: |
+            .github/dependabot.yml
+
+
+

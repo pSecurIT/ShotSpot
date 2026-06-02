@@ -22,12 +22,12 @@ describe('ExecutionHistory', () => {
 
     render(<ExecutionHistory scheduleId={10} />);
 
-    expect(screen.getByText('Loading history...')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading history...');
     expect(mockGetHistory).toHaveBeenCalledWith(10, 20);
 
     resolveHistory?.({ history: [] });
 
-    expect(await screen.findByText('No executions yet.')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent('No executions yet.');
   });
 
   it('renders execution rows when history exists', async () => {
@@ -52,6 +52,7 @@ describe('ExecutionHistory', () => {
     render(<ExecutionHistory scheduleId={11} />);
 
     expect(await screen.findByText('Weekly Team Insights - run')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Execution history' })).toBeInTheDocument();
     expect(screen.getByText('queued')).toBeInTheDocument();
     expect(screen.getByText('JSON')).toBeInTheDocument();
   });
@@ -61,7 +62,7 @@ describe('ExecutionHistory', () => {
 
     render(<ExecutionHistory scheduleId={12} />);
 
-    expect(await screen.findByText('History failed')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('History failed');
   });
 
   it('shows the fallback error for non-error failures', async () => {
@@ -69,7 +70,7 @@ describe('ExecutionHistory', () => {
 
     render(<ExecutionHistory scheduleId={13} />);
 
-    expect(await screen.findByText('Failed to load execution history')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load execution history');
     await waitFor(() => {
       expect(screen.queryByText('Loading history...')).not.toBeInTheDocument();
     });

@@ -1,4 +1,6 @@
 import pkg from 'pg';
+import { logInfo, logError } from './utils/logger.js';
+
 import {
   sanitizeDbError,
   createQueryLogMetadata,
@@ -13,11 +15,15 @@ let pool = null;
 
 function getPool() {
   if (!pool) {
+    const isTestEnv = process.env.NODE_ENV === 'test';
+    const configuredMin = Number(process.env.DB_MIN_CONNECTIONS);
+    const configuredMax = Number(process.env.DB_MAX_CONNECTIONS) || Number(process.env.DB_MAX_CLIENTS);
+
     // Construct connection string from individual variables if DATABASE_URL is not provided
     const connectionConfig = process.env.DATABASE_URL
       ? { connectionString: process.env.DATABASE_URL }
       : {
-        user: process.env.DB_USER,
+        user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD,
         host: process.env.DB_HOST,
         port: Number(process.env.DB_PORT) || 5432,
@@ -26,9 +32,13 @@ function getPool() {
 
     pool = new Pool({
       ...connectionConfig,
-      max: Number(process.env.DB_MAX_CONNECTIONS) || Number(process.env.DB_MAX_CLIENTS) || 20,
-      idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
-      connectionTimeoutMillis: 2000,
+      // Keep tests lightweight and deterministic to avoid pool-related flakiness.
+      min: isTestEnv ? 0 : (Number.isFinite(configuredMin) ? configuredMin : 5),
+      max: isTestEnv ? 5 : (Number.isFinite(configuredMax) ? configuredMax : 20),
+      idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 120000,
+      connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 5000,
+      // Allows Node to exit once no queries are active, even with idle clients.
+      allowExitOnIdle: isTestEnv,
     });
   }
   return pool;
@@ -41,7 +51,7 @@ const query = async (text, params) => {
     // Validate that query uses parameterized format for security
     if (params && params.length > 0 && !isParameterizedQuery(text)) {
       const sanitizedText = sanitizeQueryForLogging(text);
-      console.error('Invalid query format - must use parameterized placeholders:', sanitizedText);
+      logError('Invalid query format - must use parameterized placeholders:', sanitizedText);
       throw new Error('Query must use parameterized format ($1, $2, etc.) when parameters are provided');
     }
     
@@ -56,13 +66,13 @@ const query = async (text, params) => {
       // Only log param count, not actual param values to prevent sensitive data exposure
       const paramCount = Array.isArray(params) ? params.length : 0;
       const logMetadata = createQueryLogMetadata(sanitizedText, duration, res.rowCount, false);
-      console.log('Executed query', { ...logMetadata, paramCount });
+      logInfo('Executed query', { ...logMetadata, paramCount });
     }
     return res;
   } catch (err) {
     // Log sanitized error information to avoid exposing sensitive data
     const sanitizedError = sanitizeDbError(err);
-    console.error('Error executing query', sanitizedError);
+    logError('Error executing query', sanitizedError);
     throw err;
   } finally {
     client.release();
@@ -74,13 +84,14 @@ export async function dbHealthCheck() {
   try {
     // Safe: hardcoded query with no user input
     await client.query('SELECT 1');
-    client.release();
     return true;
   } catch (err) {
     // Use sanitized error to avoid exposing sensitive connection details
     const sanitizedError = sanitizeDbError(err);
-    console.error('Database health check failed:', sanitizedError);
+    logError('Database health check failed:', sanitizedError);
     throw new Error(`Database connection failed: ${sanitizedError.message}`, { cause: err });
+  } finally {
+    client.release();
   }
 }
 
@@ -88,10 +99,11 @@ export async function closePool() {
   try {
     if (pool) {
       await pool.end();
+      pool = null;
     }
   } catch (err) {
     const sanitizedError = sanitizeDbError(err);
-    console.error('Error closing DB pool:', sanitizedError);
+    logError('Error closing DB pool:', sanitizedError);
   }
 }
 

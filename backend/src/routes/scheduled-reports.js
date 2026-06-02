@@ -4,6 +4,8 @@ import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { composeReport, writeReportFile } from '../services/reportComposer.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -174,7 +176,7 @@ router.get('/', [
     const result = await db.query(queryText, queryParams);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching scheduled reports:', err);
+    logError('Error fetching scheduled reports:', err);
     res.status(500).json({ error: 'Failed to fetch scheduled reports' });
   }
 });
@@ -219,7 +221,7 @@ router.get('/:id', [
 
     res.json(scheduledReport);
   } catch (err) {
-    console.error('Error fetching scheduled report:', err);
+    logError('Error fetching scheduled report:', err);
     res.status(500).json({ error: 'Failed to fetch scheduled report' });
   }
 });
@@ -341,7 +343,7 @@ router.post('/', [
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('Error creating scheduled report:', err);
+    logError('Error creating scheduled report:', err);
     res.status(500).json({ error: 'Failed to create scheduled report' });
   }
 });
@@ -506,7 +508,7 @@ router.put('/:id', [
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating scheduled report:', err);
+    logError('Error updating scheduled report:', err);
     res.status(500).json({ error: 'Failed to update scheduled report' });
   }
 });
@@ -548,7 +550,7 @@ router.delete('/:id', [
 
     res.json({ message: 'Scheduled report deleted successfully' });
   } catch (err) {
-    console.error('Error deleting scheduled report:', err);
+    logError('Error deleting scheduled report:', err);
     res.status(500).json({ error: 'Failed to delete scheduled report' });
   }
 });
@@ -661,7 +663,7 @@ router.post('/:id/run', [
       next_run_at: nextRunAt,
     });
   } catch (err) {
-    console.error('Error triggering scheduled report:', err);
+    logError('Error triggering scheduled report:', err);
     res.status(500).json({ error: 'Failed to trigger scheduled report' });
   }
 });
@@ -719,7 +721,7 @@ router.get('/:id/history', [
 
     res.json({ history: historyResult.rows });
   } catch (err) {
-    console.error('Error fetching scheduled report history:', err);
+    logError('Error fetching scheduled report history:', err);
     res.status(500).json({ error: 'Failed to fetch scheduled report history' });
   }
 });

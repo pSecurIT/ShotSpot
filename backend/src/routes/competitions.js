@@ -3,6 +3,8 @@ import { body, param, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -74,7 +76,7 @@ router.get('/', [
     const result = await db.query(queryText, params);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching competitions:', err);
+    logError('Error fetching competitions:', err);
     res.status(500).json({ error: 'Failed to fetch competitions' });
   }
 });
@@ -110,7 +112,7 @@ router.get('/:id', [
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error fetching competition:', err);
+    logError('Error fetching competition:', err);
     res.status(500).json({ error: 'Failed to fetch competition' });
   }
 });
@@ -194,7 +196,7 @@ router.post('/', [
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('Error creating competition:', err);
+    logError('Error creating competition:', err);
     res.status(500).json({ error: 'Failed to create competition' });
   }
 });
@@ -340,7 +342,7 @@ router.put('/:id', [
     const result = await db.query(queryText, params);
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating competition:', err);
+    logError('Error updating competition:', err);
     res.status(500).json({ error: 'Failed to update competition' });
   }
 });
@@ -368,7 +370,7 @@ router.delete('/:id', [
     await db.query('DELETE FROM competitions WHERE id = $1', [id]);
     res.status(204).send();
   } catch (err) {
-    console.error('Error deleting competition:', err);
+    logError('Error deleting competition:', err);
     res.status(500).json({ error: 'Failed to delete competition' });
   }
 });
@@ -403,7 +405,7 @@ router.get('/:id/teams', [
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching competition teams:', err);
+    logError('Error fetching competition teams:', err);
     res.status(500).json({ error: 'Failed to fetch competition teams' });
   }
 });
@@ -469,7 +471,7 @@ router.post('/:id/teams', [
 
     res.status(201).json(response);
   } catch (err) {
-    console.error('Error adding team to competition:', err);
+    logError('Error adding team to competition:', err);
     res.status(500).json({ error: 'Failed to add team to competition' });
   }
 });
@@ -501,7 +503,7 @@ router.delete('/:id/teams/:teamId', [
 
     res.status(204).send();
   } catch (err) {
-    console.error('Error removing team from competition:', err);
+    logError('Error removing team from competition:', err);
     res.status(500).json({ error: 'Failed to remove team from competition' });
   }
 });
@@ -561,7 +563,7 @@ router.get('/:id/bracket', [
       rounds: Object.values(rounds)
     });
   } catch (err) {
-    console.error('Error fetching tournament bracket:', err);
+    logError('Error fetching tournament bracket:', err);
     res.status(500).json({ error: 'Failed to fetch tournament bracket' });
   }
 });
@@ -755,7 +757,7 @@ router.post('/:id/bracket/generate', [
       bracket: finalBracket.rows
     });
   } catch (err) {
-    console.error('Error generating tournament bracket:', err);
+    logError('Error generating tournament bracket:', err);
     res.status(500).json({ error: 'Failed to generate tournament bracket' });
   }
 });
@@ -927,7 +929,7 @@ router.put('/:id/bracket/:bracketId', [
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating bracket match:', err);
+    logError('Error updating bracket match:', err);
     res.status(500).json({ error: 'Failed to update bracket match' });
   }
 });
@@ -962,7 +964,7 @@ router.get('/:id/standings', [
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching standings:', err);
+    logError('Error fetching standings:', err);
     res.status(500).json({ error: 'Failed to fetch standings' });
   }
 });
@@ -1025,7 +1027,7 @@ router.patch('/:id/standings/:teamId', [
 
     res.json(standings.rows);
   } catch (err) {
-    console.error('Error updating standings points:', err);
+    logError('Error updating standings points:', err);
     res.status(500).json({ error: 'Failed to update standings points' });
   }
 });
@@ -1082,7 +1084,7 @@ router.post('/:id/standings/initialize', [
 
     res.status(201).json(result.rows);
   } catch (err) {
-    console.error('Error initializing standings:', err);
+    logError('Error initializing standings:', err);
     res.status(500).json({ error: 'Failed to initialize standings' });
   }
 });
@@ -1217,7 +1219,7 @@ router.post('/:id/standings/update', [
 
     res.json(standings.rows);
   } catch (err) {
-    console.error('Error updating standings:', err);
+    logError('Error updating standings:', err);
     res.status(500).json({ error: 'Failed to update standings' });
   }
 });

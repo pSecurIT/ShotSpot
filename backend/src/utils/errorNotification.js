@@ -1,3 +1,5 @@
+import { logInfo, logError as writeLogError } from './logger.js';
+
 /**
  * Error Notification Service
  * Handles multi-channel error notifications with severity-based filtering and rate limiting
@@ -169,10 +171,10 @@ class ErrorNotificationService {
       });
       
       if (!response.ok) {
-        console.error('Webhook notification failed:', response.statusText);
+        writeLogError('Webhook notification failed:', response.statusText);
       }
     } catch (error) {
-      console.error('Failed to send webhook notification:', error.message);
+      writeLogError('Failed to send webhook notification:', error.message);
     }
   }
 
@@ -252,10 +254,10 @@ class ErrorNotificationService {
       });
 
       if (!response.ok) {
-        console.error('Slack notification failed:', response.statusText);
+        writeLogError('Slack notification failed:', response.statusText);
       }
     } catch (error) {
-      console.error('Failed to send Slack notification:', error.message);
+      writeLogError('Failed to send Slack notification:', error.message);
     }
   }
 
@@ -310,10 +312,10 @@ class ErrorNotificationService {
       });
 
       if (!response.ok) {
-        console.error('Teams notification failed:', response.statusText);
+        writeLogError('Teams notification failed:', response.statusText);
       }
     } catch (error) {
-      console.error('Failed to send Teams notification:', error.message);
+      writeLogError('Failed to send Teams notification:', error.message);
     }
   }
 
@@ -368,7 +370,7 @@ class ErrorNotificationService {
     // await ses.sendEmail({ ... }).promise();
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('📧 Email notification (not sent - email service not configured):', emailData.subject);
+      logInfo('📧 Email notification (not sent - email service not configured):', emailData.subject);
     }
   }
 }

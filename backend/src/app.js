@@ -5,11 +5,12 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
+import csurf from 'csurf';
 import crypto from 'crypto';
 import path from 'node:path';
 import fs from 'fs';
-import csrf from './middleware/csrf.js';
 import { errorNotificationService } from './utils/errorNotification.js';
+import { logError, logInfo, logWarn } from './utils/logger.js';
 import authRoutes from './routes/auth.js';
 import clubRoutes from './routes/clubs.js';
 import teamRoutes from './routes/teams.js';
@@ -30,6 +31,7 @@ import analyticsRoutes from './routes/analytics.js';
 import advancedAnalyticsRoutes from './routes/advanced-analytics.js';
 import achievementsRoutes from './routes/achievements.js';
 import dashboardRoutes from './routes/dashboard.js';
+import uxObservabilityRoutes from './routes/ux-observability.js';
 import reportTemplatesRoutes from './routes/report-templates.js';
 import exportSettingsRoutes from './routes/export-settings.js';
 import scheduledReportsRoutes from './routes/scheduled-reports.js';
@@ -45,6 +47,19 @@ import seasonsRoutes from './routes/seasons.js';
 
 
 const app = express();
+
+function resolveSafeLogPath() {
+  const logsDir = path.resolve(process.cwd(), 'logs');
+  const configuredPath = process.env.LOG_FILE_PATH;
+  const rawName = configuredPath ? path.basename(configuredPath) : 'app.log';
+  const sanitizedName = (rawName || 'app.log').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const fileName = sanitizedName.endsWith('.log') ? sanitizedName : `${sanitizedName}.log`;
+
+  return {
+    logsDir,
+    logPath: path.join(logsDir, fileName)
+  };
+}
 
 // Security middleware with enhanced configuration
 app.use(helmet({
@@ -90,12 +105,26 @@ app.use(helmet({
 
 // Custom CSP report handler
 app.post('/api/csp-report', express.json({ type: 'application/csp-report' }), (req, res) => {
-  console.error('CSP Violation:', req.body);
+  logError('CSP Violation:', req.body);
   res.status(204).end();
 });
 
 // Rate limiting with enhanced security (disabled in test to prevent timer leaks)
 if (process.env.NODE_ENV !== 'test') {
+  const shouldSkipGeneralRateLimit = (req) => {
+    // Keep tests deterministic while enforcing limits elsewhere.
+    if (process.env.NODE_ENV === 'test') {
+      return true;
+    }
+
+    // Skip only for trusted IPs and health checks.
+    const trustedIPs = (process.env.TRUSTED_IPS || '').split(',');
+    const isHealthCheck = req.path === '/api/health';
+    const isTrustedIP = trustedIPs.includes(req.ip);
+
+    return isHealthCheck || isTrustedIP;
+  };
+
   const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
     max: parseInt(process.env.RATE_LIMIT_MAX) || 5000, // Increased for development with timer polling
@@ -109,20 +138,7 @@ if (process.env.NODE_ENV !== 'test') {
         retryAfter: Math.ceil(req.rateLimit.resetTime / 1000) - Date.now() / 1000
       });
     },
-    skip: (req) => {
-      // Skip rate limiting in development mode entirely to avoid issues during rapid dev cycles
-      const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production';
-      if (isDevelopment) {
-        return true; // Skip all rate limiting in development
-      }
-      
-      // In production, skip only for trusted IPs and health checks
-      const trustedIPs = (process.env.TRUSTED_IPS || '').split(',');
-      const isHealthCheck = req.path === '/api/health';
-      const isTrustedIP = trustedIPs.includes(req.ip);
-      
-      return isHealthCheck || isTrustedIP;
-    }
+    skip: shouldSkipGeneralRateLimit
   });
 
   // Speed limiter - gradually slow down responses based on number of requests
@@ -130,7 +146,8 @@ if (process.env.NODE_ENV !== 'test') {
     windowMs: 900000, // 15 minutes
     delayAfter: 50, // allow 50 requests per 15 minutes, then...
     delayMs: (hits) => hits * 100, // add 100ms of delay per hit
-    maxDelayMs: 3000 // maximum delay of 3 seconds
+    maxDelayMs: 3000, // maximum delay of 3 seconds
+    skip: shouldSkipGeneralRateLimit
   });
 
   // Apply rate limiting and speed limiting to all routes
@@ -139,13 +156,16 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // CORS configuration with enhanced security
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+const configuredOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
   .split(',')
   .map(origin => origin.trim());
 
+const mobileAppOrigins = ['http://localhost', 'https://localhost', 'capacitor://localhost'];
+const allowedOrigins = [...new Set([...configuredOrigins, ...mobileAppOrigins])];
+
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+    // Requests without origin are handled by the production API guard below.
     if (!origin) {
       return callback(null, true);
     }
@@ -156,7 +176,7 @@ const corsOptions = {
     } else {
       // Log but don't crash - just deny the request
       if (process.env.NODE_ENV !== 'test') {
-        console.warn(`⚠️  CORS: Blocked request from origin: ${origin}`);
+        logWarn('CORS: Blocked request from origin:', origin);
       }
       // Return false to deny, but DON'T throw error (causes crash)
       callback(null, false);
@@ -178,25 +198,39 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
+app.use((req, res, next) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isApiRequest = req.path.startsWith('/api/');
+  const isHealthCheck = req.path === '/api/health';
+  const hasOrigin = Boolean(req.headers.origin);
+
+  // Reject API calls without Origin in production, except health checks.
+  if (isProduction && isApiRequest && !isHealthCheck && !hasOrigin) {
+    return res.status(403).json({
+      error: 'Origin header required in production'
+    });
+  }
+
+  return next();
+});
+
 try {
   app.use(cors(corsOptions));
 } catch (corsError) {
-  console.error('❌ CORS middleware error:', corsError);
+  logError('CORS middleware error:', corsError);
   throw corsError;
 }
 
 // Debug middleware (silent in test environment)
 app.use((req, res, next) => {
-  if (process.env.NODE_ENV !== 'test') {
-    console.log('Request:', {
-      method: req.method,
-      path: req.path,
-      headers: {
-        authorization: req.headers.authorization ? 'present' : 'missing',
-        'content-type': req.headers['content-type']
-      }
-    });
-  }
+  logInfo('Request:', {
+    method: req.method,
+    path: req.path,
+    headers: {
+      authorization: req.headers.authorization ? 'present' : 'missing',
+      'content-type': req.headers['content-type']
+    }
+  });
   next();
 });
 
@@ -204,9 +238,9 @@ app.use((req, res, next) => {
 app.use(cookieParser());
 
 // Ensure session secret is available
-const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET;
+const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret) {
-  throw new Error('SESSION_SECRET or JWT_SECRET must be set in environment variables');
+  throw new Error('SESSION_SECRET must be set in environment variables');
 }
 
 // Session configuration with security settings from environment
@@ -259,8 +293,18 @@ app.use(express.json({
   strict: true // Reject payloads that are not arrays or objects
 }));
 
-// CSRF protection
-app.use(csrf);
+// CSRF protection (session-backed synchronizer token pattern)
+const csrfProtection = csurf({
+  ignoreMethods: ['GET', 'HEAD', 'OPTIONS'],
+  value: (req) => req.headers['x-csrf-token'] || req.body?._csrf || req.query?._csrf
+});
+
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'test' && process.env.ENABLE_CSRF_IN_TEST !== 'true') {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+});
 
 // Security headers middleware
 app.use((req, res, next) => {
@@ -306,6 +350,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/advanced-analytics', advancedAnalyticsRoutes);
 app.use('/api/achievements', achievementsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/ux-observability', uxObservabilityRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/events', eventsRoutes);
@@ -332,7 +377,7 @@ app.use('/api/seasons', seasonsRoutes);
 app.use((err, req, res, _next) => {
   // Log error details securely
   const errorId = crypto.randomUUID();
-  const logError = {
+  const errorContext = {
     id: errorId,
     timestamp: new Date().toISOString(),
     method: req.method,
@@ -347,23 +392,33 @@ app.use((err, req, res, _next) => {
   };
   
   // Always log errors to console for debugging
-  console.error('Error caught by global handler:', logError);
+  logError('Error caught by global handler:', errorContext);
   
   // Log based on environment configuration
   if (process.env.ENABLE_ERROR_LOGGING === 'true') {
     if (process.env.NODE_ENV === 'production') {
       // Production logging to file
-      const logPath = process.env.LOG_FILE_PATH || 'logs/app.log';
+      const { logsDir, logPath } = resolveSafeLogPath();
       const logLevel = process.env.LOG_LEVEL || 'error';
+      const logStatus = Number.isInteger(err.status) ? err.status : 500;
+      const persistentLogEntry = {
+        id: errorId,
+        timestamp: new Date().toISOString(),
+        level: logLevel,
+        status: logStatus,
+        errorName: typeof err.name === 'string' ? err.name : 'Error',
+        // Avoid persisting request/network-derived payloads to file.
+        message: logStatus >= 500 ? 'Internal server error' : 'Request failed'
+      };
       
       // Ensure log directory exists
-      const logDir = path.dirname(logPath);
-      fs.mkdirSync(logDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
       
       // Write to log file
       fs.appendFileSync(
         logPath,
-        JSON.stringify({ ...logError, level: logLevel }) + '\n'
+        JSON.stringify(persistentLogEntry) + '\n',
+        { encoding: 'utf8' }
       );
       
       // Send notification for critical errors if webhook is configured
@@ -371,10 +426,10 @@ app.use((err, req, res, _next) => {
         fetch(process.env.ERROR_NOTIFICATION_WEBHOOK, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(logError)
+          body: JSON.stringify(errorContext)
         }).catch(webhookErr => {
           // Log webhook failures but don't crash the app
-          console.error('Failed to send error notification to webhook:', webhookErr.message);
+          logError('Failed to send error notification to webhook:', webhookErr.message);
         });
       }
     }
@@ -435,7 +490,7 @@ app.use((err, req, res, _next) => {
   if (error.status >= 500 || error.status === 429 || error.status === 401) {
     errorNotificationService.notifyTeam(logError).catch(notifyErr => {
       // Don't crash the app if notification fails
-      console.error('Failed to send error notification:', notifyErr.message);
+      logError('Failed to send error notification:', notifyErr.message);
     });
   }
 });
@@ -463,7 +518,7 @@ if (process.env.NODE_ENV !== 'test') {
   const serveFrontend = Boolean(frontendDistPath);
 
   if (serveFrontend) {
-    console.log('Frontend dist folder found, serving static files from:', frontendDistPath);
+    logInfo('Frontend dist folder found, serving static files from:', frontendDistPath);
 
     // Serve static files
     app.use(
@@ -500,7 +555,7 @@ if (process.env.NODE_ENV !== 'test') {
       return res.status(404).json({ error: 'Route not found' });
     });
   } else {
-    console.log('Frontend dist folder not found. Run "npm run build" in frontend directory to build.');
+    logInfo('Frontend dist folder not found. Run "npm run build" in frontend directory to build.');
 
     // 404 handler when frontend is not built
     app.use((req, res) => {

@@ -499,6 +499,217 @@ describe('Twizzit API Client', () => {
       expect(mockAxiosInstance.post).toHaveBeenCalled();
     });
   });
+
+  describe('getContacts', () => {
+    it('should fetch contacts by IDs', async () => {
+      const mockContacts = [
+        { id: 'contact-1', 'first-name': 'John', 'last-name': 'Doe' },
+        { id: 'contact-2', 'first-name': 'Jane', 'last-name': 'Smith' }
+      ];
+
+      mockAxiosInstance.get.mockResolvedValue({
+        data: mockContacts
+      });
+
+      const result = await client.getContacts(['contact-1', 'contact-2']);
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/contacts', {
+        params: expect.any(Object)
+      });
+      expect(result.contacts).toEqual(mockContacts);
+    });
+
+    it('should handle empty contacts response', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: [] });
+
+      const result = await client.getContacts(['contact-1']);
+
+      expect(result.contacts).toEqual([]);
+    });
+
+    it('should handle contacts network error', async () => {
+      mockAxiosInstance.get.mockRejectedValue(new Error('Network error'));
+
+      await expect(client.getContacts(['contact-1'])).rejects.toThrow();
+    });
+  });
+
+  describe('getSeasons', () => {
+    it('should fetch seasons successfully', async () => {
+      const mockSeasons = [
+        { id: 'season-1', name: '2024-2025' },
+        { id: 'season-2', name: '2023-2024' }
+      ];
+
+      mockAxiosInstance.get.mockResolvedValue({
+        data: mockSeasons
+      });
+
+      const result = await client.getSeasons();
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/v2/api/seasons', {
+        params: {}
+      });
+      expect(result.seasons).toEqual(mockSeasons);
+    });
+
+    it('should handle empty seasons response', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: null });
+
+      const result = await client.getSeasons();
+
+      expect(result.seasons).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it('should handle seasons network error', async () => {
+      mockAxiosInstance.get.mockRejectedValue(new Error('Network timeout'));
+
+      await expect(client.getSeasons()).rejects.toThrow('Failed to fetch seasons');
+    });
+  });
+
+  describe('Rate Limiting (429 Errors)', () => {
+    it('should handle 429 too many requests', async () => {
+      mockAxiosInstance.get.mockRejectedValue({
+        response: {
+          status: 429,
+          data: { error: 'Too many requests' }
+        }
+      });
+
+      await expect(client.getGroups()).rejects.toThrow();
+    });
+
+    it('should handle 429 on authentication', async () => {
+      mockAxiosInstance.post.mockRejectedValue({
+        response: {
+          status: 429,
+          headers: { 'retry-after': '60' }
+        }
+      });
+
+      await expect(client.authenticate()).rejects.toThrow();
+    });
+  });
+
+  describe('Token Expiry Edge Cases', () => {
+    it('should handle token with no expiry time', async () => {
+      mockAxiosInstance.post.mockResolvedValue({
+        data: { token: 'test-token' }
+      });
+
+      const token = await client.authenticate();
+
+      expect(token).toBe('test-token');
+      expect(client.accessToken).toBe('test-token');
+    });
+
+    it('should handle extremely short token expiry', async () => {
+      client.accessToken = 'short-expiry-token';
+      client.tokenExpiry = Date.now() + 1000; // 1 second from now
+
+      mockAxiosInstance.post.mockResolvedValue({
+        data: { token: 'new-token', expires_in: 3600 }
+      });
+
+      await client.ensureAuthenticated();
+
+      expect(mockAxiosInstance.post).toHaveBeenCalled();
+      expect(client.accessToken).toBe('new-token');
+    });
+
+    it('should handle token with 5 minute expiry exactly', async () => {
+      client.accessToken = 'edge-case-token';
+      client.tokenExpiry = Date.now() + 300000; // Exactly 5 minutes
+
+      mockAxiosInstance.post.mockResolvedValue({
+        data: { token: 'new-token', expires_in: 3600 }
+      });
+
+      await client.ensureAuthenticated();
+
+      // Current client behavior refreshes when remaining time is <= 5 minutes.
+      expect(mockAxiosInstance.post).toHaveBeenCalled();
+      expect(client.accessToken).toBe('new-token');
+    });
+
+    it('should re-authenticate if token expiry is less than 5 minutes', async () => {
+      client.accessToken = 'expiring-soon-token';
+      client.tokenExpiry = Date.now() + 299999; // 4:59.999 minutes
+
+      mockAxiosInstance.post.mockResolvedValue({
+        data: { token: 'refreshed-token', expires_in: 3600 }
+      });
+
+      await client.ensureAuthenticated();
+
+      expect(mockAxiosInstance.post).toHaveBeenCalled();
+      expect(client.accessToken).toBe('refreshed-token');
+    });
+  });
+
+  describe('Configuration and Defaults', () => {
+    it('should use default timeout if not provided', () => {
+      const defaultClient = new TwizzitApiClient({
+        apiEndpoint: 'https://app.twizzit.com',
+        username: 'user',
+        password: 'pass'
+      });
+      expect(defaultClient.timeout).toBe(30000);
+    });
+
+    it('should use provided timeout', () => {
+      const customClient = new TwizzitApiClient({
+        apiEndpoint: 'https://app.twizzit.com',
+        username: 'user',
+        password: 'pass',
+        timeout: 15000
+      });
+      expect(customClient.timeout).toBe(15000);
+    });
+
+    it('should handle API endpoint without trailing slash', () => {
+      const client = new TwizzitApiClient({
+        apiEndpoint: 'https://api.twizzit.com',
+        username: 'user',
+        password: 'pass'
+      });
+      expect(client.apiEndpoint).toBe('https://api.twizzit.com');
+    });
+
+    it('should handle API endpoint with trailing slash', () => {
+      const client = new TwizzitApiClient({
+        apiEndpoint: 'https://api.twizzit.com/',
+        username: 'user',
+        password: 'pass'
+      });
+      expect(client.apiEndpoint).toBe('https://api.twizzit.com/');
+    });
+
+    it('should use default apiEndpoint if not provided', () => {
+      const client = new TwizzitApiClient({
+        username: 'user',
+        password: 'pass'
+      });
+      expect(client.apiEndpoint).toBe('https://app.twizzit.com');
+    });
+  });
+
+  describe('Error Messages', () => {
+
+    it('should include specific error for network failures in getGroups', async () => {
+      mockAxiosInstance.get.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(client.getGroups()).rejects.toThrow('Failed to fetch groups');
+    });
+
+    it('should include specific error for network failures in getSeasons', async () => {
+      mockAxiosInstance.get.mockRejectedValue(new Error('ENOTFOUND'));
+
+      await expect(client.getSeasons()).rejects.toThrow('Failed to fetch seasons');
+    });
+  });
 });
 
 

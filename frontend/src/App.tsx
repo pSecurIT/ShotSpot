@@ -9,7 +9,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Navigation from './components/Navigation.tsx';
 import OfflineIndicator from './components/OfflineIndicator';
 import NotFound from './components/NotFound';
-import logo from './img/ShotSpot_logo.png';
+import RoutePending from './components/ui/RoutePending';
+import UxObservabilityBootstrap from './components/UxObservabilityBootstrap';
+import logo from './img/shotspot-mark.svg';
 
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const GameManagement = React.lazy(() => import('./components/GameManagement'));
@@ -28,36 +30,40 @@ const MyAchievements = React.lazy(() => import('./components/MyAchievements'));
 const CompetitionManagement = React.lazy(() => import('./components/CompetitionManagement'));
 const CompetitionBracketView = React.lazy(() => import('./components/CompetitionBracketView'));
 const CompetitionStandingsView = React.lazy(() => import('./components/CompetitionStandingsView'));
+const SeriesManagement = React.lazy(() => import('./components/SeriesManagement'));
 const AdvancedAnalytics = React.lazy(() => import('./components/AdvancedAnalytics'));
 const TeamAnalytics = React.lazy(() => import('./components/TeamAnalytics'));
 const ScheduledReports = React.lazy(() => import('./components/ScheduledReports'));
 const ReportTemplates = React.lazy(() => import('./components/ReportTemplates'));
 const SettingsPage = React.lazy(() => import('./components/SettingsPage'));
+const UxObservabilityDashboard = React.lazy(() => import('./components/UxObservabilityDashboard'));
 
 const RouteLoader = ({ children }: { children: React.ReactNode }) => (
-  <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading…</div>}>
+  <Suspense fallback={<RoutePending />}>
     {children}
   </Suspense>
 );
 
 const App: React.FC = () => {
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
         <WebSocketProvider>
           <Router>
+            <UxObservabilityBootstrap />
             <div className="App">
+            <a className="skip-link" href="#app-main">Skip to main content</a>
             <OfflineIndicator />
             <header className="App-header">
               <div className="header-content">
                 <div className="header-branding">
-                  <img src={logo} alt="ShotSpot Logo" className="header-logo" />
+                  <img src={logo} alt="ShotSpot Logo" className="header-logo" loading="lazy" decoding="async" />
                   <h1>ShotSpot - Korfball Statistics</h1>
                 </div>
                 <Navigation />
               </div>
             </header>
-            <main>
+            <main id="app-main" className="App-main" tabIndex={-1}>
               <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />
@@ -201,6 +207,14 @@ const App: React.FC = () => {
                 }
               />
               <Route
+                path="/ux-observability"
+                element={
+                  <ProtectedRoute minRole="admin">
+                    <RouteLoader><UxObservabilityDashboard /></RouteLoader>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/clubs"
                 element={
                   <ProtectedRoute minRole="coach">
@@ -236,7 +250,7 @@ const App: React.FC = () => {
                 path="/series"
                 element={
                   <ProtectedRoute minRole="coach">
-                    <Navigate to="/competitions" replace />
+                    <RouteLoader><SeriesManagement /></RouteLoader>
                   </ProtectedRoute>
                 }
               />
@@ -263,7 +277,7 @@ const App: React.FC = () => {
               <Route
                 path="/settings"
                 element={
-                  <ProtectedRoute minRole="coach">
+                  <ProtectedRoute>
                     <RouteLoader><SettingsPage /></RouteLoader>
                   </ProtectedRoute>
                 }
@@ -275,8 +289,8 @@ const App: React.FC = () => {
           </div>
           </Router>
         </WebSocketProvider>
-      </AuthProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 };
 

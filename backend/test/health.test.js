@@ -1,6 +1,6 @@
 import request from 'supertest';
 import app from '../src/app.js';
-import db from '../src/db.js';
+import * as dbModule from '../src/db.js';
 
 describe('🏥 Health Check', () => {
   describe('✅ Successful Health Checks', () => {
@@ -70,6 +70,18 @@ describe('🏥 Health Check', () => {
   });
 
   describe('❌ Invalid Health Check Requests', () => {
+    it('❌ should return 503 degraded status when database health check fails', async () => {
+      const healthSpy = jest.spyOn(dbModule, 'dbHealthCheck').mockRejectedValueOnce(new Error('db unavailable'));
+
+      const response = await request(app).get('/api/health');
+
+      expect(response.status).toBe(503);
+      expect(response.body.status).toBe('degraded');
+      expect(response.body.services.database).toBe('db unavailable');
+
+      healthSpy.mockRestore();
+    });
+
     it('❌ should reject POST requests to health endpoint', async () => {
       const response = await request(app).post('/api/health');
       
@@ -250,7 +262,7 @@ describe('🏥 Health Check', () => {
   afterAll(async () => {
     try {
       // Close the database pool (this is the last test file to run)
-      await db.closePool();
+      await dbModule.closePool();
       console.log('✅ Health Check tests completed');
     } catch (error) {
       console.error('❌ Health Check cleanup error:', error.message);

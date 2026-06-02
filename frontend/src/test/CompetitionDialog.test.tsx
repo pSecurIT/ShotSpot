@@ -90,6 +90,24 @@ describe('CompetitionDialog', () => {
     return { onClose, onSuccess };
   };
 
+  it('renders with dialog semantics and focuses the name field', async () => {
+    renderDialog();
+
+    expect(screen.getByRole('dialog', { name: 'Create Competition' })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Competition name')).toHaveFocus();
+    });
+  });
+
+  it('closes on Escape', async () => {
+    const { onClose } = renderDialog();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('prevents end date earlier than start date', async () => {
     renderDialog();
 
@@ -99,7 +117,8 @@ describe('CompetitionDialog', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
-    expect(screen.getByText('End date cannot be before start date')).toBeInTheDocument();
+    expect(screen.getByText('End date cannot be before start date')).toHaveAttribute('id', 'competition-end-error');
+    expect(screen.getByLabelText('End date (optional)')).toHaveAttribute('aria-invalid', 'true');
     expect(createMock).not.toHaveBeenCalled();
   });
 

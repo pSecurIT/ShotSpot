@@ -69,9 +69,9 @@ describe('MatchTemplates', () => {
     localStorage.setItem('token', 'test-token');
   });
 
-  it('should render loading state initially', () => {
+  it('should render loading state initially', async () => {
     renderWithProviders(<MatchTemplates />);
-    expect(screen.getByText('Loading templates...')).toBeInTheDocument();
+    expect(await screen.findByText(/loading templates/i)).toBeInTheDocument();
   });
 
   it('should render templates after loading', async () => {
@@ -201,7 +201,7 @@ describe('MatchTemplates', () => {
     fireEvent.click(screen.getByText('Create Template'));
     
     await waitFor(() => {
-      expect(screen.getByText('Template created successfully')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Template created successfully');
     });
   });
 
@@ -226,7 +226,7 @@ describe('MatchTemplates', () => {
     renderWithProviders(<MatchTemplates />);
     
     await waitFor(() => {
-      expect(screen.getByText('Failed to load match templates')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to load match templates');
     });
   });
 });

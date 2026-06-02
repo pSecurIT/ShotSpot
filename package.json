@@ -1,7 +1,8 @@
 {
   "name": "shotspot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ShotSpot - Korfball match statistics platform for live event capture, reporting, and analysis.",
+  "type": "module",
   "scripts": {
     "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
     "start:backend": "cd backend && npm start",
@@ -23,7 +24,9 @@
     "release:changelog": "node scripts/generate-changelog.js",
     "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
     "lint:fix": "npm --prefix backend run lint:fix && npm --prefix frontend run lint:fix",
-    "test:frontend": "npm --prefix frontend run test:run"
+    "test:frontend": "npm --prefix frontend run test:run",
+    "snyk:scan": "npm --prefix backend run snyk:scan && npm --prefix frontend run snyk:scan",
+    "snyk:code": "snyk code test . --severity-threshold=high"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
@@ -31,5 +34,8 @@
   "overrides": {
     "glob": ">=11.1.0",
     "tar": "7.5.3"
+  },
+  "dependencies": {
+    "@dr.pogodin/csurf": "^1.16.9"
   }
 }

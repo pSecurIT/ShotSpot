@@ -1,3 +1,5 @@
+import { createSecureHexId } from '../utils/secureRandom';
+
 export type ReportTemplateType = 'summary' | 'detailed' | 'coach_focused' | 'custom';
 export type TemplateSectionType = 'summary' | 'stats' | 'charts' | 'commentary' | 'comparison';
 export type MetricKey =
@@ -215,8 +217,10 @@ const toTitleCase = (value: string) => value.replace(/[_-]+/g, ' ').replace(/\b\
 
 export const getMetricLabel = (metric: string) => metricLabels[metric as MetricKey] || toTitleCase(metric);
 
+const createSectionIdSuffix = (): string => createSecureHexId(8);
+
 export const createTemplateSection = (type: TemplateSectionType): ReportTemplateSection => ({
-  id: `section-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  id: `section-${Date.now()}-${createSectionIdSuffix()}`,
   ...sectionDefaults[type],
   config: {
     ...sectionDefaults[type].config,

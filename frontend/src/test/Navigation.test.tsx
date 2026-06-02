@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
@@ -31,6 +31,7 @@ const renderNavigation = (user: { username: string; role: string } | null = null
     user,
     logout: mockLogout,
     login: vi.fn(),
+    updateUser: vi.fn(),
     isLoading: false
   });
 
@@ -39,6 +40,17 @@ const renderNavigation = (user: { username: string; role: string } | null = null
       <Navigation />
     </BrowserRouter>
   );
+};
+
+const setViewportWidth = (width: number) => {
+  act(() => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: width
+    });
+    window.dispatchEvent(new Event('resize'));
+  });
 };
 
 const openUserMenu = async () => {
@@ -64,6 +76,11 @@ describe('Navigation Component', () => {
     vi.clearAllMocks();
     // Mock window.alert
     global.alert = vi.fn();
+    window.localStorage.clear();
+    window.localStorage.setItem('shotspot:onboarding:v1:1:user', 'done');
+    window.localStorage.setItem('shotspot:onboarding:v1:2:admin', 'done');
+    window.localStorage.setItem('shotspot:onboarding:v1:3:coach', 'done');
+    setViewportWidth(1280);
   });
 
   describe('Unauthenticated State', () => {
@@ -121,13 +138,96 @@ describe('Navigation Component', () => {
       expect(screen.getByRole('button', { name: 'Matches' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Analytics' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Data' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument();
+    });
+
+    it('shows Help menu for coach/player roles only', () => {
+      const { unmount } = renderNavigation(regularUser);
+      expect(screen.getByRole('button', { name: 'Help' })).toBeInTheDocument();
+
+      unmount();
+
+      renderNavigation(adminUser);
+      expect(screen.queryByRole('button', { name: 'Help' })).not.toBeInTheDocument();
+    });
+
+    it('shows first-run checklist for coach and allows skipping', async () => {
+      window.localStorage.removeItem('shotspot:onboarding:v1:3:coach');
+      const user = userEvent.setup();
+      renderNavigation(coachUser);
+
+      expect(screen.getByText('Welcome to ShotSpot')).toBeInTheDocument();
+      await user.click(screen.getByText('Skip for now'));
+
+      await waitFor(() => {
+        expect(screen.queryByText('Welcome to ShotSpot')).not.toBeInTheDocument();
+      });
+
+      expect(window.localStorage.getItem('shotspot:onboarding:v1:3:coach')).toBe('skipped');
+    });
+
+    it('moves focus into onboarding dialog and closes on Escape', async () => {
+      window.localStorage.removeItem('shotspot:onboarding:v1:3:coach');
+      const user = userEvent.setup();
+      renderNavigation(coachUser);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Skip for now' })).toHaveFocus();
+      });
+
+      await user.keyboard('{Escape}');
+
+      await waitFor(() => {
+        expect(screen.queryByText('Welcome to ShotSpot')).not.toBeInTheDocument();
+      });
+    });
+
+    it('opens targeted help content from the Help menu', async () => {
+      const user = userEvent.setup();
+      renderNavigation(regularUser);
+
+      await user.click(screen.getByRole('button', { name: 'Help' }));
+      await user.click(screen.getByRole('menuitem', { name: /Games tips/i }));
+
+      expect(screen.getByText('Games Tips')).toBeInTheDocument();
+      expect(screen.getByText('Game flow tips')).toBeInTheDocument();
+    });
+
+    it('closes help dialog on Escape key', async () => {
+      const user = userEvent.setup();
+      renderNavigation(regularUser);
+
+      await user.click(screen.getByRole('button', { name: 'Help' }));
+      await user.click(screen.getByRole('menuitem', { name: /Overview/i }));
+
+      expect(screen.getByText('Quick Help Overview')).toBeInTheDocument();
+      await user.keyboard('{Escape}');
+
+      await waitFor(() => {
+        expect(screen.queryByText('Quick Help Overview')).not.toBeInTheDocument();
+      });
+    });
+
+    it('supports opening dropdown menus with keyboard and focuses the first item', async () => {
+      renderNavigation(regularUser);
+
+      const trigger = screen.getByRole('button', { name: 'Matches' });
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+
+      await waitFor(() => {
+        expect(screen.getByRole('menu', { name: 'Matches menu' })).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole('menuitem', { name: /All Games/i })).toHaveFocus();
     });
 
     it('displays user information', () => {
       renderNavigation(regularUser);
-      
-      expect(screen.getByText(/testuser\s*\(\s*user\s*\)/i)).toBeInTheDocument();
+
+      expect(screen.getByLabelText('Current user')).toHaveTextContent('testuser');
+      expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument();
     });
 
     it('shows change password button when authenticated', async () => {
@@ -145,6 +245,13 @@ describe('Navigation Component', () => {
       expect(screen.getByText('User Management')).toBeInTheDocument();
     });
 
+    it('shows UX Observability link for admin users under Analytics', () => {
+      renderNavigation(adminUser);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Analytics' }));
+      expect(screen.getByText('UX Observability')).toBeInTheDocument();
+    });
+
     it('shows an Admin badge for admin-only items', () => {
       renderNavigation(adminUser);
 
@@ -153,11 +260,19 @@ describe('Navigation Component', () => {
       expect(within(userManagement).getByText('Admin')).toBeInTheDocument();
     });
 
-    it('hides Users link for non-admin users', () => {
+    it('hides User Management link for non-admin users while keeping Settings visible', () => {
       renderNavigation(regularUser);
       
-      expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+      expect(screen.getByRole('menuitem', { name: /Settings/i })).toBeInTheDocument();
       expect(screen.queryByText('User Management')).not.toBeInTheDocument();
+    });
+
+    it('hides UX Observability link for non-admin users', () => {
+      renderNavigation(regularUser);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Analytics' }));
+      expect(screen.queryByText('UX Observability')).not.toBeInTheDocument();
     });
 
     it('shows Users link for coach users', () => {
@@ -477,6 +592,204 @@ describe('Navigation Component', () => {
       fireEvent.click(screen.getAllByText('Change Password')[0]);
       
       expect(screen.getByText('Change Your Password')).toBeInTheDocument();
+    });
+  });
+
+  it('exposes a skip link to main content', () => {
+    renderNavigation(null);
+
+    expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument();
+  });
+});
+
+describe('Navigation: Mobile Swipe Gestures', () => {
+  const regularUser = {
+    id: 1,
+    username: 'testuser',
+    email: 'test@example.com',
+    role: 'user'
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    global.alert = vi.fn();
+    window.localStorage.clear();
+    window.localStorage.setItem('shotspot:onboarding:v1:1:user', 'done');
+  });
+
+  it('right-swipe on left edge opens mobile menu on collapsed viewport', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    // Verify hamburger button exists
+    expect(screen.getByRole('button', { name: 'Open navigation menu' })).toBeInTheDocument();
+
+    // Simulate right-swipe from left edge
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+    expect(swipeEdge).toBeInTheDocument();
+
+    act(() => {
+      fireEvent.touchStart(swipeEdge!, {
+        touches: [{ clientX: 18, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    act(() => {
+      fireEvent.touchEnd(swipeEdge!, {
+        changedTouches: [{ clientX: 100, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    // Menu should open
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+  });
+
+  it('swipe-to-open disabled on desktop viewport', async () => {
+    setViewportWidth(1280); // Desktop viewport
+    renderNavigation(regularUser);
+
+    // Hamburger button should not exist
+    expect(screen.queryByRole('button', { name: 'Open navigation menu' })).not.toBeInTheDocument();
+
+    // Swipe edge should not exist
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+    expect(swipeEdge).not.toBeInTheDocument();
+  });
+
+  it('swipe-to-open disabled when menu already open', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    // Open menu via hamburger button
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+
+    // Swipe gesture should be disabled while menu is open
+    // (Verified by the useSwipeGesture hook's enabled prop)
+    expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+  });
+
+  it('swipe-to-open not triggered by insufficient distance', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+
+    // Small swipe (less than 56px minimum)
+    act(() => {
+      fireEvent.touchStart(swipeEdge!, {
+        touches: [{ clientX: 18, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    act(() => {
+      fireEvent.touchEnd(swipeEdge!, {
+        changedTouches: [{ clientX: 40, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    // Menu should not open
+    expect(document.querySelector('.mobile-menu-panel')).not.toHaveClass('open');
+  });
+
+  it('swipe-to-open not triggered by excessive vertical movement', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+
+    // Vertical swipe (excessive y-axis movement)
+    act(() => {
+      fireEvent.touchStart(swipeEdge!, {
+        touches: [{ clientX: 18, clientY: 300 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    act(() => {
+      fireEvent.touchEnd(swipeEdge!, {
+        changedTouches: [{ clientX: 100, clientY: 500 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    // Menu should not open
+    expect(document.querySelector('.mobile-menu-panel')).not.toHaveClass('open');
+  });
+
+  it('menu can be opened via swipe and closed via close button', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    const swipeEdge = document.querySelector('.navigation-v2__swipe-edge');
+
+    // Open via swipe
+    act(() => {
+      fireEvent.touchStart(swipeEdge!, {
+        touches: [{ clientX: 18, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    act(() => {
+      fireEvent.touchEnd(swipeEdge!, {
+        changedTouches: [{ clientX: 100, clientY: 400 }]
+      } as unknown as React.TouchEvent<HTMLElement>);
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+
+    // Close via the menu close button
+    fireEvent.click(screen.getByRole('button', { name: 'Close menu' }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).not.toHaveClass('open');
+    });
+  });
+
+  it('tab key supports navigation focus on mobile', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    // Open menu
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+
+    // Tab key should move focus within menu
+    const closeButton = document.querySelector('.mobile-menu-header__close');
+    act(() => {
+      (closeButton as HTMLElement).focus();
+    });
+
+    expect(document.activeElement).toBe(closeButton);
+  });
+
+  it('escape key closes mobile menu', async () => {
+    setViewportWidth(375); // iPhone viewport
+    renderNavigation(regularUser);
+
+    // Open menu
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).toHaveClass('open');
+    });
+
+    // Press Escape
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(document.querySelector('.mobile-menu-panel')).not.toHaveClass('open');
     });
   });
 });

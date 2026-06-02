@@ -7,6 +7,8 @@ import db from '../db.js';
 import TwizzitApiClient from './twizzit-api-client.js';
 import { getCredentials, updateVerificationTimestamp } from './twizzit-auth.js';
 
+import { logWarn, logError } from '../utils/logger.js';
+
 const SYNC_OPTIONS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const SYNC_OPTIONS_ERROR_TTL_MS = 15 * 60 * 1000; // 15 minutes (avoid hammering on quota/429)
 const syncOptionsCache = new Map();
@@ -686,7 +688,7 @@ async function logSyncHistory(syncData) {
 
     return result.rows[0].id;
   } catch (error) {
-    console.error('Failed to log sync history:', error);
+    logError('Failed to log sync history:', error);
     throw error;
   }
 }
@@ -732,7 +734,7 @@ async function updateSyncHistory(syncId, updates) {
       [syncId, status, itemsProcessed, itemsSucceeded, itemsFailed, errorMessage, completedAt]
     );
   } catch (error) {
-    console.error('Failed to update sync history:', error);
+    logError('Failed to update sync history:', error);
     throw error;
   }
 }
@@ -1092,7 +1094,7 @@ async function syncTeamPlayers(credentialId, twizzitTeamId, localTeamId, options
       const gender = extractGender(twizzitPlayer);
       if (!firstName || !lastName) {
         failed++;
-        console.warn('[twizzit] Skipping player with missing name fields', {
+        logWarn('[twizzit] Skipping player with missing name fields', {
           twizzitPlayerId: String(twizzitPlayer?.id ?? twizzitPlayer?.contact_id ?? twizzitPlayer?.contactId ?? ''),
           hasFirstName: Boolean(firstName),
           hasLastName: Boolean(lastName)
@@ -1182,7 +1184,7 @@ async function syncTeamPlayers(credentialId, twizzitTeamId, localTeamId, options
       succeeded++;
     } catch (error) {
       failed++;
-      console.error(`Failed to sync player ${twizzitPlayer.id}:`, error);
+      logError(`Failed to sync player ${twizzitPlayer.id}:`, error);
     }
   }
 
@@ -1269,7 +1271,7 @@ export async function syncPlayersFromTwizzit(credentialId, _options = {}) {
         succeeded += result.succeeded;
         failed += result.failed;
       } catch (error) {
-        console.error(`Failed to sync players for team ${mapping.twizzit_team_id}:`, error);
+        logError(`Failed to sync players for team ${mapping.twizzit_team_id}:`, error);
       }
     }
 

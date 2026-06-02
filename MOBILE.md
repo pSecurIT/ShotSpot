@@ -560,13 +560,35 @@ For issues related to mobile app development:
    - Console errors
    - Screenshots if applicable
 
+## Biometric Authentication
+
+ShotSpot now supports native biometric quick login on iOS and Android builds.
+
+### What it does
+
+- Prompts the user to enable Face ID / Touch ID / fingerprint login after a successful password sign-in.
+- Stores the session token in the device keychain / secure storage, not in plaintext app state.
+- Shows a quick-login button on app launch when biometric enrollment already exists.
+- Falls back to password login when biometrics are unavailable, cancelled, or fail.
+- Keeps the offline-first flow intact so cached role/session state and queued writes still work after biometric unlock.
+
+### Platform setup
+
+- iOS: add `NSFaceIDUsageDescription` to `ios/App/App/Info.plist`.
+- Android: add `android.permission.USE_BIOMETRIC` and `android.permission.USE_FINGERPRINT` to `android/app/src/main/AndroidManifest.xml`.
+- After running `npx cap add ios` or `npx cap add android`, run `npm run mobile:setup-biometric` from `frontend/` to patch the native files.
+
+### User controls
+
+- Users can enable biometric login after password login or from Settings → Security.
+- Users can disable biometric login from Settings → Security, which clears the stored biometric enrollment.
+
 ## Future Enhancements
 
 Potential mobile-specific features to implement:
 
 - **Push notifications** - Notify coaches of game events
 - **Camera integration** - Take team photos, scan QR codes for quick player selection
-- **Biometric authentication** - Touch ID/Face ID for quick login
 - **Native share** - Share match reports via native share dialog
 - **Haptic feedback** - Vibration on shot recorded
 - **Background sync** - Sync data even when app is backgrounded

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import ScheduleConfigForm from './ScheduleConfigForm';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 import type {
   ReportTemplateOption,
   ScheduledReport,
@@ -25,6 +26,12 @@ const ReportScheduleDialog: React.FC<ReportScheduleDialogProps> = ({
   onSave,
 }) => {
   const title = initialSchedule ? 'Edit Scheduled Report' : 'Create Scheduled Report';
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const { dialogRef, titleId, onDialogKeyDown } = useAccessibleDialog({
+    isOpen,
+    onClose,
+    initialFocusRef: closeButtonRef,
+  });
 
   if (!isOpen) {
     return null;
@@ -36,11 +43,28 @@ const ReportScheduleDialog: React.FC<ReportScheduleDialogProps> = ({
   };
 
   return (
-    <div className="scheduled-reports-modal-overlay" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="scheduled-reports-modal">
+    <div
+      className="scheduled-reports-modal-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="scheduled-reports-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={onDialogKeyDown}
+        onMouseDown={(event) => event.stopPropagation()}
+        tabIndex={-1}
+      >
         <div className="scheduled-reports-modal__header">
-          <h3>{title}</h3>
+          <h3 id={titleId}>{title}</h3>
           <button
+            ref={closeButtonRef}
             type="button"
             className="scheduled-reports-modal__close"
             onClick={onClose}

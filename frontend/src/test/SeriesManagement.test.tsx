@@ -69,6 +69,13 @@ describe('SeriesManagement', () => {
     });
   });
 
+  it('announces empty state accessibly', async () => {
+    listMock.mockResolvedValue([]);
+    renderPage();
+
+    expect(await screen.findByRole('status')).toHaveTextContent('No series found');
+  });
+
   it('creates a series with region assignment', async () => {
     const user = userEvent.setup();
     renderPage();

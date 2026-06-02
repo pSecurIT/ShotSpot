@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Club } from '../types/clubs';
 import { clubsApi } from '../services/clubsApi';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 interface ClubDialogProps {
   isOpen: boolean;
@@ -19,10 +20,16 @@ const validateName = (name: string): string | null => {
 
 const ClubDialog: React.FC<ClubDialogProps> = ({ isOpen, onClose, onSuccess, club }) => {
   const isEdit = useMemo(() => Boolean(club), [club]);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const { dialogRef, titleId, onDialogKeyDown } = useAccessibleDialog({
+    isOpen,
+    onClose,
+    initialFocusRef: nameInputRef,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -61,25 +68,34 @@ const ClubDialog: React.FC<ClubDialogProps> = ({ isOpen, onClose, onSuccess, clu
   };
 
   return (
-    <div className="club-dialog__overlay" role="dialog" aria-modal="true" aria-label={title}
+    <div className="club-dialog__overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="club-dialog__content">
+      <div
+        ref={dialogRef}
+        className="club-dialog__content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={onDialogKeyDown}
+        tabIndex={-1}
+      >
         <div className="club-dialog__header">
-          <h3>{title}</h3>
+          <h3 id={titleId}>{title}</h3>
           <button type="button" className="secondary-button" onClick={onClose} aria-label="Close">
             ✕
           </button>
         </div>
 
-        {formError && <div className="alert alert-error">{formError}</div>}
+        {formError && <div className="alert alert-error" role="alert">{formError}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="club-dialog__field">
             <label htmlFor="club-name">Club name</label>
             <input
+              ref={nameInputRef}
               id="club-name"
               type="text"
               value={name}
@@ -90,9 +106,10 @@ const ClubDialog: React.FC<ClubDialogProps> = ({ isOpen, onClose, onSuccess, clu
               placeholder="Enter club name"
               disabled={submitting}
               className={fieldError ? 'error' : ''}
-              autoFocus
+              aria-invalid={fieldError ? 'true' : 'false'}
+              aria-describedby={fieldError ? 'club-name-error' : undefined}
             />
-            {fieldError && <span className="field-error">{fieldError}</span>}
+            {fieldError && <span className="field-error" id="club-name-error">{fieldError}</span>}
           </div>
 
           <div className="club-dialog__actions">

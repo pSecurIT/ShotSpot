@@ -1,9 +1,17 @@
 import express from 'express';
-import { body, validationResult } from 'express-validator';
+import { body, param, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
+const CLUB_THEME_PALETTE_IDS = [
+  'shotspot-blue',
+  'emerald-club',
+  'sunset-flare',
+  'crimson-strike',
+  'violet-pulse',
+  'graphite-gold'
+];
 
 // Apply authentication middleware to all routes
 router.use(auth);
@@ -60,6 +68,68 @@ router.get('/:id', async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+router.get('/:id/theme', [
+  param('id').isInt({ min: 1 }).withMessage('Club ID must be a positive integer')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  try {
+    const result = await db.query(
+      'SELECT id, club_theme_palette_id FROM clubs WHERE id = $1',
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Club not found' });
+    }
+
+    return res.json({
+      club_id: result.rows[0].id,
+      palette_id: result.rows[0].club_theme_palette_id || 'shotspot-blue'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+router.put('/:id/theme', [
+  requireRole(['admin']),
+  param('id').isInt({ min: 1 }).withMessage('Club ID must be a positive integer'),
+  body('palette_id')
+    .isIn(CLUB_THEME_PALETTE_IDS)
+    .withMessage(`Palette ID must be one of: ${CLUB_THEME_PALETTE_IDS.join(', ')}`)
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg, errors: errors.array() });
+  }
+
+  try {
+    const result = await db.query(
+      `UPDATE clubs
+       SET club_theme_palette_id = $1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING id, club_theme_palette_id`,
+      [req.body.palette_id, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Club not found' });
+    }
+
+    return res.json({
+      club_id: result.rows[0].id,
+      palette_id: result.rows[0].club_theme_palette_id
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
 

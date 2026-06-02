@@ -1,8 +1,10 @@
 import express from 'express';
+import { randomUUID } from 'crypto';
 import { body, query, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { hasTrainerAccess } from '../middleware/trainerAccess.js';
+import { logError, logInfo } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -127,7 +129,7 @@ router.get('/', [
     const result = await db.query(query, params);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching games:', err);
+    logError('Error fetching games:', err);
     res.status(500).json({ error: 'Failed to fetch games' });
   }
 });
@@ -160,7 +162,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error fetching game:', err);
+    logError('Error fetching game:', err);
     res.status(500).json({ error: 'Failed to fetch game' });
   }
 });
@@ -283,7 +285,7 @@ router.post('/', [
 
     res.status(201).json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error creating game:', err);
+    logError('Error creating game:', err);
     res.status(500).json({ error: 'Failed to create game' });
   }
 });
@@ -432,6 +434,31 @@ router.put('/:id', [
     `;
 
     const _result = await db.query(query, params);
+    const previousGame = gameCheck.rows[0];
+
+    // Auto-create initial possession when game transitions to in_progress
+    if (status === 'in_progress' && previousGame.status !== 'in_progress') {
+      // Check if an active possession already exists for this period
+      const existingPossession = await db.query(
+        `SELECT id FROM ball_possessions 
+         WHERE game_id = $1 AND period = $2 AND ended_at IS NULL
+         LIMIT 1`,
+        [id, 1]
+      );
+
+      if (existingPossession.rows.length === 0) {
+        // Create initial possession for home team at period 1
+        const possessionInsert = await db.query(
+          `INSERT INTO ball_possessions (game_id, club_id, period, started_at, event_status, client_uuid)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id`,
+          [id, previousGame.home_club_id, 1, new Date().toISOString(), 'confirmed', randomUUID()]
+        );
+        if (process.env.NODE_ENV !== 'test') {
+          logInfo(`Auto-created initial possession ${possessionInsert.rows[0].id} for game ${id}`);
+        }
+      }
+    }
 
     // Fetch updated game with team names
     const gameResult = await db.query(`
@@ -447,7 +474,7 @@ router.put('/:id', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error updating game:', err);
+    logError('Error updating game:', err);
     res.status(500).json({ error: 'Failed to update game' });
   }
 });
@@ -516,7 +543,7 @@ router.post('/:id/start', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error starting game:', err);
+    logError('Error starting game:', err);
     res.status(500).json({ error: 'Failed to start game' });
   }
 });
@@ -565,7 +592,7 @@ router.post('/:id/end', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error ending game:', err);
+    logError('Error ending game:', err);
     res.status(500).json({ error: 'Failed to end game' });
   }
 });
@@ -614,7 +641,7 @@ router.post('/:id/cancel', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error cancelling game:', err);
+    logError('Error cancelling game:', err);
     res.status(500).json({ error: 'Failed to cancel game' });
   }
 });
@@ -692,7 +719,7 @@ router.post('/:id/reschedule', [
 
     res.json(gameResult.rows[0]);
   } catch (err) {
-    console.error('Error rescheduling game:', err);
+    logError('Error rescheduling game:', err);
     res.status(500).json({ error: 'Failed to reschedule game' });
   }
 });
@@ -737,16 +764,21 @@ router.delete('/:id', [
     }
     
     // Log the deletion for audit purposes
-    console.log(`Deleting game ${id}: ${game.home_team_name} vs ${game.away_team_name} (Status: ${game.status})`);
+    logInfo('Deleting game:', {
+      id,
+      homeTeamName: game.home_team_name,
+      awayTeamName: game.away_team_name,
+      status: game.status
+    });
     
     // Delete the game (cascade will handle related records)
     const _result = await db.query('DELETE FROM games WHERE id = $1 RETURNING id', [id]);
     
-    console.log(`Successfully deleted game ${id} and all related records`);
+    logInfo('Successfully deleted game and all related records:', { id });
     
     res.status(204).send();
   } catch (err) {
-    console.error('Error deleting game:', err);
+    logError('Error deleting game:', err);
     res.status(500).json({ error: 'Failed to delete game' });
   }
 });

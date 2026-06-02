@@ -1,7 +1,21 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite';
+import { createLogger, defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { configDefaults } from 'vitest/config';
+import { visualizer } from 'rollup-plugin-visualizer';
+
+const analyzeBundle = process.env.ANALYZE === 'true';
+const isCypressRuntime = process.env.CYPRESS === '1';
+const viteLogger = createLogger();
+const originalError = viteLogger.error;
+
+viteLogger.error = (msg, options) => {
+  if (typeof msg === 'string' && msg.includes('[vite] http proxy error:')) {
+    return;
+  }
+
+  originalError(msg, options);
+};
 
 const shouldServeSpaEntry = (requestUrl: string | undefined, acceptHeader: string | undefined): boolean => {
   if (!requestUrl || !acceptHeader?.includes('text/html')) {
@@ -50,8 +64,23 @@ const spaFallbackPlugin = {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), spaFallbackPlugin],
+  customLogger: viteLogger,
+  plugins: [
+    react(),
+    spaFallbackPlugin,
+    ...(analyzeBundle
+      ? [
+          visualizer({
+            filename: './dist/stats.html',
+            gzipSize: true,
+            brotliSize: true,
+            template: 'treemap'
+          })
+        ]
+      : [])
+  ],
   build: {
+    cssCodeSplit: true,
     rollupOptions: {
       input: {
         main: './index.html',
@@ -59,10 +88,46 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'react-core';
+            if (id.includes('/react-router') || id.includes('/history/')) return 'routing';
+            if (id.includes('/@capacitor/')) return 'capacitor';
             if (id.includes('/recharts/')) return 'charts';
             if (id.includes('/socket.io-client/')) return 'realtime';
-            if (id.includes('/html2canvas/') || id.includes('/jspdf/')) return 'export';
+            if (id.includes('/jspdf/')) return 'pdf';
+            if (id.includes('/html2canvas/')) return 'canvas';
+            if (id.includes('/xlsx/')) return 'spreadsheet';
             return 'vendor';
+          }
+
+          if (id.includes('/src/components/UxObservabilityDashboard') || id.includes('/src/components/UserManagement')) {
+            return 'route-admin';
+          }
+
+          if (
+            id.includes('/src/components/CompetitionManagement') ||
+            id.includes('/src/components/CompetitionBracketView') ||
+            id.includes('/src/components/CompetitionStandingsView') ||
+            id.includes('/src/components/SeriesManagement')
+          ) {
+            return 'route-competition';
+          }
+
+          if (
+            id.includes('/src/components/AdvancedAnalytics') ||
+            id.includes('/src/components/TeamAnalytics') ||
+            id.includes('/src/components/ShotAnalytics') ||
+            id.includes('/src/components/AchievementsPage')
+          ) {
+            return 'route-analytics';
+          }
+
+          if (
+            id.includes('/src/components/SettingsPage') ||
+            id.includes('/src/components/ReportTemplates') ||
+            id.includes('/src/components/ScheduledReports') ||
+            id.includes('/src/components/ExportCenter')
+          ) {
+            return 'route-settings';
           }
         }
       }
@@ -118,13 +183,27 @@ export default defineConfig({
   server: {
     port: 3000,
     open: process.env.CYPRESS !== '1',
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        secure: false,
-      }
-    },
+    proxy: isCypressRuntime
+      ? undefined
+      : {
+          '/api': {
+            target: 'http://localhost:3001',
+            changeOrigin: true,
+            secure: false,
+            configure: (proxy) => {
+              proxy.removeAllListeners('error');
+              proxy.on('error', (error) => {
+                // Cypress and local frontend-only runs intentionally hit a missing backend.
+                // Suppress noisy ECONNREFUSED logs while leaving unexpected proxy errors visible.
+                if ((error as NodeJS.ErrnoException).code === 'ECONNREFUSED') {
+                  return;
+                }
+
+                console.error('[vite] proxy error:', error);
+              });
+            },
+          }
+        },
     host: true, // Listen on all addresses
     ...(process.env.NODE_ENV === 'production' ? {
       host: 'localhost',

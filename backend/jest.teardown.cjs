@@ -4,13 +4,10 @@ module.exports = async () => {
   console.log('🧹 GLOBAL TEARDOWN: Starting cleanup...');
   
   try {
-    // Clear all active timers to prevent worker hangs
-    const activeTimers = setTimeout(() => {}, 0);
-    for (let i = 0; i <= activeTimers; i++) {
-      clearTimeout(i);
-      clearInterval(i);
-    }
-    console.log('✅ GLOBAL TEARDOWN: Cleared all active timers');
+    // Clear a marker timer only; sweeping timer IDs is unreliable in Node.
+    const markerTimer = setTimeout(() => {}, 0);
+    clearTimeout(markerTimer);
+    console.log('✅ GLOBAL TEARDOWN: Cleared teardown marker timer');
     
     // Force close all database connections
     if (db && db.default) {
@@ -29,8 +26,8 @@ module.exports = async () => {
       console.log('✅ GLOBAL TEARDOWN: Garbage collection forced');
     }
     
-    // Small delay to ensure all connections are fully closed
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Yield once to allow pending microtasks to settle.
+    await Promise.resolve();
     
     console.log('✅ GLOBAL TEARDOWN: Cleanup completed successfully');
   } catch (error) {

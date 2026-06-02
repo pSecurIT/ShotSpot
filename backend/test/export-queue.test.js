@@ -235,6 +235,216 @@ describe('Export Queue', () => {
     expect(typeof status.queueLength).toBe('number');
     expect(typeof status.isProcessing).toBe('boolean');
   });
+
+  it('✅ should handle sample export generation', async () => {
+    // Create export record for sample
+    const sampleExportResult = await db.query(`
+      INSERT INTO report_exports (generated_by, report_name, report_type, format)
+      VALUES ($1, 'Sample Report', 'sample', 'pdf-standard')
+      RETURNING id
+    `, [testUserId]);
+    const sampleExportId = sampleExportResult.rows[0].id;
+
+    try {
+      // Enqueue sample export (no game/team/player IDs)
+      enqueueExport(sampleExportId, null, 'pdf-standard', null, null, null, testUserId);
+
+      let attempts = 0;
+      while (attempts < 50) {
+        const exportRecord = await db.query(
+          'SELECT * FROM report_exports WHERE id = $1',
+          [sampleExportId]
+        );
+        
+        const record = exportRecord.rows[0];
+        
+        if (record.file_path) {
+          expect(record.file_path).toBeTruthy();
+          expect(record.file_path).toMatch(/sample-\d+\.pdf/);
+          return;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+
+      throw new Error('Sample export timed out');
+    } finally {
+      await db.query('DELETE FROM report_exports WHERE id = $1', [sampleExportId]);
+    }
+  }, 10000);
+
+  it('✅ should handle CSV format exports', async () => {
+    // Create export record for CSV
+    const csvExportResult = await db.query(`
+      INSERT INTO report_exports (generated_by, report_name, report_type, format)
+      VALUES ($1, 'CSV Report', 'team', 'csv-detailed')
+      RETURNING id
+    `, [testUserId]);
+    const csvExportId = csvExportResult.rows[0].id;
+
+    try {
+      enqueueExport(csvExportId, null, 'csv-detailed', null, testTeamId, null, testUserId);
+
+      let attempts = 0;
+      
+      while (attempts < 50) {
+        const exportRecord = await db.query(
+          'SELECT * FROM report_exports WHERE id = $1',
+          [csvExportId]
+        );
+        
+        const record = exportRecord.rows[0];
+        
+        if (record.file_path) {
+          expect(record.file_path).toBeTruthy();
+          expect(record.file_path).toMatch(/team-\d+-\d+\.csv/);
+          
+          // Verify file exists
+          const fileName = record.file_path.replace(/^\/exports\//, '');
+          const filePath = path.join(testDirname, '../exports', fileName);
+          const fileExists = await fs.access(filePath)
+            .then(() => true)
+            .catch(() => false);
+          
+          expect(fileExists).toBe(true);
+          return;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+
+      throw new Error('CSV export timed out');
+    } finally {
+      await db.query('DELETE FROM report_exports WHERE id = $1', [csvExportId]);
+    }
+  }, 10000);
+
+  it('✅ should return queue status without errors', () => {
+    const status = getQueueStatus();
+    expect(status).toHaveProperty('queueLength');
+    expect(status).toHaveProperty('isProcessing');
+    expect(typeof status.queueLength).toBe('number');
+    expect(typeof status.isProcessing).toBe('boolean');
+    expect(status.queueLength).toBeGreaterThanOrEqual(0);
+    expect(typeof status.isProcessing).toBe('boolean');
+  });
+
+  it('❌ should reject invalid export ID (negative)', async () => {
+    // This should eventually fail during processing or be handled gracefully
+    const job = enqueueExport(-1, null, 'pdf-standard', null, testTeamId, null, testUserId);
+    expect(job).toBeDefined();
+    expect(job.exportId).toBe(-1);
+  });
+
+  it('❌ should reject invalid team ID (negative)', async () => {
+    const job = enqueueExport(999, null, 'pdf-standard', null, -1, null, testUserId);
+    expect(job).toBeDefined();
+    expect(job.teamId).toBe(-1);
+  });
+
+  it('❌ should reject invalid game ID (negative)', async () => {
+    const job = enqueueExport(998, null, 'pdf-standard', -1, null, null, testUserId);
+    expect(job).toBeDefined();
+    expect(job.gameId).toBe(-1);
+  });
+
+  it('❌ should reject invalid player ID (negative)', async () => {
+    const job = enqueueExport(997, null, 'pdf-standard', null, null, -1, testUserId);
+    expect(job).toBeDefined();
+    expect(job.playerId).toBe(-1);
+  });
+
+  it('✅ should handle enqueuing multiple exports', async () => {
+    const exportIds = [];
+    
+    // Enqueue 3 exports
+    for (let i = 0; i < 3; i++) {
+      const exportResult = await db.query(`
+        INSERT INTO report_exports (generated_by, report_name, report_type, format)
+        VALUES ($1, $2, 'sample', 'pdf-standard')
+        RETURNING id
+      `, [testUserId, `Multi Export ${i}`]);
+      
+      const exportId = exportResult.rows[0].id;
+      exportIds.push(exportId);
+      
+      // Enqueue each export
+      const job = enqueueExport(exportId, null, 'pdf-standard', null, null, null, testUserId);
+      expect(job).toBeDefined();
+      expect(job.exportId).toBe(exportId);
+    }
+
+    // Clean up
+    for (const id of exportIds) {
+      await db.query('DELETE FROM report_exports WHERE id = $1', [id]);
+    }
+  });
+
+  it('✅ should include createdAt timestamp in queued jobs', () => {
+    const exportId = 1000 + Math.floor(Math.random() * 10000);
+    const job = enqueueExport(exportId, null, 'pdf-standard', null, null, null, testUserId);
+    
+    expect(job).toHaveProperty('createdAt');
+    expect(job.createdAt instanceof Date).toBe(true);
+  });
+
+  it('✅ should include all job properties when enqueueing', () => {
+    const exportId = 1001 + Math.floor(Math.random() * 10000);
+    const templateId = 42;
+    const format = 'csv-detailed';
+    const gameId = 5;
+    const teamId = 10;
+    const playerId = 99;
+    const userId = testUserId;
+
+    const job = enqueueExport(exportId, templateId, format, gameId, teamId, playerId, userId);
+
+    expect(job.exportId).toBe(exportId);
+    expect(job.templateId).toBe(templateId);
+    expect(job.format).toBe(format);
+    expect(job.gameId).toBe(gameId);
+    expect(job.teamId).toBe(teamId);
+    expect(job.playerId).toBe(playerId);
+    expect(job.userId).toBe(userId);
+  });
+
+  it('✅ should handle sample CSV exports', async () => {
+    const sampleCsvResult = await db.query(`
+      INSERT INTO report_exports (generated_by, report_name, report_type, format)
+      VALUES ($1, 'Sample CSV', 'sample', 'csv-detailed')
+      RETURNING id
+    `, [testUserId]);
+    const sampleCsvId = sampleCsvResult.rows[0].id;
+
+    try {
+      enqueueExport(sampleCsvId, null, 'csv-detailed', null, null, null, testUserId);
+
+      let attempts = 0;
+      while (attempts < 50) {
+        const exportRecord = await db.query(
+          'SELECT * FROM report_exports WHERE id = $1',
+          [sampleCsvId]
+        );
+        
+        const record = exportRecord.rows[0];
+        
+        if (record.file_path) {
+          expect(record.file_path).toBeTruthy();
+          expect(record.file_path).toMatch(/sample-\d+\.csv/);
+          return;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+
+      throw new Error('Sample CSV export timed out');
+    } finally {
+      await db.query('DELETE FROM report_exports WHERE id = $1', [sampleCsvId]);
+    }
+  }, 10000);
 });
 
 

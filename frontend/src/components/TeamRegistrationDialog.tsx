@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../utils/api';
 import type { Competition, CompetitionTeam } from '../types/competitions';
 import { competitionsApi } from '../services/competitionsApi';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 interface Team {
   id: number;
@@ -23,6 +24,7 @@ const TeamRegistrationDialog: React.FC<TeamRegistrationDialogProps> = ({
   onClose,
   onNavigateToBracket,
 }) => {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
   const [registeredTeams, setRegisteredTeams] = useState<CompetitionTeam[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,6 +32,11 @@ const TeamRegistrationDialog: React.FC<TeamRegistrationDialogProps> = ({
   const [submitting, setSubmitting] = useState(false);
 
   const registeredTeamIds = useMemo(() => new Set(registeredTeams.map((t) => t.team_id)), [registeredTeams]);
+  const { dialogRef, titleId, onDialogKeyDown } = useAccessibleDialog({
+    isOpen,
+    onClose,
+    initialFocusRef: closeButtonRef,
+  });
 
   const load = async () => {
     try {
@@ -108,23 +115,28 @@ const TeamRegistrationDialog: React.FC<TeamRegistrationDialogProps> = ({
   return (
     <div
       className="competition-dialog__overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Manage Teams - ${competition.name}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="competition-dialog__content">
+      <div
+        ref={dialogRef}
+        className="competition-dialog__content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={onDialogKeyDown}
+        tabIndex={-1}
+      >
         <div className="competition-dialog__header">
-          <h3>Manage Teams - {competition.name}</h3>
-          <button type="button" className="secondary-button" onClick={onClose} aria-label="Close">
+          <h3 id={titleId}>Manage Teams - {competition.name}</h3>
+          <button ref={closeButtonRef} type="button" className="secondary-button" onClick={onClose} aria-label="Close">
             ✕
           </button>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
-        {loading && <div>Loading…</div>}
+        {error && <div className="alert alert-error" role="alert">{error}</div>}
+        {loading && <div role="status" aria-live="polite">Loading…</div>}
 
         {!loading && (
           <div className="teams-layout">

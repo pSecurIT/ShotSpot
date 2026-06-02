@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import CreateUserDialog from '../components/CreateUserDialog';
 import api from '../utils/api';
@@ -25,7 +26,7 @@ describe('CreateUserDialog Component', () => {
         />
       );
 
-      expect(screen.getByText('Create New User')).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Create New User' })).toBeInTheDocument();
     });
 
     it('does not render when isOpen is false', () => {
@@ -59,6 +60,12 @@ describe('CreateUserDialog Component', () => {
       expect(screen.getByLabelText('Role *')).toBeInTheDocument();
     });
 
+    it('focuses the username field when opened', async () => {
+      await waitFor(() => {
+        expect(screen.getByLabelText('Username *')).toHaveFocus();
+      });
+    });
+
     it('has correct input types', () => {
       const usernameInput = screen.getByLabelText('Username *') as HTMLInputElement;
       const emailInput = screen.getByLabelText('Email *') as HTMLInputElement;
@@ -87,6 +94,27 @@ describe('CreateUserDialog Component', () => {
       expect(screen.getByText('3-50 characters, letters, numbers, _ and - only')).toBeInTheDocument();
       expect(screen.getByText('Min 8 chars with uppercase, lowercase, number, and special character')).toBeInTheDocument();
       expect(screen.getByText('User: View only • Coach: Manage teams/games • Admin: Full access')).toBeInTheDocument();
+      expect(screen.getByLabelText('Username *')).toHaveAttribute('aria-describedby', 'username-hint');
+      expect(screen.getByLabelText('Password *')).toHaveAttribute('aria-describedby', 'create-user-password-hint');
+      expect(screen.getByLabelText('Role *')).toHaveAttribute('aria-describedby', 'role-hint');
+    });
+  });
+
+  describe('Keyboard Behavior', () => {
+    it('closes on Escape', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <CreateUserDialog
+          isOpen={true}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+
+      await user.keyboard('{Escape}');
+
+      expect(mockOnClose).toHaveBeenCalled();
     });
   });
 

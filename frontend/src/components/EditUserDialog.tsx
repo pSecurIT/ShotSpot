@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../utils/api';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 interface EditUserDialogProps {
   isOpen: boolean;
@@ -19,10 +20,16 @@ interface EditUserDialogProps {
 }
 
 const EditUserDialog: React.FC<EditUserDialogProps> = ({ isOpen, onClose, onSuccess, user }) => {
+  const usernameRef = useRef<HTMLInputElement>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { dialogRef, titleId, onDialogKeyDown } = useAccessibleDialog({
+    isOpen: isOpen && Boolean(user),
+    onClose,
+    initialFocusRef: usernameRef,
+  });
 
   // Populate form when user prop changes
   useEffect(() => {
@@ -72,10 +79,26 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ isOpen, onClose, onSucc
   if (!isOpen || !user) return null;
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.dialog}>
+    <div
+      style={styles.overlay}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        style={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={onDialogKeyDown}
+        onMouseDown={(event) => event.stopPropagation()}
+        tabIndex={-1}
+      >
         <div style={styles.header}>
-          <h3 style={styles.title}>Edit User Profile</h3>
+          <h3 style={styles.title} id={titleId}>Edit User Profile</h3>
           <button
             onClick={onClose}
             style={styles.closeButton}
@@ -86,7 +109,7 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ isOpen, onClose, onSucc
         </div>
 
         {error && (
-          <div style={styles.errorAlert}>
+          <div style={styles.errorAlert} role="alert">
             {error}
           </div>
         )}
@@ -97,6 +120,7 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ isOpen, onClose, onSucc
               Username *
             </label>
             <input
+              ref={usernameRef}
               id="edit-username"
               type="text"
               value={username}
@@ -108,8 +132,9 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ isOpen, onClose, onSucc
               title="Username can only contain letters, numbers, underscores, and hyphens"
               style={styles.input}
               disabled={loading}
+              aria-describedby="edit-username-hint"
             />
-            <small style={styles.hint}>3-50 characters, letters, numbers, _ and - only</small>
+            <small style={styles.hint} id="edit-username-hint">3-50 characters, letters, numbers, _ and - only</small>
           </div>
 
           <div style={styles.formGroup}>

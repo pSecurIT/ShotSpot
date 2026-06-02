@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-shotspot_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-shotspot_dev}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       POSTGRES_DB: ${DB_NAME:-shotspot_db}
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
@@ -37,10 +37,13 @@ services:
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-shotspot_db}
       DB_USER: ${DB_USER:-shotspot_user}
-      DB_PASSWORD: ${DB_PASSWORD:-shotspot_dev}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_MAX_CONNECTIONS: ${DB_MAX_CONNECTIONS:-20}
+      DB_IDLE_TIMEOUT_MS: ${DB_IDLE_TIMEOUT_MS:-30000}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
       CORS_ORIGIN: http://localhost:3000
       LOG_LEVEL: debug
     volumes:

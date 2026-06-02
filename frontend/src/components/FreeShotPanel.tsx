@@ -331,8 +331,8 @@ const FreeShotPanel: React.FC<FreeShotPanelProps> = ({
     <div className="free-shot-panel">
       <h4>Record Free Shot / Penalty</h4>
 
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message" role="alert">{error}</div>}
+      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
 
       <div className="free-shot-form">
         {/* Free Shot Type Selection */}

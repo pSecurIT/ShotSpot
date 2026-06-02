@@ -1,5 +1,7 @@
 import Tokens from 'csrf';
 
+import { logError } from '../utils/logger.js';
+
 const tokens = new Tokens();
 
 // Initialize CSRF middleware
@@ -9,28 +11,13 @@ const csrf = (req, res, next) => {
     return next();
   }
 
-  // For APIs authenticated via Authorization: Bearer <jwt>, CSRF protection is
-  // not required because the browser will not attach the token automatically.
-  // This also prevents dev-time issues after server restarts (in-memory session reset).
-  const authHeader = req.headers?.authorization;
-  if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
-    return next();
-  }
-
-  // Skip CSRF check for GET requests (they should be safe operations)
-  if (req.method === 'GET') {
+  // Skip CSRF check for safe methods
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     return next();
   }
 
   // Skip CSRF check for the CSRF token endpoint itself
   if (req.path === '/api/auth/csrf') {
-    return next();
-  }
-
-  // Login creates a JWT and does not rely on cookie-based auth.
-  // Skipping CSRF here improves dev ergonomics (e.g., VS Code Simple Browser)
-  // without weakening protections for cookie-authenticated routes.
-  if (req.path === '/api/auth/login') {
     return next();
   }
 
@@ -41,7 +28,7 @@ const csrf = (req, res, next) => {
     // Check if session has a CSRF secret
     if (!req.session || !req.session.csrfSecret) {
       if (process.env.NODE_ENV !== 'test') {
-        console.error('CSRF validation failed: No CSRF secret in session', {
+        logError('CSRF validation failed: No CSRF secret in session', {
           hasSession: !!req.session,
           sessionId: req.sessionID,
           hasSecret: !!(req.session && req.session.csrfSecret),
@@ -58,7 +45,7 @@ const csrf = (req, res, next) => {
 
     // Verify the token
     if (!csrfToken || !tokens.verify(req.session.csrfSecret, csrfToken)) {
-      console.error('CSRF validation failed:', {
+      logError('CSRF validation failed:', {
         hasToken: !!csrfToken,
         hasSecret: !!req.session.csrfSecret,
         path: req.path,
