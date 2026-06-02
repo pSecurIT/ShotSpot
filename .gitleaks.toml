@@ -28,7 +28,7 @@ tags        = ["shotspot", "twizzit", "encryption", "aes"]
 [[rules]]
 id          = "shotspot-jwt-secret"
 description = "ShotSpot JWT secret with assignment"
-regex       = '''(?i)JWT_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?'''
+regex       = '''(?im)^\s*['"]?(?:export\s+)?JWT_SECRET\b\s*[=:]\s*["']?(?!\$\{)(?!\$\()([A-Za-z0-9+/=_\-]{32,})["']?'''
 tags        = ["shotspot", "jwt", "auth"]
 [[rules.Entropies]]
   Min   = 3.5
@@ -38,7 +38,7 @@ tags        = ["shotspot", "jwt", "auth"]
 [[rules]]
 id          = "shotspot-session-secret"
 description = "ShotSpot session secret with assignment"
-regex       = '''(?i)SESSION_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?'''
+regex       = '''(?im)^\s*['"]?(?:export\s+)?SESSION_SECRET\b\s*[=:]\s*["']?(?!\$\{)(?!\$\()([A-Za-z0-9+/=_\-]{32,})["']?'''
 tags        = ["shotspot", "session", "auth"]
 [[rules.Entropies]]
   Min   = 3.5
@@ -48,7 +48,7 @@ tags        = ["shotspot", "session", "auth"]
 [[rules]]
 id          = "shotspot-csrf-secret"
 description = "ShotSpot CSRF secret with assignment"
-regex       = '''(?i)CSRF_SECRET\s*[=:]\s*["']?([A-Za-z0-9+/=_\-]{32,})["']?'''
+regex       = '''(?im)^\s*['"]?(?:export\s+)?CSRF_SECRET\b\s*[=:]\s*["']?(?!\$\{)(?!\$\()([A-Za-z0-9+/=_\-]{32,})["']?'''
 tags        = ["shotspot", "csrf", "auth"]
 [[rules.Entropies]]
   Min   = 3.5
@@ -58,7 +58,7 @@ tags        = ["shotspot", "csrf", "auth"]
 [[rules]]
 id          = "shotspot-db-password"
 description = "ShotSpot database password assignment"
-regex       = '''(?i)DB_PASSWORD\s*[=:]\s*["']?([^\s"']{8,})["']?'''
+regex       = '''(?im)^\s*['"]?(?:export\s+)?DB_PASSWORD\b\s*[=:]\s*["']?(?!\$\{)(?!\$\()([^\s"'$]{8,})["']?'''
 tags        = ["shotspot", "database", "credentials"]
 [[rules.Entropies]]
   Min   = 3.0
