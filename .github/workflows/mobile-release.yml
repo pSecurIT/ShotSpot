@@ -4,9 +4,6 @@ permissions:
   contents: write
 
 on:
-  push:
-    tags:
-      - 'v*'
   release:
     types: [published]
   workflow_dispatch:
@@ -38,17 +35,22 @@ jobs:
     name: Android Release Build
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'push' ||
       github.event_name == 'release' || 
       (github.event_name == 'workflow_dispatch' && 
        (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both'))
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets['ANDROID_KEYSTORE_BASE64'] }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets['ANDROID_KEYSTORE_PASSWORD'] }}
+      ANDROID_KEY_ALIAS: ${{ secrets['ANDROID_KEY_ALIAS'] }}
+      ANDROID_KEY_PASSWORD: ${{ secrets['ANDROID_KEY_PASSWORD'] }}
+      VITE_API_URL_PRODUCTION: ${{ secrets['VITE_API_URL_PRODUCTION'] }}
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -58,17 +60,15 @@ jobs:
         run: npm install -g npm@10.9.2
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699
 
       - name: Decode Keystore
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
             mkdir -p frontend/android/app
@@ -79,16 +79,12 @@ jobs:
           fi
 
       - name: Create keystore.properties
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_PASSWORD" ]; then
+          if [ -n "$ANDROID_KEYSTORE_PASSWORD" ]; then
             echo "storeFile=app/release.keystore" > frontend/android/keystore.properties
-            echo "storePassword=${KEYSTORE_PASSWORD}" >> frontend/android/keystore.properties
-            echo "keyAlias=${KEY_ALIAS}" >> frontend/android/keystore.properties
-            echo "keyPassword=${KEY_PASSWORD}" >> frontend/android/keystore.properties
+            echo "storePassword=${ANDROID_KEYSTORE_PASSWORD}" >> frontend/android/keystore.properties
+            echo "keyAlias=${ANDROID_KEY_ALIAS}" >> frontend/android/keystore.properties
+            echo "keyPassword=${ANDROID_KEY_PASSWORD}" >> frontend/android/keystore.properties
             echo "✅ keystore.properties created"
           else
             echo "⚠️  Warning: Keystore secrets not set. Build may fail."
@@ -101,12 +97,15 @@ jobs:
       - name: Build web app (production)
         working-directory: frontend
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL_PRODUCTION }}
+          VITE_API_URL: ${{ env.VITE_API_URL_PRODUCTION }}
         run: npm run build
 
       - name: Add Android platform
         working-directory: frontend
-        run: npx cap add android
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
 
       - name: Sync Capacitor
         working-directory: frontend
@@ -154,7 +153,7 @@ jobs:
       #     whatsNewDirectory: frontend/android/release-notes
 
       - name: Upload Release Artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: android-release
           path: |
@@ -164,7 +163,7 @@ jobs:
 
       - name: Create GitHub Release Asset
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda
         with:
           files: |
             frontend/android/app/build/outputs/apk/release/app-release.apk
@@ -176,32 +175,65 @@ jobs:
     name: iOS Release Build
     runs-on: macos-latest
     if: |
-      github.event_name == 'push' ||
       github.event_name == 'release' || 
       (github.event_name == 'workflow_dispatch' && 
        (github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both'))
+    env:
+      VITE_API_URL_PRODUCTION: ${{ secrets['VITE_API_URL_PRODUCTION'] }}
+      IOS_CERTIFICATE_BASE64: ${{ secrets['IOS_CERTIFICATE_BASE64'] }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets['IOS_CERTIFICATE_PASSWORD'] }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets['IOS_PROVISIONING_PROFILE_BASE64'] }}
+      IOS_TEAM_ID: ${{ secrets['IOS_TEAM_ID'] }}
+      IOS_PROVISIONING_PROFILE_NAME: ${{ secrets['IOS_PROVISIONING_PROFILE_NAME'] }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets['APP_STORE_CONNECT_API_KEY_ID'] }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets['APP_STORE_CONNECT_ISSUER_ID'] }}
+      APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets['APP_STORE_CONNECT_API_KEY_BASE64'] }}
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Detect signing secrets
         id: detect_signing
-        env:
-          P12_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-          PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
         run: |
-          # If both P12 and provisioning profile secrets exist, enable signing path
-          if [ -n "$P12_BASE64" ] && [ -n "$PROVISIONING_PROFILE_BASE64" ]; then
+          required=(
+            IOS_CERTIFICATE_BASE64
+            IOS_CERTIFICATE_PASSWORD
+            IOS_PROVISIONING_PROFILE_BASE64
+            IOS_TEAM_ID
+            IOS_PROVISIONING_PROFILE_NAME
+          )
+
+          missing=()
+          present=0
+
+          for var_name in "${required[@]}"; do
+            if [ -n "${!var_name}" ]; then
+              present=$((present + 1))
+            else
+              missing+=("$var_name")
+            fi
+          done
+
+          # Fully configured: use signed archive flow.
+          if [ ${#missing[@]} -eq 0 ]; then
             echo "signing_required=true" >> $GITHUB_ENV
+            echo "signing_required=true" >> $GITHUB_OUTPUT
             echo "✅ Signing secrets detected - will perform signed archive"
-          else
+          # Not configured at all: use simulator fallback flow.
+          elif [ $present -eq 0 ]; then
             echo "signing_required=false" >> $GITHUB_ENV
+            echo "signing_required=false" >> $GITHUB_OUTPUT
             echo "⚠️  Signing secrets not configured - will perform simulator build"
+          # Partially configured: fail fast with actionable diagnostics.
+          else
+            echo "::error::Partial iOS signing configuration detected. Missing required secret(s): ${missing[*]}"
+            echo "Provide all required secrets for signed builds, or remove all iOS signing secrets to use simulator fallback."
+            exit 1
           fi
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -211,7 +243,7 @@ jobs:
         run: npm install -g npm@10.9.2
 
       - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90
         with:
           xcode-version: 'latest-stable'
 
@@ -219,16 +251,13 @@ jobs:
         run: sudo gem install cocoapods
 
       - name: Install Apple Certificate
-        if: env.signing_required == 'true'
-        env:
-          P12_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-          P12_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        if: ${{ steps.detect_signing.outputs.signing_required == 'true' }}
         run: |
           set -e
           echo "Importing certificate into temporary keychain"
-          echo "$P12_BASE64" | base64 --decode > certificate.p12
+          echo "$IOS_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
           security create-keychain -p "" build.keychain
-          security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security import certificate.p12 -k build.keychain -P "$IOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           security list-keychains -s build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
@@ -236,15 +265,13 @@ jobs:
           echo "✅ Certificate imported successfully"
 
       - name: Install Provisioning Profile
-        if: env.signing_required == 'true'
-        env:
-          PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        if: ${{ steps.detect_signing.outputs.signing_required == 'true' }}
         run: |
           set -e
           echo "Installing provisioning profile"
           PP_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PP_PATH"
-          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PP_PATH/profile.mobileprovision"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PP_PATH/profile.mobileprovision"
           echo "✅ Provisioning profile installed"
 
       - name: Install frontend dependencies
@@ -254,20 +281,61 @@ jobs:
       - name: Build web app (production)
         working-directory: frontend
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL_PRODUCTION }}
+          VITE_API_URL: ${{ env.VITE_API_URL_PRODUCTION }}
         run: npm run build
 
-      - name: Add iOS platform
+      - name: Ensure iOS platform exists
         working-directory: frontend
-        run: npx cap add ios
+        run: |
+          set -e
+
+          if [ ! -f ios/App/Podfile ] || [ ! -f ios/App/App.xcodeproj/project.pbxproj ]; then
+            echo "iOS platform is missing or incomplete; recreating it"
+            rm -rf ios
+            npx cap add ios
+          else
+            echo "iOS platform already present"
+          fi
 
       - name: Sync Capacitor
         working-directory: frontend
         run: npx cap sync ios
 
+      - name: Inspect generated iOS project
+        working-directory: frontend
+        run: |
+          echo "iOS directory structure:"
+          find ios -maxdepth 4 | sort
+
       - name: Install iOS dependencies
         working-directory: frontend/ios/App
         run: pod install
+
+      - name: Verify expected iOS app layout
+        working-directory: frontend
+        run: |
+          set -e
+
+          if [ ! -d ios/App ]; then
+            echo "❌ Expected ios/App directory was not generated"
+            echo "Current iOS structure:"
+            find ios -maxdepth 4 | sort || true
+            exit 1
+          fi
+
+          if [ ! -f ios/App/App.xcworkspace/contents.xcworkspacedata ]; then
+            echo "❌ Missing ios/App/App.xcworkspace"
+            find ios/App -maxdepth 3 | sort || true
+            exit 1
+          fi
+
+          if [ ! -f ios/App/App/Info.plist ]; then
+            echo "❌ Missing ios/App/App/Info.plist"
+            find ios/App -maxdepth 4 | sort || true
+            exit 1
+          fi
+
+          echo "✅ Verified expected iOS layout at ios/App"
 
       - name: Bump version
         working-directory: frontend/ios/App
@@ -282,7 +350,7 @@ jobs:
           echo "Building version $VERSION_NAME ($BUILD_NUMBER)"
 
       - name: Build and Archive iOS app (signed)
-        if: env.signing_required == 'true'
+        if: ${{ steps.detect_signing.outputs.signing_required == 'true' }}
         working-directory: frontend/ios/App
         run: |
           set -e
@@ -294,11 +362,11 @@ jobs:
             -archivePath $PWD/build/App.xcarchive \
             clean archive \
             CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=${{ secrets.IOS_TEAM_ID }} \
-            PROVISIONING_PROFILE_SPECIFIER="${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}"
+            DEVELOPMENT_TEAM=$IOS_TEAM_ID \
+            PROVISIONING_PROFILE_SPECIFIER="$IOS_PROVISIONING_PROFILE_NAME"
 
       - name: Build for iOS Simulator (unsigned)
-        if: env.signing_required == 'false'
+        if: ${{ steps.detect_signing.outputs.signing_required == 'false' }}
         working-directory: frontend/ios/App
         run: |
           set -e
@@ -314,7 +382,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO
 
       - name: Export IPA
-        if: env.signing_required == 'true'
+        if: ${{ steps.detect_signing.outputs.signing_required == 'true' }}
         working-directory: frontend/ios/App
         run: |
           cat > ExportOptions.plist << EOF
@@ -325,7 +393,7 @@ jobs:
             <key>method</key>
             <string>app-store</string>
             <key>teamID</key>
-            <string>${{ secrets.IOS_TEAM_ID }}</string>
+            <string>$IOS_TEAM_ID</string>
             <key>uploadSymbols</key>
             <true/>
             <key>uploadBitcode</key>
@@ -342,28 +410,24 @@ jobs:
       - name: Upload to App Store Connect
         if: |
           success() && 
-          env.signing_required == 'true' &&
+          steps.detect_signing.outputs.signing_required == 'true' &&
           (github.event_name == 'release' || 
           github.event.inputs.release_type == 'production')
-        env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
         run: |
           # Create API key file
           mkdir -p ~/private_keys
           echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > ~/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
           
-          # Upload using xcrun notarytool (altool is deprecated)
-          xcrun notarytool submit frontend/ios/App/build/App.ipa \
-            --key ~/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8 \
-            --key-id $APP_STORE_CONNECT_API_KEY_ID \
-            --issuer $APP_STORE_CONNECT_ISSUER_ID \
-            --wait
+          # Upload IPA to App Store Connect using altool API key auth
+          xcrun altool --upload-app \
+            --type ios \
+            --file frontend/ios/App/build/App.ipa \
+            --apiKey $APP_STORE_CONNECT_API_KEY_ID \
+            --apiIssuer $APP_STORE_CONNECT_ISSUER_ID
 
       - name: Upload Release Artifacts (signed)
-        if: env.signing_required == 'true'
-        uses: actions/upload-artifact@v7
+        if: ${{ steps.detect_signing.outputs.signing_required == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ios-release
           path: |
@@ -372,16 +436,16 @@ jobs:
           retention-days: 30
 
       - name: Upload Build Artifacts (unsigned)
-        if: env.signing_required == 'false'
-        uses: actions/upload-artifact@v7
+        if: ${{ steps.detect_signing.outputs.signing_required == 'false' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ios-simulator-build
           path: frontend/ios/App/build/DerivedData
           retention-days: 30
 
       - name: Create GitHub Release Asset
-        if: env.signing_required == 'true' && github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
+        if: ${{ steps.detect_signing.outputs.signing_required == 'true' && github.event_name == 'release' }}
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda
         with:
           files: frontend/ios/App/build/App.ipa
           token: ${{ secrets.GITHUB_TOKEN }}

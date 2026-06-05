@@ -36,18 +36,17 @@ This directory contains all CI/CD workflows for ShotSpot.
 ---
 
 ### test-coverage.yml - Coverage Reports
-**Triggers**: Push/PR to `main` or `develop`
+**Triggers**: Push/PR to `main`, weekly schedule, manual dispatch
 
 **Jobs**:
-- Backend coverage (Jest)
+- Backend coverage (Jest; single-project on PRs, parallel project coverage on push/schedule)
 - Frontend coverage (Vitest)
 - Upload to Codecov
-- Generate HTML reports
 
 **Secrets Required**:
 - `CODECOV_TOKEN` (optional but recommended)
 
-**Output**: Coverage badges, HTML reports
+**Output**: Coverage badges and Codecov reports
 
 ---
 

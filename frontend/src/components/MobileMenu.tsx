@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { NavigationItem as NavigationItemType } from '../config/navigation';
 import NavigationItem from './NavigationItem';
+import { useSwipeGesture } from '../hooks/useSwipeGesture';
 
 interface MobileMenuProps {
+  menuId?: string;
   isOpen: boolean;
   onClose: () => void;
   navigationItems: NavigationItemType[];
@@ -11,6 +13,7 @@ interface MobileMenuProps {
 }
 
 const MobileMenu: React.FC<MobileMenuProps> = ({
+  menuId,
   isOpen,
   onClose,
   navigationItems,
@@ -18,6 +21,17 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
   userMenuItems = []
 }) => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+  const roleLabel = userRole.charAt(0).toUpperCase() + userRole.slice(1);
+  const closeSwipe = useSwipeGesture({
+    enabled: isOpen,
+    minDistance: 64,
+    maxCrossAxisDistance: 88,
+    onSwipeLeft: onClose,
+  });
 
   // Lock body scroll when menu is open
   useEffect(() => {
@@ -30,6 +44,18 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
     return () => {
       document.body.style.overflow = '';
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      closeButtonRef.current?.focus();
+      return;
+    }
+
+    previousFocusRef.current?.focus();
   }, [isOpen]);
 
   // Close on Escape key
@@ -62,6 +88,39 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
     onClose();
   };
 
+  const handlePanelKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const focusableElements = panelRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+
+    if (!focusableElements || focusableElements.length === 0) return;
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      const focusedElement = document.activeElement as HTMLElement | null;
+      const currentIndex = Array.from(focusableElements).findIndex((element) => element === focusedElement);
+      const offset = event.key === 'ArrowDown' ? 1 : -1;
+      const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+      const nextIndex = (safeIndex + offset + focusableElements.length) % focusableElements.length;
+
+      event.preventDefault();
+      focusableElements[nextIndex].focus();
+      return;
+    }
+
+    if (event.key !== 'Tab') return;
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  };
+
   // Filter items based on user role
   const filterItemsByRole = (items: NavigationItemType[]): NavigationItemType[] => {
     return items.filter((item) => item.roles.includes(userRole as 'user' | 'coach' | 'admin'));
@@ -73,21 +132,35 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
       <div
         className={`mobile-menu-overlay ${isOpen ? 'open' : ''}`}
         onClick={onClose}
-        aria-hidden="true"
+        aria-hidden={!isOpen}
       />
 
       {/* Menu Panel */}
       <div
         className={`mobile-menu-panel ${isOpen ? 'open' : ''}`}
+        id={menuId}
+        ref={panelRef}
         role="dialog"
         aria-modal={isOpen ? true : undefined}
         aria-hidden={!isOpen}
-        aria-label="Navigation menu"
+        aria-labelledby={titleId}
+        aria-label="Mobile navigation menu"
+        onKeyDown={handlePanelKeyDown}
+        onTouchStart={closeSwipe.onTouchStart}
+        onTouchEnd={closeSwipe.onTouchEnd}
+        onTouchCancel={closeSwipe.onTouchCancel}
+        tabIndex={-1}
       >
         {/* Header */}
         <div className="mobile-menu-header">
-          <h2 className="mobile-menu-header__title">Menu</h2>
+          <div className="mobile-menu-header__copy">
+            <span className="mobile-menu-header__eyebrow">Navigation</span>
+            <h2 className="mobile-menu-header__title" id={titleId}>Match menu</h2>
+            <p className="mobile-menu-header__subtitle">Fast access to capture, review, and account tools.</p>
+          </div>
+          <span className="mobile-menu-header__role-chip">{roleLabel}</span>
           <button
+            ref={closeButtonRef}
             className="mobile-menu-header__close"
             onClick={onClose}
             aria-label="Close menu"
@@ -98,13 +171,19 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
         </div>
 
         {/* Menu Items */}
-        <nav className="mobile-menu-nav">
+        <nav className="mobile-menu-nav" aria-label="Mobile site navigation">
+          <div className="mobile-menu-nav__intro">
+            <span className="mobile-menu-nav__intro-label">Quick access</span>
+            <span className="mobile-menu-nav__intro-copy">Choose a section to jump straight back into match operations.</span>
+          </div>
+
           {filterItemsByRole(navigationItems).map((item) => {
             const isExpanded = expandedSections.has(item.label);
             const hasChildren = item.children && item.children.length > 0;
             const visibleChildren = hasChildren
               ? filterItemsByRole(item.children!)
               : [];
+            const sectionControlsId = `mobile-section-${item.label.toLowerCase().replace(/\s+/g, '-')}`;
 
             return (
               <div key={item.label} className="mobile-menu-section">
@@ -114,20 +193,21 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                       className={`mobile-menu-section__header ${isExpanded ? 'expanded' : ''}`}
                       onClick={() => toggleSection(item.label)}
                       aria-expanded={isExpanded}
+                      aria-controls={sectionControlsId}
                       type="button"
                     >
-                      <span className="mobile-menu-section__icon">{item.icon}</span>
+                      <span className="mobile-menu-section__icon" aria-hidden="true">{item.icon}</span>
                       <span className="mobile-menu-section__label">{item.label}</span>
                       {item.badge && (
                         <span className="mobile-menu-section__badge">{item.badge}</span>
                       )}
-                      <span className={`mobile-menu-section__arrow ${isExpanded ? 'open' : ''}`}>
+                      <span className={`mobile-menu-section__arrow ${isExpanded ? 'open' : ''}`} aria-hidden="true">
                         ▼
                       </span>
                     </button>
 
                     {isExpanded && visibleChildren.length > 0 && (
-                      <div className="mobile-menu-section__children">
+                      <div className="mobile-menu-section__children" id={sectionControlsId}>
                         {visibleChildren.map((child) => (
                           <div key={child.label} className="mobile-menu-section__child">
                             {child.divider ? (
@@ -160,7 +240,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
           {userMenuItems.length > 0 && (
             <div className="mobile-menu-section mobile-menu-section--user">
               <div className="mobile-menu-section__header mobile-menu-section__header--static">
-                <span className="mobile-menu-section__icon">👤</span>
+                <span className="mobile-menu-section__icon" aria-hidden="true">👤</span>
                 <span className="mobile-menu-section__label">User</span>
               </div>
               <div className="mobile-menu-section__children">

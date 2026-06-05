@@ -5,10 +5,11 @@ import app from '../src/app.js';
 import db from '../src/db.js';
 
 describe('🔐 Authentication API', () => {
+  const AUTH_PREFIX = `auth_${process.pid}_`;
   let testUsers = [];
   const validUserData = {
-    username: 'testuser',
-    email: 'test@example.com',
+    username: `${AUTH_PREFIX}user`,
+    email: `${AUTH_PREFIX}user@test.local`,
     password: 'TestPassword123!'
   };
 
@@ -19,10 +20,10 @@ describe('🔐 Authentication API', () => {
   beforeEach(async () => {
     // Clean up users table before each test to ensure isolation
     // Clean up in correct order due to foreign key constraints
-    await db.query('DELETE FROM trainer_assignments WHERE user_id IN (SELECT id FROM users WHERE username LIKE $1)', ['test%']);
-    await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE $1)', ['test%']);
-    await db.query('DELETE FROM clubs WHERE name LIKE $1', ['test%']);
-    await db.query('DELETE FROM users WHERE username LIKE $1 OR email LIKE $2', ['test%', 'test%']);
+    await db.query('DELETE FROM trainer_assignments WHERE user_id IN (SELECT id FROM users WHERE username LIKE $1)', [`${AUTH_PREFIX}%`]);
+    await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE $1)', [`${AUTH_PREFIX}%`]);
+    await db.query('DELETE FROM clubs WHERE name LIKE $1', [`${AUTH_PREFIX}%`]);
+    await db.query('DELETE FROM users WHERE username LIKE $1 OR email LIKE $2', [`${AUTH_PREFIX}%`, `${AUTH_PREFIX}%`]);
     testUsers = [];
   });
 
@@ -31,8 +32,8 @@ describe('🔐 Authentication API', () => {
     if (testUsers.length > 0) {
       const userIds = testUsers.map(u => u.id);
       await db.query('DELETE FROM trainer_assignments WHERE user_id = ANY($1)', [userIds]);
-      await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE \'test%\')', []);
-      await db.query('DELETE FROM clubs WHERE name LIKE \'test%\'', []);
+      await db.query('DELETE FROM teams WHERE club_id IN (SELECT id FROM clubs WHERE name LIKE $1)', [`${AUTH_PREFIX}%`]);
+      await db.query('DELETE FROM clubs WHERE name LIKE $1', [`${AUTH_PREFIX}%`]);
       await db.query('DELETE FROM users WHERE id = ANY($1)', [userIds]);
     }
   });
@@ -467,6 +468,112 @@ describe('🔐 Authentication API', () => {
       const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing');
       expect(decoded).toHaveProperty('role', 'admin');
       expect(response.body.user).toHaveProperty('role', 'admin');
+    });
+
+    it('✅ should allow login with valid CSRF token when CSRF is enabled in test mode', async () => {
+      const originalEnableCsrfInTest = process.env.ENABLE_CSRF_IN_TEST;
+      const originalNodeEnv = process.env.NODE_ENV;
+
+      process.env.NODE_ENV = 'test';
+      process.env.ENABLE_CSRF_IN_TEST = 'true';
+
+      try {
+        const agent = request.agent(app);
+
+        // Step 1: fetch CSRF token; agent retains the session cookie automatically.
+        const csrfResponse = await agent
+          .get('/api/auth/csrf')
+          .expect(200);
+
+        expect(csrfResponse.body).toHaveProperty('csrfToken');
+        const { csrfToken } = csrfResponse.body;
+        expect(typeof csrfToken).toBe('string');
+
+        // Step 2: perform login with the same agent — do not manually set Cookie,
+        // the agent already carries the session so CSRF token stays bound to it.
+        const loginResponse = await agent
+          .post('/api/auth/login')
+          .set('x-csrf-token', csrfToken)
+          .send({
+            username: validUserData.username,
+            password: validUserData.password
+          })
+          .expect(200);
+
+        expect(loginResponse.body).toHaveProperty('token');
+        expect(loginResponse.body).toHaveProperty('user');
+        expect(loginResponse.body.user).toHaveProperty('username', validUserData.username);
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+        process.env.ENABLE_CSRF_IN_TEST = originalEnableCsrfInTest;
+      }
+    });
+
+    it('✅ should rate-limit repeated failed login attempts', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      const originalEnableInTest = process.env.ENABLE_AUTH_RATE_LIMIT_IN_TEST;
+      const originalMaxAttempts = process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS;
+
+      process.env.NODE_ENV = 'test';
+      process.env.ENABLE_AUTH_RATE_LIMIT_IN_TEST = 'true';
+      process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS = '10';
+
+      try {
+        for (let i = 0; i < 10; i += 1) {
+          await request(app)
+            .post('/api/auth/login')
+            .send({
+              username: 'nonexistent-user-rate-limit',
+              password: 'WrongPassword123!'
+            })
+            .expect(401);
+        }
+
+        const limitedResponse = await request(app)
+          .post('/api/auth/login')
+          .send({
+            username: 'nonexistent-user-rate-limit',
+            password: 'WrongPassword123!'
+          })
+          .expect(429);
+
+        expect(limitedResponse.body).toHaveProperty('error');
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+        process.env.ENABLE_AUTH_RATE_LIMIT_IN_TEST = originalEnableInTest;
+        process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS = originalMaxAttempts;
+      }
+    });
+
+    it('✅ should reject API requests without Origin in production', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      try {
+        const response = await request(app)
+          .get('/api/auth/csrf')
+          .expect(403);
+
+        expect(response.body).toEqual({ error: 'Origin header required in production' });
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    });
+
+    it('✅ should allow API requests with valid Origin in production', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      try {
+        const response = await request(app)
+          .get('/api/auth/csrf')
+          .set('Origin', 'http://localhost:3000')
+          .expect(200);
+
+        expect(response.body).toHaveProperty('csrfToken');
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
     });
   });
 

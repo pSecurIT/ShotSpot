@@ -4,6 +4,8 @@ import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { hasTrainerAccess } from '../middleware/trainerAccess.js';
 
+import { logInfo, logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Validation middleware
@@ -51,7 +53,7 @@ router.use(auth);
 
 // Debug middleware to log all requests
 router.use((req, res, next) => {
-  console.log('Player Route Request:', {
+  logInfo('Player Route Request:', {
     method: req.method,
     path: req.path,
     user: req.user,
@@ -194,14 +196,14 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
     }
 
     if (req.user.role === 'coach') {
-      const allowed = await hasTrainerAccess(req.user.userId, { clubId: club_id, teamId: team_id || null });
+      const allowed = await hasTrainerAccess(req.user.userId, { clubId: club_id, teamId: team_id ?? null });
       if (!allowed) {
         return res.status(403).json({ error: 'Trainer assignment required for this club/team' });
       }
     }
 
     // If team_id provided, verify it exists and belongs to the club
-    if (team_id) {
+    if (team_id != null) {
       const teamExists = await db.query('SELECT id FROM teams WHERE id = $1 AND club_id = $2', [team_id, club_id]);
       if (teamExists.rows.length === 0) {
         return res.status(400).json({ error: 'Team does not exist or does not belong to this club' });
@@ -222,7 +224,7 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
 
     const result = await db.query(
       'INSERT INTO players (club_id, team_id, first_name, last_name, jersey_number, gender, is_twizzit_registered) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [club_id, team_id || null, first_name, last_name, jersey_number, gender || null, false]
+      [club_id, team_id ?? null, first_name, last_name, jersey_number, gender || null, false]
     );
     
     const player = result.rows[0];
@@ -236,7 +238,7 @@ router.post('/', [requireRole(['admin', 'coach']), ...validatePlayer], async (re
     if (err.code === '23503') { // Foreign key violation
       return res.status(400).json({ error: 'Team does not exist' });
     }
-    console.error('Create player error:', err);
+    logError('Create player error:', err);
     res.status(500).json({ error: 'Failed to create player' });
   }
 });
@@ -254,7 +256,11 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
     });
   }
 
-  const { id } = req.params;
+  const playerId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    return res.status(400).json({ error: 'Invalid player id' });
+  }
+
   // Handle both camelCase and snake_case property names
   const {
     club_id = req.body.clubId,
@@ -267,6 +273,12 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
   } = req.body;
   
   try {
+    // Return 404 before further validation checks if player does not exist.
+    const playerExists = await db.query('SELECT id FROM players WHERE id = $1', [playerId]);
+    if (playerExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
     // Verify club exists
     const clubExists = await db.query('SELECT id FROM clubs WHERE id = $1', [club_id]);
     if (clubExists.rows.length === 0) {
@@ -290,7 +302,7 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
       // Check for duplicate jersey number in the same team, excluding current player
       const existingPlayer = await db.query(
         'SELECT id FROM players WHERE team_id = $1 AND jersey_number = $2 AND id != $3',
-        [team_id, jersey_number, id]
+        [team_id, jersey_number, playerId]
       );
 
       if (existingPlayer.rows.length > 0) {
@@ -306,9 +318,9 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
            jersey_number = $5, is_active = $6, gender = $7,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $8 RETURNING *`,
-      [club_id, team_id || null, first_name, last_name, jersey_number, is_active, gender || null, id]
+      [club_id, team_id || null, first_name, last_name, jersey_number, is_active, gender || null, playerId]
     );
-    if (result.rows.length === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Player not found' });
     }
     res.json(result.rows[0]);
@@ -316,14 +328,18 @@ router.put('/:id', [requireRole(['admin', 'coach']), ...validatePlayer], async (
     if (err.code === '23503') { // Foreign key violation
       return res.status(400).json({ error: 'Team does not exist' });
     }
-    console.error('Update player error:', err);
+    logError('Update player error:', err);
     res.status(500).json({ error: 'Failed to update player' });
   }
 });
 
 // Delete a player
 router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
-  const { id } = req.params;
+  const playerId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    return res.status(400).json({ error: 'Invalid player id' });
+  }
+
   try {
     // Begin transaction
     await db.query('BEGIN');
@@ -335,7 +351,7 @@ router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
       JOIN shots s ON g.id = s.game_id
       WHERE s.player_id = $1
       LIMIT 1
-    `, [id]);
+    `, [playerId]);
 
     if (gameCheck.rows.length > 0) {
       await db.query('ROLLBACK');
@@ -345,7 +361,17 @@ router.delete('/:id', [requireRole(['admin', 'coach'])], async (req, res) => {
       });
     }
 
-    const result = await db.query('DELETE FROM players WHERE id = $1 RETURNING *', [id]);
+    await db.query('DELETE FROM substitutions WHERE player_in_id = $1 OR player_out_id = $1', [playerId]);
+    await db.query('DELETE FROM game_rosters WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM free_shots WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM shots WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM game_events WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM player_achievements WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM player_leaderboard WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM player_predictions WHERE player_id = $1', [playerId]);
+    await db.query('DELETE FROM twizzit_player_mappings WHERE local_player_id = $1', [playerId]);
+
+    const result = await db.query('DELETE FROM players WHERE id = $1 RETURNING *', [playerId]);
     if (result.rows.length === 0) {
       await db.query('ROLLBACK');
       return res.status(404).json({ error: 'Player not found' });

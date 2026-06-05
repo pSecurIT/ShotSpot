@@ -94,6 +94,39 @@ describe('ReportTemplates', () => {
     expect(screen.getByRole('button', { name: 'Duplicate Template' })).toBeInTheDocument();
   });
 
+  it('announces empty and success states accessibly', async () => {
+    const user = userEvent.setup();
+    getAllMock.mockResolvedValueOnce([]);
+
+    render(<ReportTemplates />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('No templates yet');
+    });
+
+    await user.type(screen.getByLabelText('Template Name'), 'Weekly Insights');
+    await user.click(screen.getByRole('button', { name: 'Save Template' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('Template created successfully');
+    });
+  });
+
+  it('shows a retry state when the initial template load fails', async () => {
+    const user = userEvent.setup();
+    getAllMock.mockRejectedValueOnce(new Error('Failed to load templates')).mockResolvedValueOnce([seededTemplate]);
+
+    render(<ReportTemplates />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to load templates');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect((await screen.findAllByText('Game Summary')).length).toBeGreaterThan(0);
+  });
+
   it('creates a new template', async () => {
     const user = userEvent.setup();
     render(<ReportTemplates />);

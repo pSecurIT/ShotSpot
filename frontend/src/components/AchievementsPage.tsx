@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AchievementGallery from './AchievementGallery';
 import Leaderboard from './Leaderboard';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import type { Achievement, LeaderboardPlayer } from '../types/achievements';
 import api from '../utils/api';
 import '../styles/AchievementsPage.css';
@@ -32,6 +34,7 @@ const CATEGORY_OPTIONS: Array<{ value: AchievementCategoryFilter; label: string 
 ];
 
 const AchievementsPage: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [players, setPlayers] = useState<PlayerOption[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
@@ -225,6 +228,12 @@ const AchievementsPage: React.FC = () => {
   };
 
   return (
+    <PageLayout
+      title="Achievements"
+      eyebrow="Analytics > Achievements"
+      description="Track badges, player milestones, and leaderboard momentum."
+      breadcrumbs={breadcrumbs}
+    >
     <div className="achievements-page">
       <header className="achievements-page__hero">
         <div>
@@ -244,8 +253,16 @@ const AchievementsPage: React.FC = () => {
         </div>
       </header>
 
-      {error && <div className="achievements-page__error">{error}</div>}
-      {shareStatus && <div className="achievements-page__status">{shareStatus}</div>}
+      {error && (
+        <div className="achievements-page__error" role="alert">
+          {error}
+        </div>
+      )}
+      {shareStatus && (
+        <div className="achievements-page__status" role="status" aria-live="polite">
+          {shareStatus}
+        </div>
+      )}
 
       <section className="achievements-page__controls">
         <div className="achievements-page__field">
@@ -296,7 +313,11 @@ const AchievementsPage: React.FC = () => {
               <h3>Player achievement showcase</h3>
               <p>Progress tracking and earned badge collection for the selected player.</p>
             </div>
-            {playerLoading && <span className="achievements-page__loading">Refreshing player data…</span>}
+            {playerLoading && (
+              <span className="achievements-page__loading" role="status" aria-live="polite">
+                Refreshing player data…
+              </span>
+            )}
           </div>
 
           {selectedPlayer ? (
@@ -354,7 +375,7 @@ const AchievementsPage: React.FC = () => {
                     })}
                   </div>
                 ) : (
-                  <p className="achievements-page__empty">No badges unlocked yet.</p>
+                  <p className="achievements-page__empty" role="status" aria-live="polite">No badges unlocked yet.</p>
                 )}
               </div>
 
@@ -371,7 +392,9 @@ const AchievementsPage: React.FC = () => {
               </div>
             </>
           ) : (
-            <p className="achievements-page__empty">Select a player to see progress tracking and collection details.</p>
+            <p className="achievements-page__empty" role="status" aria-live="polite">
+              Select a player to see progress tracking and collection details.
+            </p>
           )}
         </article>
 
@@ -385,7 +408,7 @@ const AchievementsPage: React.FC = () => {
           </div>
 
           {pageLoading ? (
-            <p className="achievements-page__loading">Loading achievements…</p>
+            <p className="achievements-page__loading" role="status" aria-live="polite">Loading achievements…</p>
           ) : (
             <AchievementGallery
               achievements={filteredAchievements}
@@ -445,6 +468,7 @@ const AchievementsPage: React.FC = () => {
         />
       </section>
     </div>
+    </PageLayout>
   );
 };
 

@@ -1,15 +1,20 @@
 name: Security Scan
 
-# Run security scans on PRs, pushes to main, and weekly to catch regressions
+# Run security scans on pull requests to main, pushes to main, weekly, and manually.
 on:
   pull_request:
     branches: [ main ]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [ main ]
   schedule:
     # Run weekly on Monday at 2 AM UTC
     - cron: '0 2 * * 1'
   workflow_dispatch: # Allow manual trigger
+
+concurrency:
+  group: security-scan-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -26,7 +31,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Build image for scanning
         shell: bash
@@ -36,7 +41,7 @@ jobs:
           docker build -t local/shotspot:scan-${{ github.sha }} .
 
       - name: Run Trivy vulnerability scanner (SARIF)
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: local/shotspot:scan-${{ github.sha }}
           format: 'sarif'
@@ -47,24 +52,16 @@ jobs:
           exit-code: '0'
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
         if: ${{ hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-results.sarif'
-          # Keep category compatible with historical baseline config from docker.yml
-          # so PR code scanning can compare against main without "configuration not found".
-          category: '.github/workflows/docker.yml:scan-vulnerabilities'
-
-      - name: Upload Trivy results with legacy container category
-        uses: github/codeql-action/upload-sarif@v4
-        if: ${{ hashFiles('trivy-results.sarif') != '' }}
-        with:
-          sarif_file: 'trivy-results.sarif'
-          # Backward-compatible category retained for old code-scanning baselines.
           category: 'trivy-container-scan'
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+          sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Fail on critical vulnerabilities
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: local/shotspot:scan-${{ github.sha }}
           format: 'table'
@@ -72,6 +69,18 @@ jobs:
           scanners: 'vuln,secret'
           ignore-unfixed: true
           exit-code: '1'
+
+      - name: Trivy image summary
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: local/shotspot:scan-${{ github.sha }}
+          format: 'github'
+          output: '$GITHUB_STEP_SUMMARY'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          scanners: 'vuln,secret'
+          ignore-unfixed: true
+          exit-code: '0'
 
   scan-filesystem:
     name: Scan Filesystem
@@ -83,10 +92,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Run Trivy filesystem scanner (SARIF)
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -98,14 +107,16 @@ jobs:
           exit-code: '0'
 
       - name: Upload Trivy filesystem results
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
         if: ${{ hashFiles('trivy-fs-results.sarif') != '' }}
         with:
           sarif_file: 'trivy-fs-results.sarif'
           category: 'trivy-filesystem-scan'
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+          sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Fail on critical dependency vulnerabilities
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -114,3 +125,18 @@ jobs:
           scanners: 'vuln,secret'
           ignore-unfixed: true
           exit-code: '1'
+
+      - name: Trivy filesystem summary
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'github'
+          output: '$GITHUB_STEP_SUMMARY'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          scanners: 'vuln,secret'
+          ignore-unfixed: true
+          exit-code: '0'
+
+

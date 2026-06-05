@@ -5,7 +5,133 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2025-11-29
+
+
+
+
+
+
+
+
+## [1.0.1] - 2026-05-26
+
+### ✨ New Features
+
+- feat: sync backend package-lock.json with package.json version during release
+- feat: enhance release script with tag existence checks and version override options
+
+### 🐛 Bug Fixes
+
+- fix: improve exec function to handle command output and return trimmed result
+- fix: update exec function to set current working directory based on options
+- fix: correct member references in log-injection-sanitizer.yml
+- fix: add module type declaration in package.json
+- fix: correct extension point name in log-injection-sanitizer.yml
+- fix: update logo references from PNG to SVG format in documentation
+- fix: ensure iOS platform exists and streamline dependency installation in mobile release workflow (#540)
+- fix: enhance iOS project inspection and dependency installation in mo… (#537)
+
+
+## [1.0.1] - 2026-05-26
+
+### ✨ New Features
+
+- feat: enhance release script with tag existence checks and version override options
+
+### 🐛 Bug Fixes
+
+- fix: improve exec function to handle command output and return trimmed result
+- fix: update exec function to set current working directory based on options
+- fix: correct member references in log-injection-sanitizer.yml
+- fix: add module type declaration in package.json
+- fix: correct extension point name in log-injection-sanitizer.yml
+- fix: update logo references from PNG to SVG format in documentation
+- fix: ensure iOS platform exists and streamline dependency installation in mobile release workflow (#540)
+- fix: enhance iOS project inspection and dependency installation in mo… (#537)
+
+
+## [1.0.1] - 2026-05-26
+
+### 🐛 Bug Fixes
+
+- fix: improve exec function to handle command output and return trimmed result
+- fix: update exec function to set current working directory based on options
+- fix: correct member references in log-injection-sanitizer.yml
+- fix: add module type declaration in package.json
+- fix: correct extension point name in log-injection-sanitizer.yml
+- fix: update logo references from PNG to SVG format in documentation
+- fix: ensure iOS platform exists and streamline dependency installation in mobile release workflow (#540)
+- fix: enhance iOS project inspection and dependency installation in mo… (#537)
+
+
+## [1.0.1] - 2026-05-26
+
+
+## [1.0.1] - 2026-05-26
+
+### 🐛 Bug Fixes
+
+- fix: improve exec function to handle command output and return trimmed result
+- fix: update exec function to set current working directory based on options
+- fix: correct member references in log-injection-sanitizer.yml
+- fix: add module type declaration in package.json
+- fix: correct extension point name in log-injection-sanitizer.yml
+- fix: update logo references from PNG to SVG format in documentation
+- fix: ensure iOS platform exists and streamline dependency installation in mobile release workflow (#540)
+- fix: enhance iOS project inspection and dependency installation in mo… (#537)
+
+
+## [1.0.1] - 2026-05-26
+
+### 🐛 Bug Fixes
+
+- fix: update exec function to set current working directory based on options
+- fix: correct member references in log-injection-sanitizer.yml
+- fix: add module type declaration in package.json
+- fix: correct extension point name in log-injection-sanitizer.yml
+- fix: update logo references from PNG to SVG format in documentation
+- fix: ensure iOS platform exists and streamline dependency installation in mobile release workflow (#540)
+- fix: enhance iOS project inspection and dependency installation in mo… (#537)
+
+
+## [1.0.1] - 2026-05-26
+
+### 🐛 Bug Fixes
+
+- fix: correct member references in log-injection-sanitizer.yml
+- fix: add module type declaration in package.json
+- fix: correct extension point name in log-injection-sanitizer.yml
+- fix: update logo references from PNG to SVG format in documentation
+- fix: ensure iOS platform exists and streamline dependency installation in mobile release workflow (#540)
+- fix: enhance iOS project inspection and dependency installation in mo… (#537)
+
+
+## [1.0.1] - 2026-05-26
+
+### 🐛 Bug Fixes
+
+- fix: correct member references in log-injection-sanitizer.yml
+- fix: add module type declaration in package.json
+- fix: correct extension point name in log-injection-sanitizer.yml
+- fix: update logo references from PNG to SVG format in documentation
+- fix: ensure iOS platform exists and streamline dependency installation in mobile release workflow (#540)
+- fix: enhance iOS project inspection and dependency installation in mo… (#537)
+
+
+## [1.0.0] - 2026-05-15
+
+### Added
+- New documentation set for navigation and feature adoption:
+	- `docs/USER_GUIDE.md`
+	- `docs/NAVIGATION_GUIDE.md`
+	- `docs/COMPETITION_MANAGEMENT.md`
+- Architecture diagrams for navigation rendering flow and competition lifecycle
+- API client documentation for navigation-linked feature modules (clubs, competitions, series, analytics, reports, settings)
+
+### Changed
+- Updated `README.md` with navigation/competition enhancements and visual references
+- Updated `frontend/README.md` with component-level navigation documentation and API method index
+- Updated `QUICKSTART.md` with navigation quick tour and direct links to new guides
 
 ### ✨ Initial Release
 

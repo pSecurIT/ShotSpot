@@ -29,6 +29,7 @@ This guide outlines the procedures for managing secrets across different environ
 - API keys
 - JWT secrets
 - Service account credentials
+- `DEPENDENCY_REMEDIATION_TOKEN`: repository secret used by `.github/workflows/dependency-remediation.yml` so the automated remediation PR is created with a token that can start downstream PR checks.
 
 ### Management Process
 1. Store secrets in CI/CD platform

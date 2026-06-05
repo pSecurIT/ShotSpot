@@ -5,20 +5,30 @@ import Login from '../components/Login';
 import type { AuthContextType } from '../types/auth';
 
 // Mock useNavigate
-const mockNavigate = vi.fn();
+const mocks = vi.hoisted(() => ({
+  mockNavigate: vi.fn(),
+  mockLogin: vi.fn(),
+  mockLogout: vi.fn(),
+  mockRegister: vi.fn(),
+  mockUpdateUser: vi.fn(),
+  mockCanUseBiometric: vi.fn(),
+  mockEnrollBiometricAfterLogin: vi.fn(),
+  mockBiometricLogin: vi.fn(),
+  mockDisableBiometric: vi.fn(),
+  mockHasAppBiometricEnrollment: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
     ...actual,
-    useNavigate: () => mockNavigate,
+    useNavigate: () => mocks.mockNavigate,
   };
 });
 
-// Create mock functions that can be updated per test
-const mockLogin = vi.fn();
-const mockLogout = vi.fn();
-const mockRegister = vi.fn();
-const mockUpdateUser = vi.fn();
+vi.mock('../utils/biometricService', () => ({
+  hasAppBiometricEnrollment: mocks.mockHasAppBiometricEnrollment,
+}));
 
 // Mock the useAuth hook
 vi.mock('../contexts/AuthContext', async () => {
@@ -27,10 +37,15 @@ vi.mock('../contexts/AuthContext', async () => {
     ...actual,
     useAuth: (): AuthContextType => ({
       user: null,
-      login: mockLogin,
-      logout: mockLogout,
-      register: mockRegister,
-      updateUser: mockUpdateUser,
+      login: mocks.mockLogin,
+      logout: mocks.mockLogout,
+      register: mocks.mockRegister,
+      updateUser: mocks.mockUpdateUser,
+      biometricEnrolled: false,
+      canUseBiometric: mocks.mockCanUseBiometric,
+      enrollBiometricAfterLogin: mocks.mockEnrollBiometricAfterLogin,
+      biometricLogin: mocks.mockBiometricLogin,
+      disableBiometric: mocks.mockDisableBiometric,
     }),
   };
 });
@@ -46,6 +61,11 @@ describe('Login Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.mockHasAppBiometricEnrollment.mockResolvedValue(false);
+    mocks.mockCanUseBiometric.mockResolvedValue({ available: false });
+    mocks.mockEnrollBiometricAfterLogin.mockResolvedValue({ success: true });
+    mocks.mockBiometricLogin.mockResolvedValue({ success: false });
+    mocks.mockDisableBiometric.mockResolvedValue(undefined);
   });
 
   describe('Form Rendering', () => {
@@ -73,6 +93,16 @@ describe('Login Component', () => {
       expect(passwordInput).toBeRequired();
 
       expect(submitButton).toHaveAttribute('type', 'submit');
+    });
+
+    it('shows quick biometric login when enrollment exists', async () => {
+      mocks.mockHasAppBiometricEnrollment.mockResolvedValue(true);
+
+      renderLogin();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Sign in with biometrics')).toBeInTheDocument();
+      });
     });
 
     it('does not display error message initially', () => {
@@ -120,7 +150,7 @@ describe('Login Component', () => {
 
   describe('Form Submission', () => {
     it('calls login function with correct credentials on form submit', () => {
-      mockLogin.mockResolvedValue({ success: true });
+      mocks.mockLogin.mockResolvedValue({ success: true });
       renderLogin();
 
       const usernameInput = screen.getByLabelText('Username or Email');
@@ -131,11 +161,11 @@ describe('Login Component', () => {
       fireEvent.change(passwordInput, { target: { value: 'testpass' } });
       fireEvent.click(submitButton);
 
-      expect(mockLogin).toHaveBeenCalledWith('testuser', 'testpass');
+      expect(mocks.mockLogin).toHaveBeenCalledWith('testuser', 'testpass');
     });
 
     it('navigates to dashboard after successful login', async () => {
-      mockLogin.mockResolvedValue({ success: true });
+      mocks.mockLogin.mockResolvedValue({ success: true });
       renderLogin();
 
       const usernameInput = screen.getByLabelText('Username or Email');
@@ -147,12 +177,12 @@ describe('Login Component', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+        expect(mocks.mockNavigate).toHaveBeenCalledWith('/dashboard');
       });
     });
 
     it('clears error message on new submission attempt', async () => {
-      mockLogin
+      mocks.mockLogin
         .mockResolvedValueOnce({ success: false, error: 'Invalid credentials' })
         .mockResolvedValueOnce({ success: true });
       
@@ -180,11 +210,27 @@ describe('Login Component', () => {
         expect(screen.queryByText('Invalid credentials')).not.toBeInTheDocument();
       });
     });
+
+    it('shows biometric enrollment prompt after successful password login when not enrolled', async () => {
+      mocks.mockLogin.mockResolvedValueOnce({ success: true });
+      mocks.mockHasAppBiometricEnrollment.mockResolvedValue(false);
+      mocks.mockCanUseBiometric.mockResolvedValue({ available: true });
+
+      renderLogin();
+
+      fireEvent.change(screen.getByLabelText('Username or Email'), { target: { value: 'coach' } });
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /enable biometric login\?/i })).toBeInTheDocument();
+      });
+    });
   });
 
   describe('Error Handling', () => {
     it('displays error message when login fails with server error', async () => {
-      mockLogin.mockResolvedValue({ 
+      mocks.mockLogin.mockResolvedValue({
         success: false, 
         error: 'Invalid username or password' 
       });
@@ -200,12 +246,12 @@ describe('Login Component', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Invalid username or password')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent('Invalid username or password');
       });
     });
 
     it('displays generic error message when login fails without specific error', async () => {
-      mockLogin.mockResolvedValue({ success: false });
+      mocks.mockLogin.mockResolvedValue({ success: false });
       
       renderLogin();
 
@@ -224,7 +270,7 @@ describe('Login Component', () => {
 
     it('handles unexpected exceptions during login', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockLogin.mockRejectedValue(new Error('Network error'));
+      mocks.mockLogin.mockRejectedValue(new Error('Network error'));
       
       renderLogin();
 
@@ -242,13 +288,13 @@ describe('Login Component', () => {
 
       expect(consoleSpy).toHaveBeenCalled();
       const call = consoleSpy.mock.calls[0];
-      expect(call[0]).toContain('Login');
+      expect(call[0]).toContain('Login exception');
       expect(call[1]).toBeInstanceOf(Error);
       consoleSpy.mockRestore();
     });
 
     it('displays error with correct CSS classes', async () => {
-      mockLogin.mockResolvedValue({ 
+      mocks.mockLogin.mockResolvedValue({
         success: false, 
         error: 'Test error message' 
       });
@@ -286,7 +332,7 @@ describe('Login Component', () => {
     });
 
     it('submits form with minimal valid input', () => {
-      mockLogin.mockResolvedValue({ success: true });
+      mocks.mockLogin.mockResolvedValue({ success: true });
       renderLogin();
 
       const usernameInput = screen.getByLabelText('Username or Email');
@@ -297,13 +343,13 @@ describe('Login Component', () => {
       fireEvent.change(passwordInput, { target: { value: 'b' } });
       fireEvent.click(submitButton);
 
-      expect(mockLogin).toHaveBeenCalledWith('a', 'b');
+      expect(mocks.mockLogin).toHaveBeenCalledWith('a', 'b');
     });
   });
 
   describe('Edge Cases', () => {
-    it('handles empty form submission', () => {
-      mockLogin.mockResolvedValue({ success: false, error: 'Fields required' });
+    it('handles empty form submission', async () => {
+      mocks.mockLogin.mockResolvedValue({ success: false, error: 'Fields required' });
       renderLogin();
 
       // HTML5 validation prevents empty form submission, so let's test with form submit event
@@ -312,11 +358,13 @@ describe('Login Component', () => {
         fireEvent.submit(form);
       }
 
-      expect(mockLogin).toHaveBeenCalledWith('', '');
+      await waitFor(() => {
+        expect(mocks.mockLogin).toHaveBeenCalledWith('', '');
+      });
     });
 
     it('handles whitespace-only input', () => {
-      mockLogin.mockResolvedValue({ success: true });
+      mocks.mockLogin.mockResolvedValue({ success: true });
       renderLogin();
 
       const usernameInput = screen.getByLabelText('Username or Email');
@@ -327,11 +375,11 @@ describe('Login Component', () => {
       fireEvent.change(passwordInput, { target: { value: '  \t  ' } });
       fireEvent.click(submitButton);
 
-      expect(mockLogin).toHaveBeenCalledWith('   ', '  \t  ');
+      expect(mocks.mockLogin).toHaveBeenCalledWith('   ', '  \t  ');
     });
 
     it('handles very long input values', () => {
-      mockLogin.mockResolvedValue({ success: true });
+      mocks.mockLogin.mockResolvedValue({ success: true });
       renderLogin();
 
       const longUsername = 'a'.repeat(1000);
@@ -345,7 +393,7 @@ describe('Login Component', () => {
       fireEvent.change(passwordInput, { target: { value: longPassword } });
       fireEvent.click(submitButton);
 
-      expect(mockLogin).toHaveBeenCalledWith(longUsername, longPassword);
+      expect(mocks.mockLogin).toHaveBeenCalledWith(longUsername, longPassword);
     });
   });
 });

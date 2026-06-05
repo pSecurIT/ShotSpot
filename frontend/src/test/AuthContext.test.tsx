@@ -106,16 +106,18 @@ describe('AuthContext', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       // AuthContext now handles invalid JSON gracefully with try-catch
-      const { getByTestId } = render(
+      render(
         <AuthProvider>
           <TestComponent />
         </AuthProvider>
       );
 
-      // Should render without crashing, user should be null
-      expect(getByTestId('username')).toHaveTextContent('null');
-      expect(getByTestId('email')).toHaveTextContent('null');
-      expect(getByTestId('role')).toHaveTextContent('null');
+      // Should render without crashing, user should be null once bootstrap completes
+      await waitFor(() => {
+        expect(screen.getByTestId('username')).toHaveTextContent('null');
+        expect(screen.getByTestId('email')).toHaveTextContent('null');
+        expect(screen.getByTestId('role')).toHaveTextContent('null');
+      });
       
       // Verify localStorage was cleaned up
       expect(localStorage.getItem('user')).toBeNull();
@@ -131,19 +133,10 @@ describe('AuthContext', () => {
     });
 
     it('should show loading state initially', () => {
-      const LoadingTestComponent = () => {
-        try {
-          const auth = useAuth();
-          return <div data-testid="loaded">Loaded: {auth.user?.username || 'null'}</div>;
-        } catch {
-          return <div data-testid="loading">Loading...</div>;
-        }
-      };
-
       // Render without waiting
       const { container } = render(
         <AuthProvider>
-          <LoadingTestComponent />
+          <div data-testid="loaded">Loaded</div>
         </AuthProvider>
       );
 
@@ -161,7 +154,7 @@ describe('AuthContext', () => {
         role: 'user'
       };
 
-      const mockToken = 'auth-token-123';
+      const mockToken = 'demo';
 
       // Mock CSRF token request
       mockAxios.onGet('/auth/csrf').reply(200, { csrfToken: 'csrf-token' });

@@ -1,185 +1,137 @@
-# ShotSpot Docker Release
+# ShotSpot Release Guide
 
-This directory contains files for deploying ShotSpot using the pre-built Docker image from GitHub Container Registry.
+Use this guide when you want to publish a new ShotSpot version in GitHub and let the automation build and ship the release image.
 
-## 📦 Files
+## What happens in a release
 
-- **`docker-compose.yml`** - Docker Compose configuration for local testing and deployment
-- **`deployment.sh`** - Automated deployment script with backup and update features
+When you publish a GitHub Release or push a tag that starts with `v`, the release workflow in [`.github/workflows/release.yml`](../.github/workflows/release.yml) builds the Docker image, pushes it to GitHub Container Registry, and tags it with the version plus `latest` where appropriate.
 
-## 🚀 Quick Start
+## Before you start
 
-### 1. Pull and Run
-
-```bash
-# Pull the latest image
-docker pull ghcr.io/psecurit/shotspot:latest
-
-# Use deployment script (recommended)
-./deployment.sh deploy
-
-# Or manually with docker-compose
-docker-compose up -d
-```
-
-### 2. Access Application
-
-- **Application**: http://localhost:3001
-- **API**: http://localhost:3001/api
-- **Health Check**: http://localhost:3001/api/health
-
-## 🔧 Configuration
-
-Create a `.env` file in this directory with your configuration:
-
-```env
-# Database
-POSTGRES_USER=shotspot_user
-POSTGRES_PASSWORD=your_secure_password
-POSTGRES_DB=shotspot_db
-
-# Application
-PORT=3001
-NODE_ENV=production
-DB_HOST=db
-DB_PORT=5432
-DB_NAME=shotspot_db
-DB_USER=shotspot_user
-DB_PASSWORD=your_secure_password
-JWT_SECRET=your_jwt_secret_min_32_chars
-CORS_ORIGIN=http://localhost:3001
-```
-
-## 📜 Deployment Script Usage
-
-The `deployment.sh` script provides convenient commands for managing your deployment:
+Make sure you are on the latest `main` branch and that the code you want to ship is already merged.
 
 ```bash
-# Deploy (pull image, start, and wait for health)
-./deployment.sh deploy
-
-# Deploy specific version
-./deployment.sh deploy v1.2.3
-
-# Update to latest version (with backup)
-./deployment.sh update
-
-# Backup database
-./deployment.sh backup
-
-# Start containers (without pulling)
-./deployment.sh start
-
-# Stop containers
-./deployment.sh stop
-
-# Restart containers
-./deployment.sh restart
-
-# View status
-./deployment.sh status
-
-# Follow logs
-./deployment.sh logs
+git checkout main
+git pull origin main
 ```
 
-## 🔄 Updating
+## The simplest release flow
 
-To update to a new version:
+### 1. Prepare the release locally
+
+Run the release helper script from the repository root:
 
 ```bash
-# Automatic update with backup
-./deployment.sh update
-
-# Or manually
-docker-compose down
-docker pull ghcr.io/psecurit/shotspot:latest
-docker-compose up -d
+node scripts/create-release.js
 ```
 
-## 💾 Database Backups
+The script will ask you for:
 
-### Automatic Backup
+1. Release type: major, minor, patch, or custom version.
+2. Confirmation before changing files.
+3. Whether you want to push the tag and commit after it prepares the release.
+
+### 2. Choose the version
+
+Pick the version that matches the change:
+
+1. Major: breaking changes.
+2. Minor: new features.
+3. Patch: bug fixes or small safe updates.
+4. Custom version: only if you already know the exact version number.
+
+If you are unsure, choose patch.
+
+### 3. Review what the script changes
+
+The script updates all three version files together:
+
+- `package.json`
+- `frontend/package.json`
+- `backend/package.json`
+- `CHANGELOG.md`
+
+It also creates a tag like `v1.2.3` and commits the release prep changes.
+
+### 4. Push the release commit and tag
+
+If the script asks to push now, answer `y`.
+
+If you prefer to do it manually, push both the commit and the tag:
 
 ```bash
-./deployment.sh backup
+git push origin main
+git push origin v1.2.3
 ```
 
-Backups are saved to `./backups/shotspot_YYYYMMDD_HHMMSS.sql`
+Replace `v1.2.3` with your actual version.
 
-### Manual Backup
+### 5. Create the GitHub Release
 
-```bash
-docker-compose exec db pg_dump -U shotspot_user shotspot_db > backup.sql
-```
+In GitHub:
 
-### Restore Backup
+1. Open the repository.
+2. Click **Releases**.
+3. Click **Draft a new release**.
+4. Choose the tag you just pushed, for example `v1.2.3`.
+5. Set the release title to the same version.
+6. Paste or generate release notes.
+7. Click **Publish release**.
 
-```bash
-docker-compose exec -T db psql -U shotspot_user shotspot_db < backup.sql
-```
+Screenshot callout: add a screenshot here showing the **Releases** page with **Draft a new release** highlighted.
 
-## 🐛 Troubleshooting
+Screenshot callout: add a screenshot here showing the **Choose a tag** dropdown with `v1.2.3` selected.
 
-### Check Logs
+## What to expect after publishing
 
-```bash
-# All services
-docker-compose logs -f
+After the release is published, GitHub Actions starts the workflow automatically. The workflow:
 
-# Specific service
-docker-compose logs -f app
-docker-compose logs -f db
-```
+1. Builds the Docker image.
+2. Pushes the image to GitHub Container Registry.
+3. Publishes release tags such as `v1.2.3`, `v1.2`, `v1`, and `latest` where applicable.
+4. Verifies the pushed image.
 
-### Check Status
+If the workflow does not start, check that:
 
-```bash
-docker-compose ps
-```
+1. The release was actually published, not left as a draft.
+2. The tag starts with `v`.
+3. The workflow file in [`.github/workflows/release.yml`](../.github/workflows/release.yml) still has the `release` and `push.tags` triggers.
 
-### Reset Everything
+## If you only want to rebuild the release image
 
-```bash
-docker-compose down -v
-rm -rf backups/*
-# Edit .env with new configuration
-docker-compose up -d
-```
+You do not need to cut a new version every time you want a rebuild. You can manually run the workflow from GitHub:
 
-## 📋 Available Image Tags
+1. Open **Actions**.
+2. Select **Build and Push Docker Image**.
+3. Click **Run workflow**.
+4. Optional: type a tag such as `latest`.
 
-- `latest` - Latest stable release
-- `v1.2.3` - Specific version
-- `v1.2` - Minor version
-- `v1` - Major version
-- `sha-abc123` - Specific commit
+Screenshot callout: add a screenshot here showing the **Actions** page and the **Run workflow** button.
 
-Pull specific version:
-```bash
-docker pull ghcr.io/psecurit/shotspot:v1.2.3
-```
+## Common mistakes
 
-## 🔒 Security Notes
+1. Forgetting to push the tag. If the tag is only local, GitHub will not build the release.
+2. Publishing a draft release and expecting Actions to run. Drafts do not trigger the release event.
+3. Using a version tag without the `v` prefix. This repo expects release tags like `v1.2.3`.
+4. Skipping the changelog review. The script creates an automatic draft, but you should still check the notes before publishing.
 
-1. **Never use default passwords** in production
-2. **Set file permissions**: `chmod 600 .env`
-3. **Regular backups**: Schedule daily backups
-4. **Update regularly**: Check for new versions weekly
-5. **Monitor logs**: Watch for security events
+## Rollback
 
-## 📖 Documentation
+If you published the wrong version:
+
+1. Delete the GitHub Release.
+2. Delete the bad tag from GitHub and locally.
+3. Recreate the release with the corrected version.
+
+## Related deployment docs
+
+If your goal is not to publish a new version but to deploy an already published image, use these documents instead:
 
 - [Full Docker Guide](../DOCKER.md)
-- [Security Guide](../DOCKER_SECURITY.md)
 - [Deployment Guide](../DEPLOYMENT.md)
 - [Main README](../README.md)
 
-## 🆘 Support
+## Support
 
 - GitHub Issues: https://github.com/pSecurIT/ShotSpot/issues
 - Security: security@shotspot.example.com (private disclosure)
-
----
-
-**For building your own image from source, see the main [DOCKER.md](../DOCKER.md) guide.**

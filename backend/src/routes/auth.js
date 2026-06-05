@@ -1,30 +1,47 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
 import Tokens from 'csrf';
+import { body, validationResult } from 'express-validator';
 import db from '../db.js';
+import { auth } from '../middleware/auth.js';
+import { getJwtSecret } from '../utils/authToken.js';
+import { logError } from '../utils/logger.js';
 
 const router = express.Router();
 const tokens = new Tokens();
 
+const authLimiter = rateLimit({
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS, 10) || 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  skip: () => process.env.NODE_ENV === 'test' && process.env.ENABLE_AUTH_RATE_LIMIT_IN_TEST !== 'true',
+  message: {
+    error: 'Too many authentication attempts, please try again later.'
+  }
+});
+
 // CSRF token endpoint
 router.get('/csrf', (req, res) => {
-  if (!req.session.csrfSecret) {
-    req.session.csrfSecret = tokens.secretSync();
-  }
-  const token = tokens.create(req.session.csrfSecret);
-  
-  // Explicitly save the session to ensure it's persisted
-  req.session.save((err) => {
-    if (err) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.error('Error saving session for CSRF:', err);
-      }
-      return res.status(500).json({ error: 'Failed to create CSRF token' });
+  try {
+    const token = (typeof req.csrfToken === 'function')
+      ? req.csrfToken()
+      : (() => {
+        if (!req.session.csrfSecret) {
+          req.session.csrfSecret = tokens.secretSync();
+        }
+        return tokens.create(req.session.csrfSecret);
+      })();
+    return res.json({ csrfToken: token });
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+      logError('Error creating CSRF token:', err);
     }
-    res.json({ csrfToken: token });
-  });
+    return res.status(500).json({ error: 'Failed to create CSRF token' });
+  }
 });
 
 // Validation middleware
@@ -115,13 +132,13 @@ router.post('/register', validateRegistration, async (req, res) => {
       throw txError;
     }
   } catch (error) {
-    console.error('Registration error:', error);
+    logError('Registration error:', error);
     res.status(500).json({ error: 'Error creating user' });
   }
 });
 
 // Login user
-router.post('/login', [
+router.post('/login', authLimiter, [
   body('username').trim().notEmpty(),
   body('password').notEmpty()
 ], async (req, res) => {
@@ -188,7 +205,7 @@ router.post('/login', [
     );
 
     // Generate JWT
-    const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
+    const jwtSecret = getJwtSecret();
     
     // Normalize expiresIn: allow numeric string (seconds) or timeframe string like '1h'
     const rawExpires = process.env.JWT_EXPIRES_IN;
@@ -226,14 +243,13 @@ router.post('/login', [
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logError('Login error:', error);
     res.status(500).json({ error: 'Error during login' });
   }
 });
 
 // Change password endpoint (works even if password_must_change is true)
-// Note: In production, also apply CSRF protection middleware to this endpoint
-router.post('/change-password', [
+router.post('/change-password', auth, authLimiter, [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   body('newPassword')
     .isLength({ min: 8 })
@@ -249,27 +265,12 @@ router.post('/change-password', [
 
     const { currentPassword, newPassword } = req.body;
 
-    // Get token from header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const token = authHeader.substring(7);
-    const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_key_min_32_chars_long_for_testing';
-
-    // Verify token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, jwtSecret);
-    } catch (_err) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
+    const jwtSecret = getJwtSecret();
 
     // Get user from database
     const result = await db.query(
       'SELECT id, username, email, password_hash, role, password_must_change FROM users WHERE id = $1',
-      [decoded.userId]
+      [req.user.userId]
     );
 
     if (result.rows.length === 0) {
@@ -326,7 +327,7 @@ router.post('/change-password', [
       }
     });
   } catch (error) {
-    console.error('Change password error:', error);
+    logError('Change password error:', error);
     res.status(500).json({ error: 'Error changing password' });
   }
 });

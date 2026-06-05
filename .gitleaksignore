@@ -1,0 +1,95 @@
+# .gitleaksignore — fingerprints of known-safe findings
+# https://github.com/gitleaks/gitleaks#gitleaksignore
+#
+# These are not real secrets. They are either:
+#   - Shell command substitutions that generate runtime values ($(openssl rand -hex 16))
+#   - Docker Compose / shell variable references that require the value from the environment (${VAR:?...})
+#
+# Commit 365ac47 — Issue #477: replaced hardcoded CI secrets with ephemeral generation
+365ac47230b9d8c1dd812ab0469aa969125209d5:release/docker-compose.yml:shotspot-db-password:37
+365ac47230b9d8c1dd812ab0469aa969125209d5:.github/workflows/release.yml:shotspot-db-password:267
+365ac47230b9d8c1dd812ab0469aa969125209d5:.github/workflows/docker.yml:shotspot-db-password:112
+365ac47230b9d8c1dd812ab0469aa969125209d5:docker-compose.dev.yml:shotspot-db-password:40
+365ac47230b9d8c1dd812ab0469aa969125209d5:.github/workflows/docker.yml:shotspot-db-password:265
+
+# Dynamic JWT/SESSION secret generation via openssl in CI workflows (not real secrets)
+# These use $(openssl rand -hex N) to generate ephemeral values at CI runtime
+1bb88ed1:.github/workflows/node.js.yml:shotspot-jwt-secret:63
+1bb88ed1:.github/workflows/node.js.yml:shotspot-session-secret:64
+1bb88ed1:.github/workflows/test-coverage.yml:shotspot-jwt-secret:107
+1bb88ed1:.github/workflows/test-coverage.yml:shotspot-session-secret:108
+1bb88ed1:.github/workflows/docker.yml:shotspot-jwt-secret:168
+1bb88ed1:.github/workflows/docker.yml:shotspot-db-password:169
+1bb88ed1:.github/workflows/docker.yml:shotspot-jwt-secret:327
+1bb88ed1:.github/workflows/docker.yml:shotspot-db-password:328
+1bb88ed1:.github/workflows/release.yml:shotspot-jwt-secret:268
+1bb88ed1:.github/workflows/release.yml:shotspot-session-secret:269
+
+# Environment variable placeholders in docker-compose files (${VAR:?error message})
+# These require values from the environment/user and are not hardcoded secrets
+1bb88ed1:docker-compose.dev.yml:shotspot-db-password:11
+1bb88ed1:docker-compose.dev.yml:shotspot-db-password:40
+1bb88ed1:docker-compose.dev.yml:shotspot-jwt-secret:43
+1bb88ed1:docker-compose.yml:shotspot-db-password:30
+1bb88ed1:docker-compose.yml:shotspot-db-password:94
+1bb88ed1:docker-compose.yml:shotspot-jwt-secret:100
+1bb88ed1:docker-compose.yml:shotspot-session-secret:103
+1bb88ed1:docker-compose.yml:shotspot-csrf-secret:104
+1bb88ed1:release/docker-compose.yml:shotspot-db-password:12
+1bb88ed1:release/docker-compose.yml:shotspot-db-password:37
+1bb88ed1:release/docker-compose.yml:shotspot-jwt-secret:41
+1bb88ed1:release/docker-compose.yml:shotspot-session-secret:42
+
+# Test job hardcoded credentials (test database, not production)
+# These are intentional default test credentials for CI isolation
+1bb88ed1:.github/workflows/test-coverage.yml:shotspot-db-password:73
+1bb88ed1:.github/workflows/node.js.yml:shotspot-db-password:35
+
+# Historical CI/runtime placeholders and test-only values from full-history scans
+# - Runtime-generated secrets (e.g. $(openssl rand -hex ...))
+# - Compose placeholders/reference syntax (${VAR:?...})
+# - Legacy CI defaults used only in test/release automation
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:.github/workflows/release.yml:shotspot-db-password:267
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:release/docker-compose.yml:shotspot-db-password:37
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:.github/workflows/docker.yml:shotspot-db-password:112
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:docker-compose.dev.yml:shotspot-db-password:40
+ce9a782b1b7a2c8b767ecf50680f3d144ade4342:.github/workflows/docker.yml:shotspot-db-password:265
+410f19882807e01cbd9074aedf74b1ff9c1eabe8:.github/workflows/test-coverage.yml:shotspot-jwt-secret:94
+6309707335cfa99e00c4f4c5ddd0a7a119ab1193:.github/workflows/release.yml:shotspot-db-password:277
+6309707335cfa99e00c4f4c5ddd0a7a119ab1193:.github/workflows/release.yml:shotspot-jwt-secret:281
+1005be5804cf8c7ba99dcd676ad15c3ecfa816ba:release/docker-compose.yml:shotspot-jwt-secret:39
+e6321ebc42f74ba50a3cca620b20fae5f82d73d4:.github/workflows/release.yml:shotspot-jwt-secret:265
+3c27fa521f7daeecd98a5f482eaf96d1d89ed616:.github/workflows/docker.yml:shotspot-db-password:88
+b4bf5a057554ec1860a7220340f8678d89ad35c6:.github/workflows/docker.yml:shotspot-db-password:88
+3c27fa521f7daeecd98a5f482eaf96d1d89ed616:.github/workflows/docker.yml:shotspot-db-password:222
+b4bf5a057554ec1860a7220340f8678d89ad35c6:.github/workflows/docker.yml:shotspot-db-password:222
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.dev.yml:shotspot-jwt-secret:42
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.dev.yml:shotspot-db-password:11
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.dev.yml:shotspot-db-password:41
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:.github/workflows/release.yml:shotspot-db-password:169
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:release/docker-compose.yml:shotspot-db-password:35
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:release/docker-compose.yml:shotspot-jwt-secret:36
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.yml:shotspot-db-password:27
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:docker-compose.yml:shotspot-db-password:87
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:.github/workflows/docker.yml:shotspot-db-password:82
+f8c8cf771d0986f491ef3ba49dc9992b23657e58:.github/workflows/docker.yml:shotspot-db-password:166
+ac5d33976a5ff38c4fe2800c4981ee3668c2f580:.github/workflows/node.js.yml:shotspot-jwt-secret:33
+ac5d33976a5ff38c4fe2800c4981ee3668c2f580:.github/workflows/test-coverage.yml:shotspot-jwt-secret:83
+ac5d33976a5ff38c4fe2800c4981ee3668c2f580:.github/workflows/coverage-badge.yml:shotspot-jwt-secret:89
+bc58e3e323e4c50b4fc0ca0e46716e454566f836:.github/workflows/node.js.yml:shotspot-jwt-secret:68
+6c8c3a3e19ef3b45b6f40c488dadbd341690a7d4:.github/workflows/node.js.yml:shotspot-jwt-secret:60
+
+# Orphaned/unreachable test fixtures (from historical development commits)
+# These are mock/placeholder tokens in test files and documentation examples
+# All values are either encrypted_password_here placeholders, mock JWT tokens (eyJ...), or test fixture IDs
+8a360648a423712265a0c4a337c944470ce7d210:backend/test/twizzit-routes.test.js:generic-api-key:159
+d914a626975b69642a760868b752182cfff15eff:backend/scripts/simple-auth-test.js:generic-api-key:20
+d914a626975b69642a760868b752182cfff15eff:backend/test/twizzit-api-client.test.js:generic-api-key:82
+d914a626975b69642a760868b752182cfff15eff:backend/test/twizzit-routes.test.js:generic-api-key:103
+68b5e0369b9fd38e9e303dd48ef80c17b4de2aa0:REPORTS_API.md:curl-auth-header:64
+68b5e0369b9fd38e9e303dd48ef80c17b4de2aa0:REPORTS_API.md:curl-auth-header:121
+68b5e0369b9fd38e9e303dd48ef80c17b4de2aa0:REPORTS_API.md:curl-auth-header:192
+ad24040fe28f7784e74e9030a04839c681424235:DEFAULT_ADMIN.md:generic-api-key:112
+ad24040fe28f7784e74e9030a04839c681424235:DEFAULT_ADMIN.md:generic-api-key:153
+6313ee9103acd03307c6aa31d49366688ce3343d:backend/test/csrf.test.js:generic-api-key:269
+6313ee9103acd03307c6aa31d49366688ce3343d:backend/test/csrf.test.js:generic-api-key:293

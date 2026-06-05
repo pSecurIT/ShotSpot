@@ -9,8 +9,21 @@ import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { enqueueExport, getQueueStatus } from '../utils/exportQueue.js';
 
+import { logInfo, logWarn, logError } from '../utils/logger.js';
+
 const exportsFilename = fileURLToPath(import.meta.url);
 const exportsDirname = path.dirname(exportsFilename);
+const exportsStorageDir = path.resolve(exportsDirname, '../../exports');
+
+const isSafeExportPath = (filePath) => {
+  if (typeof filePath !== 'string' || filePath.trim() === '') {
+    return false;
+  }
+
+  const relativeExportPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+  const normalizedPath = path.resolve(exportsStorageDir, relativeExportPath);
+  return normalizedPath.startsWith(exportsStorageDir + path.sep);
+};
 
 const router = express.Router();
 
@@ -331,7 +344,7 @@ router.post('/match-pdf/:gameId', [
     doc.pipe(res);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error generating match PDF:', err);
+      logError('Error generating match PDF:', err);
     }
     res.status(500).json({ error: 'Failed to generate PDF' });
   }
@@ -396,7 +409,7 @@ router.get('/match-csv/:gameId', [
     res.send(csvOutput);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error generating match CSV:', err);
+      logError('Error generating match CSV:', err);
     }
     res.status(500).json({ error: 'Failed to generate CSV' });
   }
@@ -480,7 +493,7 @@ router.post('/season-pdf', [
     doc.pipe(res);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error generating season PDF:', err);
+      logError('Error generating season PDF:', err);
     }
     res.status(500).json({ error: 'Failed to generate season PDF' });
   }
@@ -534,7 +547,7 @@ router.get('/season-csv', [
     stringify([columns, ...data], (err, output) => {
       if (err) {
         if (process.env.NODE_ENV !== 'test') {
-          console.error('Error generating season CSV:', err);
+          logError('Error generating season CSV:', err);
         }
         return res.status(500).json({ error: 'Failed to generate CSV' });
       }
@@ -545,7 +558,7 @@ router.get('/season-csv', [
     });
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error generating season CSV:', err);
+      logError('Error generating season CSV:', err);
     }
     res.status(500).json({ error: 'Failed to generate season CSV' });
   }
@@ -657,7 +670,7 @@ router.post('/bulk', [
     }
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error generating bulk export:', err);
+      logError('Error generating bulk export:', err);
     }
     res.status(500).json({ error: 'Failed to generate bulk export' });
   }
@@ -784,7 +797,7 @@ router.get('/player-report/:playerId', [
       stringify([columns, ...data], (err, output) => {
         if (err) {
           if (process.env.NODE_ENV !== 'test') {
-            console.error('Error generating player CSV:', err);
+            logError('Error generating player CSV:', err);
           }
           return res.status(500).json({ error: 'Failed to generate CSV' });
         }
@@ -796,7 +809,7 @@ router.get('/player-report/:playerId', [
     }
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error generating player report:', err);
+      logError('Error generating player report:', err);
     }
     res.status(500).json({ error: 'Failed to generate player report' });
   }
@@ -836,7 +849,7 @@ router.get('/recent', async (req, res) => {
     res.json(exports);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error fetching recent exports:', err);
+      logError('Error fetching recent exports:', err);
     }
     res.status(500).json({ error: 'Failed to fetch exports' });
   }
@@ -864,7 +877,7 @@ router.get('/templates', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error fetching templates:', err);
+      logError('Error fetching templates:', err);
     }
     res.status(500).json({ error: 'Failed to fetch templates' });
   }
@@ -898,7 +911,7 @@ router.post('/templates', [
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error creating template:', err);
+      logError('Error creating template:', err);
     }
     res.status(500).json({ error: 'Failed to create template' });
   }
@@ -971,7 +984,7 @@ router.put('/templates/:id', [
     res.json(result.rows[0]);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error updating template:', err);
+      logError('Error updating template:', err);
     }
     res.status(500).json({ error: 'Failed to update template' });
   }
@@ -1005,7 +1018,7 @@ router.delete('/templates/:id', [
     res.json({ message: 'Template deleted successfully' });
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error deleting template:', err);
+      logError('Error deleting template:', err);
     }
     res.status(500).json({ error: 'Failed to delete template' });
   }
@@ -1088,7 +1101,7 @@ router.post('/from-template', [
     res.status(201).json(exportRecord);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error creating export from template:', err);
+      logError('Error creating export from template:', err);
     }
     res.status(500).json({ error: 'Failed to create export' });
   }
@@ -1125,8 +1138,20 @@ router.get('/download/:id', [
       return res.status(404).json({ error: 'Export file not yet generated' });
     }
 
+    if (!isSafeExportPath(exportRecord.file_path)) {
+      return res.status(400).json({ error: 'Invalid export file path' });
+    }
+
     // Read and send file
-    const fullPath = path.join(exportsDirname, '../../', exportRecord.file_path);
+    const relativeExportPath = exportRecord.file_path.startsWith('/')
+      ? exportRecord.file_path.slice(1)
+      : exportRecord.file_path;
+    const fullPath = path.resolve(exportsStorageDir, relativeExportPath);
+
+    if (!fullPath.startsWith(exportsStorageDir + path.sep)) {
+      return res.status(400).json({ error: 'Invalid export file path' });
+    }
+
     const fileBuffer = await fs.readFile(fullPath);
 
     // Set appropriate headers
@@ -1151,7 +1176,7 @@ router.get('/download/:id', [
     res.send(fileBuffer);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error downloading export:', err);
+      logError('Error downloading export:', err);
     }
     res.status(500).json({ error: 'Failed to download export' });
   }
@@ -1167,7 +1192,7 @@ router.get('/queue-status', async (req, res) => {
     res.json(status);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error getting queue status:', err);
+      logError('Error getting queue status:', err);
     }
     res.status(500).json({ error: 'Failed to get queue status' });
   }
@@ -1200,6 +1225,10 @@ router.delete('/:id', [
 
     const filePath = fileResult.rows[0].file_path;
 
+    if (filePath && !isSafeExportPath(filePath)) {
+      return res.status(400).json({ error: 'Invalid export file path' });
+    }
+
     // Delete database record
     await db.query(
       'DELETE FROM report_exports WHERE id = $1 AND generated_by = $2',
@@ -1209,15 +1238,21 @@ router.delete('/:id', [
     // Delete actual file from storage if it exists
     if (filePath) {
       try {
-        const fullPath = path.join(exportsDirname, '../../', filePath);
+        const relativeExportPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+        const fullPath = path.resolve(exportsStorageDir, relativeExportPath);
+
+        if (!fullPath.startsWith(exportsStorageDir + path.sep)) {
+          throw new Error('Invalid export file path');
+        }
+
         await fs.unlink(fullPath);
         if (process.env.NODE_ENV !== 'test') {
-          console.log(`Deleted export file: ${filePath}`);
+          logInfo(`Deleted export file: ${filePath}`);
         }
       } catch (fileErr) {
         // File might not exist or already deleted, log but don't fail
         if (process.env.NODE_ENV !== 'test') {
-          console.warn(`Could not delete file ${filePath}:`, fileErr.message);
+          logWarn(`Could not delete file ${filePath}:`, fileErr.message);
         }
       }
     }
@@ -1225,7 +1260,7 @@ router.delete('/:id', [
     res.json({ message: 'Export deleted successfully' });
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
-      console.error('Error deleting export:', err);
+      logError('Error deleting export:', err);
     }
     res.status(500).json({ error: 'Failed to delete export' });
   }

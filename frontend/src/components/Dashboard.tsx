@@ -1,10 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../utils/api';
 import DashboardWidget from './DashboardWidget';
 import QuickActions from './QuickActions';
+import StatePanel from './ui/StatePanel';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useAuth } from '../contexts/AuthContext';
+import { completeFlowTiming } from '../utils/uxObservability';
 import '../styles/Dashboard.css';
 
 interface GameListItem {
@@ -44,19 +48,29 @@ const formatGameTitle = (g: GameListItem): string => {
   return `${home} vs ${away}`;
 };
 
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: IdleRequestCallback) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 const Dashboard: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const { socket, connected } = useWebSocket();
   const { user } = useAuth();
+  const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
+  const loginFlowCompletedRef = useRef(false);
 
   const [recentGames, setRecentGames] = useState<GameListItem[]>([]);
   const [upcomingGames, setUpcomingGames] = useState<GameListItem[]>([]);
   const [recentAchievements, setRecentAchievements] = useState<RecentAchievementItem[]>([]);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [showSecondaryPanels, setShowSecondaryPanels] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
 
   const [loading, setLoading] = useState({
     recent: true,
     upcoming: true,
-    achievements: true,
+    achievements: false,
     summary: true
   });
 
@@ -67,71 +81,203 @@ const Dashboard: React.FC = () => {
     summary: null
   });
 
+  const apiWithPerfHelpers = api as typeof api & {
+    getWithCache?: <T>(url: string, config?: unknown, options?: { ttlMs?: number }) => Promise<T>;
+    prefetchGet?: (url: string, config?: unknown, options?: { ttlMs?: number }) => Promise<void>;
+  };
+
+  const readCached = useCallback(async <T,>(url: string, params?: Record<string, unknown>, ttlMs?: number) => {
+    if (typeof apiWithPerfHelpers.getWithCache === 'function') {
+      const cachedData = await apiWithPerfHelpers.getWithCache<T>(url, params ? { params } : undefined, { ttlMs });
+      if (cachedData !== undefined && cachedData !== null) {
+        return cachedData;
+      }
+    }
+
+    const response = params ? await api.get<T>(url, { params }) : await api.get<T>(url);
+    return response.data;
+  }, [apiWithPerfHelpers]);
+
+  const safePrefetch = useCallback(async (url: string, params?: Record<string, unknown>, ttlMs?: number) => {
+    if (typeof apiWithPerfHelpers.prefetchGet === 'function') {
+      await apiWithPerfHelpers.prefetchGet(url, params ? { params } : undefined, { ttlMs });
+      return;
+    }
+
+    try {
+      if (params) {
+        await api.get(url, { params });
+      } else {
+        await api.get(url);
+      }
+    } catch {
+      // Prefetch remains non-blocking in test and runtime fallback paths.
+    }
+  }, [apiWithPerfHelpers]);
+
   const fetchRecentGames = useCallback(async () => {
     setLoading((p) => ({ ...p, recent: true }));
     setErrors((p) => ({ ...p, recent: null }));
     try {
-      const response = await api.get<GameListItem[]>('/games', {
-        params: { limit: 5, sort: 'recent' }
-      });
-      setRecentGames(response.data);
+      const data = await readCached<GameListItem[]>('/games', { limit: 5, sort: 'recent' }, 12000);
+      setRecentGames(data);
     } catch {
       setErrors((p) => ({ ...p, recent: 'Failed to load recent matches' }));
     } finally {
       setLoading((p) => ({ ...p, recent: false }));
     }
-  }, []);
+  }, [readCached]);
 
   const fetchUpcomingGames = useCallback(async () => {
     setLoading((p) => ({ ...p, upcoming: true }));
     setErrors((p) => ({ ...p, upcoming: null }));
     try {
-      const response = await api.get<GameListItem[]>('/games', {
-        params: { status: 'upcoming' }
-      });
-      setUpcomingGames(response.data.slice(0, 5));
+      const data = await readCached<GameListItem[]>('/games', { status: 'upcoming' }, 12000);
+      setUpcomingGames(data.slice(0, 5));
     } catch {
       setErrors((p) => ({ ...p, upcoming: 'Failed to load upcoming games' }));
     } finally {
       setLoading((p) => ({ ...p, upcoming: false }));
     }
-  }, []);
+  }, [readCached]);
 
   const fetchRecentAchievements = useCallback(async () => {
     setLoading((p) => ({ ...p, achievements: true }));
     setErrors((p) => ({ ...p, achievements: null }));
     try {
-      const response = await api.get<RecentAchievementItem[]>('/achievements/recent', {
-        params: { limit: 8 }
-      });
-      setRecentAchievements(response.data);
+      const data = await readCached<RecentAchievementItem[]>('/achievements/recent', { limit: 8 }, 8000);
+      setRecentAchievements(data);
     } catch {
       setErrors((p) => ({ ...p, achievements: 'Failed to load achievements feed' }));
     } finally {
       setLoading((p) => ({ ...p, achievements: false }));
     }
-  }, []);
+  }, [readCached]);
 
   const fetchSummary = useCallback(async () => {
     setLoading((p) => ({ ...p, summary: true }));
     setErrors((p) => ({ ...p, summary: null }));
     try {
-      const response = await api.get<DashboardSummary>('/dashboard/summary');
-      setSummary(response.data);
+      const data = await readCached<DashboardSummary>('/dashboard/summary', undefined, 15000);
+      setSummary(data);
     } catch {
       setErrors((p) => ({ ...p, summary: 'Failed to load summary stats' }));
     } finally {
       setLoading((p) => ({ ...p, summary: false }));
     }
-  }, []);
+  }, [readCached]);
+
+  const refreshCore = useCallback(async () => {
+    await Promise.all([fetchRecentGames(), fetchUpcomingGames(), fetchSummary()]);
+  }, [fetchRecentGames, fetchUpcomingGames, fetchSummary]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([fetchRecentGames(), fetchUpcomingGames(), fetchRecentAchievements(), fetchSummary()]);
-  }, [fetchRecentGames, fetchUpcomingGames, fetchRecentAchievements, fetchSummary]);
+    if (showSecondaryPanels) {
+      await Promise.all([refreshCore(), fetchRecentAchievements()]);
+      return;
+    }
+
+    await refreshCore();
+  }, [showSecondaryPanels, refreshCore, fetchRecentAchievements]);
 
   useEffect(() => {
-    void refreshAll();
-  }, [refreshAll]);
+    void refreshCore();
+  }, [refreshCore]);
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let idleCallbackId: number | null = null;
+    const idleWindow = window as IdleWindow;
+
+    if (idleWindow.requestIdleCallback) {
+      idleCallbackId = idleWindow.requestIdleCallback(() => {
+        setShowQuickActions(true);
+      });
+    } else {
+      timeoutId = setTimeout(() => {
+        setShowQuickActions(true);
+      }, 200);
+    }
+
+    return () => {
+      if (idleCallbackId !== null && idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(idleCallbackId);
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let idleCallbackId: number | null = null;
+    const idleWindow = window as IdleWindow;
+
+    if (idleWindow.requestIdleCallback) {
+      idleCallbackId = idleWindow.requestIdleCallback(() => {
+        setShowSecondaryPanels(true);
+      });
+    } else {
+      timeoutId = setTimeout(() => setShowSecondaryPanels(true), 120);
+    }
+
+    return () => {
+      if (idleCallbackId !== null && idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(idleCallbackId);
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showSecondaryPanels) {
+      return;
+    }
+
+    void fetchRecentAchievements();
+  }, [showSecondaryPanels, fetchRecentAchievements]);
+
+  useEffect(() => {
+    if (loading.summary || loginFlowCompletedRef.current) {
+      return;
+    }
+
+    completeFlowTiming('login_to_dashboard', '/dashboard', {
+      readySource: 'dashboard_summary',
+    });
+    loginFlowCompletedRef.current = true;
+  }, [loading.summary]);
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let idleCallbackId: number | null = null;
+    const idleWindow = window as IdleWindow;
+
+    const runPrefetch = () => {
+      void Promise.all([
+        safePrefetch('/games', { status: 'upcoming' }, 12000),
+        safePrefetch('/games', { limit: 20, sort: 'recent' }, 12000)
+      ]);
+    };
+
+    if (idleWindow.requestIdleCallback) {
+      idleCallbackId = idleWindow.requestIdleCallback(runPrefetch);
+    } else {
+      timeoutId = setTimeout(runPrefetch, 200);
+    }
+
+    return () => {
+      if (idleCallbackId !== null && idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(idleCallbackId);
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [safePrefetch]);
 
   // Real-time achievements updates (if WebSocket is connected)
   useEffect(() => {
@@ -172,23 +318,91 @@ const Dashboard: React.FC = () => {
   }, [connected, user?.passwordMustChange]);
 
   return (
+    <PageLayout
+      title="Dashboard"
+      eyebrow="Performance hub"
+      description="Matchday ops, live system signals, and the fastest path back into action."
+      breadcrumbs={breadcrumbs}
+      actions={(
+        <div className="dashboard__header-actions">
+          <button
+            type="button"
+            className="dashboard-action dashboard-action--secondary"
+            onClick={() => {
+              void refreshAll();
+            }}
+          >
+            Refresh feed
+          </button>
+          <Link
+            to={isCoachOrAdmin ? '/games' : '/analytics'}
+            className="dashboard-action dashboard-action--primary"
+          >
+            {isCoachOrAdmin ? 'Open match center' : 'View analytics'}
+          </Link>
+        </div>
+      )}
+    >
     <div className="dashboard">
       <div className="dashboard__header">
-        <h1 className="dashboard__title">Dashboard</h1>
-        <p className="dashboard__subtitle">Quick actions and recent activity</p>
+        <div className="dashboard__hero-copy">
+          <span className="dashboard__eyebrow">Today</span>
+          <h2 className="dashboard__title">Dashboard focus</h2>
+          <p className="dashboard__subtitle">Live highlights, recovery status, and upcoming actions at a glance.</p>
+        </div>
       </div>
 
+      <section className="dashboard__spotlight" aria-label="Dashboard status">
+        <div className="dashboard__spotlight-card dashboard__spotlight-card--signal">
+          <span className="dashboard__spotlight-label">Sync state</span>
+          <strong className="dashboard__spotlight-value">{connected ? 'Live' : 'Standby'}</strong>
+          <span className="dashboard__spotlight-meta">{connected ? 'Realtime updates are flowing.' : 'Live updates will resume when the socket reconnects.'}</span>
+        </div>
+        <div className="dashboard__spotlight-card">
+          <span className="dashboard__spotlight-label">Matchday mode</span>
+          <strong className="dashboard__spotlight-value">{typeof navigator !== 'undefined' && !navigator.onLine ? 'Offline queue' : 'Ready'}</strong>
+          <span className="dashboard__spotlight-meta">{typeof navigator !== 'undefined' && !navigator.onLine ? 'New actions will be queued safely for sync.' : 'Connected for capture, analysis, and export.'}</span>
+        </div>
+        <div className="dashboard__spotlight-card">
+          <span className="dashboard__spotlight-label">Primary focus</span>
+          <strong className="dashboard__spotlight-value">{isCoachOrAdmin ? 'Run the next match' : 'Review performance'}</strong>
+          <span className="dashboard__spotlight-meta">{isCoachOrAdmin ? 'Use quick actions to jump into match prep and exports.' : 'Use analytics and achievements to review the latest results.'}</span>
+        </div>
+      </section>
+
       <div className="dashboard__grid">
-        <div style={{ gridColumn: 'span 12' }}>
+        <div className="dashboard__panel dashboard__panel--full">
           <DashboardWidget title="Quick Actions" icon="⚡">
-            <QuickActions />
+            {showQuickActions ? (
+              <QuickActions />
+            ) : (
+              <StatePanel
+                variant="loading"
+                compact
+                title="Preparing actions"
+                message="Loading your shortcuts and navigation targets."
+              />
+            )}
           </DashboardWidget>
         </div>
 
-        <div style={{ gridColumn: 'span 6' }}>
-          <DashboardWidget title="Recent Matches" icon="🕒" loading={loading.recent} error={errors.recent}>
+        <div className="dashboard__panel dashboard__panel--half">
+          <DashboardWidget
+            title="Recent Matches"
+            icon="🕒"
+            loading={loading.recent}
+            error={errors.recent}
+            onRetry={() => {
+              void fetchRecentGames();
+            }}
+          >
             {recentGames.length === 0 ? (
-              <div>No recent matches found.</div>
+              <StatePanel
+                variant="empty"
+                compact
+                title="No recent matches yet"
+                message="Finished matches will appear here once games have been tracked."
+              />
             ) : (
               <ul className="dashboard-list">
                 {recentGames.map((g) => (
@@ -211,10 +425,23 @@ const Dashboard: React.FC = () => {
           </DashboardWidget>
         </div>
 
-        <div style={{ gridColumn: 'span 6' }}>
-          <DashboardWidget title="Upcoming Games" icon="📅" loading={loading.upcoming} error={errors.upcoming}>
+        <div className="dashboard__panel dashboard__panel--half">
+          <DashboardWidget
+            title="Upcoming Games"
+            icon="📅"
+            loading={loading.upcoming}
+            error={errors.upcoming}
+            onRetry={() => {
+              void fetchUpcomingGames();
+            }}
+          >
             {upcomingGames.length === 0 ? (
-              <div>No upcoming games.</div>
+              <StatePanel
+                variant="empty"
+                compact
+                title="No upcoming games"
+                message="Schedule the next match to keep the sideline ready."
+              />
             ) : (
               <ul className="dashboard-list">
                 {upcomingGames.map((g) => (
@@ -235,8 +462,16 @@ const Dashboard: React.FC = () => {
           </DashboardWidget>
         </div>
 
-        <div style={{ gridColumn: 'span 6' }}>
-          <DashboardWidget title="Quick Stats" icon="📈" loading={loading.summary} error={errors.summary}>
+        <div className="dashboard__panel dashboard__panel--half">
+          <DashboardWidget
+            title="Quick Stats"
+            icon="📈"
+            loading={loading.summary}
+            error={errors.summary}
+            onRetry={() => {
+              void fetchSummary();
+            }}
+          >
             {summary ? (
               <div className="stats-row">
                 <div className="stat-card">
@@ -253,12 +488,18 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div />
+              <StatePanel
+                variant="empty"
+                compact
+                title="No summary available"
+                message="Team, player, and game totals will appear here once data is available."
+              />
             )}
           </DashboardWidget>
         </div>
 
-        <div style={{ gridColumn: 'span 6' }}>
+        {showSecondaryPanels && (
+        <div className="dashboard__panel dashboard__panel--half">
           <DashboardWidget title="Notifications" icon="🔔">
             <div className="notifications">
               {notifications.map((n) => (
@@ -267,11 +508,26 @@ const Dashboard: React.FC = () => {
             </div>
           </DashboardWidget>
         </div>
+        )}
 
-        <div style={{ gridColumn: 'span 12' }}>
-          <DashboardWidget title="Recent Achievements" icon="🏆" loading={loading.achievements} error={errors.achievements}>
+        {showSecondaryPanels && (
+        <div className="dashboard__panel dashboard__panel--full">
+          <DashboardWidget
+            title="Recent Achievements"
+            icon="🏆"
+            loading={loading.achievements}
+            error={errors.achievements}
+            onRetry={() => {
+              void fetchRecentAchievements();
+            }}
+          >
             {recentAchievements.length === 0 ? (
-              <div>No recent achievements.</div>
+              <StatePanel
+                variant="empty"
+                compact
+                title="No recent achievements"
+                message="Unlocked milestones will show up here as soon as players start earning them."
+              />
             ) : (
               <ul className="dashboard-list">
                 {recentAchievements.map((a) => (
@@ -291,8 +547,10 @@ const Dashboard: React.FC = () => {
             )}
           </DashboardWidget>
         </div>
+        )}
       </div>
     </div>
+    </PageLayout>
   );
 };
 

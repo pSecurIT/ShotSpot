@@ -3,6 +3,8 @@ import { clubsApi } from '../services/clubsApi';
 import type { Club, ClubPlayer, ClubTeam } from '../types/clubs';
 import ClubCard from './ClubCard';
 import ClubDialog from './ClubDialog';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/ClubManagement.css';
 
 type DetailView =
@@ -13,6 +15,7 @@ type DetailView =
 const PAGE_SIZE = 12;
 
 const ClubManagement: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -140,13 +143,17 @@ const ClubManagement: React.FC = () => {
   };
 
   return (
-    <div className="club-management">
-      <div className="club-management__header">
-        <h2>Clubs Management</h2>
+    <PageLayout
+      title="Clubs Management"
+      eyebrow="Data > Clubs"
+      description="Organize club structures and drill into teams and players."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <button type="button" className="primary-button" onClick={openCreate}>
           Add Club
         </button>
-      </div>
+      )}
+    >
 
       <div className="club-management__controls">
         <input
@@ -161,12 +168,12 @@ const ClubManagement: React.FC = () => {
         />
       </div>
 
-      {loading && <div className="club-management__loading">Loading clubs…</div>}
-      {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
+      {loading && <div className="club-management__loading" role="status" aria-live="polite">Loading clubs…</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      {success && <div className="alert alert-success" role="status" aria-live="polite">{success}</div>}
 
       {!loading && !error && filteredClubs.length === 0 && (
-        <div className="empty-state">No clubs found</div>
+        <div className="empty-state" role="status" aria-live="polite">No clubs found</div>
       )}
 
       <div className="club-grid" aria-busy={loading ? 'true' : 'false'}>
@@ -241,13 +248,13 @@ const ClubManagement: React.FC = () => {
               </button>
             </div>
 
-            {detailLoading && <div>Loading…</div>}
-            {detailError && <div className="alert alert-error">{detailError}</div>}
+            {detailLoading && <div role="status" aria-live="polite">Loading…</div>}
+            {detailError && <div className="alert alert-error" role="alert">{detailError}</div>}
 
             {!detailLoading && !detailError && detailView.mode === 'teams' && (
               <div className="club-details__list">
                 {clubTeams.length === 0 ? (
-                  <div className="empty-state">No teams found for this club</div>
+                  <div className="empty-state" role="status" aria-live="polite">No teams found for this club</div>
                 ) : (
                   <ul className="list" aria-label="Club teams list">
                     {clubTeams.map((t) => (
@@ -263,7 +270,7 @@ const ClubManagement: React.FC = () => {
             {!detailLoading && !detailError && detailView.mode === 'players' && (
               <div className="club-details__list">
                 {clubPlayers.length === 0 ? (
-                  <div className="empty-state">No players found for this club</div>
+                  <div className="empty-state" role="status" aria-live="polite">No players found for this club</div>
                 ) : (
                   <ul className="list" aria-label="Club players list">
                     {clubPlayers.map((p) => (
@@ -281,7 +288,7 @@ const ClubManagement: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 };
 

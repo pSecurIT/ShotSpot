@@ -1,12 +1,20 @@
 name: Node.js CI
 permissions:
   contents: read
+  security-events: write
 
 on:
   push:
     branches: [ "main"]
   pull_request:
     branches: [ "main"]
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: node-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend:
@@ -32,9 +40,6 @@ jobs:
       DB_NAME_GAME_LOGIC: shotspot_test_db_game_logic
       DB_MAX_CONNECTIONS: 5
       DB_IDLE_TIMEOUT_MS: 1000
-      JWT_SECRET: test_jwt_secret_key_min_32_chars_long_for_testing
-      SESSION_SECRET: test-session-secret
-
     services:
       postgres:
         image: postgres:14
@@ -51,10 +56,21 @@ jobs:
         node-version: [22.x]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
-    - uses: actions/checkout@v4
-    
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+    - name: Generate ephemeral test secrets
+      run: |
+        {
+          echo "JWT_SECRET<<EOF"
+          openssl rand -hex 32
+          echo "EOF"
+          echo "SESSION_SECRET<<EOF"
+          openssl rand -hex 24
+          echo "EOF"
+        } >> "$GITHUB_ENV"
+
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -89,15 +105,21 @@ jobs:
         echo "Setting up parallel test databases..."
         node scripts/setup-parallel-dbs.js
         
-    - name: Run Backend Tests
+    - name: Run Backend Tests with Coverage
       working-directory: backend
       run: |
         echo "Waiting for Postgres to be fully ready..."
         sleep 10
-        # Run parallel tests with isolated databases for better performance
-        npm run test:parallel
+        # Run parallel tests with isolated databases and collect coverage
+        npm run test:parallel:coverage
 
-    # Coverage reporting can be added later with Codecov or similar services
+    - name: Upload backend coverage reports to Codecov
+      uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: backend/coverage
+        flags: backend
+        fail_ci_if_error: true
 
   frontend:
     name: Frontend Tests
@@ -108,10 +130,10 @@ jobs:
         node-version: [22.x]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
     
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -137,11 +159,17 @@ jobs:
       working-directory: frontend
       run: npm run lint
 
-    - name: Run Frontend Tests
+    - name: Run Frontend Tests with Coverage
       working-directory: frontend
-      run: npm test -- --coverage
+      run: npm run coverage
 
-    # Coverage reporting can be added later with Codecov or similar services
+    - name: Upload frontend coverage reports to Codecov
+      uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: frontend/coverage
+        flags: frontend
+        fail_ci_if_error: true
 
     - name: Build Frontend
       working-directory: frontend
@@ -150,12 +178,15 @@ jobs:
   security:
     name: Security Checks
     runs-on: ubuntu-latest
+    env:
+      # Keep Snyk Code limited to weekly/manual runs to manage quota.
+      SNYK_ENABLE_CODE_SCAN: 'true'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
     - name: Use Node.js 22.x
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
       with:
         node-version: 22.x
 
@@ -170,30 +201,235 @@ jobs:
       working-directory: frontend
       run: npm ci
 
-    - name: Run npm audit (Backend)
+    - name: Set up Snyk CLI
+      uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04
+
+    - name: Resolve Snyk reporting settings
+      shell: bash
+      env:
+        VARS_JSON: ${{ toJSON(vars) }}
+      run: |
+        echo "SNYK_REMOTE_REPO_URL=https://github.com/${GITHUB_REPOSITORY}.git" >> "$GITHUB_ENV"
+        snyk_org="$(node -e "const v = JSON.parse(process.env.VARS_JSON || '{}'); process.stdout.write(v.SNYK_ORG || '')")"
+        if [ -n "$snyk_org" ]; then
+          echo "SNYK_ORG_FLAG=--org=$snyk_org" >> "$GITHUB_ENV"
+        else
+          echo "SNYK_ORG_FLAG=" >> "$GITHUB_ENV"
+        fi
+
+    - name: Run Snyk scan (Backend npm packages + SARIF)
+      id: snyk_backend_scan
+      continue-on-error: true
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       working-directory: backend
       run: |
-        echo "Running npm audit for backend..."
-        npm audit --audit-level=high || true
-        echo "Note: Moderate vulnerabilities in validator package (express-validator dependency) are known and tracked"
+        set +e
+        snyk test --severity-threshold=high --sarif-file-output=../snyk-backend.sarif $SNYK_ORG_FLAG > ../snyk-backend.log 2>&1
+        exit_code=$?
+        echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+        exit 0
 
-    - name: Run npm audit (Frontend)
+    - name: Run Snyk scan (Frontend npm packages + SARIF)
+      id: snyk_frontend_scan
+      continue-on-error: true
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       working-directory: frontend
       run: |
-        echo "Running npm audit for frontend..."
-        npm audit --audit-level=high
-        echo "Frontend security check passed!"
+        set +e
+        snyk test --severity-threshold=high --sarif-file-output=../snyk-frontend.sarif $SNYK_ORG_FLAG > ../snyk-frontend.log 2>&1
+        exit_code=$?
+        echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+        exit 0
 
-    - name: Check for critical vulnerabilities (Backend)
+    - name: Run Snyk scan (Android Gradle dependencies + SARIF)
+      id: snyk_android_scan
+      if: ${{ github.event_name != 'pull_request' }}
+      continue-on-error: true
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: |
+        set +e
+
+        if [ ! -d "frontend/android" ]; then
+          echo "Android project not present; skipping Android Gradle Snyk scan." > snyk-android-gradle.log
+          echo "exit_code=0" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        cd frontend/android
+        snyk test --all-sub-projects --severity-threshold=high --sarif-file-output=../../snyk-android-gradle.sarif $SNYK_ORG_FLAG > ../../snyk-android-gradle.log 2>&1
+        exit_code=$?
+        echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+        exit 0
+
+    - name: Upload Backend SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
+      if: ${{ always() && hashFiles('snyk-backend.sarif') != '' }}
+      with:
+        sarif_file: snyk-backend.sarif
+        category: 'Snyk/Open Source/shotspot/0'
+        ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+    - name: Upload Frontend SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
+      if: ${{ always() && hashFiles('snyk-frontend.sarif') != '' }}
+      with:
+        sarif_file: snyk-frontend.sarif
+        category: snyk-frontend
+        ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+    - name: Upload Android Gradle SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
+      if: ${{ always() && hashFiles('snyk-android-gradle.sarif') != '' }}
+      with:
+        sarif_file: snyk-android-gradle.sarif
+        category: snyk-android-gradle
+        ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+    - name: Run Snyk Code scan
+      id: snyk_code_test
+      if: ${{ env.SNYK_ENABLE_CODE_SCAN == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+      continue-on-error: true
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: |
+        report_args=""
+        if [ "${{ github.event_name }}" != "pull_request" ]; then
+          report_args="--report --project-name=shotspot-code --target-name=${GITHUB_REPOSITORY} --target-reference=${GITHUB_REF_NAME} --remote-repo-url=$SNYK_REMOTE_REPO_URL"
+        fi
+
+        snyk code test . \
+          --severity-threshold=high \
+          --sarif-file-output=snyk-code.sarif \
+          $report_args \
+          $SNYK_ORG_FLAG
+
+    - name: Upload Snyk Code SARIF to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa
+      if: ${{ always() && hashFiles('snyk-code.sarif') != '' }}
+      with:
+        sarif_file: snyk-code.sarif
+        category: snyk-code
+        ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
+        sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+    - name: Monitor backend dependencies in Snyk
+      if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
       working-directory: backend
-      run: npm audit --audit-level=critical
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: |
+        snyk monitor \
+          --project-name=shotspot-backend \
+          --target-reference=${GITHUB_REF_NAME} \
+          --remote-repo-url=$SNYK_REMOTE_REPO_URL \
+          --project-environment=backend \
+          --project-lifecycle=production \
+          $SNYK_ORG_FLAG
 
-    - name: Check for critical vulnerabilities (Frontend)
+    - name: Monitor frontend dependencies in Snyk
+      if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
       working-directory: frontend
-      run: npm audit --audit-level=critical
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: |
+        snyk monitor \
+          --project-name=shotspot-frontend \
+          --target-reference=${GITHUB_REF_NAME} \
+          --remote-repo-url=$SNYK_REMOTE_REPO_URL \
+          --project-environment=frontend \
+          --project-lifecycle=production \
+          $SNYK_ORG_FLAG
 
-    # Security scanning can be added later with Snyk or other tools
+    - name: Evaluate Snyk findings (quota-aware)
+      shell: bash
+      env:
+        BACKEND_EXIT: ${{ steps.snyk_backend_scan.outputs.exit_code }}
+        FRONTEND_EXIT: ${{ steps.snyk_frontend_scan.outputs.exit_code }}
+        ANDROID_EXIT: ${{ steps.snyk_android_scan.outputs.exit_code }}
+        CODE_OUTCOME: ${{ steps.snyk_code_test.outcome }}
+      run: |
+        set -euo pipefail
 
+        blocking=0
+
+        is_quota_error() {
+          local log_file="$1"
+          [ -f "$log_file" ] && grep -Eiq 'quota|limit reached|over.*plan|plan usage|monthly limit|rate limit|429|too many requests' "$log_file"
+        }
+
+        evaluate_scan() {
+          local name="$1"
+          local exit_code="$2"
+          local log_file="$3"
+
+          if [ -z "$exit_code" ] || [ "$exit_code" = "0" ]; then
+            echo "${name}: no blocking findings"
+            return
+          fi
+
+          if [ "$exit_code" = "1" ]; then
+            echo "::error::${name}: high/critical findings detected by Snyk"
+            blocking=1
+            return
+          fi
+
+          if is_quota_error "$log_file"; then
+            echo "::warning::${name}: Snyk quota/plan limit reached; not blocking this run"
+            return
+          fi
+
+          echo "::error::${name}: Snyk execution failed (exit ${exit_code})"
+          blocking=1
+        }
+
+        evaluate_scan "Backend dependencies" "${BACKEND_EXIT:-}" "snyk-backend.log"
+        evaluate_scan "Frontend dependencies" "${FRONTEND_EXIT:-}" "snyk-frontend.log"
+        evaluate_scan "Android Gradle dependencies" "${ANDROID_EXIT:-}" "snyk-android-gradle.log"
+
+        if [ "${CODE_OUTCOME:-}" = "failure" ]; then
+          echo "::error::Snyk Code scan reported blocking findings"
+          blocking=1
+        fi
+
+        if [ "$blocking" -ne 0 ]; then
+          echo "::error::Blocking Snyk findings detected. Check SARIF and logs for details."
+          exit 1
+        fi
+
+    - name: Publish security summary
+      if: always()
+      shell: bash
+      env:
+        BACKEND_EXIT: ${{ steps.snyk_backend_scan.outputs.exit_code }}
+        FRONTEND_EXIT: ${{ steps.snyk_frontend_scan.outputs.exit_code }}
+        ANDROID_EXIT: ${{ steps.snyk_android_scan.outputs.exit_code }}
+      run: |
+        set -euo pipefail
+
+        echo "## Security Checks Summary" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Backend Snyk exit code: ${BACKEND_EXIT:-0}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Frontend Snyk exit code: ${FRONTEND_EXIT:-0}" >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          echo "- Android Gradle scan: skipped on pull requests to keep the PR critical path lean" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "- Android Gradle Snyk exit code: ${ANDROID_EXIT:-0}" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        
   # E2E tests disabled until Cypress is configured
   # Uncomment when E2E tests are implemented
   # e2e:
@@ -217,10 +453,10 @@ jobs:
   #         --health-retries 5
   #
   #   steps:
-  #   - uses: actions/checkout@v4
+  #   - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
   #
   #   - name: Use Node.js 20.x
-  #     uses: actions/setup-node@v4
+  #     uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
   #     with:
   #       node-version: 20.x
   #       cache: 'npm'
@@ -268,3 +504,6 @@ jobs:
   #     with:
   #       name: cypress-results
   #       path: frontend/cypress/videos/
+
+
+

@@ -5,43 +5,35 @@
 
 version: 2
 updates:
-  # Backend npm dependencies
-  - package-ecosystem: "npm"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: "chore(backend)"
-      include: "scope"
-
-  # Frontend npm dependencies
-  - package-ecosystem: "npm"
-    directory: "/frontend"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "eslint"
-        update-types:
-          - "version-update:semver-major"
-      - dependency-name: "@eslint/js"
-        update-types:
-          - "version-update:semver-major"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: "chore(frontend)"
-      include: "scope"
-
+  # Note: npm dependency remediation for /backend and /frontend is handled by
+  # .github/workflows/dependency-remediation.yml to avoid duplicate PRs.
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "wednesday"
+      time: "01:00"
+      timezone: "UTC"
     labels:
       - "dependencies"
     commit-message:
       prefix: "chore(ci)"
+
+  # BEGIN_ANDROID_GRADLE_DEPENDABOT
+  # Android Gradle dependencies
+  - package-ecosystem: "gradle"
+    directory: "/frontend/android"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "01:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "android"
+    commit-message:
+      prefix: "chore(android)"
+      include: "scope"
+  # END_ANDROID_GRADLE_DEPENDABOT

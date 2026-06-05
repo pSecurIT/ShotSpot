@@ -22,11 +22,14 @@ import type {
   TeamMapping,
   PlayerMapping,
 } from '../types/twizzit';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import './TwizzitIntegration.css';
 
 type TabType = 'credentials' | 'sync' | 'config' | 'history' | 'mappings';
 
 const TwizzitIntegration: React.FC = () => {
+  const breadcrumbs = useBreadcrumbs();
   const [activeTab, setActiveTab] = useState<TabType>('credentials');
   const [credentials, setCredentials] = useState<TwizzitCredential[]>([]);
   const [selectedCredential, setSelectedCredential] = useState<number | null>(null);
@@ -521,7 +524,7 @@ const TwizzitIntegration: React.FC = () => {
 
       <div className="credentials-list">
         {credentials.length === 0 ? (
-          <p className="empty-state">No credentials configured. Add one to get started.</p>
+          <p className="empty-state" role="status" aria-live="polite">No credentials configured. Add one to get started.</p>
         ) : (
           credentials.map((cred) => (
             <div
@@ -560,7 +563,7 @@ const TwizzitIntegration: React.FC = () => {
       <h3>Sync Data</h3>
 
       {!selectedCredential ? (
-        <p className="empty-state">Please select a credential first</p>
+        <p className="empty-state" role="status" aria-live="polite">Please select a credential first</p>
       ) : (
         <>
           <div className="sync-actions">
@@ -594,7 +597,7 @@ const TwizzitIntegration: React.FC = () => {
                   ))
                 )}
               </select>
-              {loadingSeasons && <small>Loading available seasons...</small>}
+              {loadingSeasons && <small role="status" aria-live="polite">Loading available seasons...</small>}
             </div>
             <div className="form-group">
               <label htmlFor="groupId">Group / Team</label>
@@ -615,8 +618,8 @@ const TwizzitIntegration: React.FC = () => {
                   ))
                 )}
               </select>
-              {loadingGroups && <small>Loading available groups...</small>}
-              {!seasonId && !loadingSeasons && <small>Please select a season to load groups</small>}
+              {loadingGroups && <small role="status" aria-live="polite">Loading available groups...</small>}
+              {!seasonId && !loadingSeasons && <small role="status" aria-live="polite">Please select a season to load groups</small>}
             </div>
             <div className="form-group checkbox">
               <label>
@@ -656,9 +659,9 @@ const TwizzitIntegration: React.FC = () => {
       <h3>Auto-Sync Configuration</h3>
 
       {!selectedCredential ? (
-        <p className="empty-state">Please select a credential first</p>
+        <p className="empty-state" role="status" aria-live="polite">Please select a credential first</p>
       ) : !syncConfig ? (
-        <p>Loading configuration...</p>
+        <p role="status" aria-live="polite">Loading configuration...</p>
       ) : (
         <div className="config-form">
           <div className="form-group checkbox">
@@ -754,9 +757,9 @@ const TwizzitIntegration: React.FC = () => {
         <h3>Sync History</h3>
 
         {!selectedCredential ? (
-          <p className="empty-state">Please select a credential first</p>
+          <p className="empty-state" role="status" aria-live="polite">Please select a credential first</p>
         ) : syncHistory.length === 0 ? (
-          <p className="empty-state">No sync history yet</p>
+          <p className="empty-state" role="status" aria-live="polite">No sync history yet</p>
         ) : (
           <div className="history-list">
             {syncHistory.map((entry) => (
@@ -824,13 +827,13 @@ const TwizzitIntegration: React.FC = () => {
         <h3>Data Mappings</h3>
 
         {!selectedCredential ? (
-          <p className="empty-state">Please select a credential first</p>
+          <p className="empty-state" role="status" aria-live="polite">Please select a credential first</p>
         ) : (
           <>
             <div className="mappings-section">
               <h4>Team Mappings ({teamMappings.length})</h4>
               {teamMappings.length === 0 ? (
-                <p className="empty-state">No team mappings yet</p>
+                <p className="empty-state" role="status" aria-live="polite">No team mappings yet</p>
               ) : (
                 <table className="mappings-table">
                   <thead>
@@ -862,7 +865,7 @@ const TwizzitIntegration: React.FC = () => {
             <div className="mappings-section">
               <h4>Player Mappings ({playerMappings.length})</h4>
               {playerMappings.length === 0 ? (
-                <p className="empty-state">No player mappings yet</p>
+                <p className="empty-state" role="status" aria-live="polite">No player mappings yet</p>
               ) : (
                 <table className="mappings-table">
                   <thead>
@@ -901,23 +904,23 @@ const TwizzitIntegration: React.FC = () => {
   };
 
   return (
+    <PageLayout
+      title="Twizzit Integration"
+      eyebrow="Settings > Twizzit"
+      description="Sync teams and players from the Belgian Korfball Federation via Twizzit."
+      breadcrumbs={breadcrumbs}
+    >
     <div className="twizzit-integration">
-      <div className="page-header">
-        <h1>Twizzit Integration</h1>
-        <p className="page-description">
-          Integrate with Twizzit to sync teams and players from the Belgian Korfball Federation
-        </p>
-      </div>
 
       {error && (
-        <div className="alert alert-error">
+        <div className="alert alert-error" role="alert">
           <strong>Error:</strong> {error}
           <button className="alert-close" onClick={clearMessages}>×</button>
         </div>
       )}
 
       {success && (
-        <div className="alert alert-success">
+        <div className="alert alert-success" role="status" aria-live="polite">
           <strong>Success:</strong> {success}
           <button className="alert-close" onClick={clearMessages}>×</button>
         </div>
@@ -967,6 +970,7 @@ const TwizzitIntegration: React.FC = () => {
         {activeTab === 'mappings' && renderMappings()}
       </div>
     </div>
+    </PageLayout>
   );
 };
 

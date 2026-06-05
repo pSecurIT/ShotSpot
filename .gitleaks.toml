@@ -1,0 +1,109 @@
+# Gitleaks configuration for ShotSpot
+# https://github.com/gitleaks/gitleaks
+#
+# Extends the default ruleset with project-specific patterns.
+# Used in CI (security-scan.yml) and can be run locally:
+#   npx gitleaks detect --config .gitleaks.toml --source .
+
+title = "ShotSpot Secret Scanning"
+
+[extend]
+# Inherit all default gitleaks rules (JWT, AWS keys, private keys, etc.)
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Project-specific custom rules
+# ---------------------------------------------------------------------------
+
+[[rules]]
+id          = "shotspot-twizzit-encryption-key"
+description = "ShotSpot Twizzit AES-256-CBC encryption key (64-char hex)"
+regex       = '''(?i)TWIZZIT_ENCRYPTION_KEY\s*[=:]\s*["']?([0-9a-fA-F]{64})["']?'''
+tags        = ["shotspot", "twizzit", "encryption", "aes"]
+[[rules.Entropies]]
+  Min   = 3.5
+  Max   = 8.0
+  Group = 1
+
+[[rules]]
+id          = "shotspot-jwt-secret"
+description = "ShotSpot JWT secret with assignment"
+regex       = '''(?im)^\s*['"]?(?:export\s+)?JWT_SECRET\b\s*[=:]\s*["']?(?!\$\{)(?!\$\()([A-Za-z0-9+/=_\-]{32,})["']?'''
+tags        = ["shotspot", "jwt", "auth"]
+[[rules.Entropies]]
+  Min   = 3.5
+  Max   = 8.0
+  Group = 1
+
+[[rules]]
+id          = "shotspot-session-secret"
+description = "ShotSpot session secret with assignment"
+regex       = '''(?im)^\s*['"]?(?:export\s+)?SESSION_SECRET\b\s*[=:]\s*["']?(?!\$\{)(?!\$\()([A-Za-z0-9+/=_\-]{32,})["']?'''
+tags        = ["shotspot", "session", "auth"]
+[[rules.Entropies]]
+  Min   = 3.5
+  Max   = 8.0
+  Group = 1
+
+[[rules]]
+id          = "shotspot-csrf-secret"
+description = "ShotSpot CSRF secret with assignment"
+regex       = '''(?im)^\s*['"]?(?:export\s+)?CSRF_SECRET\b\s*[=:]\s*["']?(?!\$\{)(?!\$\()([A-Za-z0-9+/=_\-]{32,})["']?'''
+tags        = ["shotspot", "csrf", "auth"]
+[[rules.Entropies]]
+  Min   = 3.5
+  Max   = 8.0
+  Group = 1
+
+[[rules]]
+id          = "shotspot-db-password"
+description = "ShotSpot database password assignment"
+regex       = '''(?im)^\s*['"]?(?:export\s+)?DB_PASSWORD\b\s*[=:]\s*["']?(?!\$\{)(?!\$\()([^\s"'$]{8,})["']?'''
+tags        = ["shotspot", "database", "credentials"]
+[[rules.Entropies]]
+  Min   = 3.0
+  Max   = 8.0
+  Group = 1
+
+# ---------------------------------------------------------------------------
+# Path allowlist — exclude template / fixture files from all rules
+# ---------------------------------------------------------------------------
+
+[allowlist]
+description = "Exclude example env files, test fixtures, docs, and CI-only placeholder values"
+paths = [
+  # Template / example env files
+  ".env.example",
+  ".env.docker.example",
+  ".env.*.example",
+  # Test fixtures may contain intentionally fake credentials
+  "backend/test/",
+  "frontend/cypress/",
+  # Build output
+  "backend/coverage/",
+  "frontend/coverage/",
+  "frontend/dist/",
+  "frontend/android/",
+  "frontend/ios/",
+  # Documentation — contains example/placeholder values for instructional purposes
+  "README.md",
+  "QUICKSTART.md",
+  "INSTALLATION.md",
+  "DEPLOYMENT.md",
+  "DOCKER.md",
+  "DOCKER_CHEATSHEET.md",
+  "BUILD.md",
+  "DEFAULT_ADMIN.md",
+  "REPORTS_API.md",
+  "release/README.md",
+  "docs/",
+]
+
+# Global regex allowlist — match against the SECRET (captured group), not the full line.
+# Shell substitutions and variable references are suppressed via .gitleaksignore fingerprints.
+regexes = [
+  # GitHub Actions postgres service default password — not a real credential
+  '''(?i)^postgres$''',
+  # Bearer tokens used in documentation curl examples
+  '''Authorization:\s+Bearer\s+[A-Za-z0-9_\-\.]{20,}''',
+]

@@ -672,6 +672,70 @@ describe('🏀 Shot Routes', () => {
         throw error;
       }
     });
+
+    it('❌ should reject update with no fields', async () => {
+      const response = await request(app)
+        .put(`/api/shots/${testGame.id}/${testShot.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('Content-Type', 'application/json')
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('No fields to update');
+    });
+  });
+
+  describe('✅ POST /api/shots/:gameId/:shotId/confirm', () => {
+    let unconfirmedShot;
+
+    beforeEach(async () => {
+      await db.query('UPDATE games SET home_score = 0, away_score = 0 WHERE id = $1', [testGame.id]);
+
+      const shotResult = await db.query(
+        `INSERT INTO shots (game_id, player_id, club_id, x_coord, y_coord, result, period, event_status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [testGame.id, player1.id, club1.id, 44, 33, 'goal', 1, 'unconfirmed']
+      );
+
+      unconfirmedShot = shotResult.rows[0];
+    });
+
+    afterEach(async () => {
+      await db.query('DELETE FROM shots WHERE id = $1', [unconfirmedShot.id]);
+    });
+
+    it('✅ should confirm unconfirmed shot and increment score for goal', async () => {
+      const response = await request(app)
+        .post(`/api/shots/${testGame.id}/${unconfirmedShot.id}/confirm`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.event_status).toBe('confirmed');
+
+      const gameCheck = await db.query('SELECT home_score FROM games WHERE id = $1', [testGame.id]);
+      expect(gameCheck.rows[0].home_score).toBe(1);
+    });
+
+    it('✅ should return existing shot when already confirmed', async () => {
+      await db.query('UPDATE shots SET event_status = $1 WHERE id = $2', ['confirmed', unconfirmedShot.id]);
+
+      const response = await request(app)
+        .post(`/api/shots/${testGame.id}/${unconfirmedShot.id}/confirm`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.id).toBe(unconfirmedShot.id);
+      expect(response.body.event_status).toBe('confirmed');
+    });
+
+    it('❌ should return 404 when confirming a missing shot', async () => {
+      const response = await request(app)
+        .post(`/api/shots/${testGame.id}/999999/confirm`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Shot not found');
+    });
   });
 
   describe('🗑️ DELETE /api/shots/:gameId/:shotId', () => {

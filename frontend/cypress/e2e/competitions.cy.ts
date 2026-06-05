@@ -62,6 +62,7 @@ const visitCompetitions = (user = COACH_USER) => {
     onBeforeLoad: (win) => {
       win.localStorage.setItem('token', 'cypress-token');
       win.localStorage.setItem('user', JSON.stringify(user));
+      win.localStorage.setItem(`shotspot:onboarding:v1:${user.id}:${user.role}`, 'done');
     },
   });
 };

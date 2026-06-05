@@ -62,7 +62,9 @@ describe('FreeShotPanel', () => {
   });
 
   it('renders free shot panel interface correctly', async () => {
-    render(<FreeShotPanel {...mockProps} />);
+    await act(async () => {
+      render(<FreeShotPanel {...mockProps} />);
+    });
     
     expect(screen.getByText('Record Free Shot / Penalty')).toBeInTheDocument();
     expect(screen.getByText('Shot Type:')).toBeInTheDocument();
@@ -217,7 +219,9 @@ describe('FreeShotPanel', () => {
   });
 
   it('validates required fields before submission', async () => {
-    render(<FreeShotPanel {...mockProps} />);
+    await act(async () => {
+      render(<FreeShotPanel {...mockProps} />);
+    });
     
     // Try to submit without selecting player
     const recordButton = screen.getByRole('button', { name: 'Record Free Shot' });
@@ -231,7 +235,7 @@ describe('FreeShotPanel', () => {
   });
 
   it('disables submit button when required fields are missing', async () => {
-    act(() => {
+    await act(async () => {
       render(<FreeShotPanel {...mockProps} />);
     });
     
@@ -422,11 +426,15 @@ describe('FreeShotPanel', () => {
     expect(screen.getByText('🛡️ Blocked')).toHaveClass('active');
   });
 
-  it('updates time remaining when prop changes', () => {
-    const { rerender } = render(<FreeShotPanel {...mockProps} />);
+  it('updates time remaining when prop changes', async () => {
+    let rerender: ReturnType<typeof render>['rerender'];
+
+    await act(async () => {
+      ({ rerender } = render(<FreeShotPanel {...mockProps} />));
+    });
     
     // Update time remaining
-    act(() => {
+    await act(async () => {
       rerender(<FreeShotPanel {...mockProps} timeRemaining="00:05:00" />);
     });
     

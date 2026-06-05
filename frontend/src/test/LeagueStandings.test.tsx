@@ -27,7 +27,7 @@ describe('LeagueStandings', () => {
   const updateStandingPointsMock = competitionsApi.updateStandingPoints as unknown as Mock;
 
   const mockStanding = (overrides: Partial<LeagueStanding> = {}): LeagueStanding => ({
-    id: 1,
+    id: overrides.id ?? overrides.team_id ?? 1,
     competition_id: 1,
     team_id: 1,
     team_name: 'Team A',
@@ -53,7 +53,27 @@ describe('LeagueStandings', () => {
     
     render(<LeagueStandings competitionId={1} />);
     
-    expect(screen.getByText('Loading standings…')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading standings…');
+  });
+
+  it('announces empty state accessibly', async () => {
+    getStandingsMock.mockResolvedValue([]);
+
+    render(<LeagueStandings competitionId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('No standings available yet');
+    });
+  });
+
+  it('announces API errors accessibly', async () => {
+    getStandingsMock.mockRejectedValue(new Error('Standings failed'));
+
+    render(<LeagueStandings competitionId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to load standings');
+    });
   });
 
   it('renders standings table with data', async () => {
@@ -180,6 +200,7 @@ describe('LeagueStandings', () => {
 
     const createElementSpy = vi.spyOn(document, 'createElement');
     const removeChildSpy = vi.spyOn(document.body, 'removeChild');
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     render(<LeagueStandings competitionId={1} />);
 
@@ -196,6 +217,7 @@ describe('LeagueStandings', () => {
 
     createElementSpy.mockRestore();
     removeChildSpy.mockRestore();
+    clickSpy.mockRestore();
   });
 
   it('calls onUpdate callback when data changes', async () => {

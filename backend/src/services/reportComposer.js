@@ -31,11 +31,13 @@ const METRIC_LABELS = {
 };
 
 function sanitizeFilenameComponent(component) {
-  return String(component ?? '')
-    .trim()
-    .replace(/[^a-zA-Z0-9-_]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80);
+  const s = String(component ?? '').trim().replace(/[^a-zA-Z0-9_-]+/g, '-');
+  // Trim leading/trailing hyphens without a regex that backtracks on '-' runs.
+  let start = 0;
+  let end = s.length;
+  while (start < end && s[start] === '-') start++;
+  while (end > start && s[end - 1] === '-') end--;
+  return s.slice(start, end).slice(0, 80);
 }
 
 function ensureArray(value) {

@@ -1,0 +1,28 @@
+{
+  "generatedAtUtc": "2026-05-15T17:37:24Z",
+  "strictUpdates": false,
+  "workflowFilesScanned": 14,
+  "usesLinesScanned": 89,
+  "shaPinnedRefsChecked": 89,
+  "nonShaRefs": 0,
+  "outdatedShaRefs": 0,
+  "pass": true,
+  "scannedFiles": [
+    ".github/workflows/codeql.yml",
+    ".github/workflows/dependency-remediation.yml",
+    ".github/workflows/docker.yml",
+    ".github/workflows/license-compliance.yml",
+    ".github/workflows/mobile-ci.yml",
+    ".github/workflows/mobile-preview.yml",
+    ".github/workflows/mobile-release.yml",
+    ".github/workflows/node.js.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/security-scan.yml",
+    ".github/workflows/sync-dependabot-android.yml",
+    ".github/workflows/test-coverage.yml",
+    ".github/workflows/validate-migrations.yml",
+    ".github/workflows/verify-action-pins.yml"
+  ],
+  "findings": [
+  ]
+}

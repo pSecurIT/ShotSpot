@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import ExportDialog from '../components/ExportDialog';
 
@@ -17,7 +18,31 @@ describe('ExportDialog', () => {
       />
     );
 
-    expect(screen.getByText('Test Export')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Test Export' })).toBeInTheDocument();
+  });
+
+  it('should focus the close button and close on Escape', async () => {
+    const mockOnClose = vi.fn();
+    const mockOnExport = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ExportDialog
+        isOpen={true}
+        onClose={mockOnClose}
+        onExport={mockOnExport}
+        title="Test Export"
+        dataType="game"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Close dialog' })).toHaveFocus();
+    });
+
+    await user.keyboard('{Escape}');
+
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
   it('should not render when closed', () => {

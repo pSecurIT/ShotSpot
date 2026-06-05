@@ -9,6 +9,8 @@ import { param, body, validationResult } from 'express-validator';
 import db from '../db.js';
 import { auth, requireRole } from '../middleware/auth.js';
 
+import { logError } from '../utils/logger.js';
+
 const router = express.Router();
 
 // Apply authentication middleware to all routes
@@ -35,7 +37,7 @@ router.get('/', auth, async (req, res) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Error fetching series:', err);
+    logError('Error fetching series:', err);
     res.status(500).json({ error: 'Failed to fetch series' });
   }
 });
@@ -85,7 +87,7 @@ router.get('/:id', [
       competitions: competitionsResult.rows
     });
   } catch (err) {
-    console.error('Error fetching series:', err);
+    logError('Error fetching series:', err);
     res.status(500).json({ error: 'Failed to fetch series' });
   }
 });
@@ -96,10 +98,10 @@ router.get('/:id', [
 
 /**
  * Create a new series (division)
- * Requires admin role
+ * Requires coach or admin role
  */
 router.post('/', [
-  requireRole(['admin']),
+  requireRole(['admin', 'coach']),
   body('name')
     .trim()
     .notEmpty().withMessage('Series name is required')
@@ -133,7 +135,7 @@ router.post('/', [
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('Error creating series:', err);
+    logError('Error creating series:', err);
     res.status(500).json({ error: 'Failed to create series' });
   }
 });
@@ -144,10 +146,10 @@ router.post('/', [
 
 /**
  * Update a series
- * Requires admin role
+ * Requires coach or admin role
  */
 router.put('/:id', [
-  requireRole(['admin']),
+  requireRole(['admin', 'coach']),
   param('id').isInt({ min: 1 }).withMessage('Series ID must be a positive integer'),
   body('name')
     .optional()
@@ -224,7 +226,7 @@ router.put('/:id', [
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error updating series:', err);
+    logError('Error updating series:', err);
     res.status(500).json({ error: 'Failed to update series' });
   }
 });
@@ -235,11 +237,11 @@ router.put('/:id', [
 
 /**
  * Delete a series
- * Requires admin role
+ * Requires coach or admin role
  * Cannot delete if competitions exist in this series
  */
 router.delete('/:id', [
-  requireRole(['admin']),
+  requireRole(['admin', 'coach']),
   param('id').isInt({ min: 1 }).withMessage('Series ID must be a positive integer')
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -271,7 +273,7 @@ router.delete('/:id', [
     await db.query('DELETE FROM series WHERE id = $1', [id]);
     res.json({ message: 'Series deleted successfully' });
   } catch (err) {
-    console.error('Error deleting series:', err);
+    logError('Error deleting series:', err);
     res.status(500).json({ error: 'Failed to delete series' });
   }
 });

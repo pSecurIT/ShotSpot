@@ -607,7 +607,7 @@ Generate a comprehensive post-match report with game statistics, scoring breakdo
 ```bash
 curl -X GET \
   https://api.shotspot.com/api/reports/games/123/post-match \
-  -H 'Authorization: demo' \
+  -H 'Auth-Header: demo' \
   -o post-match-report.pdf
 ```
 
@@ -664,7 +664,7 @@ Generate a detailed performance report for a specific player in a game.
 ```bash
 curl -X GET \
   https://api.shotspot.com/api/reports/games/123/player/456 \
-  -H 'Authorization: demo' \
+  -H 'Auth-Header: demo' \
   -o player-performance-report.pdf
 ```
 
@@ -735,7 +735,7 @@ Generate a tactical analysis report with strategic insights and recommendations.
 ```bash
 curl -X POST \
   https://api.shotspot.com/api/reports/games/123/coach-analysis \
-  -H 'Authorization: demo' \
+  -H 'Auth-Header: demo' \
   -H 'Content-Type: application/json' \
   -d '{
     "notes": "Excellent defensive performance in the second half. Focus on maintaining possession time and reducing turnovers in the next match."

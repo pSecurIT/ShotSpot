@@ -25,11 +25,14 @@ function question(query) {
 
 function exec(command, options = {}) {
   try {
-    return execSync(command, { 
+    const result = execSync(command, { 
       encoding: 'utf-8', 
       stdio: options.silent ? 'pipe' : 'inherit',
+      cwd: options.cwd || rootDir,
       ...options 
-    }).trim();
+    });
+
+    return typeof result === 'string' ? result.trim() : '';
   } catch (error) {
     if (options.ignoreError) return '';
     throw error;
@@ -63,6 +66,24 @@ function updateVersion(newVersion) {
   console.log(`✅ Updated version to ${newVersion} in all package.json files`);
 }
 
+function syncBackendLockfile() {
+  // Keep backend/package-lock.json aligned with backend/package.json version.
+  // This mirrors the Docker CI lockfile validation step.
+  exec('npm install --package-lock-only --include=optional --ignore-scripts', {
+    cwd: join(rootDir, 'backend'),
+  });
+  console.log('✅ Synced backend/package-lock.json');
+}
+
+function syncFrontendLockfile() {
+  // Keep frontend/package-lock.json aligned with frontend/package.json version.
+  // This mirrors the Docker CI lockfile validation step.
+  exec('npm install --package-lock-only --include=optional --ignore-scripts', {
+    cwd: join(rootDir, 'frontend'),
+  });
+  console.log('✅ Synced frontend/package-lock.json');
+}
+
 function incrementVersion(version, type) {
   const parts = version.split('.').map(Number);
   switch (type) {
@@ -85,6 +106,35 @@ function getGitLog(fromTag) {
   return exec(command, { silent: true, ignoreError: true })
     .split('\n')
     .filter(line => line.trim());
+}
+
+function tagExists(tagName) {
+  return Boolean(exec(`git rev-parse -q --verify "refs/tags/${tagName}"`, {
+    silent: true,
+    ignoreError: true,
+  }));
+}
+
+function remoteTagExists(tagName) {
+  return Boolean(exec(`git ls-remote --tags origin "refs/tags/${tagName}"`, {
+    silent: true,
+    ignoreError: true,
+  }));
+}
+
+function getLatestTag(excludedTag = '') {
+  const excludeArg = excludedTag ? ` --exclude=${excludedTag}` : '';
+  return exec(`git describe --tags --abbrev=0${excludeArg}`, {
+    silent: true,
+    ignoreError: true,
+  }) || '';
+}
+
+function getCurrentBranch() {
+  return exec('git branch --show-current', {
+    silent: true,
+    ignoreError: true,
+  }) || 'main';
 }
 
 function categorizeCommits(commits) {
@@ -193,7 +243,20 @@ async function main() {
 
   // Get current version
   const currentVersion = getCurrentVersion();
+  const currentBranch = getCurrentBranch();
   console.log(`Current version: ${currentVersion}\n`);
+
+  if (currentBranch !== 'main') {
+    const continueOnBranch = await question(
+      `⚠️  You are on branch ${currentBranch}. Continue release on this branch? (y/N): `
+    );
+
+    if (continueOnBranch.toLowerCase() !== 'y') {
+      console.log('❌ Aborted');
+      rl.close();
+      process.exit(0);
+    }
+  }
 
   // Ask for release type
   console.log('Select release type:');
@@ -231,8 +294,56 @@ async function main() {
 
   console.log(`\nNew version will be: ${newVersion}`);
 
+  let allowVersionOverride = false;
+  const releaseTag = `v${newVersion}`;
+  const localTagExists = tagExists(releaseTag);
+  const pushedTagExists = remoteTagExists(releaseTag);
+
+  if (newVersion === currentVersion) {
+    const continueOverride = await question(
+      `⚠️  Version ${newVersion} is already current. Continue with override mode? (y/N): `
+    );
+
+    if (continueOverride.toLowerCase() !== 'y') {
+      console.log('❌ Aborted');
+      rl.close();
+      process.exit(0);
+    }
+
+    allowVersionOverride = true;
+  }
+
+  if (pushedTagExists) {
+    console.log(`❌ Tag ${releaseTag} already exists.`);
+    console.log('   The tag already exists on origin, so this release version cannot be overridden.');
+    rl.close();
+    process.exit(1);
+  }
+
+  let replaceLocalTag = false;
+  if (localTagExists) {
+    if (!allowVersionOverride) {
+      console.log(`❌ Tag ${releaseTag} already exists locally.`);
+      console.log('   Choose a different release version or rerun in override mode.');
+      rl.close();
+      process.exit(1);
+    }
+
+    const recreateTag = await question(
+      `⚠️  Local tag ${releaseTag} exists but is not on origin. Recreate it? (y/N): `
+    );
+
+    if (recreateTag.toLowerCase() !== 'y') {
+      console.log('❌ Aborted');
+      rl.close();
+      process.exit(0);
+    }
+
+    replaceLocalTag = true;
+  }
+
   // Get latest tag
-  const latestTag = exec('git describe --tags --abbrev=0', { silent: true, ignoreError: true }) || '';
+  const latestTag = getLatestTag(replaceLocalTag ? releaseTag : '');
   
   // Get commits since last tag
   const commits = getGitLog(latestTag);
@@ -254,29 +365,44 @@ async function main() {
   // Update versions
   updateVersion(newVersion);
 
+  // Ensure backend lockfile stays in sync with backend package version.
+  syncBackendLockfile();
+
+  // Ensure frontend lockfile stays in sync with frontend package version.
+  syncFrontendLockfile();
+
   // Update changelog
   updateChangelogFile(changelog);
 
   // Commit changes
-  exec('git add package.json frontend/package.json backend/package.json CHANGELOG.md');
-  exec(`git commit -m "chore: release version ${newVersion}"`);
-  console.log('✅ Committed version updates');
+  exec('git add package.json frontend/package.json backend/package.json frontend/package-lock.json backend/package-lock.json CHANGELOG.md');
+  const stagedChanges = exec('git diff --cached --name-only', { silent: true });
+  if (stagedChanges) {
+    exec(`git commit -m "chore: release version ${newVersion}"`);
+    console.log('✅ Committed version updates');
+  } else {
+    console.log('ℹ️  No staged file changes detected, skipping release commit');
+  }
 
   // Create tag
-  exec(`git tag -a v${newVersion} -m "Release version ${newVersion}"`);
-  console.log(`✅ Created tag v${newVersion}`);
+  if (replaceLocalTag) {
+    exec(`git tag -d ${releaseTag}`);
+    console.log(`✅ Removed existing local tag ${releaseTag}`);
+  }
+  exec(`git tag -a ${releaseTag} -m "Release version ${newVersion}"`);
+  console.log(`✅ Created tag ${releaseTag}`);
 
   console.log('\n🎉 Release prepared successfully!\n');
   console.log('Next steps:');
-  console.log(`1. Push changes: git push origin main`);
-  console.log(`2. Push tag: git push origin v${newVersion}`);
+  console.log(`1. Push changes: git push origin ${currentBranch}`);
+  console.log(`2. Push tag: git push origin ${releaseTag}`);
   console.log('3. Create GitHub release from the tag');
   console.log('4. GitHub Actions will automatically build mobile packages\n');
 
   const pushNow = await question('Push to remote now? (y/N): ');
   if (pushNow.toLowerCase() === 'y') {
-    exec('git push origin main');
-    exec(`git push origin v${newVersion}`);
+    exec(`git push origin ${currentBranch}`);
+    exec(`git push origin ${releaseTag}`);
     console.log('✅ Pushed to remote');
     console.log('\n🚀 GitHub Actions will now build the mobile packages!');
     console.log('Check: https://github.com/pSecurIT/Korfball-game-statistics/actions');

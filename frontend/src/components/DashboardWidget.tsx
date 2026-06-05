@@ -1,10 +1,12 @@
 import React from 'react';
+import StatePanel from './ui/StatePanel';
 
 interface DashboardWidgetProps {
   title: string;
   icon?: string;
   loading?: boolean;
   error?: string | null;
+  onRetry?: () => void;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }
@@ -14,6 +16,7 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({
   icon,
   loading = false,
   error,
+  onRetry,
   actions,
   children
 }) => {
@@ -21,7 +24,11 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({
     <section className="dashboard-widget" aria-label={title}>
       <div className="dashboard-widget__header">
         <h2 className="dashboard-widget__title">
-          {icon && <span className="dashboard-widget__icon" aria-hidden="true">{icon}</span>}
+          {icon && (
+            <span className="dashboard-widget__icon-shell" aria-hidden="true">
+              <span className="dashboard-widget__icon">{icon}</span>
+            </span>
+          )}
           <span>{title}</span>
         </h2>
         {actions && <div className="dashboard-widget__actions">{actions}</div>}
@@ -29,9 +36,23 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({
 
       <div className="dashboard-widget__body">
         {loading ? (
-          <div className="dashboard-widget__loading">Loading…</div>
+          <StatePanel
+            variant="loading"
+            title={`Loading ${title.toLowerCase()}`}
+            message="Pulling in the latest data without shifting the layout."
+            compact
+            className="dashboard-widget__state"
+          />
         ) : error ? (
-          <div className="dashboard-widget__error" role="alert">{error}</div>
+          <StatePanel
+            variant="error"
+            title={`Couldn’t load ${title.toLowerCase()}`}
+            message={error}
+            actionLabel={onRetry ? 'Retry' : undefined}
+            onAction={onRetry}
+            compact
+            className="dashboard-widget__state"
+          />
         ) : (
           children
         )}

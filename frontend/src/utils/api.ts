@@ -1,14 +1,128 @@
 import axios from 'axios';
+import type { AxiosRequestConfig } from 'axios';
 import { queueAction } from './offlineSync';
 import { ensureMatchEventClientUuid } from './matchEventIdentity';
+import { getUxRouteContext, trackApiLatency } from './uxObservability';
+import { resolveApiBaseUrl } from './networkConfig';
+import { clearStoredAuthSession, getStoredAuthToken } from './authSessionStorage';
+
+type RequestUxMetadata = {
+  startedAt: number;
+  routePath: string;
+  flowName: string | null;
+  method: string;
+  endpoint: string;
+};
+
+type UxAxiosConfig = AxiosRequestConfig & {
+  _ux?: RequestUxMetadata;
+};
 
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_URL as string) || '/api',
+  baseURL: resolveApiBaseUrl(import.meta.env.VITE_API_URL as string | undefined),
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true, // Important: enables cookies/session
 });
+
+type CacheOptions = {
+  ttlMs?: number;
+  forceRefresh?: boolean;
+};
+
+const DEFAULT_GET_CACHE_TTL_MS = 10000;
+const getResponseCache = new Map<string, { expiresAt: number; data: unknown }>();
+const inflightGetRequests = new Map<string, Promise<unknown>>();
+
+const sortObjectKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(sortObjectKeys);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((acc, key) => {
+        acc[key] = sortObjectKeys((value as Record<string, unknown>)[key]);
+        return acc;
+      }, {});
+  }
+
+  return value;
+};
+
+const buildGetCacheKey = (url: string, config?: AxiosRequestConfig): string => {
+  const sortedParams = sortObjectKeys(config?.params || null);
+  const sortedHeaders = sortObjectKeys(config?.headers || null);
+  return `${url}::${JSON.stringify(sortedParams)}::${JSON.stringify(sortedHeaders)}`;
+};
+
+export const clearGetCache = (): void => {
+  getResponseCache.clear();
+  inflightGetRequests.clear();
+};
+
+export const getWithCache = async <T>(
+  url: string,
+  config?: AxiosRequestConfig,
+  options?: CacheOptions
+): Promise<T> => {
+  const now = Date.now();
+  const key = buildGetCacheKey(url, config);
+
+  if (!options?.forceRefresh) {
+    const cachedEntry = getResponseCache.get(key);
+    if (cachedEntry && cachedEntry.expiresAt > now) {
+      return cachedEntry.data as T;
+    }
+  }
+
+  const inflight = inflightGetRequests.get(key);
+  if (inflight) {
+    return inflight as Promise<T>;
+  }
+
+  const requestPromise = api.get<T>(url, config)
+    .then((response) => {
+      const ttlMs = options?.ttlMs ?? DEFAULT_GET_CACHE_TTL_MS;
+      if (ttlMs > 0) {
+        getResponseCache.set(key, {
+          expiresAt: Date.now() + ttlMs,
+          data: response.data
+        });
+      }
+      return response.data;
+    })
+    .finally(() => {
+      inflightGetRequests.delete(key);
+    });
+
+  inflightGetRequests.set(key, requestPromise);
+  return requestPromise;
+};
+
+export const prefetchGet = async (
+  url: string,
+  config?: AxiosRequestConfig,
+  options?: CacheOptions
+): Promise<void> => {
+  try {
+    await getWithCache(url, config, options);
+  } catch {
+    // Prefetch failures are non-blocking and should not interrupt navigation.
+  }
+};
+
+type ApiWithPerfHelpers = typeof api & {
+  getWithCache?: typeof getWithCache;
+  prefetchGet?: typeof prefetchGet;
+  clearGetCache?: typeof clearGetCache;
+};
+
+(api as ApiWithPerfHelpers).getWithCache = getWithCache;
+(api as ApiWithPerfHelpers).prefetchGet = prefetchGet;
+(api as ApiWithPerfHelpers).clearGetCache = clearGetCache;
 
 // Store CSRF token
 let csrfToken: string | null = null;
@@ -30,10 +144,20 @@ export const getCsrfToken = async (): Promise<string | null> => {
 // Add auth token and CSRF token to requests
 api.interceptors.request.use(
   async (config) => {
+    const uxConfig = config as UxAxiosConfig;
+    const context = getUxRouteContext();
+    uxConfig._ux = {
+      startedAt: performance.now(),
+      routePath: context.routePath,
+      flowName: context.flowName,
+      method: (config.method || 'GET').toUpperCase(),
+      endpoint: config.url || '',
+    };
+
     config.data = ensureMatchEventClientUuid(config.method, config.url, config.data);
 
     // Add Bearer token
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = getStoredAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -60,9 +184,35 @@ api.interceptors.request.use(
 
 // Handle auth errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const config = response.config as UxAxiosConfig;
+    if (config._ux) {
+      trackApiLatency({
+        endpoint: config._ux.endpoint,
+        method: config._ux.method,
+        status: response.status,
+        valueMs: performance.now() - config._ux.startedAt,
+        routePath: config._ux.routePath,
+        flowName: config._ux.flowName,
+      });
+    }
+
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
+
+    const uxConfig = originalRequest as UxAxiosConfig;
+    if (uxConfig?._ux) {
+      trackApiLatency({
+        endpoint: uxConfig._ux.endpoint,
+        method: uxConfig._ux.method,
+        status: error.response?.status,
+        valueMs: performance.now() - uxConfig._ux.startedAt,
+        routePath: uxConfig._ux.routePath,
+        flowName: uxConfig._ux.flowName,
+      });
+    }
     
     // Check if request failed due to network/backend issues
     const isNetworkError = !error.response; // No response means network failure
@@ -71,8 +221,13 @@ api.interceptors.response.use(
     const isOffline = !navigator.onLine;
     
     // Queue write operations when offline or backend unavailable
+    const method = originalRequest.method?.toUpperCase() || '';
+    const requestUrl = String(originalRequest.url || '');
+    const isAuthEndpoint = /\/auth\/(login|register|csrf)/.test(requestUrl);
+
     const shouldQueue = (isOffline || isNetworkError || isServerError || isCorsError) &&
-                       ['POST', 'PUT', 'DELETE'].includes(originalRequest.method?.toUpperCase() || '');
+               ['POST', 'PUT', 'DELETE'].includes(method) &&
+               !isAuthEndpoint;
 
     if (shouldQueue) {
       const endpoint = originalRequest.url || '';
@@ -130,11 +285,11 @@ api.interceptors.response.use(
       // Don't redirect if this is a login/register attempt (let the component handle the error)
       const isAuthEndpoint = originalRequest.url?.includes('/auth/login') || 
                             originalRequest.url?.includes('/auth/register');
+      const hasAuthToken = Boolean(getStoredAuthToken());
       
-      if (!isAuthEndpoint && typeof window !== 'undefined') {
+      if (!isAuthEndpoint && hasAuthToken && typeof window !== 'undefined') {
         // Token expired or invalid - redirect to login
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        clearStoredAuthSession();
         window.location.href = '/login';
       }
     }

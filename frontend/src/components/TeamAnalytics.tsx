@@ -13,6 +13,8 @@ import type {
   TeamMomentumResponse,
   TeamStrengthsWeaknessesResponse,
 } from '../types/team-analytics';
+import PageLayout from './ui/PageLayout';
+import useBreadcrumbs from '../hooks/useBreadcrumbs';
 import '../styles/TeamAnalytics.css';
 
 const selectDefaultSeason = (team: TeamAnalyticsTeamOption | undefined, seasons: Season[]): string => {
@@ -38,6 +40,7 @@ const sortTeams = (teams: TeamAnalyticsTeamOption[]): TeamAnalyticsTeamOption[] 
 
 const TeamAnalytics: React.FC = () => {
   const exportRef = useRef<HTMLDivElement>(null);
+  const breadcrumbs = useBreadcrumbs();
   const [teams, setTeams] = useState<TeamAnalyticsTeamOption[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
@@ -189,12 +192,12 @@ const TeamAnalytics: React.FC = () => {
     : null;
 
   return (
-    <div className="team-analytics">
-      <div className="team-analytics__hero">
-        <div>
-          <h1>Team Analytics Dashboard</h1>
-          <p>Season form, momentum, scorer output, and comparative team diagnostics.</p>
-        </div>
+    <PageLayout
+      title="Team Analytics Dashboard"
+      eyebrow="Analytics > Team Performance"
+      description="Season form, momentum, scorer output, and comparative team diagnostics."
+      breadcrumbs={breadcrumbs}
+      actions={(
         <button
           type="button"
           className="team-analytics__export-button"
@@ -203,8 +206,9 @@ const TeamAnalytics: React.FC = () => {
         >
           {exporting ? 'Exporting PDF…' : 'Export PDF'}
         </button>
-      </div>
-
+      )}
+    >
+    <div className="team-analytics">
       <section className="team-analytics__toolbar" aria-label="Team analytics filters">
         <label className="team-analytics__field">
           <span>Team</span>
@@ -254,15 +258,15 @@ const TeamAnalytics: React.FC = () => {
       )}
 
       {scopeNotice && (
-        <div className="team-analytics__alert team-analytics__alert--info">
+        <div className="team-analytics__alert team-analytics__alert--info" role="status" aria-live="polite">
           {scopeNotice}
         </div>
       )}
 
       {loadingOptions || loadingData ? (
-        <div className="team-analytics__loading">Loading team analytics…</div>
+        <div className="team-analytics__loading" role="status" aria-live="polite">Loading team analytics…</div>
       ) : !overview || !momentum || !strengthsWeaknesses ? (
-        <div className="team-analytics__empty">Choose a team to load analytics.</div>
+        <div className="team-analytics__empty" role="status" aria-live="polite">Choose a team to load analytics.</div>
       ) : (
         <div ref={exportRef} className="team-analytics__content" data-testid="team-analytics-export-surface">
           <SeasonOverview overview={overview} />
@@ -280,7 +284,7 @@ const TeamAnalytics: React.FC = () => {
               <article className="team-analytics__panel">
                 <h3>Strengths</h3>
                 {strengthsWeaknesses.strengths.length === 0 ? (
-                  <p className="team-analytics__empty">No strengths identified yet.</p>
+                  <p className="team-analytics__empty" role="status" aria-live="polite">No strengths identified yet.</p>
                 ) : (
                   <ul className="team-analytics__insight-list">
                     {strengthsWeaknesses.strengths.map((insight) => (
@@ -296,7 +300,7 @@ const TeamAnalytics: React.FC = () => {
               <article className="team-analytics__panel">
                 <h3>Weaknesses</h3>
                 {strengthsWeaknesses.weaknesses.length === 0 ? (
-                  <p className="team-analytics__empty">No weaknesses identified yet.</p>
+                  <p className="team-analytics__empty" role="status" aria-live="polite">No weaknesses identified yet.</p>
                 ) : (
                   <ul className="team-analytics__insight-list">
                     {strengthsWeaknesses.weaknesses.map((insight) => (
@@ -339,6 +343,7 @@ const TeamAnalytics: React.FC = () => {
         </div>
       )}
     </div>
+    </PageLayout>
   );
 };
 
