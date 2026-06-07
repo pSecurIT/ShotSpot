@@ -113,6 +113,10 @@ jobs:
         # Run parallel tests with isolated databases and collect coverage
         npm run test:parallel:coverage
 
+    - name: Import Codecov GPG key
+      run: |
+        gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 27034E7FDB850E0BBC2C62FF806BB28AED779869
+
     - name: Upload backend coverage reports to Codecov
       uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
       with:
@@ -162,6 +166,10 @@ jobs:
     - name: Run Frontend Tests with Coverage
       working-directory: frontend
       run: npm run coverage
+
+    - name: Import Codecov GPG key
+      run: |
+        gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 27034E7FDB850E0BBC2C62FF806BB28AED779869
 
     - name: Upload frontend coverage reports to Codecov
       uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
