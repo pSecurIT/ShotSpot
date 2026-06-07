@@ -478,10 +478,9 @@ describe('🔐 Authentication API', () => {
       process.env.ENABLE_CSRF_IN_TEST = 'true';
 
       try {
-        const agent = request.agent(app);
-
-        // Step 1: fetch CSRF token; agent retains the session cookie automatically.
-        const csrfResponse = await agent
+        // Step 1: fetch CSRF token; capture the session cookie explicitly so the
+        // CSRF secret remains bound to the same session on the subsequent POST.
+        const csrfResponse = await request(app)
           .get('/api/auth/csrf')
           .expect(200);
 
@@ -489,10 +488,17 @@ describe('🔐 Authentication API', () => {
         const { csrfToken } = csrfResponse.body;
         expect(typeof csrfToken).toBe('string');
 
-        // Step 2: perform login with the same agent — do not manually set Cookie,
-        // the agent already carries the session so CSRF token stays bound to it.
-        const loginResponse = await agent
+        // Extract just the name=value pairs from every Set-Cookie header so we
+        // can replay the session cookie without relying on a cookie-jar.
+        const sessionCookie = (csrfResponse.headers['set-cookie'] || [])
+          .map(c => c.split(';')[0])
+          .join('; ');
+
+        // Step 2: perform login, forwarding the session cookie so the server can
+        // look up the CSRF secret that was stored during step 1.
+        const loginResponse = await request(app)
           .post('/api/auth/login')
+          .set('Cookie', sessionCookie)
           .set('x-csrf-token', csrfToken)
           .send({
             username: validUserData.username,
