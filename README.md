@@ -53,7 +53,7 @@ ShotSpot is designed for real-world sideline use. The product prioritizes:
 ### Brand mark
 
 <p align="center">
-  <img src="frontend/src/img/ShotSpot_icon.png" alt="ShotSpot app icon" width="128" />
+  <img src="frontend/src/img/shotspot-mark.svg" alt="ShotSpot app icon" width="128" />
 </p>
 
 ### Court and tracking context
@@ -95,7 +95,7 @@ See the implementation guides:
 The following assets are included in this repository and referenced by the new guides.
 
 ![ShotSpot logo](frontend/src/img/shotspot-mark.svg)
-![ShotSpot icon](frontend/src/img/ShotSpot_icon.png)
+![ShotSpot icon](frontend/src/img/shotspot-mark.svg)
 ![Korfball court context](frontend/src/img/Korfbalveld-breed.PNG)
 
 ## Architecture
