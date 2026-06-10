@@ -50,7 +50,7 @@ jobs:
           gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 27034E7FDB850E0BBC2C62FF806BB28AED779869
 
       - name: Upload frontend coverage to Codecov
-        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           directory: ./frontend/coverage
           flags: frontend
@@ -156,7 +156,7 @@ jobs:
           fi
 
       - name: Upload backend coverage to Codecov
-        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           directory: ./backend/coverage
           flags: backend
