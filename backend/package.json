@@ -52,7 +52,7 @@
     "express-validator": "^7.3.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
-    "nodemailer": "^8.0.10",
+    "nodemailer": "^8.0.11",
     "pdfkit": "^0.18.0",
     "pg": "^8.21.0",
     "socket.io": "^4.8.3"
@@ -64,7 +64,7 @@
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.9.1",
+    "@types/node": "^25.9.3",
     "babel-jest": "^30.2.0",
     "babel-plugin-transform-import-meta": "^2.3.3",
     "cross-env": "^10.1.0",
