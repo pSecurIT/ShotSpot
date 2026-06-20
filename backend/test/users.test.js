@@ -249,7 +249,7 @@ describe('👥 Users API', () => {
     it('❌ should reject wrong current password', async () => {
       const targetUser = testUsers[1];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/password`)
         .set('Authorization', `Bearer ${userToken}`)
         .send({ 
@@ -257,12 +257,15 @@ describe('👥 Users API', () => {
           newPassword: 'newpassword123'
         })
         .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Invalid current password');
     });
 
     it('❌ should reject short passwords', async () => {
       const targetUser = testUsers[1];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/password`)
         .set('Authorization', `Bearer ${userToken}`)
         .send({ 
@@ -270,6 +273,9 @@ describe('👥 Users API', () => {
           newPassword: 'short'
         })
         .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Password must be at least 8 characters');
     });
 
     it('✅ should allow admin to change other users passwords', async () => {
