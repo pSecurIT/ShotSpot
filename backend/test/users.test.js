@@ -96,16 +96,22 @@ describe('👥 Users API', () => {
     });
 
     it('❌ should reject non-admin users', async () => {
-      await request(app)
+      const response = await request(app)
         .get('/api/users')
         .set('Authorization', `Bearer ${userToken}`)
         .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Forbidden');
     });
 
     it('❌ should reject unauthenticated requests', async () => {
-      await request(app)
+      const response = await request(app)
         .get('/api/users')
         .expect(401);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Unauthorized');
     });
   });
 
@@ -124,19 +130,25 @@ describe('👥 Users API', () => {
     });
 
     it('❌ should reject unauthenticated requests', async () => {
-      await request(app)
+      const response = await request(app)
         .get('/api/users/me')
         .expect(401);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Unauthorized');
     });
 
     it('❌ should handle non-existent user gracefully', async () => {
       // Create token for non-existent user
       const invalidToken = generateJWT({ id: 999999, username: 'nonexistent', role: 'user' });
       
-      await request(app)
+      const response = await request(app)
         .get('/api/users/me')
         .set('Authorization', `Bearer ${invalidToken}`)
         .expect(404);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Not Found');
     });
   });
 

@@ -89,6 +89,5 @@ export default {
   },
   
   // Jest 29+ compatibility settings
-  changedFiles: true,
-  onlyChanged: true
+  // changedFiles: true, // Disabled - not supported in all Jest versions
 };
