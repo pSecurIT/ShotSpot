@@ -176,39 +176,51 @@ describe('👥 Users API', () => {
     it('❌ should reject invalid roles', async () => {
       const targetUser = testUsers[1];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'invalid_role' })
         .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Invalid role');
     });
 
     it('❌ should reject non-admin users', async () => {
       const targetUser = testUsers[2];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/role`)
         .set('Authorization', `Bearer ${userToken}`)
         .send({ role: 'admin' })
         .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Forbidden');
     });
 
     it('❌ should prevent admin self-demotion', async () => {
       const adminUser = testUsers[0];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${adminUser.id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'user' })
         .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Forbidden');
     });
 
     it('❌ should return 404 for non-existent user', async () => {
-      await request(app)
+      const response = await request(app)
         .put('/api/users/999999/role')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'user' })
         .expect(404);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Not Found');
     });
   });
 
