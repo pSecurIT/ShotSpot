@@ -2,7 +2,6 @@
 export default {
   verbose: false, // Reduce verbosity for faster execution
   testEnvironment: 'node',
-  maxWorkers: 1, // Run tests serially to avoid database conflicts
   testTimeout: 10000, // Reduced timeout for faster failure detection
   globalSetup: '<rootDir>/jest.globalSetup.cjs',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],

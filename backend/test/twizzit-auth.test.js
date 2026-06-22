@@ -70,7 +70,7 @@ describe('Twizzit Authentication Service', () => {
       const { encryptedPassword } = twizzitAuth.encryptPassword('test');
       const wrongIv = crypto.randomBytes(16).toString('hex');
       
-      expect(() => twizzitAuth.decryptPassword(encryptedPassword, wrongIv)).toThrow();
+      expect(() => twizzitAuth.decryptPassword(encryptedPassword, wrongIv)).toThrow('Password decryption failed');
     });
 
     it('should handle special characters in password', () => {
