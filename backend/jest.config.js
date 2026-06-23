@@ -86,5 +86,8 @@ export default {
   haste: {
     computeSha1: false,
     enableSymlinks: false
-  }
+  },
+  
+  // Jest 29+ compatibility settings
+  // changedFiles: true, // Disabled - not supported in all Jest versions
 };

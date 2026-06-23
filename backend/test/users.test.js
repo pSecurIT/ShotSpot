@@ -96,16 +96,22 @@ describe('👥 Users API', () => {
     });
 
     it('❌ should reject non-admin users', async () => {
-      await request(app)
+      const response = await request(app)
         .get('/api/users')
         .set('Authorization', `Bearer ${userToken}`)
         .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Insufficient permissions');
     });
 
     it('❌ should reject unauthenticated requests', async () => {
-      await request(app)
+      const response = await request(app)
         .get('/api/users')
         .expect(401);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Invalid token');
     });
   });
 
@@ -124,19 +130,25 @@ describe('👥 Users API', () => {
     });
 
     it('❌ should reject unauthenticated requests', async () => {
-      await request(app)
+      const response = await request(app)
         .get('/api/users/me')
         .expect(401);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Invalid token');
     });
 
     it('❌ should handle non-existent user gracefully', async () => {
       // Create token for non-existent user
       const invalidToken = generateJWT({ id: 999999, username: 'nonexistent', role: 'user' });
       
-      await request(app)
+      const response = await request(app)
         .get('/api/users/me')
         .set('Authorization', `Bearer ${invalidToken}`)
         .expect(404);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('User not found');
     });
   });
 
@@ -164,39 +176,51 @@ describe('👥 Users API', () => {
     it('❌ should reject invalid roles', async () => {
       const targetUser = testUsers[1];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'invalid_role' })
         .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+      expect(response.body.errors[0].msg).toBe('Invalid role');
     });
 
     it('❌ should reject non-admin users', async () => {
       const targetUser = testUsers[2];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/role`)
         .set('Authorization', `Bearer ${userToken}`)
         .send({ role: 'admin' })
         .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Insufficient permissions');
     });
 
     it('❌ should prevent admin self-demotion', async () => {
       const adminUser = testUsers[0];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${adminUser.id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'user' })
         .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Cannot remove admin role from yourself');
     });
 
     it('❌ should return 404 for non-existent user', async () => {
-      await request(app)
+      const response = await request(app)
         .put('/api/users/999999/role')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'user' })
         .expect(404);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('User not found');
     });
   });
 
@@ -225,7 +249,7 @@ describe('👥 Users API', () => {
     it('❌ should reject wrong current password', async () => {
       const targetUser = testUsers[1];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/password`)
         .set('Authorization', `Bearer ${userToken}`)
         .send({ 
@@ -233,12 +257,15 @@ describe('👥 Users API', () => {
           newPassword: 'newpassword123'
         })
         .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Current password is incorrect');
     });
 
     it('❌ should reject short passwords', async () => {
       const targetUser = testUsers[1];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/password`)
         .set('Authorization', `Bearer ${userToken}`)
         .send({ 
@@ -246,18 +273,24 @@ describe('👥 Users API', () => {
           newPassword: 'short'
         })
         .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+      expect(response.body.errors[0].msg).toBe('Password must be at least 8 characters');
     });
 
     it('✅ should allow admin to change other users passwords', async () => {
       const targetUser = testUsers[2]; // Coach user
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/password`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ 
           newPassword: 'adminsetpassword123'
         })
         .expect(200);
+
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.message).toBe('Password updated successfully');
 
       // Verify password was changed
       const dbResult = await db.query(
@@ -271,25 +304,31 @@ describe('👥 Users API', () => {
     it('❌ should reject non-admin changing other users passwords', async () => {
       const targetUser = testUsers[0]; // Admin user
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/password`)
         .set('Authorization', `Bearer ${userToken}`)
         .send({ 
           newPassword: 'hackattempt123'
         })
         .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toBe('Not authorized to change other users\' passwords');
     });
 
     it('❌ should require current password when changing own password', async () => {
       const targetUser = testUsers[1];
       
-      await request(app)
+      const response = await request(app)
         .put(`/api/users/${targetUser.id}/password`)
         .set('Authorization', `Bearer ${userToken}`)
         .send({ 
           newPassword: 'missingcurrent123'
         })
         .expect(400);
+
+      expect(response.body).toHaveProperty('errors');
+      expect(response.body.errors[0].msg).toBe('Current password is required');
     });
   });
 
@@ -1117,6 +1156,103 @@ describe('👥 Users API', () => {
         console.log('      ✅ Teams correctly ordered');
       } catch (error) {
         console.log('      ❌ Ordering test failed:', error.message);
+        throw error;
+      }
+    });
+
+    it('✅ admin should see all teams with club and team names', async () => {
+      try {
+        const response = await request(app)
+          .get('/api/users/me/assignable-teams')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
+
+        expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body.length).toBeGreaterThanOrEqual(3);
+        
+        // Check that each team has club_name and name
+        response.body.forEach(team => {
+          expect(team).toHaveProperty('id');
+          expect(team).toHaveProperty('name');
+          expect(team).toHaveProperty('club_id');
+          expect(team).toHaveProperty('club_name');
+        });
+        
+        console.log('      ✅ Admin sees all teams with club and team names');
+      } catch (error) {
+        console.log('      ❌ Admin assignable teams test failed:', error.message);
+        throw error;
+      }
+    });
+
+    it('✅ coach should only see assigned teams', async () => {
+      try {
+        const response = await request(app)
+          .get('/api/users/me/assignable-teams')
+          .set('Authorization', `Bearer ${coachToken}`)
+          .expect(200);
+
+        expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body.length).toBe(2);
+        
+        // Should include team1 and team2
+        const teamIds = response.body.map(t => t.id);
+        expect(teamIds).toContain(team1.id);
+        expect(teamIds).toContain(team2.id);
+        expect(teamIds).not.toContain(team3.id);
+        
+        // Check structure
+        response.body.forEach(team => {
+          expect(team).toHaveProperty('id');
+          expect(team).toHaveProperty('name');
+          expect(team).toHaveProperty('club_id');
+          expect(team).toHaveProperty('club_name');
+        });
+        
+        console.log('      ✅ Coach sees only assigned teams');
+      } catch (error) {
+        console.log('      ❌ Coach assignable teams test failed:', error.message);
+        throw error;
+      }
+    });
+
+    it('✅ coach with no assignments should see empty array', async () => {
+      try {
+        // Create coach without any assignments
+        const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        const hashedPassword = await bcrypt.hash('password123', 10);
+        const unassignedCoachResult = await db.query(
+          'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
+          [`coach_unassigned_${uniqueId}`, `coach_unassigned_${uniqueId}@test.com`, hashedPassword, 'coach']
+        );
+        const unassignedCoach = unassignedCoachResult.rows[0];
+        const unassignedCoachToken = generateJWT(unassignedCoach);
+
+        const response = await request(app)
+          .get('/api/users/me/assignable-teams')
+          .set('Authorization', `Bearer ${unassignedCoachToken}`)
+          .expect(200);
+
+        expect(Array.isArray(response.body)).toBe(true);
+        expect(response.body.length).toBe(0);
+        
+        await db.query('DELETE FROM users WHERE id = $1', [unassignedCoach.id]);
+        console.log('      ✅ Unassigned coach sees empty array');
+      } catch (error) {
+        console.log('      ❌ Unassigned coach test failed:', error.message);
+        throw error;
+      }
+    });
+
+    it('❌ should require authentication', async () => {
+      try {
+        await request(app)
+          .get('/api/users/me/assignable-teams')
+          .expect(401);
+        
+        console.log('      ✅ Correctly requires authentication');
+      } catch (error) {
+        console.log('      ❌ Authentication requirement test failed:', error.message);
         throw error;
       }
     });
