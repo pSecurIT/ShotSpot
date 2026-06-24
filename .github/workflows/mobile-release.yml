@@ -163,7 +163,7 @@ jobs:
 
       - name: Create GitHub Release Asset
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
         with:
           files: |
             frontend/android/app/build/outputs/apk/release/app-release.apk
@@ -445,7 +445,7 @@ jobs:
 
       - name: Create GitHub Release Asset
         if: ${{ steps.detect_signing.outputs.signing_required == 'true' && github.event_name == 'release' }}
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
         with:
           files: frontend/ios/App/build/App.ipa
           token: ${{ secrets.GITHUB_TOKEN }}
