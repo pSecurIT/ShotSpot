@@ -65,5 +65,5 @@ Code-scanning results should represent the default branch and scheduled/manual s
 1. Keep action pins updated.
 2. Preserve stable SARIF categories unless there is an intentional migration.
 3. Re-check the repository rulesets after renaming any blocking job.
-4. Update [e:\code\ShotSpot\CONTRIBUTING.md](e:\code\ShotSpot\CONTRIBUTING.md) if branch policy or merge gates change.
+4. Update [CONTRIBUTING.md](../../CONTRIBUTING.md) if branch policy or merge gates change.
 5. Prefer small, reviewable workflow changes over large CI rewrites.
