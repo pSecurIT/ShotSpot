@@ -10,7 +10,7 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - '.github/workflows/docker.yml'
-  # Always run on PRs to ensure required checks are reported.
+  # Run on PRs that change Docker/app/workflow files so required checks are reported where applicable.
   pull_request:
     branches: [ main ]
     paths:
@@ -465,5 +465,4 @@ jobs:
             fi
             rm -f .env.docker || true
           fi
-
 
