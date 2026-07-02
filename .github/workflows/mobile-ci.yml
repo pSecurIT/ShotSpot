@@ -6,7 +6,14 @@ permissions:
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/mobile-ci.yml'
   pull_request:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/mobile-ci.yml'
 
 jobs:
   ios:

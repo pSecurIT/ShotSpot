@@ -34,6 +34,20 @@ The standard local endpoints are:
 5. Run the relevant checks locally before opening a pull request.
 6. Write a pull request description that explains motivation, approach, and verification.
 
+## Branch Protection And Merge Gates
+
+ShotSpot uses different merge gates for `main` and protected feature branches.
+
+- `main` is the strict branch. Pull requests to `main` should expect approval, resolved review threads, and the full required check set configured in GitHub.
+- Protected feature branches are intentionally lighter. They should only require fast feedback checks and review, not the full `main` security and compliance surface.
+- Required checks are defined in GitHub rulesets. Workflow files in `.github/workflows/` must continue to emit the exact check names referenced by those rulesets.
+- If a workflow trigger or job name changes, update the matching ruleset and documentation in the same change.
+
+Current working model:
+
+- `main`: backend tests, frontend tests, CodeQL, secret scan, license checks, and external `Trivy` protection.
+- Protected feature branches: backend tests and frontend tests, plus approval and review thread resolution.
+
 ## Quality Checks
 
 Run these before opening a pull request:
@@ -46,6 +60,12 @@ npm --prefix backend run test
 ```
 
 If your change is limited to documentation or repository metadata, state that clearly in the pull request and run the subset of checks that still applies.
+
+If your change touches GitHub Actions workflows, rulesets, release automation, or repository policy files, also review:
+
+- `.github/workflows/README.md`
+- `.github/CODEOWNERS`
+- The repository rulesets in GitHub settings
 
 ## License Compliance Policy
 
