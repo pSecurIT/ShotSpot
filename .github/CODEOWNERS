@@ -1,0 +1,12 @@
+# Default ownership
+* @pSecurIT
+
+# Backend
+/backend/ @pSecurIT
+
+# Frontend and mobile
+/frontend/ @pSecurIT
+
+# CI and repository policy
+/.github/ @pSecurIT
+/scripts/ @pSecurIT

@@ -10,9 +10,15 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - '.github/workflows/docker.yml'
-  # Always run on PRs to ensure required checks are reported.
+  # Run on PRs that change Docker/app/workflow files so required checks are reported where applicable.
   pull_request:
     branches: [ main ]
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/docker.yml'
   schedule:
     - cron: '15 3 * * 1'
   workflow_dispatch:
@@ -26,59 +32,8 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  docker-gate:
-    name: Docker Change Gate
-    runs-on: ubuntu-latest
-    outputs:
-      should_run: ${{ steps.scope.outputs.should_run }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          fetch-depth: 0
-
-      - name: Determine whether Docker validation should run
-        id: scope
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          should_run=true
-
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_sha="${{ github.event.pull_request.base.sha }}"
-            head_sha="${{ github.event.pull_request.head.sha }}"
-
-            changed_files="$(
-              git diff --name-only "$base_sha" "$head_sha" -- \
-                'Dockerfile' \
-                'docker-compose.yml' \
-                'backend/**' \
-                'frontend/**' \
-                '.github/workflows/docker.yml' 2>/dev/null
-            )" || changed_files=""
-
-            if [ -n "$changed_files" ]; then
-              should_run=true
-              echo "Docker-relevant changes detected for this pull request." >> "$GITHUB_STEP_SUMMARY"
-            elif git diff --quiet "$base_sha" "$head_sha" -- >/dev/null 2>&1; then
-              should_run=false
-              echo "No Docker-relevant changes detected for this pull request; heavy Docker validation will be skipped." >> "$GITHUB_STEP_SUMMARY"
-            else
-              should_run=true
-              echo "Unable to compute the pull request diff with local SHAs; Docker validation will run by default." >> "$GITHUB_STEP_SUMMARY"
-            fi
-          else
-            echo "Non-pull_request event; Docker validation will run." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
-
   test-docker-build:
     name: Test Docker Build
-    needs: docker-gate
-    if: ${{ needs.docker-gate.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -87,7 +42,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
@@ -192,12 +147,12 @@ jobs:
 
       - name: Upload Docker SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
-        if: ${{ always() && hashFiles('snyk-docker.sarif') != '' }}
+        if: ${{ always() && github.event_name != 'pull_request' && hashFiles('snyk-docker.sarif') != '' }}
         with:
           sarif_file: snyk-docker.sarif
           category: snyk-docker
-          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
-          sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.ref }}
+          sha: ${{ github.sha }}
 
       - name: Monitor Docker image in Snyk
         id: snyk_docker_monitor
@@ -362,15 +317,14 @@ jobs:
 
   test-docker-compose:
     name: Test Docker Compose
-    needs: docker-gate
-    if: ${{ needs.docker-gate.outputs.should_run == 'true' && github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Install docker-compose
         run: |
@@ -511,5 +465,4 @@ jobs:
             fi
             rm -f .env.docker || true
           fi
-
 
