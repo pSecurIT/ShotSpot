@@ -33,12 +33,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+
       - name: Build image for scanning
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Building local image for vulnerability scan"
-          docker build -t local/shotspot:scan-${{ github.sha }} .
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+        with:
+          context: .
+          push: false
+          load: true
+          tags: local/shotspot:scan-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner (SARIF)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
