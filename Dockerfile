@@ -23,8 +23,9 @@ ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
 # Security: Use npm ci for reproducible builds and verify checksums
 # Install as root for speed (no chown needed on node_modules)
 # Note: Keep optional deps for build tools like Rollup that need platform-specific binaries
-RUN npm ci --ignore-scripts && \
-    npm cache clean --force
+# BuildKit cache mount keeps the npm cache warm across builds without bloating the image layer.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts
 
 # Copy frontend source (already owned by root, no chown needed yet)
 COPY frontend/ ./
@@ -52,8 +53,9 @@ ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
 # Security: Use npm ci with --ignore-scripts to prevent malicious postinstall scripts
 # Install as root for speed (no chown needed on node_modules)
 # Note: Keep optional deps - backend may need platform-specific modules
-RUN npm ci --ignore-scripts && \
-    npm cache clean --force
+# BuildKit cache mount keeps the npm cache warm across builds without bloating the image layer.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts
 
 # Copy backend source (already owned by root)
 COPY backend/ ./
@@ -93,10 +95,12 @@ ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
     NPM_CONFIG_FETCH_RETRIES=10
 
 # Multi-arch: Exclude optional and dev dependencies in runtime image
-RUN npm ci --omit=optional --omit=dev --ignore-scripts && \
-    npm cache clean --force && \
-    # Runtime container does not need npm or npx after dependencies are installed.
-    rm -rf /usr/local/lib/node_modules/npm && \
+# BuildKit cache mount keeps the npm cache warm across builds without bloating the image layer.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=optional --omit=dev --ignore-scripts
+
+# Runtime container does not need npm or npx after dependencies are installed.
+RUN rm -rf /usr/local/lib/node_modules/npm && \
     rm -f /usr/local/bin/npm /usr/local/bin/npx && \
     # Security: Remove unnecessary files
     find . -name "*.md" -type f -delete && \
