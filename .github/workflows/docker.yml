@@ -210,9 +210,25 @@ jobs:
           grep -v "JWT_SECRET" .env.docker
           echo "JWT_SECRET=<redacted ${#CI_AUTH_TOKEN_SECRET} chars>"
 
+      - name: Pull base images with retry
+        run: |
+          # Pull external images with retry to handle transient Docker Hub errors (e.g. 502)
+          for attempt in 1 2 3; do
+            if docker-compose --env-file .env.docker pull db; then
+              echo "✅ Base images pulled on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ Failed to pull base images after 3 attempts"
+              exit 1
+            fi
+            echo "⚠️ Pull attempt $attempt failed, retrying in 15 seconds..."
+            sleep 15
+          done
+
       - name: Test Docker image
         run: |
-          # Start services with Docker environment
+          # Start services with Docker environment (base images already pulled above)
           docker-compose --env-file .env.docker up -d
 
           # Check for immediate restarts (diagnostic)
@@ -379,6 +395,22 @@ jobs:
 
       - name: Validate docker-compose.yml
         run: docker-compose --env-file .env.docker config
+
+      - name: Pull base images with retry
+        run: |
+          # Pull external images with retry to handle transient Docker Hub errors (e.g. 502)
+          for attempt in 1 2 3; do
+            if docker-compose --env-file .env.docker pull db; then
+              echo "✅ Base images pulled on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ Failed to pull base images after 3 attempts"
+              exit 1
+            fi
+            echo "⚠️ Pull attempt $attempt failed, retrying in 15 seconds..."
+            sleep 15
+          done
 
       - name: Start Docker Compose services
         run: docker-compose --env-file .env.docker up -d
