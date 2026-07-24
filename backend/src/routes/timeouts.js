@@ -347,6 +347,19 @@ router.put('/:timeoutId', [
   }
 
   const { timeoutId } = req.params;
+
+  // Explicit allowlist of columns that may be updated via this endpoint
+  const UPDATABLE_TIMEOUT_COLUMNS = new Set([
+    'game_id', 'club_id', 'timeout_type', 'period', 'time_remaining',
+    'duration', 'reason', 'called_by', 'event_status'
+  ]);
+
+  // Reject requests containing unrecognized keys
+  const unknownKeys = Object.keys(req.body).filter(k => !UPDATABLE_TIMEOUT_COLUMNS.has(k));
+  if (unknownKeys.length > 0) {
+    return res.status(400).json({ error: `Unknown field(s): ${unknownKeys.join(', ')}` });
+  }
+
   const updates = req.body;
   const gameId = updates.game_id;
 
@@ -361,18 +374,18 @@ router.put('/:timeoutId', [
       return res.status(404).json({ error: 'Timeout not found' });
     }
 
-    // Build dynamic update query
+    // Build dynamic update query using only whitelisted column names
     const updateFields = [];
     const params = [];
     let paramIndex = 1;
 
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value !== undefined) {
+    for (const key of UPDATABLE_TIMEOUT_COLUMNS) {
+      if (Object.prototype.hasOwnProperty.call(updates, key) && updates[key] !== undefined) {
         updateFields.push(`${key} = $${paramIndex}`);
-        params.push(value);
+        params.push(updates[key]);
         paramIndex++;
       }
-    });
+    }
 
     if (updateFields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });

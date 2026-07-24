@@ -320,6 +320,16 @@ router.put('/:gameId/:shotId', [
   }
 
   const { gameId, shotId } = req.params;
+
+  // Explicit allowlist of columns that may be updated via this endpoint
+  const UPDATABLE_SHOT_COLUMNS = new Set(['result', 'x_coord', 'y_coord', 'shot_type', 'distance', 'event_status']);
+
+  // Reject requests containing unrecognized keys
+  const unknownKeys = Object.keys(req.body).filter(k => !UPDATABLE_SHOT_COLUMNS.has(k));
+  if (unknownKeys.length > 0) {
+    return res.status(400).json({ error: `Unknown field(s): ${unknownKeys.join(', ')}` });
+  }
+
   const updates = req.body;
 
   try {
@@ -335,15 +345,17 @@ router.put('/:gameId/:shotId', [
     const newResult = updates.result || oldResult;
     const newStatus = updates.event_status || oldStatus;
 
-    // Build dynamic update query
+    // Build dynamic update query using only whitelisted column names
     const fields = [];
     const values = [];
     let paramIndex = 1;
 
-    for (const [key, value] of Object.entries(updates)) {
-      fields.push(`${key} = $${paramIndex}`);
-      values.push(value);
-      paramIndex++;
+    for (const key of UPDATABLE_SHOT_COLUMNS) {
+      if (Object.prototype.hasOwnProperty.call(updates, key)) {
+        fields.push(`${key} = $${paramIndex}`);
+        values.push(updates[key]);
+        paramIndex++;
+      }
     }
 
     if (fields.length === 0) {

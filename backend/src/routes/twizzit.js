@@ -34,6 +34,52 @@ const validate = (req, res, next) => {
 };
 
 /**
+ * Validate that an API endpoint URL is safe (not pointing to internal/private networks).
+ * Only https:// or http:// schemes with non-private hostnames are permitted.
+ */
+function isPermittedApiEndpoint(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+
+  // Only http and https schemes are allowed
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return false;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block loopback addresses
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+    return false;
+  }
+
+  // Block link-local (169.254.x.x) and IPv4-mapped link-local
+  if (/^169\.254\./.test(hostname)) {
+    return false;
+  }
+
+  // Block RFC 1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+  if (
+    /^10\./.test(hostname) ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+    /^192\.168\./.test(hostname)
+  ) {
+    return false;
+  }
+
+  // Block metadata service addresses common in cloud environments
+  if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * POST /api/twizzit/credentials
  * Store Twizzit API credentials (admin only)
  */
@@ -57,6 +103,12 @@ router.post(
       .trim()
       .isURL()
       .withMessage('API endpoint must be a valid URL')
+      .custom((value) => {
+        if (value && !isPermittedApiEndpoint(value)) {
+          throw new Error('API endpoint must not point to a private or reserved network address');
+        }
+        return true;
+      })
   ],
   validate,
   async (req, res) => {

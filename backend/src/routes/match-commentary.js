@@ -247,8 +247,20 @@ router.put('/:commentaryId', [
   }
 
   const { commentaryId } = req.params;
-  const updates = req.body;
   const userId = req.user.userId; // From auth middleware
+
+  // Explicit allowlist of columns that may be updated via this endpoint
+  const UPDATABLE_COMMENTARY_COLUMNS = new Set([
+    'period', 'time_remaining', 'commentary_type', 'title', 'content', 'event_status'
+  ]);
+
+  // Reject requests containing unrecognized keys
+  const unknownKeys = Object.keys(req.body).filter(k => !UPDATABLE_COMMENTARY_COLUMNS.has(k));
+  if (unknownKeys.length > 0) {
+    return res.status(400).json({ error: `Unknown field(s): ${unknownKeys.join(', ')}` });
+  }
+
+  const updates = req.body;
 
   try {
     // Verify commentary exists (no need for game_id verification in update)
@@ -270,18 +282,18 @@ router.put('/:commentaryId', [
       });
     }
 
-    // Build dynamic update query
+    // Build dynamic update query using only whitelisted column names
     const updateFields = [];
     const params = [];
     let paramIndex = 1;
 
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value !== undefined) {
+    for (const key of UPDATABLE_COMMENTARY_COLUMNS) {
+      if (Object.prototype.hasOwnProperty.call(updates, key) && updates[key] !== undefined) {
         updateFields.push(`${key} = $${paramIndex}`);
-        params.push(value);
+        params.push(updates[key]);
         paramIndex++;
       }
-    });
+    }
 
     if (updateFields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
