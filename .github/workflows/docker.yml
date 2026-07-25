@@ -137,6 +137,7 @@ jobs:
 
       - name: Run Snyk scan on Docker image + SARIF
         id: snyk_docker_test
+        if: ${{ secrets.SNYK_TOKEN != '' }}
         uses: snyk/actions/docker@9adf32b1121593767fc3c057af55b55db032dc04
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -156,7 +157,7 @@ jobs:
 
       - name: Monitor Docker image in Snyk
         id: snyk_docker_monitor
-        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && secrets.SNYK_TOKEN != '' }}
         continue-on-error: true
         shell: bash
         env:
