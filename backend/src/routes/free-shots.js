@@ -358,6 +358,21 @@ router.put('/:freeShotId', [
   }
 
   const { freeShotId } = req.params;
+
+  // Explicit allowlist of columns that may be updated via this endpoint.
+  // 'team_id' is accepted as an alias for 'club_id' and handled below.
+  const UPDATABLE_FREE_SHOT_COLUMNS = new Set([
+    'game_id', 'player_id', 'club_id', 'period', 'time_remaining',
+    'free_shot_type', 'reason', 'x_coord', 'y_coord', 'result',
+    'distance', 'event_status'
+  ]);
+
+  // Reject requests containing unrecognized keys (allow 'team_id' as alias)
+  const unknownKeys = Object.keys(req.body).filter(k => k !== 'team_id' && !UPDATABLE_FREE_SHOT_COLUMNS.has(k));
+  if (unknownKeys.length > 0) {
+    return res.status(400).json({ error: `Unknown field(s): ${unknownKeys.join(', ')}` });
+  }
+
   const updates = { ...req.body };
   if (updates.team_id && !updates.club_id) {
     updates.club_id = updates.team_id;
@@ -376,18 +391,18 @@ router.put('/:freeShotId', [
       return res.status(404).json({ error: 'Free shot not found' });
     }
 
-    // Build dynamic update query
+    // Build dynamic update query using only whitelisted column names
     const updateFields = [];
     const params = [];
     let paramIndex = 1;
 
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value !== undefined) {
+    for (const key of UPDATABLE_FREE_SHOT_COLUMNS) {
+      if (Object.prototype.hasOwnProperty.call(updates, key) && updates[key] !== undefined) {
         updateFields.push(`${key} = $${paramIndex}`);
-        params.push(value);
+        params.push(updates[key]);
         paramIndex++;
       }
-    });
+    }
 
     if (updateFields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
