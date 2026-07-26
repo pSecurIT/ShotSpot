@@ -39,7 +39,7 @@ jobs:
     #   uses: actions/setup-example@v1
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+      uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
@@ -69,6 +69,5 @@ jobs:
       uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
       with:
         category: "/language:${{matrix.language}}"
-
 
 
