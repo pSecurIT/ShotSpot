@@ -11,7 +11,7 @@ ShotSpot uses two merge-gate levels:
 
 Current intended required checks:
 
-- `main`: `Backend Tests (22.x)`, `Frontend Tests (22.x)`, `Analyze (actions)`, `Analyze (javascript-typescript)`, `Scan for Secrets`, `Dependency License Check (backend)`, `Dependency License Check (frontend)`, external-app `Trivy`
+- `main`: `Backend Tests (22.x)`, `Frontend Tests (22.x)`, `Analyze (actions)`, `Analyze (javascript-typescript)`, `Scan for Secrets`, `Dependency License Check (backend)`, `Dependency License Check (frontend)`, `Trivy`
 - Protected feature branches: `Backend Tests (22.x)`, `Frontend Tests (22.x)`
 
 If a workflow job name, matrix expansion, or trigger scope changes, verify the matching GitHub ruleset still references emitted check names.
@@ -23,7 +23,7 @@ Code-scanning results should represent the default branch and scheduled/manual s
 - Pull requests should still run blocking security checks where appropriate.
 - SARIF uploads should be stable and category-based.
 - SARIF uploads should prefer `push` to `main`, `schedule`, and `workflow_dispatch` over PR refs.
-- The external-app `Trivy` integration remains the canonical required Trivy signal for branch protection.
+- The repository now emits a stable `Trivy` commit-status context from `security-scan.yml` for branch protection compatibility.
 
 ## Workflow Summary
 
