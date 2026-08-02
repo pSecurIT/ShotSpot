@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import StatePanel from './ui/StatePanel';

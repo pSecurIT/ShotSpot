@@ -2,6 +2,7 @@ name: Node.js CI
 permissions:
   contents: read
   security-events: write
+  statuses: write
 
 on:
   push:
@@ -18,7 +19,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend Tests
+    name: Backend Tests (22.x)
     runs-on: ubuntu-latest
 
     # Set DB env at job level so every step/child process uses the same settings
@@ -53,10 +54,23 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22.x]  # Required by current toolchain; pin npm separately for CI stability
+        node-version: [22.22.0]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+    - name: Publish pending backend status
+      if: ${{ github.event_name == 'pull_request' }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh api \
+          --method POST \
+          repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+          -f state='pending' \
+          -f context='Backend Tests (22.x)' \
+          -f description='Backend tests are running' \
+          -f target_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
 
     - name: Generate ephemeral test secrets
       run: |
@@ -125,16 +139,55 @@ jobs:
         flags: backend
         fail_ci_if_error: true
 
+    - name: Publish successful backend status
+      if: ${{ success() && github.event_name == 'pull_request' }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh api \
+          --method POST \
+          repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+          -f state='success' \
+          -f context='Backend Tests (22.x)' \
+          -f description='Backend tests passed' \
+          -f target_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+
+    - name: Publish failed backend status
+      if: ${{ failure() && github.event_name == 'pull_request' }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh api \
+          --method POST \
+          repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+          -f state='failure' \
+          -f context='Backend Tests (22.x)' \
+          -f description='Backend tests failed' \
+          -f target_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+
   frontend:
-    name: Frontend Tests
+    name: Frontend Tests (22.x)
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [22.x]  # Required by current toolchain; pin npm separately for CI stability
+        node-version: [22.22.0]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+    - name: Publish pending frontend status
+      if: ${{ github.event_name == 'pull_request' }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh api \
+          --method POST \
+          repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+          -f state='pending' \
+          -f context='Frontend Tests (22.x)' \
+          -f description='Frontend tests are running' \
+          -f target_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
     
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
@@ -183,6 +236,32 @@ jobs:
       working-directory: frontend
       run: npm run build
 
+    - name: Publish successful frontend status
+      if: ${{ success() && github.event_name == 'pull_request' }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh api \
+          --method POST \
+          repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+          -f state='success' \
+          -f context='Frontend Tests (22.x)' \
+          -f description='Frontend tests passed' \
+          -f target_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+
+    - name: Publish failed frontend status
+      if: ${{ failure() && github.event_name == 'pull_request' }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh api \
+          --method POST \
+          repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+          -f state='failure' \
+          -f context='Frontend Tests (22.x)' \
+          -f description='Frontend tests failed' \
+          -f target_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+
   security:
     name: Security Checks
     if: ${{ github.event_name != 'pull_request' }}
@@ -194,10 +273,10 @@ jobs:
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
-    - name: Use Node.js 22.x
+    - name: Use Node.js 22.22.0
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
       with:
-        node-version: 22.x
+        node-version: 22.22.0
 
     - name: Pin npm version
       run: npm install -g npm@10.9.2

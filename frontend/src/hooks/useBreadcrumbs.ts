@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { matchPath } from 'react-router-dom';
+import { matchPath } from 'react-router';
 import { BreadcrumbItem } from '../components/ui/Breadcrumbs';
 
 export const useBreadcrumbs = (): BreadcrumbItem[] => {

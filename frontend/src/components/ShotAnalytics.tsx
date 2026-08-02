@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import {
   LineChart, Line, BarChart, Bar, ScatterChart, Scatter, RadarChart, Radar,
   PolarGrid, PolarAngleAxis, PolarRadiusAxis,

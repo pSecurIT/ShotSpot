@@ -1,0 +1,56 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+        classpath 'com.google.gms:google-services:4.4.2'
+
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+apply from: "variables.gradle"
+
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy {
+            force(
+                'org.jetbrains.kotlin:kotlin-stdlib:2.1.0',
+                'org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.0',
+                'org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.0'
+            )
+
+            eachDependency { details ->
+                if (details.requested.group == 'io.netty') {
+                    details.useVersion '4.1.133.Final'
+                    details.because 'Enforce patched Netty transitive dependencies (Snyk)'
+                }
+                if (details.requested.group == 'com.google.protobuf' && details.requested.name == 'protobuf-java') {
+                    details.useVersion '4.28.2'
+                    details.because 'Enforce patched protobuf-java to fix Stack-based Buffer Overflow (SNYK-JAVA-COMGOOGLEPROTOBUF-8055227)'
+                }
+                if (details.requested.group == 'commons-io' && details.requested.name == 'commons-io') {
+                    details.useVersion '2.14.0'
+                    details.because 'Enforce patched commons-io to fix Path Traversal (SNYK-JAVA-COMMONSIO-8161190)'
+                }
+            }
+        }
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import api from '../utils/api';
 import CourtVisualization from './CourtVisualization';
 import MatchTimeline from './MatchTimeline';

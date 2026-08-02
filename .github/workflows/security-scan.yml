@@ -28,10 +28,24 @@ jobs:
       contents: read
       security-events: write
       actions: read
+      statuses: write
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Publish pending Trivy status
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+            -f state='pending' \
+            -f context='Trivy' \
+            -f description='Trivy security scan is running' \
+            -f target_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
@@ -87,6 +101,32 @@ jobs:
           scanners: 'vuln,secret'
           ignore-unfixed: true
           exit-code: '0'
+
+      - name: Publish successful Trivy status
+        if: ${{ success() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+            -f state='success' \
+            -f context='Trivy' \
+            -f description='Trivy security scan passed' \
+            -f target_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+
+      - name: Publish failed Trivy status
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+            -f state='failure' \
+            -f context='Trivy' \
+            -f description='Trivy security scan failed' \
+            -f target_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
 
   scan-filesystem:
     name: Scan Filesystem

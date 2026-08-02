@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import MatchTimeline from '../components/MatchTimeline';
 import api from '../utils/api';
 import { waitForSelectOptions } from './helpers/testHelpers';

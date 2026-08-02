@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import AchievementGallery from './AchievementGallery';
 import Leaderboard from './Leaderboard';
 import PageLayout from './ui/PageLayout';

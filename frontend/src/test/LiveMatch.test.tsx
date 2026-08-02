@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import LiveMatch from '../components/LiveMatch';
 import api from '../utils/api';
 import type { ReactNode } from 'react';
@@ -9,10 +9,10 @@ import type { ReactNode } from 'react';
 // Mock the API module
 vi.mock('../utils/api');
 
-// Mock react-router-dom hooks
+// Mock react-router hooks
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useParams: () => ({ gameId: '1' }),

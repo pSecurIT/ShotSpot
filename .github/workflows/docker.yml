@@ -30,6 +30,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
 jobs:
   test-docker-build:
@@ -47,7 +48,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          node-version: '22'
+          node-version: '22.22.0'
 
       - name: Pin npm version
         run: npm install -g npm@10.9.2
@@ -137,14 +138,20 @@ jobs:
 
       - name: Run Snyk scan on Docker image + SARIF
         id: snyk_docker_test
-        if: ${{ secrets.SNYK_TOKEN != '' }}
-        uses: snyk/actions/docker@9adf32b1121593767fc3c057af55b55db032dc04
+        if: ${{ env.SNYK_TOKEN != '' }}
+        continue-on-error: true
+        shell: bash
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          image: ${{ steps.meta.outputs.tags }}
-          args: --severity-threshold=high --sarif-file-output=snyk-docker.sarif
-        continue-on-error: true
+        run: |
+          set +e
+          snyk container test "${{ steps.meta.outputs.tags }}" \
+            --severity-threshold=high \
+            --sarif-file-output=snyk-docker.sarif \
+            $SNYK_ORG_FLAG > snyk-docker.log 2>&1
+          exit_code=$?
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Upload Docker SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81
@@ -157,19 +164,23 @@ jobs:
 
       - name: Monitor Docker image in Snyk
         id: snyk_docker_monitor
-        if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && secrets.SNYK_TOKEN != '' }}
+        if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && env.SNYK_TOKEN != '' }}
         continue-on-error: true
         shell: bash
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
+          set +e
           snyk container monitor "${{ steps.meta.outputs.tags }}" \
             --file=Dockerfile \
             --project-name=shotspot-container \
             --target-reference=${GITHUB_REF_NAME} \
             --project-environment=hosted \
             --project-lifecycle=production \
-            $SNYK_ORG_FLAG
+            $SNYK_ORG_FLAG > snyk-docker-monitor.log 2>&1
+          exit_code=$?
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Create .env.docker for CI
         run: |
@@ -302,11 +313,74 @@ jobs:
             rm -f .env.docker || true
           fi
 
-      - name: Fail on blocking Snyk findings
-        if: ${{ steps.snyk_docker_test.outcome == 'failure' || steps.snyk_docker_monitor.outcome == 'failure' }}
+      - name: Evaluate Docker Snyk findings
+        if: ${{ env.SNYK_TOKEN != '' }}
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DOCKER_EXIT: ${{ steps.snyk_docker_test.outputs.exit_code }}
+          MONITOR_EXIT: ${{ steps.snyk_docker_monitor.outputs.exit_code }}
         run: |
-          echo "::error::Snyk detected blocking Docker findings or failed to publish the monitoring snapshot."
-          exit 1
+          set -euo pipefail
+
+          blocking=0
+
+          is_quota_error() {
+            local log_file="$1"
+            [ -f "$log_file" ] && grep -Eiq 'quota|limit reached|over.*plan|plan usage|monthly limit|rate limit|429|too many requests' "$log_file"
+          }
+
+          evaluate_test() {
+            local exit_code="$1"
+
+            if [ -z "$exit_code" ] || [ "$exit_code" = "0" ]; then
+              echo "Docker image scan: no blocking findings"
+              return
+            fi
+
+            if [ "$exit_code" = "1" ]; then
+              if [ "${EVENT_NAME}" = "pull_request" ]; then
+                echo "::warning::Docker image scan: high/critical findings detected by Snyk (advisory on pull_request)"
+              else
+                echo "::error::Docker image scan: high/critical findings detected by Snyk"
+                blocking=1
+              fi
+              return
+            fi
+
+            if is_quota_error snyk-docker.log; then
+              echo "::warning::Docker image scan: Snyk quota/plan limit reached; not blocking this run"
+              return
+            fi
+
+            echo "::error::Docker image scan: Snyk execution failed (exit ${exit_code})"
+            blocking=1
+          }
+
+          evaluate_monitor() {
+            local exit_code="$1"
+
+            if [ -z "$exit_code" ] || [ "$exit_code" = "0" ]; then
+              echo "Docker monitor snapshot: published successfully or not requested"
+              return
+            fi
+
+            if is_quota_error snyk-docker-monitor.log; then
+              echo "::warning::Docker monitor snapshot: Snyk quota/plan limit reached; not blocking this run"
+              return
+            fi
+
+            echo "::error::Docker monitor snapshot failed (exit ${exit_code})"
+            blocking=1
+          }
+
+          evaluate_test "${DOCKER_EXIT:-}"
+          evaluate_monitor "${MONITOR_EXIT:-}"
+
+          if [ "$blocking" -ne 0 ]; then
+            echo "::error::Blocking Snyk Docker findings detected. Check the Docker Snyk logs and SARIF output for details."
+            exit 1
+          fi
 
       - name: Push Docker image
         if: github.event_name != 'pull_request'

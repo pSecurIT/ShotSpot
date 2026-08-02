@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import LiveMatch from '../components/LiveMatch';
 import { vi } from 'vitest';
 import api from '../utils/api';
@@ -14,9 +14,9 @@ vi.mock('../utils/api', () => ({
   }
 }));
 
-// Mock react-router-dom hooks
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+// Mock react-router hooks
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useParams: () => ({ gameId: '1' }),

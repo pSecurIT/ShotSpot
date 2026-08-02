@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import Login from '../components/Login';
 import type { AuthContextType } from '../types/auth';
 
@@ -18,8 +18,8 @@ const mocks = vi.hoisted(() => ({
   mockHasAppBiometricEnrollment: vi.fn().mockResolvedValue(false),
 }));
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mocks.mockNavigate,
