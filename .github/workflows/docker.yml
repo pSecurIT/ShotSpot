@@ -147,7 +147,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Docker SARIF to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81
         if: ${{ always() && github.event_name != 'pull_request' && hashFiles('snyk-docker.sarif') != '' }}
         with:
           sarif_file: snyk-docker.sarif
