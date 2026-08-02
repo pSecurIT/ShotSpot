@@ -164,19 +164,25 @@ jobs:
 
       - name: Monitor Docker image in Snyk
         id: snyk_docker_monitor
-        if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && env.SNYK_TOKEN != '' }}
+        if: ${{ (github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && env.SNYK_TOKEN != '' }}
         continue-on-error: true
         shell: bash
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           set +e
+          target_ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          lifecycle="production"
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            lifecycle="development"
+          fi
+
           snyk container monitor "${{ steps.meta.outputs.tags }}" \
             --file=Dockerfile \
             --project-name=shotspot-container \
-            --target-reference=${GITHUB_REF_NAME} \
+            --target-reference=${target_ref} \
             --project-environment=hosted \
-            --project-lifecycle=production \
+            --project-lifecycle=${lifecycle} \
             $SNYK_ORG_FLAG > snyk-docker-monitor.log 2>&1
           exit_code=$?
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
@@ -381,6 +387,42 @@ jobs:
             echo "::error::Blocking Snyk Docker findings detected. Check the Docker Snyk logs and SARIF output for details."
             exit 1
           fi
+
+      - name: Publish Docker Snyk summary
+        if: ${{ always() && env.SNYK_TOKEN != '' }}
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DOCKER_EXIT: ${{ steps.snyk_docker_test.outputs.exit_code }}
+          MONITOR_EXIT: ${{ steps.snyk_docker_monitor.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+
+          echo "## Docker Snyk Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Event: ${EVENT_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Docker image test exit code: ${DOCKER_EXIT:-0}" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "- Docker monitor exit code: ${MONITOR_EXIT:-0}" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -f snyk-docker.log ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Docker Snyk log excerpt" >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 80 snyk-docker.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Docker Snyk diagnostics
+        if: ${{ always() && env.SNYK_TOKEN != '' && (hashFiles('snyk-docker.log') != '' || hashFiles('snyk-docker.sarif') != '' || hashFiles('snyk-docker-monitor.log') != '') }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: docker-snyk-diagnostics
+          if-no-files-found: ignore
+          path: |
+            snyk-docker.log
+            snyk-docker.sarif
+            snyk-docker-monitor.log
 
       - name: Push Docker image
         if: github.event_name != 'pull_request'
