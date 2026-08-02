@@ -22,7 +22,7 @@ env:
 
 jobs:
   scan-vulnerabilities:
-    name: Trivy
+    name: Scan for Vulnerabilities
     runs-on: ubuntu-latest
     permissions:
       contents: read

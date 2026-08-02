@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend Tests
+    name: Backend Tests (22.x)
     runs-on: ubuntu-latest
 
     # Set DB env at job level so every step/child process uses the same settings
@@ -126,7 +126,7 @@ jobs:
         fail_ci_if_error: true
 
   frontend:
-    name: Frontend Tests
+    name: Frontend Tests (22.x)
     runs-on: ubuntu-latest
 
     strategy:
