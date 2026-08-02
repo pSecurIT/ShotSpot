@@ -65,8 +65,34 @@ jobs:
           DENIED_REGEX="$(jq -r '.deniedLicenses | join("|")' .licenserc.json)"
           mkdir -p license-reports
 
+          resolve_base_images() {
+            local dockerfile="$1"
+            declare -A args=()
+
+            while IFS= read -r line; do
+              if [[ "$line" =~ ^ARG[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)=(.+)$ ]]; then
+                args["${BASH_REMATCH[1]}"]="${BASH_REMATCH[2]}"
+                continue
+              fi
+
+              if [[ "$line" =~ ^FROM[[:space:]]+([^[:space:]]+) ]]; then
+                local image="${BASH_REMATCH[1]}"
+                if [[ "$image" =~ ^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$ ]]; then
+                  local arg_name="${BASH_REMATCH[1]}"
+                  image="${args[$arg_name]:-}"
+                fi
+
+                if [ -n "$image" ]; then
+                  printf '%s\n' "$image"
+                fi
+              fi
+            done < "$dockerfile"
+          }
+
           mapfile -t BASE_IMAGES < <(
-            awk 'toupper($1) == "FROM" { print $2 }' Dockerfile backend/Dockerfile.dev frontend/Dockerfile.dev \
+            for dockerfile in Dockerfile backend/Dockerfile.dev frontend/Dockerfile.dev; do
+              resolve_base_images "$dockerfile"
+            done \
               | sort -u
           )
 
