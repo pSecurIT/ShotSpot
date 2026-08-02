@@ -57,7 +57,7 @@ jobs:
         node-version: [22.22.0]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
     - name: Publish pending backend status
       if: ${{ github.event_name == 'pull_request' }}
@@ -174,7 +174,7 @@ jobs:
         node-version: [22.22.0]  # Required by current toolchain; pin npm separately for CI stability
 
     steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
     - name: Publish pending frontend status
       if: ${{ github.event_name == 'pull_request' }}
@@ -271,7 +271,7 @@ jobs:
       SNYK_ENABLE_CODE_SCAN: 'true'
     
     steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
     - name: Use Node.js 22.22.0
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
@@ -541,7 +541,7 @@ jobs:
   #         --health-retries 5
   #
   #   steps:
-  #   - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+  #   - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
   #
   #   - name: Use Node.js 20.x
   #     uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
