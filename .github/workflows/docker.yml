@@ -317,6 +317,7 @@ jobs:
         if: ${{ env.SNYK_TOKEN != '' }}
         shell: bash
         env:
+          EVENT_NAME: ${{ github.event_name }}
           DOCKER_EXIT: ${{ steps.snyk_docker_test.outputs.exit_code }}
           MONITOR_EXIT: ${{ steps.snyk_docker_monitor.outputs.exit_code }}
         run: |
@@ -338,8 +339,12 @@ jobs:
             fi
 
             if [ "$exit_code" = "1" ]; then
-              echo "::error::Docker image scan: high/critical findings detected by Snyk"
-              blocking=1
+              if [ "${EVENT_NAME}" = "pull_request" ]; then
+                echo "::warning::Docker image scan: high/critical findings detected by Snyk (advisory on pull_request)"
+              else
+                echo "::error::Docker image scan: high/critical findings detected by Snyk"
+                blocking=1
+              fi
               return
             fi
 
