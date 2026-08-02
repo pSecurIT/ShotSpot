@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { BREAKPOINTS, NavigationItem } from '../config/navigation';
 import { useNavigation } from '../hooks/useNavigation';

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import api from '../utils/api';
 import DashboardWidget from './DashboardWidget';
 import QuickActions from './QuickActions';

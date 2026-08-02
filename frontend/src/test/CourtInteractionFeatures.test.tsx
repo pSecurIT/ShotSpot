@@ -2,7 +2,7 @@ import { useState, type ComponentProps } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import CourtVisualization from '../components/CourtVisualization';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import api from '../utils/api';
 
 // Mock API module

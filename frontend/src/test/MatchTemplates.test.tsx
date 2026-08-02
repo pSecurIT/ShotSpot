@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import MockAdapter from 'axios-mock-adapter';
 import api from '../utils/api';
 import MatchTemplates from '../components/MatchTemplates';

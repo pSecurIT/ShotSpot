@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { Competition, CompetitionStatus, CompetitionType } from '../types/competitions';
 import { competitionsApi } from '../services/competitionsApi';
 import CompetitionCard from './CompetitionCard';

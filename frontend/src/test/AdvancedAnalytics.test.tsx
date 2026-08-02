@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import html2canvas from 'html2canvas';
 import AdvancedAnalytics from '../components/AdvancedAnalytics';
 import api from '../utils/api';

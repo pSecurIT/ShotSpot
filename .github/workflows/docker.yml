@@ -47,7 +47,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          node-version: '22'
+          node-version: '22.22.0'
 
       - name: Pin npm version
         run: npm install -g npm@10.9.2
@@ -137,7 +137,7 @@ jobs:
 
       - name: Run Snyk scan on Docker image + SARIF
         id: snyk_docker_test
-        if: ${{ secrets.SNYK_TOKEN != '' }}
+        if: ${{ env.SNYK_TOKEN != '' }}
         uses: snyk/actions/docker@9adf32b1121593767fc3c057af55b55db032dc04
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -157,7 +157,7 @@ jobs:
 
       - name: Monitor Docker image in Snyk
         id: snyk_docker_monitor
-        if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && secrets.SNYK_TOKEN != '' }}
+        if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && env.SNYK_TOKEN != '' }}
         continue-on-error: true
         shell: bash
         env:

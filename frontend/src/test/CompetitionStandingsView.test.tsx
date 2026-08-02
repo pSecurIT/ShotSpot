@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { vi } from 'vitest';
 import CompetitionStandingsView from '../components/CompetitionStandingsView';
 import { competitionsApi } from '../services/competitionsApi';

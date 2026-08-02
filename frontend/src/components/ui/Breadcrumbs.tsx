@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useInRouterContext } from 'react-router-dom';
+import { Link, useInRouterContext } from 'react-router';
 
 export interface BreadcrumbItem {
   label: string;

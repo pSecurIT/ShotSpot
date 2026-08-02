@@ -1,7 +1,7 @@
 
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import { vi } from 'vitest';
 import UxObservabilityDashboard from '../components/UxObservabilityDashboard';
 import api from '../utils/api';

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import { vi } from 'vitest';
 import MobileMenu from '../components/MobileMenu';
 import type { NavigationItem } from '../config/navigation';
