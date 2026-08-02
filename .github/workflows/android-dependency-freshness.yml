@@ -1,0 +1,95 @@
+name: Android Dependency Freshness
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - 'scripts/check-android-dependency-updates.mjs'
+      - '.github/workflows/android-dependency-freshness.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - 'scripts/check-android-dependency-updates.mjs'
+      - '.github/workflows/android-dependency-freshness.yml'
+  schedule:
+    - cron: '30 4 * * 5'
+  workflow_dispatch:
+
+concurrency:
+  group: android-dependency-freshness-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-dependency-freshness:
+    name: Android Dependency Freshness
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      STRICT_ANDROID_UPDATES: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 22.22.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Pin npm version
+        run: npm install -g npm@10.9.2
+
+      - name: Setup Java
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Configure Android SDK path
+        working-directory: frontend/android
+        run: |
+          sdk_dir="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$sdk_dir" ]; then
+            echo "::error::Android SDK path not found in ANDROID_SDK_ROOT or ANDROID_HOME"
+            exit 1
+          fi
+          printf 'sdk.dir=%s\n' "$sdk_dir" > local.properties
+
+      - name: Ensure Gradle wrapper is executable
+        working-directory: frontend/android
+        run: chmod +x gradlew
+
+      - name: Generate Android dependency update report
+        working-directory: frontend/android
+        run: ./gradlew dependencyUpdates --no-daemon
+
+      - name: Evaluate Android dependency freshness
+        run: node scripts/check-android-dependency-updates.mjs frontend/android
+
+      - name: Upload Android dependency update report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: android-dependency-updates-report
+          if-no-files-found: warn
+          path: |
+            frontend/android/build/dependencyUpdates/report.json
+            frontend/android/build/dependencyUpdates/report.txt
