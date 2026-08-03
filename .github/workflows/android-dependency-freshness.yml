@@ -63,6 +63,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Generate Capacitor Android plugin artifacts
+        working-directory: frontend
+        run: npx cap sync android
+
       - name: Configure Android SDK path
         working-directory: frontend/android
         run: |
