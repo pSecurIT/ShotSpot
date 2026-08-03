@@ -65,7 +65,7 @@ jobs:
 
       - name: Generate Capacitor Android plugin artifacts
         working-directory: frontend
-        run: npx cap sync android
+        run: npm run build && npx cap sync android
 
       - name: Configure Android SDK path
         working-directory: frontend/android
