@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const androidRoot = path.resolve(process.argv[2] || 'frontend/android');
@@ -85,7 +85,7 @@ function appendSummary(lines) {
   }
 
   const summaryText = `${lines.join('\n')}\n`;
-  require('node:fs').appendFileSync(summaryPath, summaryText, 'utf8');
+  appendFileSync(summaryPath, summaryText, 'utf8');
 }
 
 if (!existsSync(reportPath)) {
