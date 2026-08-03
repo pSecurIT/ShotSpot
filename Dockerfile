@@ -66,8 +66,10 @@ FROM ${NODE_BASE_IMAGE}
 
 ARG NPM_VERSION
 
-# Security: Install only runtime init process and pin npm
-RUN apk add --no-cache tini && \
+# Security: Refresh Alpine packages so known fixed CVEs are pulled into runtime image,
+# then install only runtime init process and pin npm.
+RUN apk upgrade --no-cache && \
+    apk add --no-cache tini && \
     npm install -g npm@${NPM_VERSION}
 
 # Security: Create non-root user (no chown on /app yet - faster)
