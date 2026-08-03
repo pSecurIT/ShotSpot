@@ -1,10 +1,11 @@
 # Multi-stage build for ShotSpot application
 # Security: Use Node LTS with Alpine for minimal attack surface and multi-arch support
 # Pin npm to avoid vulnerable transitive dependencies in bundled npm modules.
+ARG NODE_BASE_IMAGE=node:22.22.0-alpine
 ARG NPM_VERSION=11.12.1
 
 # Stage 1: Build frontend
-FROM node:lts-alpine AS frontend-builder
+FROM ${NODE_BASE_IMAGE} AS frontend-builder
 
 ARG NPM_VERSION
 RUN npm install -g npm@${NPM_VERSION}
@@ -34,7 +35,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build backend
-FROM node:lts-alpine AS backend-builder
+FROM ${NODE_BASE_IMAGE} AS backend-builder
 
 ARG NPM_VERSION
 RUN npm install -g npm@${NPM_VERSION}
@@ -61,12 +62,14 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY backend/ ./
 
 # Stage 3: Production image
-FROM node:lts-alpine
+FROM ${NODE_BASE_IMAGE}
 
 ARG NPM_VERSION
 
-# Security: Install only runtime init process and pin npm
-RUN apk add --no-cache tini && \
+# Security: Refresh Alpine packages so known fixed CVEs are pulled into runtime image,
+# then install only runtime init process and pin npm.
+RUN apk upgrade --no-cache && \
+    apk add --no-cache tini && \
     npm install -g npm@${NPM_VERSION}
 
 # Security: Create non-root user (no chown on /app yet - faster)

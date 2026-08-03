@@ -3,19 +3,40 @@
 buildscript {
     
     repositories {
+        gradlePluginPortal()
         google()
         mavenCentral()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.13.0'
         classpath 'com.google.gms:google-services:4.4.2'
+        classpath 'com.github.ben-manes:gradle-versions-plugin:0.52.0'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
     }
 }
 
+apply plugin: 'com.github.ben-manes.versions'
+
 apply from: "variables.gradle"
+
+def isNonStableVersion = { String version ->
+    def upperVersion = version.toUpperCase()
+    def stableKeyword = ['RELEASE', 'FINAL', 'GA'].any { upperVersion.contains(it) }
+    def stablePattern = /^[0-9,.v-]+(-r)?$/
+    return !stableKeyword && !(version ==~ stablePattern)
+}
+
+tasks.named('dependencyUpdates').configure {
+    checkForGradleUpdate = true
+    outputFormatter = 'json,plain'
+    outputDir = 'build/dependencyUpdates'
+    reportfileName = 'report'
+    rejectVersionIf {
+        isNonStableVersion(it.candidate.version) && !isNonStableVersion(it.currentVersion)
+    }
+}
 
 allprojects {
     configurations.configureEach {
@@ -28,8 +49,8 @@ allprojects {
 
             eachDependency { details ->
                 if (details.requested.group == 'io.netty') {
-                    details.useVersion '4.1.133.Final'
-                    details.because 'Enforce patched Netty transitive dependencies (Snyk)'
+                    details.useVersion '4.1.135.Final'
+                    details.because 'Enforce patched Netty transitive dependencies (Snyk CVE-2026-44249)'
                 }
                 if (details.requested.group == 'com.google.protobuf' && details.requested.name == 'protobuf-java') {
                     details.useVersion '4.28.2'
