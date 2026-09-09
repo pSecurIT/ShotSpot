@@ -60,7 +60,7 @@ jobs:
         run: npm install -g npm@10.9.2
 
       - name: Setup Java
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
