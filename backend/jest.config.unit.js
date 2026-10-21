@@ -63,7 +63,7 @@ export default {
   },
   
   transformIgnorePatterns: [
-    'node_modules/(?!(supertest|express|pg)/)'
+    'node_modules/(?!(supertest|express|pg|csurf|@dr\\.pogodin/csurf|cookie)/)'
   ],
   
   clearMocks: true,
