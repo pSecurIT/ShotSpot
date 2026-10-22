@@ -10,6 +10,7 @@
     "dev": "node --watch-path=src src/index.js",
     "pre-deploy": "node scripts/pre-deploy.js",
     "setup-db": "node scripts/setup-db.js",
+    "seed-demo": "node scripts/seed-demo-data.js",
     "setup-test-db": "node scripts/setup-test-db.js",
     "migrate": "npm run setup-test-db",
     "check-migrations": "node scripts/check-migrations.js",

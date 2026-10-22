@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+﻿import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { BrowserRouter } from 'react-router';
@@ -233,7 +233,7 @@ describe('LiveMatch', () => {
     render(<LiveMatchWrapper />);
     
     await waitFor(() => {
-      expect(screen.getByText('Live Match')).toBeInTheDocument();
+      expect(screen.getByTestId('scoreboard')).toBeInTheDocument();
     });
   });
 
@@ -241,8 +241,8 @@ describe('LiveMatch', () => {
     render(<LiveMatchWrapper />);
     
     await waitFor(() => {
-      // Team names might be in the scoreboard or other sections
-      expect(screen.getByText('Live Match')).toBeInTheDocument();
+      expect(screen.getByText('Home Team')).toBeInTheDocument();
+      expect(screen.getByText('Away Team')).toBeInTheDocument();
     });
   });
 
@@ -250,7 +250,8 @@ describe('LiveMatch', () => {
     render(<LiveMatchWrapper />);
     
     await waitFor(() => {
-      expect(screen.getByText('Timer Controls')).toBeInTheDocument();
+      expect(document.querySelector('.timer-controls')).toBeInTheDocument();
+      expect(screen.getByText('▶️ Start Match')).toBeInTheDocument();
     });
   });
 
@@ -263,23 +264,60 @@ describe('LiveMatch', () => {
     });
   });
 
-  it('shows focus mode toggle', async () => {
+  it('no longer offers focus mode', async () => {
     render(<LiveMatchWrapper />);
     
     await waitFor(() => {
-      expect(screen.getByText('🎯 Focus Mode')).toBeInTheDocument();
+      expect(screen.getByTestId('scoreboard')).toBeInTheDocument();
     });
+    expect(screen.queryByText('🎯 Focus Mode')).not.toBeInTheDocument();
   });
 
-  it('renders match events dashboard', async () => {
+  it('renders the view tabs and switches to the events view', async () => {
+    const user = userEvent.setup();
     render(<LiveMatchWrapper />);
     
     await waitFor(() => {
-      expect(screen.getByText('Match Events Dashboard')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Live' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    await user.click(screen.getByRole('tab', { name: /Events/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('match-timeline')).toBeInTheDocument();
     });
   });
 
-  it('shows the pending review count on the timeline tab', async () => {
+  it('keeps the court mounted when switching tabs', async () => {
+    const user = userEvent.setup();
+    render(<LiveMatchWrapper />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('court-visualization')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('tab', { name: 'Substitutions' }));
+
+    expect(screen.getByTestId('court-visualization')).toBeInTheDocument();
+    expect(screen.getByTestId('substitution-panel')).toBeInTheDocument();
+  });
+
+  it('opens the fault panel from the quick actions and closes it with Escape', async () => {
+    const user = userEvent.setup();
+    render(<LiveMatchWrapper />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Fault/ })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Fault/ }));
+    expect(screen.getByRole('dialog', { name: 'Record fault' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows the pending review count on the events tab', async () => {
     pendingEvents.comprehensive = [{ id: 1 }, { id: 2 }];
     pendingEvents.shots = [{ id: 3 }];
     pendingEvents.substitutions = [{ id: 4 }];
@@ -287,13 +325,15 @@ describe('LiveMatch', () => {
     render(<LiveMatchWrapper />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Timeline \(4\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /Events \(4\)/i })).toBeInTheDocument();
     });
   });
 
   it('updates pending review count when timeline refresh is triggered (offline queue signal)', async () => {
     const user = userEvent.setup();
     render(<LiveMatchWrapper />);
+
+    await user.click(await screen.findByRole('tab', { name: /Events/ }));
 
     await waitFor(() => {
       expect(screen.getByTestId('timeline-refresh')).toBeInTheDocument();
@@ -306,7 +346,7 @@ describe('LiveMatch', () => {
     await user.click(screen.getByTestId('timeline-refresh'));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Timeline \(3\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /Events \(3\)/i })).toBeInTheDocument();
     });
   });
 
@@ -328,16 +368,22 @@ describe('LiveMatch', () => {
   });
 
   it('renders substitution panel', async () => {
+    const user = userEvent.setup();
     render(<LiveMatchWrapper />);
     
+    await user.click(await screen.findByRole('tab', { name: 'Substitutions' }));
+
     await waitFor(() => {
       expect(screen.getByTestId('substitution-panel')).toBeInTheDocument();
     });
   });
 
   it('renders match timeline', async () => {
+    const user = userEvent.setup();
     render(<LiveMatchWrapper />);
     
+    await user.click(await screen.findByRole('tab', { name: /Events/ }));
+
     await waitFor(() => {
       expect(screen.getByTestId('match-timeline')).toBeInTheDocument();
     });
@@ -347,7 +393,7 @@ describe('LiveMatch', () => {
     render(<LiveMatchWrapper />);
     
     await waitFor(() => {
-      expect(screen.getByText('← Back to Games')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Back to Games' })).toBeInTheDocument();
     });
   });
 
@@ -556,63 +602,6 @@ describe('LiveMatch', () => {
         expect(mockStartTimer).toHaveBeenCalledTimes(1);
         expect(screen.getByText('Error starting timer')).toBeInTheDocument();
       });
-    });
-  });
-
-  // Focus Mode Tests
-  describe('Focus Mode', () => {
-    it('toggles focus mode on button click', async () => {
-      const user = userEvent.setup();
-      
-      render(<LiveMatchWrapper />);
-      
-      await waitFor(() => {
-        expect(screen.getByText('🎯 Focus Mode')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByText('🎯 Focus Mode'));
-
-      await waitFor(() => {
-        expect(screen.getAllByText('Exit Focus').length).toBeGreaterThan(0);
-      });
-    });
-
-    it('handles F key press to toggle focus mode', async () => {
-      render(<LiveMatchWrapper />);
-      
-      await waitFor(() => {
-        expect(screen.getByText('🎯 Focus Mode')).toBeInTheDocument();
-      });
-
-      // Press F key on document
-      const event = new KeyboardEvent('keydown', { key: 'f' });
-      document.dispatchEvent(event);
-
-      await waitFor(() => {
-        expect(screen.getAllByText('Exit Focus').length).toBeGreaterThan(0);
-      });
-    });
-
-    it('ignores F key press when input is focused', async () => {
-      render(<LiveMatchWrapper />);
-      
-      await waitFor(() => {
-        expect(screen.getByText('🎯 Focus Mode')).toBeInTheDocument();
-      });
-
-      // Create and focus a mock input
-      const input = document.createElement('input');
-      document.body.appendChild(input);
-      input.focus();
-
-      // Press F key
-      const event = new KeyboardEvent('keydown', { key: 'f' });
-      document.dispatchEvent(event);
-
-      // Should still show original focus mode text
-      expect(screen.getByText('🎯 Focus Mode')).toBeInTheDocument();
-      
-      document.body.removeChild(input);
     });
   });
 
@@ -900,7 +889,7 @@ describe('LiveMatch', () => {
       render(<LiveMatchWrapper />);
       
       await waitFor(() => {
-        expect(screen.getByText('Live Match')).toBeInTheDocument();
+        expect(screen.getByTestId('scoreboard')).toBeInTheDocument();
       });
 
       // Component should fetch active possession - need to wait for the useEffect to run
@@ -923,7 +912,7 @@ describe('LiveMatch', () => {
       render(<LiveMatchWrapper />);
       
       await waitFor(() => {
-        expect(screen.getByText('Live Match')).toBeInTheDocument();
+        expect(screen.getByTestId('scoreboard')).toBeInTheDocument();
       });
 
       // Should handle 404 gracefully without showing error
@@ -953,6 +942,8 @@ describe('LiveMatch', () => {
       const user = userEvent.setup();
 
       render(<LiveMatchWrapper />);
+
+      await user.click(await screen.findByRole('tab', { name: 'Substitutions' }));
 
       await waitFor(() => {
         expect(screen.getByTestId('record-substitution')).toBeInTheDocument();
@@ -1105,7 +1096,7 @@ describe('LiveMatch', () => {
       render(<LiveMatchWrapper />);
 
       await waitFor(() => {
-        expect(screen.getByText('Live Match')).toBeInTheDocument();
+        expect(screen.getByTestId('scoreboard')).toBeInTheDocument();
       });
 
       // Should have made the API call

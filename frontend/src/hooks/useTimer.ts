@@ -153,6 +153,23 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
   const autoPauseInFlightRef = useRef(false);
   const startMutationRef = useRef<Promise<void> | null>(null);
   const pauseMutationRef = useRef<Promise<void> | null>(null);
+  const mutationChainRef = useRef<Promise<unknown>>(Promise.resolve());
+  const pendingMutationsRef = useRef(0);
+  // Bumped on every start/pause so server state fetched before it is not applied over the optimistic state
+  const mutationEpochRef = useRef(0);
+
+  // Start/pause requests must reach the server in click order
+  const enqueueMutation = useCallback(<T,>(run: () => Promise<T>): Promise<T> => {
+    pendingMutationsRef.current += 1;
+    const next = mutationChainRef.current
+      .catch(() => undefined)
+      .then(run)
+      .finally(() => {
+        pendingMutationsRef.current -= 1;
+      });
+    mutationChainRef.current = next;
+    return next;
+  }, []);
 
   const setTimerStateOptimistic = useCallback((updates: Partial<TimerState>) => {
     setTimerSnapshot(prevState => {
@@ -219,10 +236,15 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
 
     fetchingRef.current = true;
     lastFetchRef.current = now;
+    const epochAtRequest = mutationEpochRef.current;
     
     try {
       setLoading(true);
       const response = await api.get(`/timer/${gameId}`);
+
+      if (epochAtRequest !== mutationEpochRef.current) {
+        return;
+      }
 
       applyFetchedTimerState(response.data);
       if (response.data.timer_state === 'running') {
@@ -270,6 +292,7 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
       const startFromPeriodDuration = timerSnapshot?.timer_state === 'stopped';
 
       setError(null);
+      mutationEpochRef.current += 1;
       setTimerStateOptimistic({
         timer_state: 'running',
         ...(startFromPeriodDuration && timerSnapshot?._periodDurationSeconds !== null
@@ -278,14 +301,18 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
       });
 
       try {
-        await retryTimerMutation(() => api.post(`/timer/${gameId}/start`, {}));
-        reconcileTimerStateInBackground();
+        await enqueueMutation(() => retryTimerMutation(() => api.post(`/timer/${gameId}/start`, {})));
+        if (pendingMutationsRef.current === 0) {
+          reconcileTimerStateInBackground();
+        }
       } catch (err) {
         setError('Failed to start timer');
-        if (previousSnapshot) {
-          setTimerSnapshot(previousSnapshot);
+        if (pendingMutationsRef.current === 0) {
+          if (previousSnapshot) {
+            setTimerSnapshot(previousSnapshot);
+          }
+          await fetchTimerState(true);
         }
-        await fetchTimerState(true);
         throw err;
       } finally {
         startMutationRef.current = null;
@@ -294,7 +321,7 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
 
     startMutationRef.current = mutationPromise;
     return mutationPromise;
-  }, [fetchTimerState, gameId, reconcileTimerStateInBackground, setTimerStateOptimistic, timerSnapshot]);
+  }, [enqueueMutation, fetchTimerState, gameId, reconcileTimerStateInBackground, setTimerStateOptimistic, timerSnapshot]);
 
   const pauseTimer = useCallback(async () => {
     if (pauseMutationRef.current) {
@@ -314,20 +341,25 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
       const frozenTime = secondsToTimeParts(currentRemainingSecondsRef.current);
 
       setError(null);
+      mutationEpochRef.current += 1;
       setTimerStateOptimistic({
         timer_state: 'paused',
         ...(frozenTime ? { time_remaining: frozenTime } : {})
       });
 
       try {
-        await retryTimerMutation(() => api.post(`/timer/${gameId}/pause`, {}));
-        reconcileTimerStateInBackground();
+        await enqueueMutation(() => retryTimerMutation(() => api.post(`/timer/${gameId}/pause`, {})));
+        if (pendingMutationsRef.current === 0) {
+          reconcileTimerStateInBackground();
+        }
       } catch (err) {
         setError('Failed to pause timer');
-        if (previousSnapshot) {
-          setTimerSnapshot(previousSnapshot);
+        if (pendingMutationsRef.current === 0) {
+          if (previousSnapshot) {
+            setTimerSnapshot(previousSnapshot);
+          }
+          await fetchTimerState(true);
         }
-        await fetchTimerState(true);
         throw err;
       } finally {
         pauseMutationRef.current = null;
@@ -336,7 +368,7 @@ export const useTimer = (gameId: string | undefined, options?: UseTimerOptions) 
 
     pauseMutationRef.current = mutationPromise;
     return mutationPromise;
-  }, [fetchTimerState, gameId, reconcileTimerStateInBackground, setTimerStateOptimistic, timerSnapshot]);
+  }, [enqueueMutation, fetchTimerState, gameId, reconcileTimerStateInBackground, setTimerStateOptimistic, timerSnapshot]);
 
   useEffect(() => {
     if (timerSnapshot?.timer_state !== 'running') {

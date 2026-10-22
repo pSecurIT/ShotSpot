@@ -113,12 +113,17 @@ export const flushQueuedEvents = async (): Promise<void> => {
   const batch = queuedEvents.splice(0, queuedEvents.length);
 
   try {
+    // Dynamic import: api.ts imports this module, so a static import would be circular.
+    const { getCsrfToken } = await import('./api');
+    const csrfToken = await getCsrfToken();
+
     await window.fetch(UX_EVENTS_ENDPOINT, {
       method: 'POST',
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
       },
       body: JSON.stringify({ events: batch }),
     });

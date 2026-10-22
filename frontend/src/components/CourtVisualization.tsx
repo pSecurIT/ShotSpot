@@ -434,6 +434,12 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     
     // Auto-select the correct team
     setSelectedTeam(teamInfo.side);
+
+    // The team attacking the clicked half's korf gets possession
+    const attackingClubId = teamInfo.side === 'home' ? homeClubId : awayClubId;
+    if (activePossession?.club_id !== attackingClubId) {
+      onCenterLineCross(teamInfo.teamId);
+    }
     
     // Auto-select first OFFENSIVE player from that team
     const offensivePlayers = getCurrentOffensivePlayers(teamInfo.teamId);
@@ -460,7 +466,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
     
     // Team selection is automatic based on possession - no need to show message
     // (Possession buttons already indicate which team is attacking)
-  }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, normalizeTimeRemaining, timeRemaining, timerState, userAssignedTeam, homeTeamName, awayTeamName]);
+  }, [getTeamFromPosition, homePlayers, awayPlayers, getCurrentOffensivePlayers, lastSelectedPlayerId, normalizeTimeRemaining, timeRemaining, timerState, userAssignedTeam, homeTeamName, awayTeamName, homeClubId, awayClubId, activePossession, onCenterLineCross]);
 
   // Record shot with specific result - memoize with useCallback
   const handleRecordShot = useCallback(async (result: 'goal' | 'miss' | 'blocked') => {
@@ -674,6 +680,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       {error && <div className="error-message" role="alert">{error}</div>}
       {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
 
+      <div className="court-layout">
+      <div className="court-main">
       {/* Attacking Configuration Info with Possession Tracking */}
       {homeAttackingSide && (
         <div className="attacking-info">
@@ -718,6 +726,7 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
       )}
 
       {/* Court Image with Click Handling */}
+      <div className="court-stage">
       <div 
         ref={courtRef}
         className={`court-container ${timerState === 'paused' ? 'paused' : ''}`}
@@ -755,8 +764,11 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           </div>
         )}
       </div>
+      </div>
+      </div>
 
       {/* Shot Recording Controls */}
+      <div className="court-side">
       <div className="shot-controls">
         {/* Shot Type Buttons - Prominent and always visible */}
         <div className="shot-type-buttons">
@@ -899,7 +911,12 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           </div>
         )}
       </div>
+      </div>
+      </div>
 
+      <details className="court-extras">
+      <summary>Shot legend and match shot statistics</summary>
+      <div className="court-extras-body">
       {/* Shot Legend */}
       <div className="shot-legend">
         <h4>Shot Legend:</h4>
@@ -1031,6 +1048,8 @@ const CourtVisualization: React.FC<CourtVisualizationProps> = ({
           </div>
         </div>
       </div>
+      </div>
+      </details>
     </div>
   );
 };

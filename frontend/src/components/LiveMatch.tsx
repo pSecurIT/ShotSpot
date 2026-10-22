@@ -8,11 +8,11 @@ import FaultManagement from './FaultManagement';
 import TimeoutManagement from './TimeoutManagement';
 import FreeShotPanel from './FreeShotPanel';
 import MatchCommentary from './MatchCommentary';
-import FocusMode from './FocusMode';
 import LiveDashboard from './LiveDashboard';
 import ExportDialog, { ExportFormat, ExportOptions } from './ExportDialog';
 import { useTimer } from '../hooks/useTimer';
 import { completeFlowTiming } from '../utils/uxObservability';
+import '../styles/LiveMatchLayout.css';
 
 /**
  * Retry utility for API calls with exponential backoff
@@ -105,7 +105,9 @@ interface AssignableTeam {
 }
 
 type PreMatchSetupMode = 'single_team' | 'both_teams';
-type LiveMatchTab = 'timeline' | 'faults' | 'timeouts' | 'freeshots' | 'commentary';
+type LiveMatchTab = 'timeline' | 'commentary';
+type LiveMatchView = 'live' | 'subs' | 'stats' | 'events';
+type QuickAction = 'fault' | 'timeout' | 'freeshot';
 
 interface Possession {
   id: number;
@@ -122,6 +124,7 @@ interface Possession {
 
 interface PossessionTimingState {
   startedAtMs: number;
+  sourceStartedAtMs: number;
   accumulatedPausedMs: number;
   pausedAtMs: number | null;
 }
@@ -223,28 +226,14 @@ const LiveMatch: React.FC = () => {
   const nextPeriodMutationRef = useRef<Promise<void> | null>(null);
   const resetMatchMutationRef = useRef<Promise<void> | null>(null);
 
-  // Active tab for Enhanced Match Events
+  // Active sub-tab inside the Events view
   const [activeTab, setActiveTab] = useState<LiveMatchTab>('timeline');
+  const [activeView, setActiveView] = useState<LiveMatchView>('live');
+  const [quickAction, setQuickAction] = useState<QuickAction | null>(null);
 
   // Export dialog state
   const [showExportDialog, setShowExportDialog] = useState(false);
 
-  /**
-   * Focus mode state for mobile-optimized fullscreen experience
-   * 
-   * DATA PERSISTENCE GUARANTEE:
-   * Toggling between normal view and focus mode does NOT lose any data because:
-   * 1. All game state (game, players, timer, possession, scores) remains in LiveMatch parent component
-   * 2. FocusMode component is stateless and receives ALL data via props
-   * 3. Both views share the same event handlers (onShotRecorded, onSubstitutionRecorded, etc.)
-   * 4. When focusMode boolean changes, only the rendered component changes - state persists
-   * 
-   * Example flow:
-   * - User records shot in focus mode → handleShotRecorded updates game state in LiveMatch
-   * - User exits focus mode → focusMode set to false, normal view renders
-   * - Shot data remains in game.home_score/away_score and is visible in both views
-   */
-  const [focusMode, setFocusMode] = useState<boolean>(false);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
 
   const handleTabChange = useCallback((nextTab: LiveMatchTab) => {
@@ -1395,7 +1384,8 @@ const LiveMatch: React.FC = () => {
   }, [game?.id, game?.status, fetchActivePossession, fetchPossessionStats]);
 
   const possessionDuration = useMemo(() => {
-    if (!activePossession || !possessionTiming) {
+    // The possession clock only counts game time, so it stays at 0 until the period is started.
+    if (!activePossession || !possessionTiming || timerState?.timer_state === 'stopped') {
       return 0;
     }
 
@@ -1411,14 +1401,17 @@ const LiveMatch: React.FC = () => {
     if (activePossession) {
       const newStartTime = new Date(activePossession.started_at).getTime();
       setPossessionTiming(previousState => {
-        if (previousState && Math.abs(previousState.startedAtMs - newStartTime) <= 1000) {
+        if (previousState && Math.abs(previousState.sourceStartedAtMs - newStartTime) <= 1000) {
           return previousState;
         }
 
+        const timerIsRunning = timerState?.timer_state === 'running';
         return {
-          startedAtMs: newStartTime,
+          // Server start time is only trusted while the clock runs; otherwise a possession kept from an earlier session would show hours.
+          startedAtMs: timerIsRunning ? newStartTime : currentTimeMs,
+          sourceStartedAtMs: newStartTime,
           accumulatedPausedMs: 0,
-          pausedAtMs: timerState?.timer_state === 'running' ? null : currentTimeMs
+          pausedAtMs: timerIsRunning ? null : currentTimeMs
         };
       });
     } else {
@@ -1479,66 +1472,61 @@ const LiveMatch: React.FC = () => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Toggle focus mode for mobile-optimized experience
-  const toggleFocusMode = useCallback(() => {
-    setFocusMode(prev => !prev);
-  }, []);
-
-  // Keyboard shortcut for focus mode (F key)
+  // Space toggles the timer unless a control or field has focus
   useEffect(() => {
+    const handleSpace = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || event.repeat || quickAction || showExportDialog || !game || inPreMatchSetup) {
+        return;
+      }
+      const active = document.activeElement as HTMLElement | null;
+      if (active && active !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName || '')) {
+        return;
+      }
+      if (active?.isContentEditable) {
+        return;
+      }
+      // Drop focus from buttons so Space does not also activate them
+      if (active && active !== document.body) {
+        active.blur();
+      }
+      if (timerState?.timer_state === 'running') {
+        event.preventDefault();
+        void handlePauseTimer();
+      } else if (timerState) {
+        event.preventDefault();
+        void handleStartTimer();
+      }
+    };
+
+    document.addEventListener('keydown', handleSpace);
+    return () => document.removeEventListener('keydown', handleSpace);
+  });
+
+  // Esc closes the quick-action modal
+  useEffect(() => {
+    if (!quickAction) {
+      return undefined;
+    }
     const handleKeyPress = (event: KeyboardEvent) => {
-      // Only trigger on F key if no input is focused
-      if (event.key === 'f' || event.key === 'F') {
-        const activeElement = document.activeElement as HTMLElement;
-        const isInputFocused = activeElement && (
-          activeElement.tagName === 'INPUT' || 
-          activeElement.tagName === 'TEXTAREA' || 
-          activeElement.contentEditable === 'true'
-        );
-        
-        if (!isInputFocused) {
-          event.preventDefault();
-          toggleFocusMode();
-        }
+      if (event.key === 'Escape') {
+        setQuickAction(null);
       }
     };
 
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [toggleFocusMode]);
+  }, [quickAction]);
 
-  // Auto-hide cursor in focus mode for cleaner mobile experience
+  const inPreMatchSetup = showPreMatchSetup && (game?.status === 'scheduled' || game?.status === 'to_reschedule');
+
+  // Hides the app header and page padding so the live view fits the viewport
   useEffect(() => {
-    if (focusMode) {
-      document.body.style.cursor = 'none';
-      let timeoutId: NodeJS.Timeout;
-      
-      const showCursor = () => {
-        document.body.style.cursor = 'default';
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          if (focusMode) {
-            document.body.style.cursor = 'none';
-          }
-        }, 3000);
-      };
-
-      const handleMouseMove = () => showCursor();
-      const handleTouch = () => showCursor();
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('touchstart', handleTouch);
-
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('touchstart', handleTouch);
-        clearTimeout(timeoutId);
-        document.body.style.cursor = 'default';
-      };
-    } else {
-      document.body.style.cursor = 'default';
+    if (loading || !game || inPreMatchSetup) {
+      return undefined;
     }
-  }, [focusMode]);
+    document.body.classList.add('live-match-active');
+    return () => document.body.classList.remove('live-match-active');
+  }, [loading, game, inPreMatchSetup]);
 
   if (loading) {
     return <div className="loading" role="status" aria-live="polite">Loading match data...</div>;
@@ -1989,348 +1977,315 @@ const LiveMatch: React.FC = () => {
     );
   }
 
-  // Render Focus Mode if enabled
-  if (focusMode) {
-    return (
-      <FocusMode
-        gameId={parseInt(gameId!)}
-        homeTeamId={game.home_team_id}
-        awayTeamId={game.away_team_id}
-        homeClubId={game.home_club_id}
-        awayClubId={game.away_club_id}
-        homeTeamName={game.home_team_name}
-        awayTeamName={game.away_team_name}
-        homeScore={game.home_score}
-        awayScore={game.away_score}
-        currentPeriod={timerState?.current_period || game.current_period}
-        numberOfPeriods={game.number_of_periods || 4}
-        homeAttackingSide={game.home_attacking_side}
-        timerState={timerState?.timer_state}
-        timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining || game.period_duration)}
-        homePlayers={homePlayers}
-        awayPlayers={awayPlayers}
-        activePossession={activePossession}
-        possessionDuration={possessionDuration}
-        onShotRecorded={handleShotRecorded}
-        onCenterLineCross={handleCenterLineCross}
-        onStartTimer={handleStartTimer}
-        onPauseTimer={handlePauseTimer}
-        onNextPeriod={handleNextPeriod}
-        onEndGame={handleEndGame}
-        onExitFocus={toggleFocusMode}
-        onSubstitutionRecorded={() => {
-          fetchPlayers();
-          fetchGame();
-        }}
-        canAddEvents={canAddEvents}
-        onResumeTimer={handleStartTimer}
-        courtResetKey={courtResetKey}
-      />
-    );
-  }
+  const currentPeriodNumber = timerState?.current_period || game.current_period;
+  const displayTime = formatTime(timerState?.time_remaining || game.time_remaining || game.period_duration);
+  const gameIdNumber = parseInt(gameId!);
+
+  const closeQuickAction = () => setQuickAction(null);
+  const handleQuickActionRecorded = (message: string) => {
+    refreshMatchContext();
+    setQuickAction(null);
+    setSuccess(message);
+    setTimeout(() => setSuccess(null), 3000);
+  };
+
+  const viewTabs: Array<{ id: LiveMatchView; label: string }> = [
+    { id: 'live', label: 'Live' },
+    { id: 'subs', label: 'Substitutions' },
+    { id: 'stats', label: 'Statistics' },
+    { id: 'events', label: pendingReviewCount > 0 ? `Events (${pendingReviewCount})` : 'Events' },
+  ];
 
   return (
-    <div className="live-match-container">
-      <div className="live-match-header">
-        <button onClick={() => navigate('/games')} className="back-button">
-          ← Back to Games
+    <div className="live-match-container lm-root">
+      <header className="lm-topbar">
+        <button onClick={() => navigate('/games')} className="back-button" aria-label="Back to Games">
+          ←<span className="lm-back-label"> Games</span>
         </button>
-        <h2>Live Match</h2>
-        <button 
-          onClick={toggleFocusMode} 
-          className="focus-mode-toggle"
-          title="Enter Focus Mode (Press F) - Optimized fullscreen view for mobile devices"
-        >
-          🎯 Focus Mode
-        </button>
-      </div>
 
-      {error && <div className="error-message" role="alert">{error}</div>}
-      {success && <div className="success-message" role="status" aria-live="polite">{success}</div>}
-
-      {/* Scoreboard */}
-      <div className="scoreboard">
-        <div className="team-section home-team">
-          <h3>{game.home_team_name}</h3>
-          <div className="score">{game.home_score}</div>
-        </div>
-        
-        <div className="scoreboard-center">
-          <div className="period-indicator">
-            Period {timerState?.current_period || game.current_period}
+        {/* Scoreboard */}
+        <div className="scoreboard" data-testid="scoreboard">
+          <div className="team-section home-team">
+            <h3>{game.home_team_name}</h3>
+            <div className="score">{game.home_score}</div>
           </div>
-          <div className="timer-display">
-            <div className="time-remaining">
-              {formatTime(
-                timerState?.time_remaining || 
-                game.time_remaining || 
-                game.period_duration
-              )}
+
+          <div className="scoreboard-center">
+            <div className="period-indicator">
+              Period {currentPeriodNumber}
             </div>
-            <div className="timer-status">
-              {timerState?.timer_state || game.timer_state}
+            <div className="timer-display" data-testid="timer-display">
+              <div className="time-remaining">{displayTime}</div>
+              <div className="timer-status">
+                {timerState?.timer_state || game.timer_state}
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="team-section away-team">
-          <h3>{game.away_team_name}</h3>
-          <div className="score">{game.away_score}</div>
-        </div>
-      </div>
 
-      {/* Timer Controls - Hidden in focus mode */}
-      {!focusMode && (
+          <div className="team-section away-team">
+            <h3>{game.away_team_name}</h3>
+            <div className="score">{game.away_score}</div>
+          </div>
+        </div>
+
+        {/* Timer Controls */}
         <div className="timer-controls">
-          <h3>Timer Controls</h3>
           <div className="control-buttons">
-            {timerState?.timer_state === 'stopped' && (
-              <button onClick={handleStartTimer} className="primary-button start-timer-button">
-                ▶️ Start Match
-              </button>
-            )}
-            
-            {timerState?.timer_state === 'paused' && (
-              <button onClick={handleStartTimer} className="primary-button">
-                ▶️ Resume
-              </button>
-            )}
-            
-            {timerState?.timer_state === 'running' && (
-              <button onClick={handlePauseTimer} className="secondary-button">
-                ⏸️ Pause
-              </button>
-            )}
-            
-            {timerState?.timer_state === 'running' && (
-              <button onClick={handleStopTimer} className="danger-button">
-                ⏹️ Reset Match
-              </button>
-            )}
-            
-            {timerState?.timer_state === 'paused' && (
-              <button onClick={handleStopTimer} className="danger-button">
-                ⏹️ Reset Match
-              </button>
-            )}
-            
             {(timerState?.current_period || 1) < (game.number_of_periods || 4) && (
               <button onClick={handleNextPeriod} className="secondary-button">
                 ⏭️ Next Period
               </button>
             )}
-            
-            <button onClick={handleEndGame} className="danger-button">
-              🏁 End Game
+          </div>
+
+          <details className="lm-menu">
+            <summary aria-label="More match actions">⋯</summary>
+            <div className="lm-menu-items">
+              {(timerState?.timer_state === 'running' || timerState?.timer_state === 'paused') && (
+                <button onClick={handleStopTimer} className="danger-button">
+                  ⏹️ Reset Match
+                </button>
+              )}
+              <button onClick={handleEndGame} className="danger-button">
+                🏁 End Game
+              </button>
+              <button onClick={() => navigate(`/analytics/${gameId}`)} className="secondary-button">
+                📈 Analytics
+              </button>
+              <button onClick={() => setShowExportDialog(true)} className="secondary-button">
+                📥 Export
+              </button>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      {error && <div className="error-message lm-message" role="alert">{error}</div>}
+      {success && <div className="success-message lm-message" role="status" aria-live="polite">{success}</div>}
+
+      <main className="lm-body">
+        {/* Live view stays mounted so shots and possession state survive tab switches */}
+        <section className="lm-pane lm-pane-live" hidden={activeView !== 'live'} aria-label="Live">
+          <div className="court-section">
+            <CourtVisualization
+              key={courtResetKey}
+              gameId={gameIdNumber}
+              homeTeamId={game.home_team_id}
+              awayTeamId={game.away_team_id}
+              homeClubId={game.home_club_id}
+              awayClubId={game.away_club_id}
+              homeTeamName={game.home_team_name}
+              awayTeamName={game.away_team_name}
+              currentPeriod={currentPeriodNumber}
+              homeAttackingSide={game.home_attacking_side}
+              onShotRecorded={handleShotRecorded}
+              activePossession={activePossession}
+              possessionDuration={possessionDuration}
+              onCenterLineCross={handleCenterLineCross}
+              homePlayers={homePlayers}
+              awayPlayers={awayPlayers}
+              timerState={timerState?.timer_state}
+              timeRemaining={displayTime}
+              onResumeTimer={handleStartTimer}
+              onPauseTimer={handlePauseTimer}
+              canAddEvents={canAddEvents}
+              userAssignedTeam={eventRestrictedTeam}
+            />
+          </div>
+
+          <div className="lm-quick-actions" role="group" aria-label="Quick actions">
+            <button className="secondary-button" onClick={() => setQuickAction('fault')}>⚠️ Fault</button>
+            <button className="secondary-button" onClick={() => setQuickAction('timeout')}>⏸️ Timeout</button>
+            <button className="secondary-button" onClick={() => setQuickAction('freeshot')}>🎯 Free Shot</button>
+          </div>
+        </section>
+
+        {activeView === 'subs' && (
+          <section className="lm-pane lm-pane-scroll substitution-section" aria-label="Substitutions">
+            <SubstitutionPanel
+              gameId={gameIdNumber}
+              homeTeamId={game.home_team_id}
+              awayTeamId={game.away_team_id}
+              homeClubId={game.home_club_id}
+              awayClubId={game.away_club_id}
+              homeTeamName={game.home_team_name}
+              awayTeamName={game.away_team_name}
+              currentPeriod={currentPeriodNumber}
+              timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+              onSubstitutionRecorded={() => {
+                fetchPlayers();
+                fetchGame();
+              }}
+              canAddEvents={canAddEvents}
+              userAssignedTeam={eventRestrictedTeam}
+              currentUserRole={currentUserRole}
+            />
+          </section>
+        )}
+
+        {activeView === 'stats' && (
+          <section className="lm-pane lm-pane-scroll" aria-label="Statistics">
+            <LiveDashboard
+              gameId={gameIdNumber}
+              homeTeamId={game.home_team_id}
+              awayTeamId={game.away_team_id}
+              homeTeamName={game.home_team_name}
+              awayTeamName={game.away_team_name}
+              homeScore={game.home_score}
+              awayScore={game.away_score}
+              currentPeriod={currentPeriodNumber}
+              numberOfPeriods={game.number_of_periods || 4}
+              timerState={timerState?.timer_state}
+            />
+          </section>
+        )}
+
+        {activeView === 'events' && (
+          <section className="lm-pane lm-pane-scroll enhanced-events-dashboard" aria-label="Events">
+            <div className="tab-navigation" role="tablist">
+              <button
+                role="tab"
+                aria-selected={activeTab === 'timeline'}
+                className={`tab-button ${activeTab === 'timeline' ? 'active' : ''}`}
+                onClick={() => handleTabChange('timeline')}
+              >
+                📊 Timeline {pendingReviewCount > 0 ? `(${pendingReviewCount})` : ''}
+              </button>
+              <button
+                role="tab"
+                aria-selected={activeTab === 'commentary'}
+                className={`tab-button ${activeTab === 'commentary' ? 'active' : ''}`}
+                onClick={() => handleTabChange('commentary')}
+              >
+                📝 Commentary
+              </button>
+            </div>
+
+            <div className="tab-content">
+              {activeTab === 'timeline' && (
+                <MatchTimeline
+                  gameId={game.id}
+                  homeTeamId={game.home_team_id}
+                  awayTeamId={game.away_team_id}
+                  homeTeamName={game.home_team_name}
+                  awayTeamName={game.away_team_name}
+                  homePlayers={homePlayers}
+                  awayPlayers={awayPlayers}
+                  onRefresh={refreshMatchContext}
+                />
+              )}
+
+              {activeTab === 'commentary' && (
+                <MatchCommentary
+                  gameId={game.id}
+                  currentPeriod={currentPeriodNumber}
+                  timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                  onCommentaryAdded={() => {
+                    fetchGame();
+                  }}
+                />
+              )}
+            </div>
+          </section>
+        )}
+      </main>
+
+      <div className="lm-bottombar">
+        {timerState && (
+          <button
+            onClick={timerState.timer_state === 'running' ? handlePauseTimer : handleStartTimer}
+            className={`lm-timer-toggle ${timerState.timer_state}`}
+            title="Space"
+          >
+            {timerState.timer_state === 'running'
+              ? '⏸️ Pause'
+              : timerState.timer_state === 'paused'
+                ? '▶️ Resume'
+                : '▶️ Start Match'}
+          </button>
+        )}
+
+        <nav className="lm-tabbar" role="tablist" aria-label="Match views">
+          {viewTabs.map((tab) => (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={activeView === tab.id}
+              className={`lm-tab ${activeView === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveView(tab.id)}
+            >
+              {tab.label}
             </button>
+          ))}
+        </nav>
+      </div>
+
+      {quickAction && (
+        <div className="lm-modal-backdrop" onClick={closeQuickAction}>
+          <div
+            className="lm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={quickAction === 'fault' ? 'Record fault' : quickAction === 'timeout' ? 'Record timeout' : 'Record free shot'}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button className="lm-modal-close" onClick={closeQuickAction} aria-label="Close">✕</button>
+
+            {quickAction === 'fault' && (
+              <FaultManagement
+                gameId={game.id}
+                homeTeamId={game.home_team_id}
+                awayTeamId={game.away_team_id}
+                homeClubId={game.home_club_id}
+                awayClubId={game.away_club_id}
+                homeTeamName={game.home_team_name}
+                awayTeamName={game.away_team_name}
+                currentPeriod={currentPeriodNumber}
+                timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                onFaultRecorded={() => handleQuickActionRecorded('Fault recorded')}
+                canAddEvents={canAddEvents}
+                userAssignedTeam={eventRestrictedTeam}
+                currentUserRole={currentUserRole}
+              />
+            )}
+
+            {quickAction === 'timeout' && (
+              <TimeoutManagement
+                gameId={game.id}
+                homeTeamId={game.home_team_id}
+                awayTeamId={game.away_team_id}
+                homeClubId={game.home_club_id}
+                awayClubId={game.away_club_id}
+                homeTeamName={game.home_team_name}
+                awayTeamName={game.away_team_name}
+                currentPeriod={currentPeriodNumber}
+                timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                onTimeoutRecorded={() => handleQuickActionRecorded('Timeout recorded')}
+                canAddEvents={canAddEvents}
+                userAssignedTeam={eventRestrictedTeam}
+                currentUserRole={currentUserRole}
+              />
+            )}
+
+            {quickAction === 'freeshot' && (
+              <FreeShotPanel
+                gameId={game.id}
+                homeTeamId={game.home_team_id}
+                awayTeamId={game.away_team_id}
+                homeClubId={game.home_club_id}
+                awayClubId={game.away_club_id}
+                homeTeamName={game.home_team_name}
+                awayTeamName={game.away_team_name}
+                currentPeriod={currentPeriodNumber}
+                timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
+                onFreeShotRecorded={() => handleQuickActionRecorded('Free shot recorded')}
+                userAssignedTeam={eventRestrictedTeam}
+                currentUserRole={currentUserRole}
+              />
+            )}
           </div>
         </div>
       )}
-
-      {/* Court Visualization */}
-      <div className="court-section">
-        <CourtVisualization
-          key={courtResetKey}
-          gameId={parseInt(gameId!)}
-          homeTeamId={game.home_team_id}
-          awayTeamId={game.away_team_id}
-          homeClubId={game.home_club_id}
-          awayClubId={game.away_club_id}
-          homeTeamName={game.home_team_name}
-          awayTeamName={game.away_team_name}
-          currentPeriod={timerState?.current_period || game.current_period}
-          homeAttackingSide={game.home_attacking_side}
-          onShotRecorded={handleShotRecorded}
-          activePossession={activePossession}
-          possessionDuration={possessionDuration}
-          onCenterLineCross={handleCenterLineCross}
-          homePlayers={homePlayers}
-          awayPlayers={awayPlayers}
-          timerState={timerState?.timer_state}
-          timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining || game.period_duration)}
-          onResumeTimer={handleStartTimer}
-          onPauseTimer={handlePauseTimer}
-          canAddEvents={canAddEvents}
-          userAssignedTeam={eventRestrictedTeam}
-        />
-      </div>
-
-      {/* Substitution Panel */}
-      <div className="substitution-section">
-        <SubstitutionPanel
-            gameId={parseInt(gameId!)}
-            homeTeamId={game.home_team_id}
-            awayTeamId={game.away_team_id}
-            homeClubId={game.home_club_id}
-            awayClubId={game.away_club_id}
-            homeTeamName={game.home_team_name}
-            awayTeamName={game.away_team_name}
-            currentPeriod={timerState?.current_period || game.current_period}
-            timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-            onSubstitutionRecorded={() => {
-              fetchPlayers();
-              fetchGame();
-            }}
-            canAddEvents={canAddEvents}
-            userAssignedTeam={eventRestrictedTeam}
-            currentUserRole={currentUserRole}
-          />
-      </div>
-
-      {/* Live Dashboard */}
-      <LiveDashboard
-        gameId={parseInt(gameId!)}
-        homeTeamId={game.home_team_id}
-        awayTeamId={game.away_team_id}
-        homeTeamName={game.home_team_name}
-        awayTeamName={game.away_team_name}
-        homeScore={game.home_score}
-        awayScore={game.away_score}
-        currentPeriod={timerState?.current_period || game.current_period}
-        numberOfPeriods={game.number_of_periods || 4}
-        timerState={timerState?.timer_state}
-      />
-
-      {/* Enhanced Match Events Dashboard */}
-      <div className="match-content">
-          <div className="content-section full-width">
-            <div className="enhanced-events-dashboard">
-              <div className="dashboard-header">
-                <h3>Match Events Dashboard</h3>
-                <div className="tab-navigation">
-                  <button
-                    className={`tab-button ${activeTab === 'timeline' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('timeline')}
-                  >
-                    📊 Timeline {pendingReviewCount > 0 ? `(${pendingReviewCount})` : ''}
-                  </button>
-                  <button
-                    className={`tab-button ${activeTab === 'faults' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('faults')}
-                  >
-                    ⚠️ Faults
-                  </button>
-                  <button
-                    className={`tab-button ${activeTab === 'timeouts' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('timeouts')}
-                  >
-                    ⏸️ Timeouts
-                  </button>
-                  <button
-                    className={`tab-button ${activeTab === 'freeshots' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('freeshots')}
-                  >
-                    🎯 Free Shots
-                  </button>
-                  <button
-                    className={`tab-button ${activeTab === 'commentary' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('commentary')}
-                  >
-                    📝 Commentary
-                  </button>
-                  <button
-                    className="tab-button analytics-button"
-                    onClick={() => navigate(`/analytics/${gameId}`)}
-                  >
-                    📈 Analytics
-                  </button>
-                  <button
-                    className="tab-button export-button"
-                    onClick={() => setShowExportDialog(true)}
-                  >
-                    📥 Export
-                  </button>
-                </div>
-              </div>
-
-              <div className="tab-content">
-                {activeTab === 'timeline' && (
-                  <MatchTimeline
-                    gameId={game.id}
-                    homeTeamId={game.home_team_id}
-                    awayTeamId={game.away_team_id}
-                    homeTeamName={game.home_team_name}
-                    awayTeamName={game.away_team_name}
-                    homePlayers={homePlayers}
-                    awayPlayers={awayPlayers}
-                    onRefresh={refreshMatchContext}
-                  />
-                )}
-
-                {activeTab === 'faults' && (
-                  <FaultManagement
-                    gameId={game.id}
-                    homeTeamId={game.home_team_id}
-                    awayTeamId={game.away_team_id}
-                    homeClubId={game.home_club_id}
-                    awayClubId={game.away_club_id}
-                    homeTeamName={game.home_team_name}
-                    awayTeamName={game.away_team_name}
-                    currentPeriod={timerState?.current_period || game.current_period}
-                    timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-                    onFaultRecorded={() => {
-                      refreshMatchContext();
-                    }}
-                    canAddEvents={canAddEvents}
-                    userAssignedTeam={eventRestrictedTeam}
-                    currentUserRole={currentUserRole}
-                  />
-                )}
-
-                {activeTab === 'timeouts' && (
-                  <TimeoutManagement
-                    gameId={game.id}
-                    homeTeamId={game.home_team_id}
-                    awayTeamId={game.away_team_id}
-                    homeClubId={game.home_club_id}
-                    awayClubId={game.away_club_id}
-                    homeTeamName={game.home_team_name}
-                    awayTeamName={game.away_team_name}
-                    currentPeriod={timerState?.current_period || game.current_period}
-                    timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-                    onTimeoutRecorded={() => {
-                      refreshMatchContext();
-                    }}
-                    canAddEvents={canAddEvents}
-                    userAssignedTeam={eventRestrictedTeam}
-                    currentUserRole={currentUserRole}
-                  />
-                )}
-
-                {activeTab === 'freeshots' && (
-                  <FreeShotPanel
-                    gameId={game.id}
-                    homeTeamId={game.home_team_id}
-                    awayTeamId={game.away_team_id}
-                    homeClubId={game.home_club_id}
-                    awayClubId={game.away_club_id}
-                    homeTeamName={game.home_team_name}
-                    awayTeamName={game.away_team_name}
-                    currentPeriod={timerState?.current_period || game.current_period}
-                    timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-                    onFreeShotRecorded={() => {
-                      refreshMatchContext();
-                    }}
-                    userAssignedTeam={eventRestrictedTeam}
-                    currentUserRole={currentUserRole}
-                  />
-                )}
-
-                {activeTab === 'commentary' && (
-                  <MatchCommentary
-                    gameId={game.id}
-                    currentPeriod={timerState?.current_period || game.current_period}
-                    timeRemaining={formatTime(timerState?.time_remaining || game.time_remaining)}
-                    onCommentaryAdded={() => {
-                      // Refresh game data to update any match state
-                      fetchGame();
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-      </div>
 
       {showExportDialog && (
         <ExportDialog

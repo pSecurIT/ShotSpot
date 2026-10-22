@@ -1,0 +1,556 @@
+/*
+ * Live match screen: compact, viewport-fitting layout with bottom tabs.
+ * Scoped under .lm-root so the shared scoreboard/court/shot styles in main.css stay untouched elsewhere.
+ */
+
+body.live-match-active .App-header {
+  display: none;
+}
+
+body.live-match-active .App-main {
+  max-width: none;
+  padding: 0.4rem;
+}
+
+.lm-root.live-match-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  height: calc(100dvh - 0.8rem);
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.lm-root [hidden] {
+  display: none !important;
+}
+
+/* Top bar: back | scoreboard | timer controls */
+.lm-root .lm-topbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+
+.lm-root .back-button {
+  min-height: 44px;
+  padding: 0 0.75rem;
+  white-space: nowrap;
+}
+
+.lm-root .scoreboard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.35rem 0.75rem;
+  margin: 0;
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.lm-root .scoreboard .team-section {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.lm-root .scoreboard .team-section.away-team {
+  flex-direction: row-reverse;
+}
+
+.lm-root .scoreboard .team-section h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lm-root .scoreboard .team-section .score {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.lm-root .scoreboard .scoreboard-center {
+  flex-direction: row;
+  gap: 0.75rem;
+  padding: 0 0.9rem;
+  min-width: 0;
+}
+
+.lm-root .scoreboard .period-indicator {
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+}
+
+.lm-root .scoreboard .timer-display {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.lm-root .scoreboard .time-remaining {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.lm-root .scoreboard .timer-status {
+  min-width: 4.5rem;
+  margin: 0;
+  font-size: 0.7rem;
+}
+
+.lm-root .timer-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.lm-root .timer-controls .control-buttons {
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+}
+
+.lm-root .timer-controls .control-buttons button {
+  flex: none;
+  min-width: 8.5rem;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  white-space: nowrap;
+}
+
+.lm-root .timer-controls .start-timer-button {
+  font-size: 1rem !important;
+  padding: 0 1rem !important;
+}
+
+/* Overflow menu */
+.lm-menu {
+  position: relative;
+}
+
+.lm-menu summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #ccd;
+  font-size: 1.4rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.lm-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.lm-menu-items {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 180px;
+  padding: 0.5rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.lm-menu-items button {
+  min-height: 44px;
+  width: 100%;
+}
+
+.lm-root .lm-message {
+  position: absolute;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: max-content;
+  max-width: min(92%, 640px);
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+/* Body and panes */
+.lm-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lm-pane {
+  flex: 1;
+  min-height: 0;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.lm-pane-scroll {
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.lm-pane-live {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.4rem;
+}
+
+.lm-root .lm-pane-live .court-section {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.lm-quick-actions {
+  flex: none;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.lm-quick-actions button {
+  flex: 1;
+  min-height: 44px;
+}
+
+/* Court + shot panel */
+.lm-root .court-visualization {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.lm-root .court-visualization {
+  position: relative;
+}
+
+/* Overlay so shot/timer feedback never resizes the field */
+.lm-root .court-visualization > .error-message,
+.lm-root .court-visualization > .success-message {
+  position: absolute;
+  top: 0.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  width: max-content;
+  max-width: 90%;
+  margin: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.lm-root .court-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 0.5rem;
+}
+
+.lm-root .court-main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lm-root .court-side {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.lm-root .court-side .player-selection-group {
+  min-height: 7.5rem;
+}
+
+.lm-root .court-side .restriction-text {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+}
+
+.lm-root .court-main .attacking-info {
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  margin: 0 0 0.4rem;
+}
+
+.lm-root .court-main .attacking-config,
+.lm-root .court-main .info-header {
+  gap: 0.35rem;
+}
+
+.lm-root .court-main .team-attacking-info {
+  gap: 1rem;
+}
+
+.lm-root .court-main .config-item {
+  font-size: 0.78rem;
+}
+
+.lm-root .court-main .possession-button-compact {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.lm-root .court-main .court-stage {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Largest 2:1 field that fits the stage in both directions */
+.lm-root .court-main .court-container {
+  width: min(100cqw, 200cqh);
+  max-width: none;
+  margin: 0;
+  aspect-ratio: 2 / 1;
+  flex: none;
+}
+
+.lm-root .court-main .court-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lm-root .court-side .shot-controls {
+  padding: 0.5rem;
+  margin: 0;
+}
+
+.lm-root .court-side .shot-type-buttons {
+  margin-bottom: 0.4rem;
+}
+
+.lm-root .court-side .shot-type-btn,
+.lm-root .court-side .result-buttons button {
+  min-height: 44px;
+}
+
+.lm-root .court-side .control-row {
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.lm-root .court-side .player-grid {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 0.35rem;
+}
+
+.lm-root .court-side .player-card {
+  padding: 0.3rem;
+  min-height: 44px;
+}
+
+.lm-root .court-extras {
+  position: relative;
+  flex: none;
+  margin-top: 0.4rem;
+}
+
+.lm-root .court-extras summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #555;
+  min-height: 28px;
+}
+
+/* Opens upward over the field so the summary stays visible and can close it again */
+.lm-root .court-extras .court-extras-body {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  z-index: 20;
+  width: min(640px, 100%);
+  max-height: 55dvh;
+  overflow: auto;
+  padding: 0.75rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Bottom bar: large timer toggle stays reachable from every tab */
+.lm-bottombar {
+  flex: none;
+  display: flex;
+  gap: 0.4rem;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.lm-timer-toggle {
+  flex: none;
+  min-width: 11rem;
+  min-height: 64px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: #4caf50;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.lm-timer-toggle.running {
+  background: #ef6c00;
+}
+
+.lm-timer-toggle:active {
+  transform: scale(0.98);
+}
+
+/* Bottom tab bar */
+.lm-tabbar {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.25rem;
+}
+
+.lm-tab {
+  min-height: 64px;
+  border: 1px solid #ccd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lm-tab.active {
+  background: #667eea;
+  border-color: #667eea;
+  color: #fff;
+}
+
+/* Quick-action modal */
+.lm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.lm-modal {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: 92dvh;
+  overflow: auto;
+  padding: 2.5rem 0.75rem 0.75rem;
+  background: #fff;
+  border-radius: 10px;
+}
+
+.lm-modal-close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: #eee;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+/* Portrait and narrow screens: field on top, shot panel below, wrapped top bar */
+@media (max-width: 900px), (orientation: portrait) {
+  .lm-root .lm-message {
+    top: 7.5rem;
+  }
+
+  .lm-root .lm-topbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'back controls'
+      'score score';
+  }
+
+  .lm-root .lm-topbar > .back-button {
+    grid-area: back;
+  }
+
+  .lm-root .lm-topbar > .timer-controls {
+    grid-area: controls;
+    justify-content: flex-end;
+  }
+
+  .lm-root .lm-topbar > .scoreboard {
+    grid-area: score;
+  }
+
+  .lm-root .court-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow-y: auto;
+  }
+
+  .lm-root .court-main .court-stage {
+    flex: none;
+    container-type: inline-size;
+  }
+
+  .lm-root .court-main .court-container {
+    width: 100cqw;
+  }
+
+  .lm-root .court-side {
+    overflow: visible;
+  }
+
+  .lm-root .lm-back-label {
+    display: none;
+  }
+}
+
+/* Short landscape screens (phones/small tablets): tighter chrome */
+@media (max-height: 640px) and (orientation: landscape) {
+  .lm-root .scoreboard .team-section .score,
+  .lm-root .scoreboard .time-remaining {
+    font-size: 1.5rem;
+  }
+}

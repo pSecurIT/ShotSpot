@@ -15,6 +15,15 @@ This directory contains utility scripts for database setup, migrations, testing,
 
 **Required env vars**: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_HOST`, `DB_PORT`, `POSTGRES_PASSWORD`
 
+### `seed-demo-data.js`
+**Purpose**: Prefill the dev database with demo clubs, teams and players  
+**Usage**: `npm run seed-demo` (from backend directory), on demand only  
+**What it does**:
+- Reads `seed-data/demo-data.json` (edit it to customise the demo data)
+- Inserts clubs, teams and players; existing rows are skipped, so it is safe to re-run
+- Refuses to run when `NODE_ENV=production`
+- Not called by `setup-db` or on server startup
+
 ### `setup-test-db.js`
 **Purpose**: Initialize test database for running test suites  
 **Usage**: Automatically run before tests via `npm test`  

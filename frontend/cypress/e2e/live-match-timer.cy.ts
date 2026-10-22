@@ -547,7 +547,7 @@ describe('Live Match Timer', () => {
       },
     });
 
-    cy.contains('Timer Controls').should('be.visible');
+    cy.get('.timer-controls').should('be.visible');
   });
 
   it('keeps counting over a longer run and stays stable through pause and resume', () => {

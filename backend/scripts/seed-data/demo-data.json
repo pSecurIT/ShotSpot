@@ -1,0 +1,83 @@
+{
+  "_comment": "Edit freely. Players are [firstName, lastName, jerseyNumber, gender]. Jersey numbers must be unique per club.",
+  "clubs": [
+    {
+      "name": "Demo Korfball Club Alpha",
+      "teams": [
+        {
+          "name": "Alpha Senior 1",
+          "ageGroup": "Senior",
+          "gender": "mixed",
+          "players": [
+            ["Emma", "Jansen", 1, "female"],
+            ["Sophie", "De Vries", 2, "female"],
+            ["Lotte", "Peeters", 3, "female"],
+            ["Nina", "Maes", 4, "female"],
+            ["Julie", "Claes", 5, "female"],
+            ["Lars", "Bakker", 6, "male"],
+            ["Thomas", "Willems", 7, "male"],
+            ["Noah", "Janssens", 8, "male"],
+            ["Milan", "Hermans", 9, "male"],
+            ["Arne", "Goossens", 10, "male"]
+          ]
+        },
+        {
+          "name": "Alpha U17",
+          "ageGroup": "U17",
+          "gender": "mixed",
+          "players": [
+            ["Lena", "Mertens", 11, "female"],
+            ["Fien", "Jacobs", 12, "female"],
+            ["Elise", "Wouters", 13, "female"],
+            ["Marie", "Dubois", 14, "female"],
+            ["Roos", "Smets", 15, "female"],
+            ["Finn", "Lambrecht", 16, "male"],
+            ["Jonas", "Verhoeven", 17, "male"],
+            ["Liam", "Desmet", 18, "male"],
+            ["Senne", "Aerts", 19, "male"],
+            ["Tijs", "Coppens", 20, "male"]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Demo Korfball Club Bravo",
+      "teams": [
+        {
+          "name": "Bravo Senior 1",
+          "ageGroup": "Senior",
+          "gender": "mixed",
+          "players": [
+            ["Anke", "Vermeulen", 1, "female"],
+            ["Hanne", "Dewaele", 2, "female"],
+            ["Eline", "Pauwels", 3, "female"],
+            ["Charlotte", "Michiels", 4, "female"],
+            ["Zoe", "Hendrickx", 5, "female"],
+            ["Bram", "Leroy", 6, "male"],
+            ["Robbe", "Vandenberghe", 7, "male"],
+            ["Wout", "Cools", 8, "male"],
+            ["Jelle", "Martens", 9, "male"],
+            ["Stijn", "Vos", 10, "male"]
+          ]
+        },
+        {
+          "name": "Bravo U17",
+          "ageGroup": "U17",
+          "gender": "mixed",
+          "players": [
+            ["Lieke", "Moens", 11, "female"],
+            ["Kato", "Bogaert", 12, "female"],
+            ["Febe", "Dumont", 13, "female"],
+            ["Merel", "Segers", 14, "female"],
+            ["Yara", "Baert", 15, "female"],
+            ["Pieter", "Verbeke", 16, "male"],
+            ["Daan", "Heyman", 17, "male"],
+            ["Victor", "Callens", 18, "male"],
+            ["Jens", "Renders", 19, "male"],
+            ["Mats", "Thijs", 20, "male"]
+          ]
+        }
+      ]
+    }
+  ]
+}
