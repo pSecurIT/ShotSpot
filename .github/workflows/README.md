@@ -29,7 +29,7 @@ Code-scanning results should represent the default branch and scheduled/manual s
 
 ### Core CI
 
-- `node.js.yml`: backend tests, frontend tests, and scheduled/mainline Snyk security checks.
+- `node.js.yml`: backend tests and frontend tests (the Snyk security job is disabled).
 - `test-coverage.yml`: coverage reporting and Codecov uploads.
 - `validate-migrations.yml`: targeted migration validation.
 

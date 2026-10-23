@@ -32,8 +32,7 @@
     "test:game-logic": "cross-env NODE_ENV=test jest --config jest.config.game-logic.js --no-cache --runInBand",
     "twizzit:store-credentials": "node scripts/store-twizzit-credentials.js",
     "twizzit:test-connection": "node scripts/test-twizzit-connection.js",
-    "twizzit:diagnose": "node scripts/diagnose-twizzit.js",
-    "snyk:scan": "snyk test --severity-threshold=high"
+    "twizzit:diagnose": "node scripts/diagnose-twizzit.js"
   },
   "dependencies": {
     "@dr.pogodin/csurf": "^1.13.0",

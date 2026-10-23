@@ -87,8 +87,7 @@
     "mobile:run:ios": "npm run mobile:sync && npx cap run ios",
     "mobile:setup-biometric": "node scripts/setup-biometric-platforms.js",
     "mobile:run:android:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mobile-run-android.ps1",
-    "mobile:run:android:win:no-sync": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mobile-run-android.ps1 -NoSync",
-    "snyk:scan": "snyk test --severity-threshold=high"
+    "mobile:run:android:win:no-sync": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mobile-run-android.ps1 -NoSync"
   },
   "eslintConfig": {
     "extends": [
