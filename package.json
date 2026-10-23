@@ -24,9 +24,7 @@
     "release:changelog": "node scripts/generate-changelog.js",
     "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
     "lint:fix": "npm --prefix backend run lint:fix && npm --prefix frontend run lint:fix",
-    "test:frontend": "npm --prefix frontend run test:run",
-    "snyk:scan": "npm --prefix backend run snyk:scan && npm --prefix frontend run snyk:scan",
-    "snyk:code": "snyk code test . --severity-threshold=high"
+    "test:frontend": "npm --prefix frontend run test:run"
   },
   "devDependencies": {
     "concurrently": "^10.0.3"
