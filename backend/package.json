@@ -54,7 +54,7 @@
     "nodemailer": "^10.0.9",
     "pdfkit": "^0.18.0",
     "pg": "^8.21.0",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.4"
   },
   "devDependencies": {
     "@babel/core": "^7.28.6",
@@ -63,7 +63,7 @@
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.9.5",
+    "@types/node": "^25.9.9",
     "babel-jest": "^30.5.2",
     "babel-plugin-transform-import-meta": "^2.3.3",
     "cross-env": "^10.1.0",
