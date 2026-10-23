@@ -59,7 +59,7 @@ export default {
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(supertest|express|pg)/)'
+    'node_modules/(?!(supertest|express|pg|csurf|@dr\\.pogodin/csurf|cookie)/)'
   ],
   testMatch: ['**/__tests__/**/*.js', '**/?(*.)+(spec|test).js'],
   clearMocks: true,

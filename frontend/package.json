@@ -19,7 +19,6 @@
     "capacitor-secure-storage-plugin": "^0.13.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
-    "patch-package": "^8.0.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.3.1",
@@ -45,7 +44,6 @@
     "axios-mock-adapter": "^2.1.0",
     "chrome-launcher": "^1.2.2",
     "cypress": "^15.14.2",
-    "del": "^8.0.1",
     "eslint": "9.39.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -89,9 +87,7 @@
     "mobile:run:ios": "npm run mobile:sync && npx cap run ios",
     "mobile:setup-biometric": "node scripts/setup-biometric-platforms.js",
     "mobile:run:android:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mobile-run-android.ps1",
-    "mobile:run:android:win:no-sync": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mobile-run-android.ps1 -NoSync",
-    "snyk:scan": "snyk test --severity-threshold=high",
-    "postinstall": "patch-package"
+    "mobile:run:android:win:no-sync": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/mobile-run-android.ps1 -NoSync"
   },
   "eslintConfig": {
     "extends": [

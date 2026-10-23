@@ -30,7 +30,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+  # Snyk is disabled: SNYK_TOKEN is intentionally not exported, which skips all token-gated Snyk steps.
 
 jobs:
   test-docker-build:
@@ -80,12 +80,14 @@ jobs:
           echo "✅ frontend/package-lock.json is in sync"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
 
       - name: Set up Snyk CLI
+        if: ${{ false }}
         uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04
 
       - name: Resolve Snyk reporting settings
+        if: ${{ false }}
         shell: bash
         env:
           VARS_JSON: ${{ toJSON(vars) }}

@@ -21,6 +21,23 @@ const directDependencyConfigurations = new Set([
   'testImplementation'
 ]);
 
+// Majors held back until a stable Capacitor 9 release supports AGP 9 and Cordova 15.
+const deferredMajorUpdates = {
+  'com.android.tools.build:gradle': 8,
+  'org.apache.cordova:framework': 14
+};
+
+function isDeferredMajorUpdate(key, currentVersion, targetVersion) {
+  const pinnedMajor = deferredMajorUpdates[key];
+  if (pinnedMajor === undefined) {
+    return false;
+  }
+
+  const currentMajor = Number.parseInt(currentVersion, 10);
+  const targetMajor = Number.parseInt(targetVersion, 10);
+  return currentMajor === pinnedMajor && targetMajor > pinnedMajor;
+}
+
 function isNonStableVersion(version) {
   const upperVersion = version.toUpperCase();
   const hasStableKeyword = ['RELEASE', 'FINAL', 'GA'].some((keyword) => upperVersion.includes(keyword));
@@ -105,6 +122,10 @@ const directOutdatedDependencies = (report.outdated?.dependencies || [])
 
     const targetVersion = getStableTargetVersion(dependency.available);
     if (!targetVersion || targetVersion === dependency.version) {
+      return null;
+    }
+
+    if (isDeferredMajorUpdate(key, dependency.version, targetVersion)) {
       return null;
     }
 

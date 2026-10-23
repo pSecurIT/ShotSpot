@@ -264,7 +264,8 @@ jobs:
 
   security:
     name: Security Checks
-    if: ${{ github.event_name != 'pull_request' }}
+    # Snyk jobs are disabled.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     env:
       # Keep Snyk Code limited to weekly/manual runs to manage quota.

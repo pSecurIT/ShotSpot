@@ -60,13 +60,15 @@ jobs:
         run: npm install -g npm@10.9.2
 
       - name: Setup Java
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699
+        with:
+          packages: 'platform-tools'
 
       - name: Decode Keystore
         run: |
@@ -163,7 +165,7 @@ jobs:
 
       - name: Create GitHub Release Asset
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           files: |
             frontend/android/app/build/outputs/apk/release/app-release.apk
@@ -445,7 +447,7 @@ jobs:
 
       - name: Create GitHub Release Asset
         if: ${{ steps.detect_signing.outputs.signing_required == 'true' && github.event_name == 'release' }}
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           files: frontend/ios/App/build/App.ipa
           token: ${{ secrets.GITHUB_TOKEN }}
